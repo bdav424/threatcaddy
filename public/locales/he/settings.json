@@ -328,7 +328,7 @@
   "intel.disableAll": "השבת הכל",
   "intel.bulkJsonImport": "ייבוא JSON בכמויות",
   "intel.exportConfig": "ייצא הגדרות",
-  "intel.bulkImportHelp": "מקבל { cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, oci_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }",
+  "intel.bulkImportHelp": "מקבל { cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, cloud_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }",
   "intel.defaultClsLevel": "רמת סיווג ברירת מחדל",
   "intel.usingTlpDefaults": "משתמש בברירות מחדל TLP",
   "intel.defaultReportSource": "מקור דוח ברירת מחדל",

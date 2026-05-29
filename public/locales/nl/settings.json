@@ -328,7 +328,7 @@
   "intel.disableAll": "Alles uitschakelen",
   "intel.bulkJsonImport": "Bulk JSON-import",
   "intel.exportConfig": "Configuratie exporteren",
-  "intel.bulkImportHelp": "Accepteert { cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, oci_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }",
+  "intel.bulkImportHelp": "Accepteert { cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, cloud_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }",
   "intel.defaultClsLevel": "Standaard classificatieniveau",
   "intel.usingTlpDefaults": "Standaard TLP-waarden worden gebruikt",
   "intel.defaultReportSource": "Standaard rapportbron",

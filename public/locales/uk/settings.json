@@ -328,7 +328,7 @@
   "intel.disableAll": "Вимкнути всі",
   "intel.bulkJsonImport": "Масовий імпорт JSON",
   "intel.exportConfig": "Експорт конфігурації",
-  "intel.bulkImportHelp": "Приймає { cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, oci_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }",
+  "intel.bulkImportHelp": "Приймає { cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, cloud_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }",
   "intel.defaultClsLevel": "Рівень класифікації за замовчуванням",
   "intel.usingTlpDefaults": "Використовуються значення TLP за замовчуванням",
   "intel.defaultReportSource": "Джерело звіту за замовчуванням",

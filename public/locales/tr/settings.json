@@ -328,7 +328,7 @@
   "intel.disableAll": "Tümünü Devre Dışı Bırak",
   "intel.bulkJsonImport": "Toplu JSON İçe Aktarma",
   "intel.exportConfig": "Yapılandırmayı Dışa Aktar",
-  "intel.bulkImportHelp": "Şunları kabul eder: { cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, oci_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }",
+  "intel.bulkImportHelp": "Şunları kabul eder: { cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, cloud_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }",
   "intel.defaultClsLevel": "Varsayılan Sınıflandırma Düzeyi",
   "intel.usingTlpDefaults": "TLP varsayılanları kullanılıyor",
   "intel.defaultReportSource": "Varsayılan Rapor Kaynağı",

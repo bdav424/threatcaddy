@@ -328,7 +328,7 @@
   "intel.disableAll": "ปิดใช้งานทั้งหมด",
   "intel.bulkJsonImport": "นำเข้า JSON แบบกลุ่ม",
   "intel.exportConfig": "ส่งออกการกำหนดค่า",
-  "intel.bulkImportHelp": "รับ { cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, oci_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }",
+  "intel.bulkImportHelp": "รับ { cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, cloud_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }",
   "intel.defaultClsLevel": "ระดับการจำแนกเริ่มต้น",
   "intel.usingTlpDefaults": "ใช้ค่าเริ่มต้น TLP",
   "intel.defaultReportSource": "แหล่งรายงานเริ่มต้น",

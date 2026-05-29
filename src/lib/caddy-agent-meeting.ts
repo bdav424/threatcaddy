@@ -11,6 +11,7 @@ import { TOOL_DEFINITIONS } from './llm-tool-defs';
 import { buildSystemPrompt } from './llm-tools';
 import { resolveRoutingMode, sendViaExtension, sendViaServer } from './llm-router';
 import { BUILTIN_AGENT_PROFILES } from './builtin-agent-profiles';
+import { resolveLocalLLMApiKey } from './local-llm-auth';
 
 export interface AgentMeetingResult {
   meetingId: string;
@@ -36,7 +37,7 @@ function getApiKeyForProvider(provider: LLMProvider, settings: Settings): string
     case 'openai':    return settings.llmOpenAIApiKey?.trim();
     case 'gemini':    return settings.llmGeminiApiKey?.trim();
     case 'mistral':   return settings.llmMistralApiKey?.trim();
-    case 'local':     return settings.llmLocalApiKey?.trim() || 'local';
+    case 'local':     return resolveLocalLLMApiKey(settings.llmLocalApiKey, settings.llmLocalEndpoint) || 'local';
     default:          return undefined;
   }
 }

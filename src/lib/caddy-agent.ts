@@ -22,6 +22,7 @@ import { resolveRoutingMode, sendViaExtension, sendViaServer, sendDirectToLocal 
 import { DEFAULT_MODEL_PER_PROVIDER, MODEL_PROVIDER_MAP } from './models';
 import { getHostToolDefinitions } from './agent-hosts';
 import { calculateCost } from './model-pricing';
+import { resolveLocalLLMApiKey } from './local-llm-auth';
 
 // ── Tool Timeouts ─────────────────────────────────────────────────────
 
@@ -136,7 +137,7 @@ function getApiKeyForProvider(provider: LLMProvider, settings: Settings): string
     case 'openai':    return settings.llmOpenAIApiKey?.trim();
     case 'gemini':    return settings.llmGeminiApiKey?.trim();
     case 'mistral':   return settings.llmMistralApiKey?.trim();
-    case 'local':     return settings.llmLocalApiKey?.trim() || 'local';
+    case 'local':     return resolveLocalLLMApiKey(settings.llmLocalApiKey, settings.llmLocalEndpoint) || 'local';
     default:          return undefined;
   }
 }

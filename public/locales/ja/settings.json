@@ -328,7 +328,7 @@
   "intel.disableAll": "すべて無効化",
   "intel.bulkJsonImport": "一括JSONインポート",
   "intel.exportConfig": "設定をエクスポート",
-  "intel.bulkImportHelp": "{ cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, oci_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence } を受け付けます",
+  "intel.bulkImportHelp": "{ cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, cloud_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence } を受け付けます",
   "intel.defaultClsLevel": "デフォルト分類レベル",
   "intel.usingTlpDefaults": "TLPデフォルトを使用",
   "intel.defaultReportSource": "デフォルトレポートソース",

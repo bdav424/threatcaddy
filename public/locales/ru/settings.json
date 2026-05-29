@@ -328,7 +328,7 @@
   "intel.disableAll": "Отключить все",
   "intel.bulkJsonImport": "Массовый импорт JSON",
   "intel.exportConfig": "Экспорт конфигурации",
-  "intel.bulkImportHelp": "Принимает { cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, oci_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }",
+  "intel.bulkImportHelp": "Принимает { cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, cloud_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }",
   "intel.defaultClsLevel": "Уровень классификации по умолчанию",
   "intel.usingTlpDefaults": "Используются значения TLP по умолчанию",
   "intel.defaultReportSource": "Источник отчёта по умолчанию",
