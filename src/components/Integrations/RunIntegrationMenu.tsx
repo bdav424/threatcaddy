@@ -4,24 +4,26 @@ import { Zap, Loader2 } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { IntegrationExecutor } from '../../lib/integration-executor';
+import { buildIntegrationConfigError, IntegrationExecutor, validateIntegrationConfig } from '../../lib/integration-executor';
 import type { ExecutionOptions } from '../../lib/integration-executor';
 import { IntegrationResultModal } from './IntegrationResultModal';
 import { db } from '../../db';
 import type { IntegrationRun, InstalledIntegration, IntegrationTemplate } from '../../types/integration-types';
-import type { StandaloneIOC } from '../../types';
 import { currentLocale } from '../../lib/utils';
+import { persistIOCIntegrationUpdate, type IOCIntegrationSource } from '../../lib/ioc-enrichment-persistence';
 
 interface RunIntegrationMenuProps {
   ioc: { id: string; value: string; type: string; confidence: string };
   investigation?: { id: string; name: string };
+  folderId?: string;
+  source?: IOCIntegrationSource;
   matching: Array<{ installation: InstalledIntegration; template: IntegrationTemplate }>;
   addRun: (run: IntegrationRun) => Promise<void>;
   onComplete?: (run: IntegrationRun) => void;
   onOpenSettings?: () => void;
 }
 
-export function RunIntegrationMenu({ ioc, investigation, matching, addRun, onComplete, onOpenSettings }: RunIntegrationMenuProps) {
+export function RunIntegrationMenu({ ioc, investigation, folderId, source, matching, addRun, onComplete, onOpenSettings }: RunIntegrationMenuProps) {
   const { t } = useTranslation('integrations');
   const { t: tt } = useTranslation('toast');
   const { addToast } = useToast();
@@ -54,6 +56,13 @@ export function RunIntegrationMenu({ ioc, investigation, matching, addRun, onCom
       );
       if (!match) {
         addToast('error', tt('integration.notFound'));
+        setRunning(false);
+        return;
+      }
+      const missingConfig = validateIntegrationConfig(match.template, match.installation);
+      if (missingConfig.length > 0) {
+        addToast('error', buildIntegrationConfigError(match.template, missingConfig));
+        onOpenSettings?.();
         setRunning(false);
         return;
       }
@@ -173,23 +182,12 @@ export function RunIntegrationMenu({ ioc, investigation, matching, addRun, onCom
           },
           onUpdateEntity: async (type, id, fields) => {
             if (type === 'ioc') {
-              const existing = await db.standaloneIOCs.get(id);
-              if (!existing) return;
-              const updates: Partial<StandaloneIOC> = { updatedAt: Date.now() };
-              // Copy simple scalar fields
-              if (fields.iocStatus !== undefined) updates.iocStatus = fields.iocStatus as string;
-              if (fields.confidence !== undefined) updates.confidence = fields.confidence as StandaloneIOC['confidence'];
-              // Merge enrichment as timestamped snapshots
-              if (fields.enrichment) {
-                const existingEnrichment = existing.enrichment || {};
-                const newEnrichment = fields.enrichment as Record<string, Record<string, unknown>>;
-                const merged: Record<string, Array<Record<string, unknown>>> = { ...existingEnrichment };
-                for (const [provider, data] of Object.entries(newEnrichment)) {
-                  merged[provider] = [{ ...data, ts: Date.now() }, ...(merged[provider] || [])].slice(0, 20);
-                }
-                updates.enrichment = merged;
-              }
-              await db.standaloneIOCs.update(id, updates);
+              await persistIOCIntegrationUpdate({
+                ioc: { ...ioc, id },
+                fields,
+                folderId: folderId || investigation?.id,
+                source,
+              });
             }
           },
           onNotify: (message) => {
@@ -219,6 +217,10 @@ export function RunIntegrationMenu({ ioc, investigation, matching, addRun, onCom
       if (pendingNoteId && run.status === 'success') {
         window.dispatchEvent(new CustomEvent('integration-entity-created', {
           detail: { noteId: pendingNoteId },
+        }));
+      } else if (run.status === 'success' && run.entitiesUpdated > 0) {
+        window.dispatchEvent(new CustomEvent('integration-entity-created', {
+          detail: { iocId: ioc.id },
         }));
       }
     } catch (err) {

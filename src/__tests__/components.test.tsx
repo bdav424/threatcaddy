@@ -225,7 +225,7 @@ describe('Header', () => {
     render(<Header {...defaultProps} />);
     fireEvent.click(screen.getByTitle('Create new...'));
     expect(screen.getByText('Quick Note')).toBeTruthy();
-    expect(screen.getByText('Note Templates')).toBeTruthy();
+    expect(screen.getByText('New Note from Template')).toBeTruthy();
     expect(screen.getByText('Task')).toBeTruthy();
     expect(screen.getByText('Timeline Event')).toBeTruthy();
     expect(screen.getByText('Whiteboard')).toBeTruthy();
@@ -239,12 +239,20 @@ describe('Header', () => {
     expect(onQuickNote).toHaveBeenCalledOnce();
   });
 
-  it('calls onNewNote when Note Templates item is clicked', () => {
+  it('calls onNewNote when New Note from Template item is clicked', () => {
     const onNewNote = vi.fn();
     render(<Header {...defaultProps} onNewNote={onNewNote} />);
     fireEvent.click(screen.getByTitle('Create new...'));
-    fireEvent.click(screen.getByText('Note Templates'));
+    fireEvent.click(screen.getByText('New Note from Template'));
     expect(onNewNote).toHaveBeenCalledOnce();
+  });
+
+  it('calls onNewNoteTemplate when New Note Template item is clicked', () => {
+    const onNewNoteTemplate = vi.fn();
+    render(<Header {...defaultProps} onNewNoteTemplate={onNewNoteTemplate} />);
+    fireEvent.click(screen.getByTitle('Create new...'));
+    fireEvent.click(screen.getByText('New Note Template'));
+    expect(onNewNoteTemplate).toHaveBeenCalledOnce();
   });
 
   it('closes dropdown after clicking an item', () => {

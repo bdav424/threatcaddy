@@ -21,6 +21,7 @@ import { resolveRoutingMode, sendViaExtension, sendViaServer, sendDirectToLocal 
 import { DEFAULT_MODEL_PER_PROVIDER, MODEL_PROVIDER_MAP } from './models';
 import { getHostToolDefinitions } from './agent-hosts';
 import { calculateCost } from './model-pricing';
+import { resolveLocalLLMApiKey } from './local-llm-auth';
 
 // ── Tool Timeouts ─────────────────────────────────────────────────────
 
@@ -135,7 +136,7 @@ function getApiKeyForProvider(provider: LLMProvider, settings: Settings): string
     case 'openai':    return settings.llmOpenAIApiKey?.trim();
     case 'gemini':    return settings.llmGeminiApiKey?.trim();
     case 'mistral':   return settings.llmMistralApiKey?.trim();
-    case 'local':     return settings.llmLocalApiKey?.trim() || 'local';
+    case 'local':     return resolveLocalLLMApiKey(settings.llmLocalApiKey, settings.llmLocalEndpoint) || 'local';
     default:          return undefined;
   }
 }
@@ -157,13 +158,14 @@ async function buildAgentSystemPrompt(folder: Folder, _settings: Settings, provi
     if (folder.status) context += ` | Status: ${folder.status}`;
 
     // Quick entity counts
-    const [noteCount, taskCount, iocCount, eventCount] = await Promise.all([
+    const [noteCount, taskCount, iocCount, eventCount, evidenceCount] = await Promise.all([
       db.notes.where('folderId').equals(folder.id).and(n => !n.trashed).count(),
       db.tasks.where('folderId').equals(folder.id).and(t => !t.trashed).count(),
       db.standaloneIOCs.where('folderId').equals(folder.id).and(i => !i.trashed).count(),
       db.timelineEvents.where('folderId').equals(folder.id).and(e => !e.trashed).count(),
+      db.evidenceItems.where('folderId').equals(folder.id).and(e => !e.trashed).count(),
     ]);
-    context += `\nEntities: ${noteCount} notes, ${taskCount} tasks, ${iocCount} IOCs, ${eventCount} timeline events`;
+    context += `\nEntities: ${noteCount} notes, ${taskCount} tasks, ${iocCount} IOCs, ${eventCount} timeline events, ${evidenceCount} evidence items`;
   }
 
   const policy = folder.agentPolicy ?? DEFAULT_AGENT_POLICY;
@@ -173,6 +175,7 @@ async function buildAgentSystemPrompt(folder: Folder, _settings: Settings, provi
   const taskInstructions = `
 TASK WORKFLOW: Check list_tasks for todo tasks. Claim by updating to in-progress, do the work, mark done.
 KNOWLEDGE: Use recall_knowledge at cycle start to load persistent findings. Use update_knowledge to store important discoveries, confirmed facts, and hypotheses that should persist across cycles.
+EVIDENCE: Evidence uploads are source material, not notes. Use list_evidence, search_evidence, and read_evidence to inspect uploaded files; create notes only for derived analysis or analyst-requested summaries.
 SOUL: Use read_soul at the start of each investigation to remember your identity. Use reflect_on_performance after significant work to record lessons learned.`;
 
   // Soul injection — persistent cross-investigation identity.
@@ -259,14 +262,11 @@ Score: ${soul.lifetimeMetrics.performanceScore}/100 across ${soul.lifetimeMetric
     }
   }
 
-  // Agent skill summary (local + remote hosts)
-  const localSkills = (_settings.llmLocalSkills || []);
-  const hosts = (_settings.agentHosts || []).filter(h => h.enabled && h.skills.length > 0);
-  const skillParts: string[] = [];
-  if (localSkills.length > 0) skillParts.push(`Local Agent (${localSkills.map(s => s.name).join(', ')})`);
-  for (const h of hosts) skillParts.push(`${h.displayName} (${h.skills.map(s => s.name).join(', ')})`);
-  const hostBlock = skillParts.length > 0
-    ? `\nAGENT SKILLS: ${skillParts.join('; ')}. Use local:<skill> or host:<name>:<skill> tools for live system queries.`
+  // Agent skill summary (local + remote hosts). Use generated tool definitions
+  // so hidden raw request skills never appear in the prompt.
+  const agentSkillNames = getHostToolDefinitions(_settings, { llmSafeNames: true }).map(tool => tool.name).sort();
+  const hostBlock = agentSkillNames.length > 0
+    ? `\nAGENT SKILLS: ${agentSkillNames.map(name => `\`${name}\``).join(', ')}. Use these exact tool names for live system queries. Prefer source-specific CTI tools over raw request tools, and treat vendor output as evidence to corroborate.`
     : '';
 
   if (profile) {
@@ -288,6 +288,7 @@ Autonomous threat analyst. Be PROACTIVE:
 - Check list_tasks for todo tasks — claim them (update to in-progress), do the work, mark done.
 - get_investigation_summary first, then ACT.
 - Empty case? Research via fetch_url. Create notes, IOCs, tasks, timeline events.
+- Evidence uploads are source material, not notes. Use list_evidence/search_evidence/read_evidence to inspect uploaded files; create notes only for derived analysis or analyst-requested summaries.
 - Has data? Enrich IOCs (enrich_ioc or fetch_url). Fill gaps. Create analysis notes.
 - Every cycle MUST produce output. Never just read and report.
 - enrich_ioc for vendor integrations, fetch_url for OSINT. Don't repeat work.${playbookInstructions}${hostBlock}${focusAreas}`;
@@ -679,7 +680,7 @@ async function _runAgentCycleInner(
 
   // Effective tool allowlist — one source of truth for both the LLM prompt
   // and the runtime gate. See buildAgentToolset for the invariants.
-  const hostTools = getHostToolDefinitions(settings);
+  const hostTools = getHostToolDefinitions(settings, { llmSafeNames: true });
   const { availableTools: availableToolsRaw, effectiveAllowedTools } = buildAgentToolset({
     profile,
     baseTools: TOOL_DEFINITIONS,

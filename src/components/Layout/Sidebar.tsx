@@ -1,9 +1,9 @@
 import { useTranslation } from 'react-i18next';
 import {
-  FileText, ListChecks, Clock, Trash2, Briefcase,
+  FileText, FileSearch, ListChecks, Clock, Trash2, Briefcase,
   Archive, Settings as SettingsIcon,
   PanelLeftClose, PanelLeft, Github, Download, Chrome, PenTool, Activity, Network, Search, Shield,
-  LayoutDashboard, MessageSquare, MessagesSquare, ChevronLeft, Bot,
+  LayoutDashboard, MessageSquare, MessagesSquare, ChevronLeft, Bot, FileOutput,
 } from 'lucide-react';
 import type { Timeline, Whiteboard, ViewMode } from '../../types';
 import { cn } from '../../lib/utils';
@@ -35,6 +35,8 @@ interface SidebarProps {
   onRenameTag?: (id: string, name: string) => void;
   onDeleteTag?: (id: string) => void;
   investigationScopedCounts?: { notes: number; tasks: number; events: number; whiteboards: number; iocs: number } | null;
+  evidenceCount?: number;
+  productCount?: number;
   chatCount?: number;
   agentStatus?: 'idle' | 'running' | 'waiting' | 'paused' | 'error';
   onToggleAgent?: () => void;
@@ -61,6 +63,8 @@ export function Sidebar({
   onRenameTag,
   onDeleteTag,
   investigationScopedCounts,
+  evidenceCount,
+  productCount,
   chatCount,
   agentStatus,
   onToggleAgent,
@@ -102,6 +106,8 @@ export function Sidebar({
   const collapsedInvestigationItems: { view: ViewMode; icon: typeof FileText; label: string; badge?: number; badgeColor?: string; dataTour?: string }[] = [
     { view: 'notes', icon: FileText, label: t('sidebar.notes'), badge: investigationScopedCounts ? investigationScopedCounts.notes : noteCounts.total, badgeColor: 'bg-accent-blue' },
     { view: 'tasks', icon: ListChecks, label: t('sidebar.tasks'), badge: investigationScopedCounts ? investigationScopedCounts.tasks : taskCounts.total, badgeColor: 'bg-accent-amber', dataTour: 'tasks' },
+    { view: 'evidence', icon: FileSearch, label: t('sidebar.evidence'), badge: evidenceCount, badgeColor: 'bg-accent-blue' },
+    { view: 'products', icon: FileOutput, label: t('sidebar.products'), badge: productCount, badgeColor: 'bg-accent-green' },
     { view: 'timeline', icon: Clock, label: t('sidebar.timeline'), badge: investigationScopedCounts ? investigationScopedCounts.events : timelineCounts?.total, badgeColor: 'bg-accent-green', dataTour: 'timeline' },
     { view: 'whiteboard', icon: PenTool, label: t('sidebar.whiteboards'), badge: investigationScopedCounts ? investigationScopedCounts.whiteboards : whiteboardCount, dataTour: 'whiteboards' },
     { view: 'ioc-stats', icon: Search, label: t('sidebar.iocs'), badge: investigationScopedCounts ? investigationScopedCounts.iocs : undefined, badgeColor: 'bg-accent-green' },
@@ -347,6 +353,24 @@ export function Sidebar({
             scopedColor={selectedFolder?.color || undefined}
           />
         </div>
+        <NavItem
+          icon={<FileSearch size={16} />}
+          label={t('sidebar.evidence')}
+          badge={evidenceCount}
+          badgeColor="bg-accent-blue/15 text-accent-blue"
+          active={activeView === 'evidence'}
+          onClick={() => nav(() => navToView('evidence'))}
+          scopedColor={selectedFolder?.color || undefined}
+        />
+        <NavItem
+          icon={<FileOutput size={16} />}
+          label={t('sidebar.products')}
+          badge={productCount}
+          badgeColor="bg-accent-green/15 text-accent-green"
+          active={activeView === 'products'}
+          onClick={() => nav(() => navToView('products'))}
+          scopedColor={selectedFolder?.color || undefined}
+        />
         <div data-tour="timeline">
           <NavItem
             icon={<Clock size={16} />}
@@ -368,8 +392,6 @@ export function Sidebar({
             scopedColor={selectedFolder?.color || undefined}
           />
         </div>
-
-        <div className="h-1.5" />
 
         <NavItem
           icon={<Search size={16} />}

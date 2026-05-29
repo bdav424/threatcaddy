@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { LLMProvider, ContentBlock, ToolUseBlock, ToolCallRecord } from '../types';
 import { isWriteTool } from '../lib/llm-tool-defs';
 import { sendViaServer, sendDirectToLocal } from '../lib/llm-router';
+import { compactMessagesForLocal, compactSystemPromptForLocal, compactToolResultForModel } from '../lib/llm-prompt-budget';
 import { nanoid } from 'nanoid';
 import { postMessageOrigin } from '../lib/utils';
 
@@ -47,6 +48,43 @@ const MAX_TOOL_TURNS = 8;
 /** Hard cap on streaming content buffer to prevent unbounded memory growth on very long responses */
 const MAX_STREAMING_CHARS = 200_000;
 
+function visibleTextFromContentBlocks(contentBlocks: ContentBlock[]): string {
+  return contentBlocks
+    .filter((block): block is Extract<ContentBlock, { type: 'text' }> => block.type === 'text' && block.text.trim().length > 0)
+    .map((block) => block.text.trim())
+    .join('\n\n');
+}
+
+function isSerializedContentBlockPayload(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  if (!trimmed.startsWith('[') && !trimmed.startsWith('{') && !trimmed.startsWith('```')) return false;
+  try {
+    const candidate = trimmed.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+    const parsed = JSON.parse(candidate) as unknown;
+    const blocks = Array.isArray(parsed)
+      ? parsed
+      : parsed && typeof parsed === 'object' && Array.isArray((parsed as Record<string, unknown>).content)
+        ? (parsed as Record<string, unknown>).content
+        : parsed && typeof parsed === 'object' && Array.isArray((parsed as Record<string, unknown>).contentBlocks)
+          ? (parsed as Record<string, unknown>).contentBlocks
+          : null;
+    return Array.isArray(blocks) && blocks.some((block) =>
+      block && typeof block === 'object' && ['text', 'tool_use', 'tool_result'].includes(String((block as Record<string, unknown>).type))
+    );
+  } catch {
+    return trimmed.includes('"type":"tool_use"') || trimmed.includes('"type": "tool_use"');
+  }
+}
+
+function shouldNormalizeTurnText(rawTurnText: string, contentBlocks: ContentBlock[], visibleText: string): boolean {
+  const trimmed = rawTurnText.trim();
+  if (!trimmed) return false;
+  if (visibleText && trimmed === visibleText.trim()) return false;
+  return isSerializedContentBlockPayload(trimmed)
+    || contentBlocks.some((block) => block.type === 'tool_use') && trimmed.includes('"type"');
+}
+
 export interface ExtensionInfo {
   protocolVersion: number;
   capabilities: string[];
@@ -58,11 +96,18 @@ function dispatchLLMRequest(
   opts: SendRequestOptions,
   messages: SendRequestOptions['messages'],
 ) {
-  if (opts.useServerProxy) {
+  const routeOpts = opts.provider === 'local'
+    ? { ...opts, systemPrompt: compactSystemPromptForLocal(opts.systemPrompt) }
+    : opts;
+  const routeMessages = opts.provider === 'local'
+    ? compactMessagesForLocal(messages, { systemPrompt: routeOpts.systemPrompt, tools: routeOpts.tools })
+    : messages;
+
+  if (routeOpts.useServerProxy) {
     // Route through server — the server response events will be picked up by
     // the existing message listener because sendViaServer posts TC_LLM_* events
     sendViaServer(
-      { provider: opts.provider, model: opts.model, messages, systemPrompt: opts.systemPrompt, tools: opts.tools },
+      { provider: routeOpts.provider, model: routeOpts.model, messages: routeMessages, systemPrompt: routeOpts.systemPrompt, tools: routeOpts.tools },
       {
         onChunk: (content) => window.postMessage({ type: 'TC_LLM_CHUNK', requestId, content }, postMessageOrigin()),
         onDone: (stopReason, contentBlocks, usage) =>
@@ -70,10 +115,10 @@ function dispatchLLMRequest(
         onError: (error) => window.postMessage({ type: 'TC_LLM_ERROR', requestId, error }, postMessageOrigin()),
       },
     );
-  } else if (opts.provider === 'local' && opts.endpoint) {
+  } else if (routeOpts.provider === 'local' && routeOpts.endpoint) {
     // Local LLMs can be called directly without the extension
     sendDirectToLocal(
-      { provider: opts.provider, model: opts.model, messages, systemPrompt: opts.systemPrompt, tools: opts.tools, endpoint: opts.endpoint, apiKey: opts.apiKey },
+      { provider: routeOpts.provider, model: routeOpts.model, messages: routeMessages, systemPrompt: routeOpts.systemPrompt, tools: routeOpts.tools, endpoint: routeOpts.endpoint, apiKey: routeOpts.apiKey },
       {
         onChunk: (content) => window.postMessage({ type: 'TC_LLM_CHUNK', requestId, content }, postMessageOrigin()),
         onDone: (stopReason, contentBlocks, usage) =>
@@ -86,13 +131,13 @@ function dispatchLLMRequest(
       type: 'TC_LLM_REQUEST',
       requestId,
       payload: {
-        provider: opts.provider,
-        model: opts.model,
-        messages,
-        apiKey: opts.apiKey,
-        systemPrompt: opts.systemPrompt,
-        tools: opts.tools,
-        endpoint: opts.endpoint,
+        provider: routeOpts.provider,
+        model: routeOpts.model,
+        messages: routeMessages,
+        apiKey: routeOpts.apiKey,
+        systemPrompt: routeOpts.systemPrompt,
+        tools: routeOpts.tools,
+        endpoint: routeOpts.endpoint,
       },
     }, postMessageOrigin());
   }
@@ -112,6 +157,7 @@ export function useLLM() {
   const accumulatedRef = useRef('');
   const requestIdRef = useRef<string | null>(null);
   const rafRef = useRef<number | null>(null);
+  const turnStartLengthRef = useRef(0);
   const agentStateRef = useRef<{
     opts: SendRequestOptions;
     messages: SendRequestOptions['messages'];
@@ -134,6 +180,7 @@ export function useLLM() {
         const finalContent = accumulatedRef.current;
         setActiveRequestId(null);
         requestIdRef.current = null;
+        turnStartLengthRef.current = 0;
         onCompleteRef.current?.({ content: finalContent, toolCalls: [], usage: eventUsage });
         onCompleteRef.current = null;
         return;
@@ -150,6 +197,15 @@ export function useLLM() {
       const toolUseBlocks = contentBlocks.filter(
         (b): b is ToolUseBlock => b.type === 'tool_use' && !!b.id && !!b.name && typeof b.input === 'object'
       );
+      const visibleTurnText = visibleTextFromContentBlocks(contentBlocks);
+      const rawTurnText = accumulatedRef.current.slice(turnStartLengthRef.current);
+      if (shouldNormalizeTurnText(rawTurnText, contentBlocks, visibleTurnText)) {
+        const previousText = accumulatedRef.current.slice(0, turnStartLengthRef.current).trimEnd();
+        accumulatedRef.current = previousText && visibleTurnText
+          ? `${previousText}\n\n${visibleTurnText}`
+          : previousText || visibleTurnText;
+        setStreamingContent(accumulatedRef.current);
+      }
       const shouldContinue = (stopReason === 'tool_use' || stopReason === 'max_tokens') && toolUseBlocks.length > 0;
 
       if (!shouldContinue || state.turn >= MAX_TOOL_TURNS || state.aborted) {
@@ -157,6 +213,7 @@ export function useLLM() {
         const finalContent = accumulatedRef.current;
         setActiveRequestId(null);
         requestIdRef.current = null;
+        turnStartLengthRef.current = 0;
         const result = { content: finalContent, toolCalls: [...state.allToolCalls], usage: state.totalUsage.input > 0 ? { ...state.totalUsage } : undefined };
         agentStateRef.current = null;
         onCompleteRef.current?.(result);
@@ -198,7 +255,9 @@ export function useLLM() {
         return {
           type: 'tool_result',
           tool_use_id: toolUse.id,
-          content: result.result,
+          content: state.opts.provider === 'local'
+            ? compactToolResultForModel(toolUse.name, toolUse.id, result.result, { isError: result.isError })
+            : result.result,
           is_error: result.isError,
         };
       };
@@ -256,6 +315,7 @@ export function useLLM() {
       // Send next request
       const requestId = nanoid();
       requestIdRef.current = requestId;
+      turnStartLengthRef.current = accumulatedRef.current.length;
       setActiveRequestId(requestId);
 
       dispatchLLMRequest(requestId, state.opts, state.messages);
@@ -264,6 +324,7 @@ export function useLLM() {
       // Ensure we always clean up on error so the UI doesn't freeze
       setActiveRequestId(null);
       requestIdRef.current = null;
+      turnStartLengthRef.current = 0;
       setError(String((err as Error).message || err));
       const state = agentStateRef.current;
       const finalContent = accumulatedRef.current;
@@ -323,6 +384,7 @@ export function useLLM() {
         setError(event.data.error);
         setActiveRequestId(null);
         requestIdRef.current = null;
+        turnStartLengthRef.current = 0;
         setStreamingContent('');
         // Deliver any partial content to the caller rather than silently dropping it
         const partialContent = accumulatedRef.current;
@@ -355,6 +417,7 @@ export function useLLM() {
     setStreamingContent('');
     setToolActivity([]);
     accumulatedRef.current = '';
+    turnStartLengthRef.current = 0;
     requestIdRef.current = requestId;
     setActiveRequestId(requestId);
     onCompleteRef.current = onComplete;
@@ -390,6 +453,7 @@ export function useLLM() {
 
       setActiveRequestId(null);
       requestIdRef.current = null;
+      turnStartLengthRef.current = 0;
       setStreamingContent('');
       accumulatedRef.current = '';
 

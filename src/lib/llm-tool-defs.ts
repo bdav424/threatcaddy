@@ -16,7 +16,7 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'search_all',
-    description: 'Search across all entity types (notes, tasks, IOCs, timeline events) simultaneously. Returns matching entities grouped by type.',
+    description: 'Search across all entity types (notes, evidence, tasks, IOCs, timeline events) simultaneously. Returns matching entities grouped by type.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -34,6 +34,55 @@ export const TOOL_DEFINITIONS = [
       properties: {
         id: { type: 'string', description: 'Note ID' },
         title: { type: 'string', description: 'Note title (exact or partial match). Used if id is not provided.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'list_evidence',
+    description: 'List imported evidence files and extracted text chunks in the current investigation. Evidence is source material, not analyst notes.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        limit: { type: 'number', description: 'Max results to return (default 20)' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'search_evidence',
+    description: 'Search imported evidence by filename, title, or extracted text. Use this when the analyst asks CaddyAI to review uploaded files or reports.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        query: { type: 'string', description: 'Search keyword, phrase, filename, IOC, or topic' },
+        limit: { type: 'number', description: 'Max results to return (default 10)' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'read_evidence',
+    description: 'Get extracted text and metadata for a specific evidence item by ID, title, or filename. Use offset/length to read long files in chunks.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        id: { type: 'string', description: 'Evidence item ID' },
+        title: { type: 'string', description: 'Evidence title (exact or partial match). Used if id is not provided.' },
+        fileName: { type: 'string', description: 'Evidence filename (exact or partial match). Used if id/title is not provided.' },
+        offset: { type: 'number', description: 'Starting character offset for long evidence text (default 0)' },
+        length: { type: 'number', description: 'Maximum characters to return from offset (default 12000, max 12000)' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'list_product_baselines',
+    description: 'List available Jinja-compatible product baselines for generated reports, intelligence notes, reports, and other deliverables.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        query: { type: 'string', description: 'Optional baseline search text, such as Report, intel note, executive, or actor' },
       },
       required: [],
     },
@@ -338,6 +387,42 @@ export const TOOL_DEFINITIONS = [
       required: ['executiveSummary', 'findings'],
     },
   },
+  {
+    name: 'create_product_baseline',
+    description: 'Create a reusable Jinja-compatible product baseline. Use this after deriving a report structure from reference products or analyst guidance.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        name: { type: 'string', description: 'Baseline name, such as "Internal Report Baseline"' },
+        content: { type: 'string', description: 'Jinja-compatible markdown template content' },
+        description: { type: 'string', description: 'Optional description of when to use the baseline' },
+        productType: { type: 'string', enum: ['custom-report', 'custom-intel-note', 'executive-brief', 'custom'], description: 'Product family this baseline is meant to render' },
+        renderer: { type: 'string', enum: ['markdown', 'docx-template'], description: 'Expected renderer. Use docx-template only when a real DOCX template asset is attached in an imported package.' },
+        visualFidelity: { type: 'string', enum: ['placeholder', 'structural', 'word-template'], description: 'How close the package is to the source product layout.' },
+        layoutNotes: { type: 'array', items: { type: 'string' }, description: 'Layout rules captured from source reports, such as headers, footers, cover treatment, table style, or image placement.' },
+        sourceNoteRules: { type: 'array', items: { type: 'string' }, description: 'Citation/source-note rules the renderer should preserve.' },
+        requiredFields: { type: 'array', items: { type: 'string' }, description: 'Context fields expected by the Jinja template.' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Optional tags, such as report, intel-note, executive' },
+      },
+      required: ['name', 'content'],
+    },
+  },
+  {
+    name: 'render_product_baseline',
+    description: 'Render a Jinja-compatible product baseline with current investigation data and optional analyst-provided fields, then save the output as a draft Product note.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        baselineId: { type: 'string', description: 'Baseline ID from list_product_baselines' },
+        baselineName: { type: 'string', description: 'Baseline name or partial name. Used if baselineId is not provided.' },
+        title: { type: 'string', description: 'Product title' },
+        context: { type: 'object', description: 'Optional fields to merge into the template context, such as executiveSummary, keyJudgments, findings, recommendations, or priorityIntelligenceRequirements' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Optional product tags' },
+        previewOnly: { type: 'boolean', description: 'If true, render and return content without creating a Product note. Default false.' },
+      },
+      required: [],
+    },
+  },
 
   // ── Web tools ────────────────────────────────────────────────
   {
@@ -397,7 +482,7 @@ export const TOOL_DEFINITIONS = [
       type: 'object' as const,
       properties: {
         query: { type: 'string', description: 'Search keyword or phrase' },
-        entityTypes: { type: 'array', items: { type: 'string', enum: ['notes', 'tasks', 'iocs', 'events'] }, description: 'Entity types to search (default: all)' },
+        entityTypes: { type: 'array', items: { type: 'string', enum: ['notes', 'tasks', 'iocs', 'events', 'evidence'] }, description: 'Entity types to search (default: all)' },
         limit: { type: 'number', description: 'Max results per investigation (default 5)' },
       },
       required: ['query'],
@@ -434,13 +519,16 @@ export const TOOL_DEFINITIONS = [
   // ── Integration / Enrichment tools ──────────────────────────────────
   {
     name: 'enrich_ioc',
-    description: 'Run configured vendor integrations (VirusTotal, AbuseIPDB, Shodan, etc.) to enrich an IOC. Automatically finds matching integrations for the IOC type and runs them. Returns enrichment results. This is preferred over manual fetch_url for IOCs when integrations are configured.',
+    description: 'Run IOC enrichment. Pass iocId to enrich an existing stored IOC, or pass value plus optional ioc_type/provider for an ephemeral lookup that does not create an IOC. Use provider="virustotal" for raw VirusTotal lookups.',
     input_schema: {
       type: 'object' as const,
       properties: {
-        iocId: { type: 'string', description: 'ID of the IOC to enrich (from list_iocs or read_ioc)' },
+        iocId: { type: 'string', description: 'Optional ID of an existing IOC to enrich (from list_iocs or read_ioc)' },
+        value: { type: 'string', description: 'Optional raw IOC value for an ephemeral lookup, such as 8.8.8.8, a domain, URL, MD5, SHA1, or SHA256. Does not create or save an IOC.' },
+        ioc_type: { type: 'string', description: 'Optional raw IOC type hint: ipv4, ipv6, ip, domain, url, md5, sha1, sha256, hash, file.' },
+        provider: { type: 'string', description: 'Optional provider for raw lookups. Currently supported: virustotal.' },
       },
-      required: ['iocId'],
+      required: [],
     },
   },
   {
@@ -819,6 +907,8 @@ const WRITE_TOOLS = new Set([
   'create_timeline_event', 'update_timeline_event',
   'link_entities',
   'generate_report',
+  'create_product_baseline',
+  'render_product_baseline',
   'create_in_investigation',
   'delegate_task',
   'review_completed_task',
@@ -845,16 +935,25 @@ const WRITE_TOOLS = new Set([
 
 export function isWriteTool(name: string): boolean {
   if (WRITE_TOOLS.has(name)) return true;
+  const canonicalName = (() => {
+    if (name.startsWith('local__')) return `local:${name.slice(7)}`;
+    if (name.startsWith('host__')) {
+      const rest = name.slice(6);
+      const delimiter = rest.indexOf('__');
+      if (delimiter > 0) return `host:${rest.slice(0, delimiter)}:${rest.slice(delimiter + 2)}`;
+    }
+    return name;
+  })();
   // Host/local skills with 'modify' or 'create' action class are write tools
-  if (name.startsWith('host:') || name.startsWith('local:')) {
+  if (canonicalName.startsWith('host:') || canonicalName.startsWith('local:')) {
     try {
       const settings = JSON.parse(localStorage.getItem('threatcaddy-settings') || '{}');
-      if (name.startsWith('local:')) {
-        const skillName = name.slice(6);
+      if (canonicalName.startsWith('local:')) {
+        const skillName = canonicalName.slice(6);
         const skill = (settings.llmLocalSkills || []).find((s: { name: string }) => s.name === skillName);
         return skill?.actionClass === 'modify' || skill?.actionClass === 'create';
       }
-      const parts = name.split(':');
+      const parts = canonicalName.split(':');
       if (parts.length >= 3) {
         const hostName = parts[1];
         const skillName = parts.slice(2).join(':');

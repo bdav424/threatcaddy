@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { Plus, Trash2, MessageSquare, Share2, Pencil, FileText, Key, Puzzle, Shield, ArrowLeft, Square, RefreshCw, Eye, Play, Check, X, FolderPlus, ChevronRight, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { ChatThread, ChatMessage, LLMProvider, Settings, ToolUseBlock } from '../../types';
+import type { AgentHost, ChatThread, ChatMessage, LLMProvider, Settings, ToolUseBlock, ToolCallRecord } from '../../types';
 import { ClsSelect } from '../Common/ClsSelect';
 import { ClsBadge } from '../Common/ClsBadge';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -14,7 +14,24 @@ import { DEFAULT_MODEL_PER_PROVIDER } from '../../lib/models';
 import { cn, formatDate } from '../../lib/utils';
 import { nanoid } from 'nanoid';
 import { TOOL_DEFINITIONS, buildSystemPrompt, executeTool, isWriteTool, fetchViaExtensionBridge } from '../../lib/llm-tools';
-import { getHostToolDefinitions } from '../../lib/agent-hosts';
+import { executeHostSkill, fetchHostSkills, getHostToolDefinitions } from '../../lib/agent-hosts';
+import {
+  CTI_CENSYS_TOOL,
+  CTI_FLASHPOINT_COMMUNITIES_TOOL,
+  CTI_VIRUSTOTAL_BUNDLE_TOOL,
+  CTI_VIRUSTOTAL_SEARCH_COLLECTION_TOOL,
+  CTI_VIRUSTOTAL_SEARCH_TOOL,
+  CTI_VIRUSTOTAL_TOOL,
+  DEFAULT_CTI_SOURCE_TEMPLATES,
+  getCtiTemplate,
+  normalizeCtiSourceRunResult,
+  parseCtiSlashCommand,
+  parseCtiTemplatePatchJson,
+  parseCtiTemplateJson,
+  planCtiSourceRequests,
+  renderCtiRunMarkdown,
+  renderCtiEvidenceMarkdown,
+} from '../../lib/cti-source-formatting';
 import { generateChatTitle } from '../../lib/chat-utils';
 import { truncateConversation, summarizeConversation, MAX_CONTEXT_MESSAGES } from '../../lib/chat-utils';
 import { db } from '../../db';
@@ -26,10 +43,12 @@ import { useCustomSlashCommands, interpolateTemplate } from '../../hooks/useCust
 import { useToast } from '../../contexts/ToastContext';
 import { supportsVision, describeImage } from '../../lib/image-ocr';
 import { resolveRoutingMode } from '../../lib/llm-router';
+import { resolveLocalLLMApiKey } from '../../lib/local-llm-auth';
 import type { ChatAttachment } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigation } from '../../contexts/NavigationContext';
 import { useInvestigation } from '../../contexts/InvestigationContext';
+import type { CtiEvidence, CtiSourceId, CtiSourceTemplate } from '../../types';
 
 /** Strip tool call JSON from streaming content (local LLMs output tool calls as text). */
 // Regexes hoisted to module scope — compiled once, not per render frame
@@ -55,9 +74,190 @@ interface ChatViewProps {
   onTrashThread: (id: string) => void;
   onShareThread?: (thread: ChatThread) => void;
   settings: Settings;
+  onUpdateSettings?: (updates: Partial<Settings>) => void;
   onEntitiesChanged?: () => void;
   onNavigateToEntity?: (type: string, id: string) => void;
   onOpenSettings?: (tab?: string) => void;
+  pendingDraft?: ChatPendingDraft | null;
+  onPendingDraftConsumed?: (id: string) => void;
+}
+
+const LOCAL_MAX_CONTEXT_MESSAGES = 12;
+
+interface ChatPendingDraft {
+  id: string;
+  threadId: string;
+  text: string;
+  attachments?: ChatAttachment[];
+}
+
+function summarizeToolCalls(toolCalls: ToolCallRecord[]): string {
+  if (toolCalls.length === 0) {
+    return 'Done. I did not receive a separate written summary for this step.';
+  }
+
+  const lines = toolCalls.map((tc) => {
+    const title = typeof tc.input.title === 'string' ? tc.input.title : undefined;
+    const iocCount = Array.isArray(tc.input.iocs) ? tc.input.iocs.length : undefined;
+
+    if (tc.isError) {
+      return `- \`${tc.name}\` failed.`;
+    }
+
+    switch (tc.name) {
+      case 'create_note':
+        return title ? `- Created note **${title}**.` : '- Created a note.';
+      case 'update_note':
+        return title ? `- Updated note **${title}**.` : '- Updated a note.';
+      case 'create_task':
+        return title ? `- Created task **${title}**.` : '- Created a task.';
+      case 'update_task':
+        return title ? `- Updated task **${title}**.` : '- Updated a task.';
+      case 'create_timeline_event':
+        return title ? `- Created timeline event **${title}**.` : '- Created a timeline event.';
+      case 'update_timeline_event':
+        return title ? `- Updated timeline event **${title}**.` : '- Updated a timeline event.';
+      case 'create_ioc':
+        return '- Created an IOC.';
+      case 'update_ioc':
+        return '- Updated an IOC.';
+      case 'bulk_create_iocs':
+        return typeof iocCount === 'number'
+          ? `- Processed ${iocCount} IOC${iocCount === 1 ? '' : 's'}.`
+          : '- Processed multiple IOCs.';
+      case 'link_entities':
+        return '- Linked related entities.';
+      case 'generate_report':
+        return '- Generated a report.';
+      default:
+        return `- Ran \`${tc.name}\` successfully.`;
+    }
+  });
+
+  const failed = toolCalls.filter((tc) => tc.isError).length;
+  const intro = failed > 0
+    ? 'I completed the requested actions, but some tool calls failed:'
+    : 'I completed the requested actions:';
+
+  return `${intro}\n\n${lines.join('\n')}`;
+}
+
+function parseCtiFormatCommand(text: string): { source: CtiSourceId; instruction: string } | null {
+  const match = text.match(/^\/cti-format\s+(virustotal|censys|flashpoint)\s+([\s\S]+)$/i);
+  if (!match) return null;
+  return { source: match[1].toLowerCase() as CtiSourceId, instruction: match[2].trim() };
+}
+
+function extractJsonObject(text: string): string | null {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced ? fenced[1] : text;
+  const start = candidate.indexOf('{');
+  const end = candidate.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  return candidate.slice(start, end + 1);
+}
+
+function sampleCtiEvidence(source: CtiSourceId): CtiEvidence {
+  if (source === 'virustotal') {
+    return {
+      source,
+      sourceLabel: 'VirusTotal',
+      sourceKey: source,
+      sourceName: 'VirusTotal',
+      observable: '8.8.8.8',
+      status: 'ok',
+      verdict: 'usable',
+      highlights: ['analysisStats: 0 malicious, 0 suspicious, 56 harmless, 36 undetected', 'ownerContext: Google LLC'],
+      sections: {
+        objectId: '8.8.8.8',
+        objectType: 'ip_address',
+        analysisStats: '0 malicious, 0 suspicious, 56 harmless, 36 undetected',
+        reputation: 539,
+        ownerContext: 'Google LLC',
+        tags: ['dns', 'resolver'],
+      },
+      fields: {
+        objectId: '8.8.8.8',
+        objectType: 'ip_address',
+        analysisStats: '0 malicious, 0 suspicious, 56 harmless, 36 undetected',
+        reputation: 539,
+        ownerContext: 'Google LLC',
+        tags: ['dns', 'resolver'],
+      },
+      caveats: ['Sample preview only; real evidence is rendered from Agent Host results.'],
+      recommendedPivots: ['Review related resolutions and passive DNS.'],
+      warnings: [],
+      raw: { preview: true },
+    };
+  }
+  if (source === 'censys') {
+    return {
+      source,
+      sourceLabel: 'Censys',
+      sourceKey: source,
+      sourceName: 'Censys',
+      observable: '8.8.8.8',
+      status: 'ok',
+      verdict: 'usable',
+      highlights: ['servicesCount: 4', 'asContext: GOOGLE - Google LLC'],
+      sections: {
+        host: '8.8.8.8',
+        apiMode: 'legacy',
+        servicesCount: 4,
+        asContext: 'GOOGLE - Google LLC',
+        reverseDns: ['dns.google'],
+        serviceSample: ['443/TCP HTTPS - 302 Moved', '53/UDP DNS'],
+      },
+      fields: {
+        host: '8.8.8.8',
+        apiMode: 'legacy',
+        servicesCount: 4,
+        asContext: 'GOOGLE - Google LLC',
+        reverseDns: ['dns.google'],
+        serviceSample: ['443/TCP HTTPS - 302 Moved', '53/UDP DNS'],
+      },
+      caveats: ['Sample preview only; real evidence is rendered from Agent Host results.'],
+      recommendedPivots: ['Validate current exposure and certificate reuse.'],
+      warnings: [],
+      raw: { preview: true },
+    };
+  }
+  return {
+    source,
+    sourceLabel: 'Flashpoint',
+    sourceKey: source,
+    sourceName: 'Flashpoint',
+    observable: 'Handala Hack',
+    status: 'ok',
+    verdict: 'usable',
+    highlights: ['returned: 11', 'sourceContext: Telegram | Handala Hack (3686754935)', 'latestPost: 2026-05-19T06:19:25Z'],
+    sections: {
+      queryWindow: 'author=Handala Hack; site=Telegram; now-48h to now',
+      returned: '11 returned (=11 total)',
+      sourceContext: 'Telegram | Handala Hack (3686754935) | https://t.me/CYBER_HANDALA',
+      substantivePosts: [
+        '2026-05-19T06:19:25Z - Handala Hack (3686754935)\nid=I708tzdkWIerCV-0yXD76g\nhttps://t.me/CYBER_HANDALA\nPFAP alleged leak with 639,000 documents.',
+      ],
+      emptyRows: 2,
+      notableTerms: ['PFAP', '639,000', 'documents', 'leak'],
+      latestPost: '2026-05-19T06:19:25Z - Handala Hack (3686754935)\nid=I708tzdkWIerCV-0yXD76g\nhttps://t.me/CYBER_HANDALA\nPFAP alleged leak with 639,000 documents.',
+    },
+    fields: {
+      queryWindow: 'author=Handala Hack; site=Telegram; now-48h to now',
+      returned: '11 returned (=11 total)',
+      sourceContext: 'Telegram | Handala Hack (3686754935) | https://t.me/CYBER_HANDALA',
+      substantivePosts: [
+        '2026-05-19T06:19:25Z - Handala Hack (3686754935)\nid=I708tzdkWIerCV-0yXD76g\nhttps://t.me/CYBER_HANDALA\nPFAP alleged leak with 639,000 documents.',
+      ],
+      emptyRows: 2,
+      notableTerms: ['PFAP', '639,000', 'documents', 'leak'],
+      latestPost: '2026-05-19T06:19:25Z - Handala Hack (3686754935)\nid=I708tzdkWIerCV-0yXD76g\nhttps://t.me/CYBER_HANDALA\nPFAP alleged leak with 639,000 documents.',
+    },
+    caveats: ['Sample preview only; real evidence is rendered from Agent Host results.'],
+    recommendedPivots: ['Corroborate actor and victim claims before creating final assessment language.'],
+    warnings: [],
+    raw: { preview: true },
+  };
 }
 
 export function ChatView({
@@ -68,19 +268,24 @@ export function ChatView({
   onTrashThread,
   onShareThread,
   settings,
+  onUpdateSettings,
   onEntitiesChanged,
   onNavigateToEntity,
   onOpenSettings,
+  pendingDraft,
+  onPendingDraftConsumed,
 }: ChatViewProps) {
   const { selectedChatThreadId: selectedThreadId, setSelectedChatThreadId: onSelectThread } = useNavigation();
-  const { selectedFolderId, selectedFolder } = useInvestigation();
+  const { selectedFolderId, folders } = useInvestigation();
   const { extensionAvailable, streamingContent, isStreaming, error, toolActivity, sendAgentRequest, abort } = useLLM();
   const { t } = useTranslation('chat');
   const { addToast } = useToast();
   const { serverUrl } = useAuth();
   const serverConnected = !!serverUrl;
   const effectiveRoute = resolveRoutingMode(settings.llmRoutingMode, extensionAvailable, serverConnected);
-  const hasLocalLLM = !!settings.llmLocalEndpoint?.trim();
+  const configuredLocalEndpoint = settings.llmLocalEndpoint?.trim() || '';
+  const configuredLocalModel = settings.llmLocalModelName?.trim() || '';
+  const hasLocalLLM = !!configuredLocalEndpoint;
   const canChat = extensionAvailable || serverConnected || hasLocalLLM;
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -115,6 +320,11 @@ export function ChatView({
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   const activeThread = threads.find((t) => t.id === selectedThreadId);
+  const effectiveFolderId = activeThread?.folderId || selectedFolderId;
+  const effectiveFolder = useMemo(
+    () => effectiveFolderId ? folders.find((folder) => folder.id === effectiveFolderId) : undefined,
+    [effectiveFolderId, folders],
+  );
   const { loops: activeLoops, startLoop, stopAllForThread } = useChatLoops(activeThread?.id);
   const { commands: customCommands } = useCustomSlashCommands();
 
@@ -145,19 +355,25 @@ export function ChatView({
     threadId: string;
     resolve: (approved: boolean) => void;
   } | null>(null);
+  const [pendingCtiTemplateSuggestion, setPendingCtiTemplateSuggestion] = useState<{
+    source: CtiSourceId;
+    template: CtiSourceTemplate;
+    beforePreview: string;
+    afterPreview: string;
+  } | null>(null);
 
   // Memoize system prompt — only rebuild when folder context changes
   const systemPromptRef = useRef<string>('');
   const systemPromptKeyRef = useRef<string>('');
   useEffect(() => {
     const provider = activeThread?.provider ?? 'anthropic';
-    const key = `${selectedFolder?.id ?? ''}:${selectedFolder?.updatedAt ?? ''}:${settings.llmSystemPrompt ?? ''}:${provider}`;
+    const key = `${effectiveFolder?.id ?? ''}:${effectiveFolder?.updatedAt ?? ''}:${settings.llmSystemPrompt ?? ''}:${provider}`;
     if (key === systemPromptKeyRef.current) return;
     systemPromptKeyRef.current = key;
-    buildSystemPrompt(selectedFolder, settings.llmSystemPrompt, provider).then((prompt) => {
+    buildSystemPrompt(effectiveFolder, settings.llmSystemPrompt, provider).then((prompt) => {
       systemPromptRef.current = prompt;
     });
-  }, [selectedFolder, settings.llmSystemPrompt, activeThread?.provider]);
+  }, [effectiveFolder, settings.llmSystemPrompt, activeThread?.provider]);
 
   // Auto-select first non-folder thread when none selected (or stale selection)
   useEffect(() => {
@@ -185,9 +401,9 @@ export function ChatView({
     if (settings.llmOpenAIApiKey?.trim()) providers.add('openai');
     if (settings.llmGeminiApiKey?.trim()) providers.add('gemini');
     if (settings.llmMistralApiKey?.trim()) providers.add('mistral');
-    if (settings.llmLocalEndpoint?.trim()) providers.add('local');
+    if (configuredLocalEndpoint && configuredLocalModel) providers.add('local');
     return providers;
-  }, [settings.llmAnthropicApiKey, settings.llmOpenAIApiKey, settings.llmGeminiApiKey, settings.llmMistralApiKey, settings.llmLocalEndpoint]);
+  }, [settings.llmAnthropicApiKey, settings.llmOpenAIApiKey, settings.llmGeminiApiKey, settings.llmMistralApiKey, configuredLocalEndpoint, configuredLocalModel]);
 
   const handleNewChat = useCallback(async () => {
     try {
@@ -231,7 +447,7 @@ export function ChatView({
       case 'openai': return s.llmOpenAIApiKey?.trim();
       case 'gemini': return s.llmGeminiApiKey?.trim();
       case 'mistral': return s.llmMistralApiKey?.trim();
-      case 'local': return s.llmLocalApiKey?.trim() || 'none';
+      case 'local': return resolveLocalLLMApiKey(s.llmLocalApiKey, s.llmLocalEndpoint) || 'local';
       default: return undefined;
     }
   }, []);
@@ -247,22 +463,47 @@ export function ChatView({
     }
   }, []);
 
-  const handleSend = useCallback(async (text: string) => {
+  const handleSend = useCallback(async (text: string, overrideImages?: ChatAttachment[]) => {
     if (!activeThread) return;
     setLocalError(null);
     setErrorHasSettingsLink(false);
+    const ctiSlashCommand = parseCtiSlashCommand(text);
 
-    const provider = activeThread.provider;
-    const useServerProxy = effectiveRoute === 'server';
+    let provider = activeThread.provider;
+    let model = activeThread.model;
+    const useServerProxy = effectiveRoute === 'server' && serverConnected;
+    const localEndpoint = configuredLocalEndpoint;
+    const localModel = configuredLocalModel;
 
     // Validate API key (skip when routing through server — server has its own keys)
-    if (!useServerProxy) {
-      if (provider === 'local' && !settings.llmLocalEndpoint) {
-        setLocalError(t('view.errorNoLocalEndpoint'));
-        setErrorHasSettingsLink(true);
-        return;
+    if (!useServerProxy && !ctiSlashCommand) {
+      if (!configuredProviders.has(provider)) {
+        const fallbackProvider = configuredProviders.values().next().value as LLMProvider | undefined;
+        if (fallbackProvider) {
+          provider = fallbackProvider;
+          model = DEFAULT_MODEL_PER_PROVIDER[fallbackProvider] || settings.llmLocalModelName || model;
+          onUpdateThread(activeThread.id, { provider, model });
+        }
       }
-      const apiKey = getApiKeyForProvider(provider, settings);
+      if (provider === 'local' && (!localEndpoint || !localModel)) {
+        const fallbackProvider = [...configuredProviders].find(p => p !== 'local') as LLMProvider | undefined;
+        if (fallbackProvider) {
+          provider = fallbackProvider;
+          model = DEFAULT_MODEL_PER_PROVIDER[fallbackProvider] || model;
+          onUpdateThread(activeThread.id, { provider, model });
+        } else {
+          setLocalError(t('view.errorNoLocalEndpoint'));
+          setErrorHasSettingsLink(true);
+          return;
+        }
+      }
+      let apiKey = getApiKeyForProvider(provider, settings);
+      if (!apiKey && provider !== 'local' && localEndpoint && localModel) {
+        provider = 'local';
+        model = localModel;
+        apiKey = getApiKeyForProvider(provider, settings);
+        onUpdateThread(activeThread.id, { provider, model });
+      }
       if (!apiKey) {
         setLocalError(t('view.errorNoApiKey', { provider: getProviderLabel(provider) }));
         setErrorHasSettingsLink(true);
@@ -272,7 +513,7 @@ export function ChatView({
     const apiKey = useServerProxy ? 'server-proxy' : getApiKeyForProvider(provider, settings);
 
     // Hard token budget cap — prevent sending when over budget
-    if (settings.llmTokenBudget && threadTokenTotalRef.current > settings.llmTokenBudget) {
+    if (!ctiSlashCommand && settings.llmTokenBudget && threadTokenTotalRef.current > settings.llmTokenBudget) {
       setLocalError(t('view.errorOverBudget', `Token budget exceeded (${threadTokenTotalRef.current.toLocaleString()} / ${settings.llmTokenBudget.toLocaleString()}). Start a new thread or increase the budget in Settings > AI.`));
       return;
     }
@@ -281,8 +522,10 @@ export function ChatView({
     const { displayText: mentionDisplayText, contextBlock: mentionContext } = await resolveMentions(text);
 
     // Capture and clear pending images
-    const images = pendingImages.length > 0 ? [...pendingImages] : undefined;
-    if (images) setPendingImages([]);
+    const images = overrideImages && overrideImages.length > 0
+      ? overrideImages
+      : pendingImages.length > 0 ? [...pendingImages] : undefined;
+    if (!overrideImages && images) setPendingImages([]);
 
     // Add user message (with readable @-mention labels)
     const userMsg: ChatMessage = {
@@ -294,7 +537,100 @@ export function ChatView({
     };
     await onAddMessage(activeThread.id, userMsg);
 
-    // Transform slash hint commands to natural language before sending to LLM
+    const ctiFormatCommand = parseCtiFormatCommand(text);
+
+    if (ctiFormatCommand) {
+      const currentTemplate = getCtiTemplate(ctiFormatCommand.source, settings.ctiSourceFormatTemplates);
+      const sampleEvidence = sampleCtiEvidence(ctiFormatCommand.source);
+      const beforePreview = renderCtiEvidenceMarkdown(sampleEvidence, currentTemplate);
+
+      sendAgentRequest(
+        {
+          provider,
+          model,
+          messages: [{
+            role: 'user',
+            content: [
+              'Propose a CTI source display template update.',
+              'Return only one JSON patch object, not the full template.',
+              'Allowed patch keys: label, description, sections, hiddenSections, showRawJson, caveatMode, pivotMode.',
+              'Do not include id, version, source, active, hostTool, evidence values, raw JSON, caveats, warnings, status, verdict, counts, observable, source name, tool names, inputs, or recommended pivots.',
+              'Section field keys must come from the current template; you may change labels, order, required, fallback, and format.',
+              `Source: ${ctiFormatCommand.source}`,
+              `Instruction: ${ctiFormatCommand.instruction}`,
+              `Current template JSON:\n${JSON.stringify(currentTemplate, null, 2)}`,
+            ].join('\n\n'),
+          }],
+          apiKey: apiKey!,
+          systemPrompt: 'You propose approval-gated display-template JSON patches for ThreatCaddy CTI evidence. Never alter evidence, raw vendor data, caveats, status, verdicts, counts, source identity, tool results, or inputs. Output a JSON patch object only.',
+          tools: [],
+          endpoint: provider === 'local' ? localEndpoint : undefined,
+          useServerProxy: effectiveRoute === 'server',
+        },
+        async () => ({ result: JSON.stringify({ error: 'Template suggestion requests cannot call tools.' }), isError: true }),
+        async ({ content }) => {
+          const json = extractJsonObject(content);
+          const parsed = json ? parseCtiTemplatePatchJson(json, currentTemplate, ctiFormatCommand.source) : { issues: ['The LLM did not return a JSON template patch object.'] };
+          if (!parsed.template || parsed.issues.length > 0) {
+            await onAddMessage(activeThread.id, {
+              id: nanoid(),
+              role: 'assistant',
+              content: `I could not create a safe CTI format suggestion.\n\n${parsed.issues.map(issue => `- ${issue}`).join('\n')}`,
+              model,
+              createdAt: Date.now(),
+            });
+            return;
+          }
+
+          const proposed = {
+            ...parsed.template,
+            source: ctiFormatCommand.source,
+            active: parsed.template.active,
+            suggestedBy: 'llm' as const,
+          };
+          const reparsed = parseCtiTemplateJson(JSON.stringify(proposed));
+          if (!reparsed.template || reparsed.issues.length > 0) {
+            await onAddMessage(activeThread.id, {
+              id: nanoid(),
+              role: 'assistant',
+              content: `I rejected the CTI format suggestion because it failed validation.\n\n${reparsed.issues.map(issue => `- ${issue}`).join('\n')}`,
+              model,
+              createdAt: Date.now(),
+            });
+            return;
+          }
+
+          const afterPreview = renderCtiEvidenceMarkdown(sampleEvidence, reparsed.template);
+          setPendingCtiTemplateSuggestion({
+            source: ctiFormatCommand.source,
+            template: reparsed.template,
+            beforePreview,
+            afterPreview,
+          });
+          await onAddMessage(activeThread.id, {
+            id: nanoid(),
+            role: 'assistant',
+            content: [
+              `## Proposed CTI format update: ${DEFAULT_CTI_SOURCE_TEMPLATES[ctiFormatCommand.source].label}`,
+              '',
+              'This is a display-template suggestion only. It has not been saved, and it cannot change evidence values.',
+              '',
+              '### Before',
+              beforePreview,
+              '',
+              '### After',
+              afterPreview,
+              '',
+              'Use the approval dialog to save or discard this template.',
+            ].join('\n'),
+            model,
+            createdAt: Date.now(),
+          });
+        },
+      );
+      return;
+    }
+
     const SLASH_TRANSFORMS: Record<string, (arg: string) => string> = {
       '/search':   (q) => `Search my notes for: ${q}`,
       '/note':     (t) => `Create a note titled "${t}"`,
@@ -308,7 +644,7 @@ export function ChatView({
       '/link':     (t) => `Search across all entities for "${t}" and suggest which ones should be linked together. Then use the link_entities tool to create the cross-references.`,
     };
 
-    const slashMatch = text.match(/^(\/\w+)\s*([\s\S]*)$/);
+    const slashMatch = text.match(/^(\/[a-z0-9_-]+)\s*([\s\S]*)$/i);
     let llmText = text + mentionContext;
     if (slashMatch) {
       const [, cmd, arg] = slashMatch;
@@ -325,6 +661,101 @@ export function ChatView({
       }
     }
 
+    if (ctiSlashCommand && !ctiSlashCommand.target) {
+      const assistantMsg: ChatMessage = {
+        id: nanoid(),
+        role: 'assistant',
+        content: 'Please provide an IOC, VT query, or infrastructure target, for example `/vt 8.8.8.8`, `/vt-hunt bad.example`, `/vt-search engines:"akira"`, `/censys 8.8.8.8`, or `/all 8.8.8.8`.',
+        createdAt: Date.now(),
+      };
+      await onAddMessage(activeThread.id, assistantMsg);
+      return;
+    }
+
+    let settingsForTools = settings;
+    let hostTools = getHostToolDefinitions(settingsForTools);
+    let llmHostTools = getHostToolDefinitions(settingsForTools, { llmSafeNames: true });
+    if (settings.agentHosts?.some(h => h.enabled)) {
+      const refreshedHosts = await Promise.all((settings.agentHosts || []).map(async (host) => {
+        if (!host.enabled) return host;
+        try {
+          const skills = await fetchHostSkills(host);
+          return { ...host, skills, skillsFetchedAt: Date.now() };
+        } catch {
+          return host;
+        }
+      }));
+      settingsForTools = { ...settings, agentHosts: refreshedHosts };
+      hostTools = getHostToolDefinitions(settingsForTools);
+      llmHostTools = getHostToolDefinitions(settingsForTools, { llmSafeNames: true });
+      onUpdateSettings?.({ agentHosts: refreshedHosts });
+    }
+
+    const requiredCtiToolNames = ctiSlashCommand
+      ? ctiSlashCommand.source === 'virustotal'
+        ? ctiSlashCommand.command === '/vt-search'
+          ? [CTI_VIRUSTOTAL_SEARCH_COLLECTION_TOOL, CTI_VIRUSTOTAL_SEARCH_TOOL]
+          : ctiSlashCommand.command === '/vt-hunt'
+            ? [CTI_VIRUSTOTAL_BUNDLE_TOOL, CTI_VIRUSTOTAL_TOOL]
+            : [CTI_VIRUSTOTAL_TOOL]
+        : ctiSlashCommand.source === 'censys'
+          ? [CTI_CENSYS_TOOL]
+          : ctiSlashCommand.source === 'flashpoint'
+            ? [CTI_FLASHPOINT_COMMUNITIES_TOOL]
+            : [CTI_VIRUSTOTAL_TOOL, CTI_CENSYS_TOOL, CTI_FLASHPOINT_COMMUNITIES_TOOL]
+      : [];
+    if (ctiSlashCommand && !requiredCtiToolNames.some(name => hostTools.some(t => t.name === name))) {
+      const localCtiHost: AgentHost = {
+        id: 'local-cti',
+        name: 'cti',
+        displayName: 'CTI Agent Host',
+        url: 'http://127.0.0.1:8766',
+        apiKey: 'codex-local-dev',
+        enabled: true,
+        skills: [],
+      };
+      try {
+        const skills = await fetchHostSkills(localCtiHost);
+        const transientHost = { ...localCtiHost, skills, skillsFetchedAt: Date.now() };
+        settingsForTools = { ...settingsForTools, agentHosts: [...(settingsForTools.agentHosts || []), transientHost] };
+        hostTools = getHostToolDefinitions(settingsForTools);
+        llmHostTools = getHostToolDefinitions(settingsForTools, { llmSafeNames: true });
+      } catch {
+        // The deterministic CTI slash path below will report that no Agent Host tools are reachable.
+      }
+    }
+
+    if (ctiSlashCommand) {
+      const plan = planCtiSourceRequests(ctiSlashCommand, hostTools.map(t => t.name));
+      if (plan.validationErrors.length > 0) {
+        await onAddMessage(activeThread.id, {
+          id: nanoid(),
+          role: 'assistant',
+          content: plan.validationErrors.map(issue => `- ${issue}`).join('\n'),
+          createdAt: Date.now(),
+        });
+        return;
+      }
+
+      const results = await Promise.all(plan.planned.map(async (item) => {
+        try {
+          const result = await executeHostSkill(item.tool, item.input, settingsForTools);
+          return normalizeCtiSourceRunResult(item, result);
+        } catch (err) {
+          return normalizeCtiSourceRunResult(item, JSON.stringify({ error: (err as Error).message || String(err) }));
+        }
+      }));
+
+      const assistantMsg: ChatMessage = {
+        id: nanoid(),
+        role: 'assistant',
+        content: renderCtiRunMarkdown(ctiSlashCommand.target, results, plan.skipped, settings.ctiSourceFormatTemplates),
+        createdAt: Date.now(),
+      };
+      await onAddMessage(activeThread.id, assistantMsg);
+      return;
+    }
+
     // Intercept /fetch <url> — fetch directly without LLM
     const fetchMatch = text.match(/^\/fetch\s+(https?:\/\/\S+)$/i);
     if (fetchMatch) {
@@ -338,7 +769,7 @@ export function ChatView({
             id: nanoid(),
             title,
             content: result.content || '',
-            folderId: selectedFolderId || undefined,
+            folderId: effectiveFolderId || undefined,
             tags: [],
             pinned: false,
             archived: false,
@@ -383,11 +814,11 @@ export function ChatView({
         threadId: activeThread.id,
         prompt,
         intervalStr,
-        model: activeThread.model,
-        provider: activeThread.provider,
+        model,
+        provider,
         apiKey: apiKey!,
-        systemPrompt: systemPromptRef.current || await buildSystemPrompt(selectedFolder, settings.llmSystemPrompt, activeThread.provider),
-        endpoint: activeThread.provider === 'local' ? settings.llmLocalEndpoint : undefined,
+        systemPrompt: systemPromptRef.current || await buildSystemPrompt(effectiveFolder, settings.llmSystemPrompt, provider),
+        endpoint: provider === 'local' ? localEndpoint : undefined,
         onMessage: onAddMessage,
       });
       const confirmMsg: ChatMessage = {
@@ -416,7 +847,7 @@ export function ChatView({
     }
 
     // Use memoized system prompt — only rebuilt when folder context changes
-    const systemPrompt = systemPromptRef.current || await buildSystemPrompt(selectedFolder, settings.llmSystemPrompt, activeThread.provider);
+    const systemPrompt = systemPromptRef.current || await buildSystemPrompt(effectiveFolder, settings.llmSystemPrompt, provider);
 
     // Build text-only messages for truncation, then overlay multimodal content
     const allMessages = [...activeThread.messages, userMsg];
@@ -426,13 +857,16 @@ export function ChatView({
     }));
 
     // Truncate conversation to fit context window (use cached summary if available)
-    const maxMessages = settings.llmMaxContextMessages || MAX_CONTEXT_MESSAGES;
+    const configuredMaxMessages = settings.llmMaxContextMessages || MAX_CONTEXT_MESSAGES;
+    const maxMessages = provider === 'local'
+      ? Math.min(configuredMaxMessages, LOCAL_MAX_CONTEXT_MESSAGES)
+      : configuredMaxMessages;
     const truncatedTextMessages = truncateConversation(textMessages, maxMessages, activeThread.contextSummary);
 
     // Trigger async summarization of truncated messages for future use
     if (textMessages.length > maxMessages && !activeThread.contextSummary) {
       const truncatedPortion = textMessages.slice(2, -(maxMessages - 2));
-      summarizeConversation(truncatedPortion, activeThread.provider, activeThread.model, apiKey!, activeThread.provider === 'local' ? settings.llmLocalEndpoint : undefined)
+      summarizeConversation(truncatedPortion, provider, model, apiKey!, provider === 'local' ? localEndpoint : undefined)
         .then((summary) => {
           if (summary) onUpdateThread(activeThread.id, { contextSummary: summary });
         })
@@ -440,7 +874,7 @@ export function ChatView({
     }
 
     // Build final messages with multimodal content blocks for images
-    const isVisionCapable = supportsVision(activeThread.provider);
+    const isVisionCapable = supportsVision(provider);
     const conversationMessagesPromises = truncatedTextMessages.map(async (m) => {
       const original = allMessages.find(om => om.content === m.content || (om === userMsg && m.content === llmText));
       if (original?.attachments && original.attachments.length > 0) {
@@ -452,7 +886,7 @@ export function ChatView({
             })),
             { type: 'text' as const, text: m.content },
           ];
-          return { role: m.role, content: blocks as unknown as string };
+          return { role: m.role, content: blocks };
         }
         // Fallback: describe images as text for non-vision providers
         const descriptions = await Promise.all(
@@ -469,16 +903,23 @@ export function ChatView({
 
     // In plan mode, filter out write tools so the LLM can only read/analyze
     const currentMode = activeThread.mode || 'act';
-    const hostTools = getHostToolDefinitions(settings);
-    const allTools = hostTools.length > 0 ? [...TOOL_DEFINITIONS, ...hostTools] : TOOL_DEFINITIONS;
+    const allTools = llmHostTools.length > 0 ? [...TOOL_DEFINITIONS, ...llmHostTools] : TOOL_DEFINITIONS;
     const tools = currentMode === 'plan'
       ? allTools.filter(t => !isWriteTool(t.name))
       : allTools;
 
+    const ctiHostToolNames = llmHostTools
+      .map(t => t.name)
+      .filter(name => name.startsWith('host__cti__'))
+      .sort();
+    const ctiHostPrompt = ctiHostToolNames.length > 0
+      ? `\n\nLocal CTI Agent Host tools are available for ephemeral vendor lookups without creating IOCs. Use exact tool names when needed: ${ctiHostToolNames.map(name => `\`${name}\``).join(', ')}. Prefer safe source-specific tools such as Flashpoint forum posts/reports/indicators, VirusTotal IOC reports, and Censys host/certificate lookups over raw request tools.`
+      : '';
+
     // In plan mode, append instructions to the system prompt
     const finalSystemPrompt = currentMode === 'plan'
-      ? systemPrompt + '\n\nYou are in PLAN MODE. Do NOT create, update, or modify any entities. Instead, describe what you WOULD do: list the tools you would call, what data you would create, and what your analysis plan is. Present this as a structured plan the analyst can review before switching to Act mode.'
-      : systemPrompt;
+      ? systemPrompt + ctiHostPrompt + '\n\nYou are in PLAN MODE. Do NOT create, update, or modify any entities. Instead, describe what you WOULD do: list the tools you would call, what data you would create, and what your analysis plan is. Present this as a structured plan the analyst can review before switching to Act mode.'
+      : systemPrompt + ctiHostPrompt;
 
     // Track which thread is streaming
     streamingThreadRef.current = activeThread.id;
@@ -486,13 +927,13 @@ export function ChatView({
     // Send with agentic loop
     sendAgentRequest(
       {
-        provider: activeThread.provider,
-        model: activeThread.model,
+        provider,
+        model,
         messages: conversationMessages,
         apiKey: apiKey!,
         systemPrompt: finalSystemPrompt,
         tools,
-        endpoint: activeThread.provider === 'local' ? settings.llmLocalEndpoint : undefined,
+        endpoint: provider === 'local' ? localEndpoint : undefined,
         useServerProxy: effectiveRoute === 'server',
       },
       async (toolUse: ToolUseBlock) => {
@@ -516,7 +957,7 @@ export function ChatView({
           }
         }
 
-        const result = await executeTool(toolUse, selectedFolderId);
+        const result = await executeTool(toolUse, effectiveFolderId);
         if (isWriteTool(toolUse.name) && !result.isError) {
           usedWriteTool = true;
         }
@@ -524,11 +965,13 @@ export function ChatView({
       },
       async ({ content, toolCalls, usage }) => {
         const msgId = nanoid();
+        const trimmedContent = content.trim();
+        const assistantContent = trimmedContent || summarizeToolCalls(toolCalls);
         const assistantMsg: ChatMessage = {
           id: msgId,
           role: 'assistant',
-          content,
-          model: activeThread.model,
+          content: assistantContent,
+          model,
           toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
           tokenCount: usage,
           createdAt: Date.now(),
@@ -546,11 +989,11 @@ export function ChatView({
         }
 
         // Auto-generate a contextual title after first exchange
-        if (activeThread.messages.length <= 1 && content) {
-          const titleApiKey = getApiKeyForProvider(activeThread.provider, settings);
+        if (activeThread.messages.length <= 1 && assistantContent) {
+          const titleApiKey = getApiKeyForProvider(provider, settings);
           if (titleApiKey) {
-            const titleEndpoint = activeThread.provider === 'local' ? settings.llmLocalEndpoint : undefined;
-            generateChatTitle(text, content, activeThread.provider, activeThread.model, titleApiKey, titleEndpoint)
+            const titleEndpoint = provider === 'local' ? localEndpoint : undefined;
+            generateChatTitle(text, assistantContent, provider, model, titleApiKey, titleEndpoint)
               .then((title) => {
                 if (title) onUpdateThread(activeThread.id, { title });
               })
@@ -559,7 +1002,16 @@ export function ChatView({
         }
       }
     );
-  }, [activeThread, settings, selectedFolder, selectedFolderId, sendAgentRequest, onAddMessage, onUpdateThread, onEntitiesChanged, getApiKeyForProvider, getProviderLabel, startLoop, stopAllForThread]);
+  }, [activeThread, settings, effectiveFolder, effectiveFolderId, pendingImages, sendAgentRequest, onAddMessage, onUpdateThread, onEntitiesChanged, getApiKeyForProvider, getProviderLabel, startLoop, stopAllForThread, effectiveRoute, serverConnected, configuredLocalEndpoint, configuredLocalModel]);
+
+  const consumedDraftIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!pendingDraft || consumedDraftIdsRef.current.has(pendingDraft.id)) return;
+    if (!activeThread || activeThread.id !== pendingDraft.threadId) return;
+    consumedDraftIdsRef.current.add(pendingDraft.id);
+    onPendingDraftConsumed?.(pendingDraft.id);
+    void handleSend(pendingDraft.text, pendingDraft.attachments);
+  }, [activeThread, handleSend, onPendingDraftConsumed, pendingDraft]);
 
   const handleModelChange = useCallback((model: string, provider: LLMProvider) => {
     if (activeThread) {
@@ -587,7 +1039,7 @@ export function ChatView({
       id: noteId,
       title: `Chat Export: ${activeThread.title}`,
       content,
-      folderId: selectedFolderId || undefined,
+      folderId: effectiveFolderId || undefined,
       tags: ['chat-export'],
       pinned: false,
       archived: false,
@@ -598,7 +1050,7 @@ export function ChatView({
     onEntitiesChanged?.();
     // Navigate to the newly created note — delay slightly to let the notes list reload
     setTimeout(() => onNavigateToEntity?.('note', noteId), 100);
-  }, [activeThread, selectedFolderId, onEntitiesChanged, onNavigateToEntity]);
+  }, [activeThread, effectiveFolderId, onEntitiesChanged, onNavigateToEntity]);
 
   const handleSuggestionClick = useCallback((text: string) => {
     handleSend(text);
@@ -614,6 +1066,29 @@ export function ChatView({
     pendingApproval?.resolve(false);
     setPendingApproval(null);
   }, [pendingApproval]);
+
+  const handleApproveCtiTemplate = useCallback(() => {
+    if (!pendingCtiTemplateSuggestion || !onUpdateSettings) return;
+    const approvedTemplate: CtiSourceTemplate = {
+      ...pendingCtiTemplateSuggestion.template,
+      version: (pendingCtiTemplateSuggestion.template.version || 1) + 1,
+      suggestedBy: pendingCtiTemplateSuggestion.template.suggestedBy || 'llm',
+      approvedAt: Date.now(),
+      approvedBy: settings.displayName || 'Analyst',
+    };
+    onUpdateSettings({
+      ctiSourceFormatTemplates: {
+        ...(settings.ctiSourceFormatTemplates || {}),
+        [pendingCtiTemplateSuggestion.source]: approvedTemplate,
+      },
+    });
+    setPendingCtiTemplateSuggestion(null);
+    addToast('success', `Saved ${DEFAULT_CTI_SOURCE_TEMPLATES[approvedTemplate.source].label} CTI format.`);
+  }, [addToast, onUpdateSettings, pendingCtiTemplateSuggestion, settings.ctiSourceFormatTemplates, settings.displayName]);
+
+  const handleRejectCtiTemplate = useCallback(() => {
+    setPendingCtiTemplateSuggestion(null);
+  }, []);
 
   // Clear pending approval when thread changes (prevents ghost from trashed threads)
   useEffect(() => {
@@ -1101,9 +1576,9 @@ export function ChatView({
                   <MessageSquare size={40} className="mb-3 opacity-30" />
                   <p className="text-sm font-medium">{t('view.emptyTitle')}</p>
                   <p className="text-xs mt-1">{t('view.emptySubtitle')}</p>
-                  {selectedFolder && (
+                  {effectiveFolder && (
                     <p className="text-xs mt-1 text-purple/70">
-                      {t('view.emptyFolderContext', { name: selectedFolder.name })}
+                      {t('view.emptyFolderContext', { name: effectiveFolder.name })}
                     </p>
                   )}
                 </div>
@@ -1232,13 +1707,13 @@ export function ChatView({
               onSend={handleSend}
               onStop={abort}
               isStreaming={isStreaming}
-              extensionAvailable={extensionAvailable}
+              extensionAvailable={extensionAvailable || serverConnected}
               model={activeThread.model}
               onModelChange={handleModelChange}
-              localModelName={settings.llmLocalModelName}
+              localModelName={configuredLocalModel}
               configuredProviders={configuredProviders}
               onOpenSettings={onOpenSettings ? () => onOpenSettings('ai') : undefined}
-              folderId={selectedFolderId}
+              folderId={effectiveFolderId}
               customCommands={customCommands.map(c => ({ command: `/${c.name}`, description: c.description }))}
               onImageAttach={handleImageAttach}
               attachedImages={pendingImages.map(a => ({ name: a.name || 'Image' }))}
@@ -1301,6 +1776,19 @@ export function ChatView({
         message={t('view.restoreMessage')}
         confirmLabel={t('view.restoreLabel')}
         danger
+      />
+
+      <ConfirmDialog
+        open={pendingCtiTemplateSuggestion !== null}
+        onClose={handleRejectCtiTemplate}
+        onConfirm={handleApproveCtiTemplate}
+        title="Approve CTI format update?"
+        message={pendingCtiTemplateSuggestion
+          ? `Save the proposed ${DEFAULT_CTI_SOURCE_TEMPLATES[pendingCtiTemplateSuggestion.source].label} display template? The preview is in the chat response and evidence values are not changed.`
+          : ''}
+        confirmLabel="Save template"
+        secondaryAction={handleRejectCtiTemplate}
+        secondaryLabel="Discard"
       />
 
       {/* First-use onboarding overlay */}

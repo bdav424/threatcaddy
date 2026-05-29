@@ -16,6 +16,19 @@ interface LaunchParams {
 interface LaunchQueue {
   setConsumer(consumer: (params: LaunchParams) => void): void;
 }
-declare interface Window {
+
+interface ThreatCaddyDesktopGlassConfig {
+  transparency: number;
+  blur: number;
+}
+
+interface ThreatCaddyDesktopAPI {
+  isDesktop: true;
+  platform: string;
+  setWindowGlass: (config: ThreatCaddyDesktopGlassConfig) => Promise<void>;
+}
+
+interface Window {
   launchQueue?: LaunchQueue;
+  threatcaddyDesktop?: ThreatCaddyDesktopAPI;
 }

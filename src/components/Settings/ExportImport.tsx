@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { Download, Upload, FileText, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { exportJSON, importJSON, exportNotesMarkdown, downloadFile } from '../../lib/export';
+import { exportJSON, importJSON, mergeImportJSON, exportNotesMarkdown, downloadFile } from '../../lib/export';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { MarkdownImportModal } from './MarkdownImportModal';
 import { useLogActivity } from '../../hooks/ActivityLogContext';
@@ -81,6 +81,41 @@ export function ExportImport({ notes, onImportComplete }: ExportImportProps) {
     }
   };
 
+  const handleMergeImport = async () => {
+    if (!pendingFile) return;
+    setImporting(true);
+    setError('');
+    try {
+      const text = await pendingFile.text();
+      const result = await mergeImportJSON(text);
+      const notesMerged = (result.tables.notes?.added ?? 0) + (result.tables.notes?.updated ?? 0);
+      const investigationsWithNotes = result.noteInvestigations.filter((item) => item.notes > 0).length;
+      showMessage(t('data.mergeImportedCounts', {
+        notes: notesMerged,
+        investigations: investigationsWithNotes,
+        added: result.added,
+        updated: result.updated,
+        skipped: result.skipped,
+      }));
+      addToast('success', tt('backup.mergeCompleteDetailed', {
+        notes: notesMerged,
+        investigations: investigationsWithNotes,
+        added: result.added,
+        updated: result.updated,
+        skipped: result.skipped,
+      }));
+      logActivity('data', 'import', `Merged backup: ${notesMerged} notes across ${investigationsWithNotes} investigations (${result.added} added, ${result.updated} updated, ${result.skipped} skipped)`);
+      onImportComplete();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to merge';
+      setError(msg);
+      addToast('error', tt('backup.mergeFailed'));
+    } finally {
+      setImporting(false);
+      setPendingFile(null);
+    }
+  };
+
   const handleMarkdownImport = async (importedNotes: Array<{ title: string; content: string; tags: string[] }>): Promise<number> => {
     const now = Date.now();
     const notesToAdd: Note[] = importedNotes.map((n) => ({
@@ -147,6 +182,8 @@ export function ExportImport({ notes, onImportComplete }: ExportImportProps) {
         message={t('data.importBackupMessage')}
         confirmLabel={t('data.importReplace')}
         danger
+        secondaryAction={handleMergeImport}
+        secondaryLabel={t('data.importMerge')}
       />
 
       <MarkdownImportModal

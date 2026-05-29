@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, forwardRef } from 'react';
+import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
 import { ChevronDown, ChevronRight, Search, BarChart3, List, Plus, ListPlus, Clipboard, X, ChevronUp, Pencil, Trash2, Archive, RotateCcw, ExternalLink, Columns, GitMerge, Tag as TagIcon, Download } from 'lucide-react';
 import type { Note, Task, TimelineEvent, StandaloneIOC, Settings, IOCEntry, IOCType, ConfidenceLevel, Folder, Tag, InvestigationMember } from '../../types';
 import { IOC_TYPE_LABELS, CONFIDENCE_LEVELS, ALL_IOC_TABLE_COLUMNS, DEFAULT_IOC_TABLE_COLUMNS, IOC_STATUS_VALUES, IOC_STATUS_LABELS, IOC_STATUS_COLORS } from '../../types';
@@ -24,12 +25,128 @@ const STATUS_OPTIONS = IOC_STATUS_VALUES;
 const CONFIDENCE_OPTIONS: ConfidenceLevel[] = ['low', 'medium', 'high', 'confirmed'];
 const ALL_IOC_TYPES = Object.keys(IOC_TYPE_LABELS) as IOCType[];
 const CONFIDENCE_ORDER: Record<string, number> = { low: 0, medium: 1, high: 2, confirmed: 3 };
+const DEFAULT_IOC_COLUMN_WIDTHS: Record<string, number> = {
+  value: 260,
+  type: 90,
+  confidence: 100,
+  source: 110,
+  iocStatus: 95,
+  attribution: 130,
+  clsLevel: 80,
+  updatedAt: 105,
+  analystNotes: 180,
+  tags: 140,
+  firstSeen: 110,
+  lastSeen: 110,
+  labels: 180,
+  actions: 150,
+};
+const MIN_IOC_COLUMN_WIDTH = 56;
+const CHECKBOX_COLUMN_WIDTH = 36;
+const MIN_IOC_COLUMN_WIDTHS: Record<string, number> = {
+  value: 170,
+  type: 86,
+  confidence: 116,
+  source: 96,
+  iocStatus: 92,
+  attribution: 126,
+  clsLevel: 68,
+  updatedAt: 96,
+  analystNotes: 92,
+  tags: 82,
+  firstSeen: 106,
+  lastSeen: 104,
+  labels: 88,
+  actions: 126,
+};
+const MAX_IOC_COLUMN_WIDTH = 520;
+const IOC_TABLE_BORDER_STYLE: CSSProperties = { borderColor: 'var(--color-border-medium)' };
+const IOC_RESIZE_HANDLE_STYLE: CSSProperties = {
+  backgroundColor: 'color-mix(in srgb, var(--color-border-medium) 54%, transparent)',
+  borderColor: 'var(--color-border-medium)',
+};
 /** Fallback for IOC types not in the IOC_TYPE_LABELS map (agent-created custom types). */
 const UNKNOWN_TYPE_INFO = { label: 'Unknown', color: '#6b7280', icon: '❓' };
 const UNKNOWN_CONF_INFO = { label: 'Unknown', color: '#6b7280' };
 /** Safe lookup for IOC type info — never returns undefined. */
 function getTypeInfo(type: string) { return IOC_TYPE_LABELS[type as IOCType] || UNKNOWN_TYPE_INFO; }
 function getConfInfo(level: string) { return CONFIDENCE_LEVELS[level as ConfidenceLevel] || UNKNOWN_CONF_INFO; }
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+function normalizedIOCKey(type: string, value: string): string {
+  return `${type}:${value.trim().toLowerCase()}`;
+}
+function latestEnrichment(ioc: StandaloneIOC | undefined, provider: string): Record<string, unknown> | undefined {
+  const snapshots = ioc?.enrichment?.[provider] as unknown;
+  if (Array.isArray(snapshots)) return snapshots.length > 0 && isRecord(snapshots[0]) ? snapshots[0] : undefined;
+  return isRecord(snapshots) ? snapshots : undefined;
+}
+function displayMetaValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '--';
+  if (Array.isArray(value)) return value.slice(0, 8).map(String).join(', ');
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .slice(0, 6)
+      .map(([key, val]) => `${key}: ${String(val)}`)
+      .join('; ');
+  }
+  return String(value);
+}
+function buildMetadataFields(row: UnifiedIOCRow): Array<{ label: string; value: unknown; group: string }> {
+  const ioc = row.standaloneIOC;
+  const vt = latestEnrichment(ioc, 'virusTotal');
+  const fields: Array<{ label: string; value: unknown; group: string }> = [];
+  if (vt) {
+    fields.push(
+      { group: 'VirusTotal', label: 'Detection', value: `${displayMetaValue(vt.malicious)}/${Number(vt.malicious ?? 0) + Number(vt.suspicious ?? 0) + Number(vt.harmless ?? 0) + Number(vt.undetected ?? 0)}` },
+      { group: 'VirusTotal', label: 'Reputation', value: vt.reputation },
+      { group: 'VirusTotal', label: 'Last analysis', value: vt.lastAnalysisDate },
+      { group: 'VirusTotal', label: 'Last modified', value: vt.lastModificationDate },
+    );
+    if (row.type === 'domain') {
+      fields.push(
+        { group: 'Domain', label: 'Registrar', value: vt.registrar },
+        { group: 'Domain', label: 'Categories', value: vt.categories },
+        { group: 'Domain', label: 'Created', value: vt.creationDate },
+        { group: 'Domain', label: 'Last DNS records', value: vt.lastDnsRecordsDate },
+      );
+    } else if (row.type === 'ipv4' || row.type === 'ipv6') {
+      fields.push(
+        { group: 'Network', label: 'Country', value: vt.country },
+        { group: 'Network', label: 'AS owner', value: vt.asOwner },
+        { group: 'Network', label: 'Network', value: vt.network },
+        { group: 'Network', label: 'RIR', value: vt.rir },
+      );
+    } else {
+      fields.push(
+        { group: 'File', label: 'File name', value: vt.fileName },
+        { group: 'File', label: 'Names', value: vt.names },
+        { group: 'File', label: 'Type', value: vt.fileType || vt.typeTag },
+        { group: 'File', label: 'Threat class', value: vt.threatClass },
+        { group: 'File', label: 'Tags', value: vt.tags },
+        { group: 'File', label: 'First submitted', value: vt.firstSubmissionDate },
+        { group: 'File', label: 'Last submitted', value: vt.lastSubmissionDate },
+        { group: 'File', label: 'Fuzzy hashes', value: [vt.ssdeep, vt.tlsh, vt.vhash].filter(Boolean).join(' | ') },
+      );
+    }
+  }
+  const knownFields = fields.filter((field) => displayMetaValue(field.value) !== '--');
+  if (knownFields.length > 0) return knownFields;
+
+  if (ioc?.enrichment) {
+    return Object.entries(ioc.enrichment).flatMap(([provider, snapshots]) => {
+      const latest = Array.isArray(snapshots) ? snapshots?.[0] : snapshots;
+      if (!latest) return [];
+      return Object.entries(latest)
+        .filter(([key, value]) => key !== 'ts' && displayMetaValue(value) !== '--')
+        .slice(0, 12)
+        .map(([key, value]) => ({ group: provider, label: key, value }));
+    });
+  }
+
+  return [];
+}
 
 type SortField = 'value' | 'type' | 'confidence' | 'source' | 'iocStatus' | 'attribution';
 type SortDir = 'asc' | 'desc';
@@ -88,6 +205,8 @@ interface UnifiedIOCRow {
   iocStatus?: string;
   attribution?: string;
   standaloneIOC?: StandaloneIOC;
+  firstSeen: number;
+  lastSeen: number;
   updatedAt: number;
 }
 
@@ -135,7 +254,7 @@ export function IOCStatsView({
       for (const ioc of iocs) {
         if (ioc.dismissed) continue;
         hasActiveIOC = true;
-        const key = `${ioc.type}:${ioc.value.toLowerCase()}`;
+        const key = normalizedIOCKey(ioc.type, ioc.value);
         const existing = iocMap.get(key);
         if (existing) {
           existing.entityCount++;
@@ -263,19 +382,29 @@ export function IOCStatsView({
   // ─── Build unified IOC rows for the All IOCs tab ──────────────
   const unifiedRows = useMemo(() => {
     const rows: UnifiedIOCRow[] = [];
+    const standaloneByKey = new Map<string, StandaloneIOC>();
+
+    for (const si of filteredStandaloneIOCs) {
+      if (!si.trashed) standaloneByKey.set(normalizedIOCKey(si.type, si.value), si);
+    }
 
     // Extracted from notes
     for (const note of effectiveNotes) {
       if (note.trashed || !note.iocAnalysis?.iocs) continue;
       for (const ioc of note.iocAnalysis.iocs) {
         if (ioc.dismissed) continue;
+        const matchingStandalone = standaloneByKey.get(normalizedIOCKey(ioc.type, ioc.value));
         rows.push({
           id: `note-${note.id}-${ioc.id}`,
-          value: ioc.value, type: ioc.type, confidence: ioc.confidence,
+          value: ioc.value, type: ioc.type, confidence: matchingStandalone?.confidence ?? ioc.confidence,
           source: `Note: ${note.title || 'Untitled'}`,
           sourceType: 'note', sourceId: note.id,
-          iocStatus: ioc.iocStatus, attribution: ioc.attribution,
-          updatedAt: note.updatedAt,
+          iocStatus: ioc.iocStatus ?? matchingStandalone?.iocStatus,
+          attribution: ioc.attribution ?? matchingStandalone?.attribution,
+          standaloneIOC: matchingStandalone,
+          firstSeen: matchingStandalone?.firstSeen ?? ioc.firstSeen,
+          lastSeen: matchingStandalone?.lastSeen ?? note.updatedAt,
+          updatedAt: Math.max(note.updatedAt, matchingStandalone?.updatedAt ?? 0),
         });
       }
     }
@@ -285,13 +414,18 @@ export function IOCStatsView({
       if (!task.iocAnalysis?.iocs) continue;
       for (const ioc of task.iocAnalysis.iocs) {
         if (ioc.dismissed) continue;
+        const matchingStandalone = standaloneByKey.get(normalizedIOCKey(ioc.type, ioc.value));
         rows.push({
           id: `task-${task.id}-${ioc.id}`,
-          value: ioc.value, type: ioc.type, confidence: ioc.confidence,
+          value: ioc.value, type: ioc.type, confidence: matchingStandalone?.confidence ?? ioc.confidence,
           source: `Task: ${task.title || 'Untitled'}`,
           sourceType: 'task', sourceId: task.id,
-          iocStatus: ioc.iocStatus, attribution: ioc.attribution,
-          updatedAt: task.updatedAt,
+          iocStatus: ioc.iocStatus ?? matchingStandalone?.iocStatus,
+          attribution: ioc.attribution ?? matchingStandalone?.attribution,
+          standaloneIOC: matchingStandalone,
+          firstSeen: matchingStandalone?.firstSeen ?? ioc.firstSeen,
+          lastSeen: matchingStandalone?.lastSeen ?? task.updatedAt,
+          updatedAt: Math.max(task.updatedAt, matchingStandalone?.updatedAt ?? 0),
         });
       }
     }
@@ -301,13 +435,18 @@ export function IOCStatsView({
       if (!event.iocAnalysis?.iocs) continue;
       for (const ioc of event.iocAnalysis.iocs) {
         if (ioc.dismissed) continue;
+        const matchingStandalone = standaloneByKey.get(normalizedIOCKey(ioc.type, ioc.value));
         rows.push({
           id: `event-${event.id}-${ioc.id}`,
-          value: ioc.value, type: ioc.type, confidence: ioc.confidence,
+          value: ioc.value, type: ioc.type, confidence: matchingStandalone?.confidence ?? ioc.confidence,
           source: `Event: ${event.title || 'Untitled'}`,
           sourceType: 'event', sourceId: event.id,
-          iocStatus: ioc.iocStatus, attribution: ioc.attribution,
-          updatedAt: event.updatedAt,
+          iocStatus: ioc.iocStatus ?? matchingStandalone?.iocStatus,
+          attribution: ioc.attribution ?? matchingStandalone?.attribution,
+          standaloneIOC: matchingStandalone,
+          firstSeen: matchingStandalone?.firstSeen ?? ioc.firstSeen,
+          lastSeen: matchingStandalone?.lastSeen ?? event.updatedAt,
+          updatedAt: Math.max(event.updatedAt, matchingStandalone?.updatedAt ?? 0),
         });
       }
     }
@@ -322,6 +461,8 @@ export function IOCStatsView({
         sourceType: 'standalone', sourceId: si.id,
         iocStatus: si.iocStatus, attribution: si.attribution,
         standaloneIOC: si,
+        firstSeen: si.firstSeen ?? si.createdAt,
+        lastSeen: si.lastSeen ?? si.updatedAt,
         updatedAt: si.updatedAt,
       });
     }
@@ -793,6 +934,8 @@ function AllIOCsTab({
 
   // Column customization state
   const [showColumnPicker, setShowColumnPicker] = useState(false);
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(DEFAULT_IOC_COLUMN_WIDTHS);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const visibleColumns = useMemo(() => new Set(iocTableColumns ?? DEFAULT_IOC_TABLE_COLUMNS), [iocTableColumns]);
 
   // Deduplication
@@ -1010,13 +1153,93 @@ function AllIOCsTab({
   };
 
   const isColVisible = (key: string) => visibleColumns.has(key);
+  const getMinColWidth = (key: string) => MIN_IOC_COLUMN_WIDTHS[key] ?? MIN_IOC_COLUMN_WIDTH;
+  const getColWidth = (key: string) => Math.min(
+    MAX_IOC_COLUMN_WIDTH,
+    Math.max(getMinColWidth(key), columnWidths[key] ?? DEFAULT_IOC_COLUMN_WIDTHS[key] ?? 120),
+  );
+  const colStyle = (key: string): CSSProperties => {
+    const width = getColWidth(key);
+    return { ...IOC_TABLE_BORDER_STYLE, width, minWidth: width, maxWidth: width };
+  };
+  const setColWidth = (key: string, value: number) => setColumnWidths((prev) => ({
+    ...prev,
+    [key]: Math.min(MAX_IOC_COLUMN_WIDTH, Math.max(getMinColWidth(key), value)),
+  }));
+  const visibleColumnKeys = useMemo(
+    () => ['value', ...['type', 'confidence', 'source', 'iocStatus', 'attribution', 'clsLevel', 'updatedAt', 'analystNotes', 'tags', 'firstSeen', 'lastSeen', 'labels'].filter(isColVisible), 'actions'],
+    [visibleColumns],
+  );
+  const visibleWidth = useMemo(() => {
+    return CHECKBOX_COLUMN_WIDTH + visibleColumnKeys.reduce((sum, key) => sum + getColWidth(key), 0);
+  }, [columnWidths, visibleColumnKeys]);
+  const columnWidthStyle = (key: string): CSSProperties => {
+    const width = getColWidth(key);
+    return { width, minWidth: width, maxWidth: width };
+  };
+  const renderColumnGroup = () => (
+    <colgroup>
+      <col style={{ width: CHECKBOX_COLUMN_WIDTH, minWidth: CHECKBOX_COLUMN_WIDTH, maxWidth: CHECKBOX_COLUMN_WIDTH }} />
+      {visibleColumnKeys.map((key) => (
+        <col key={key} style={columnWidthStyle(key)} />
+      ))}
+    </colgroup>
+  );
+  const startColumnResize = (key: string, event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startWidth = getColWidth(key);
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const handleMove = (moveEvent: MouseEvent) => {
+      setColWidth(key, startWidth + moveEvent.clientX - startX);
+    };
+    const handleUp = () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+    };
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+  };
+  const ColumnResizeHandle = ({ columnKey, label }: { columnKey: string; label: string }) => (
+    <button
+      type="button"
+      aria-label={`Resize ${label} column`}
+      title={`Resize ${label} column`}
+      onMouseDown={(event) => startColumnResize(columnKey, event)}
+      onClick={(event) => event.stopPropagation()}
+      className="absolute inset-y-0 right-0 z-10 w-2 cursor-col-resize border-r-2 opacity-75 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-accent/70"
+      style={IOC_RESIZE_HANDLE_STYLE}
+    />
+  );
+  const toggleExpanded = (id: string) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const SortHeader = ({ field, label, className }: { field: SortField; label: string; className: string }) => (
-    <th className={`${className} cursor-pointer select-none hover:text-gray-300 transition-colors`} onClick={() => handleSort(field)}>
-      <span className="inline-flex items-center gap-0.5">
+    <th className={`${className} relative border-b border-r cursor-pointer select-none hover:text-gray-300 transition-colors`} onClick={() => handleSort(field)} style={colStyle(field)}>
+      <span className="inline-flex max-w-full items-center gap-0.5 overflow-hidden text-ellipsis whitespace-nowrap pe-3">
         {label}
         {sortField === field ? (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />) : <span className="w-3" />}
       </span>
+      <ColumnResizeHandle columnKey={field} label={label} />
+    </th>
+  );
+  const PlainHeader = ({ columnKey, label, className, title }: { columnKey: string; label: string; className: string; title?: string }) => (
+    <th className={`${className} relative border-b border-r`} style={colStyle(columnKey)} title={title}>
+      <span className="block overflow-hidden text-ellipsis whitespace-nowrap pe-3">{label}</span>
+      <ColumnResizeHandle columnKey={columnKey} label={label} />
     </th>
   );
 
@@ -1038,27 +1261,59 @@ function AllIOCsTab({
               <Columns size={14} />
             </button>
             {showColumnPicker && (
-              <div className="absolute right-0 top-full mt-1 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 w-48">
+              <div className="absolute right-0 top-full mt-1 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-2 w-72 max-h-[420px] overflow-y-auto" style={IOC_TABLE_BORDER_STYLE}>
                 {ALL_IOC_TABLE_COLUMNS.map(col => (
-                  <button
+                  <div
                     key={col.key}
-                    onClick={() => toggleColumn(col.key)}
-                    disabled={col.alwaysVisible}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-gray-800 disabled:opacity-50"
+                    className="px-3 py-2 text-xs hover:bg-gray-800"
                   >
-                    <span className={`w-3.5 h-3.5 rounded border ${isColVisible(col.key) ? 'bg-accent border-accent' : 'border-gray-600'} flex items-center justify-center`}>
-                      {isColVisible(col.key) && <span className="text-white text-[8px]">&#10003;</span>}
-                    </span>
-                    <span className="text-gray-300">{col.label}</span>
-                    {col.hiddenByDefault && <span className="text-[9px] text-gray-600 ms-auto">hidden</span>}
-                  </button>
+                    <button
+                      onClick={() => toggleColumn(col.key)}
+                      disabled={col.alwaysVisible}
+                      className="w-full flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <span className={`w-3.5 h-3.5 rounded border ${isColVisible(col.key) ? 'bg-accent border-accent' : 'border-gray-600'} flex items-center justify-center`}>
+                        {isColVisible(col.key) && <span className="text-white text-[8px]">&#10003;</span>}
+                      </span>
+                      <span className="text-gray-300">{col.label}</span>
+                      {col.hiddenByDefault && <span className="text-[9px] text-gray-600 ms-auto">hidden</span>}
+                    </button>
+                    {isColVisible(col.key) && (
+                      <div className="flex items-center gap-2 mt-1 ps-5">
+                        <input
+                          type="range"
+                          min={getMinColWidth(col.key)}
+                          max={MAX_IOC_COLUMN_WIDTH}
+                          value={columnWidths[col.key] ?? DEFAULT_IOC_COLUMN_WIDTHS[col.key] ?? 120}
+                          onChange={(e) => setColWidth(col.key, Number(e.target.value))}
+                          className="w-full accent-accent"
+                          aria-label={`${col.label} column width`}
+                        />
+                        <span className="text-[10px] text-gray-500 tabular-nums w-9 text-end">{columnWidths[col.key] ?? DEFAULT_IOC_COLUMN_WIDTHS[col.key] ?? 120}</span>
+                      </div>
+                    )}
+                    {!col.alwaysVisible && isColVisible(col.key) && (
+                      <button
+                        onClick={() => toggleColumn(col.key)}
+                        className="ms-5 mt-1 text-[10px] text-gray-500 hover:text-gray-300"
+                      >
+                        Hide column
+                      </button>
+                    )}
+                  </div>
                 ))}
-                <div className="border-t border-gray-700 mt-1 pt-1 px-3">
+                <div className="border-t border-gray-700 mt-1 pt-1 px-3" style={IOC_TABLE_BORDER_STYLE}>
                   <button
                     onClick={() => { onUpdateTableColumns?.(DEFAULT_IOC_TABLE_COLUMNS); setShowColumnPicker(false); }}
-                    className="text-[10px] text-gray-500 hover:text-gray-300 py-0.5"
+                    className="text-[10px] text-gray-500 hover:text-gray-300 py-0.5 me-3"
                   >
                     Reset to defaults
+                  </button>
+                  <button
+                    onClick={() => setColumnWidths(DEFAULT_IOC_COLUMN_WIDTHS)}
+                    className="text-[10px] text-gray-500 hover:text-gray-300 py-0.5"
+                  >
+                    Reset widths
                   </button>
                 </div>
               </div>
@@ -1452,14 +1707,23 @@ function AllIOCsTab({
             <TableVirtuoso
               data={filteredSortedRows}
               components={{
-                Table: (props) => <table {...props} className="w-full min-w-[700px] text-xs" />,
+                Table: ({ style, children, ...props }) => (
+                  <table
+                    {...props}
+                    className="text-xs table-fixed border-separate border-spacing-0"
+                    style={{ ...style, width: visibleWidth, minWidth: visibleWidth, maxWidth: visibleWidth }}
+                  >
+                    {renderColumnGroup()}
+                    {children}
+                  </table>
+                ),
                 TableHead: forwardRef((props, ref) => <thead ref={ref} {...props} />),
-                TableRow: (props) => <tr {...props} className="border-b border-gray-800/50 group" />,
+                TableRow: (props) => <tr {...props} className="group hover:bg-gray-800/20 focus-within:bg-gray-800/25" />,
                 TableBody: forwardRef((props, ref) => <tbody ref={ref} {...props} />),
               }}
               fixedHeaderContent={() => (
-                <tr className="border-b border-gray-800 bg-gray-900">
-                  <th className="text-start text-gray-500 font-medium py-2 pe-1 w-8">
+                <tr className="border-b bg-gray-900" style={IOC_TABLE_BORDER_STYLE}>
+                  <th className="text-start text-gray-500 font-medium py-2 pe-1 w-8 border-b border-r" style={IOC_TABLE_BORDER_STYLE}>
                     <input
                       type="checkbox"
                       checked={filteredSortedRows.length > 0 && selectedIds.size === filteredSortedRows.length}
@@ -1473,13 +1737,14 @@ function AllIOCsTab({
                   {isColVisible('source') && <SortHeader field="source" label="Source" className="text-start text-gray-500 font-medium py-2 px-2" />}
                   {isColVisible('iocStatus') && <SortHeader field="iocStatus" label="Status" className="text-start text-gray-500 font-medium py-2 px-2" />}
                   {isColVisible('attribution') && <SortHeader field="attribution" label="Attribution" className="text-start text-gray-500 font-medium py-2 px-2" />}
-                  {isColVisible('clsLevel') && <th className="text-start text-gray-500 font-medium py-2 px-2" title="Classification">CLS</th>}
-                  {isColVisible('updatedAt') && <th className="text-start text-gray-500 font-medium py-2 px-2">Updated</th>}
-                  {isColVisible('analystNotes') && <th className="text-start text-gray-500 font-medium py-2 px-2">Notes</th>}
-                  {isColVisible('tags') && <th className="text-start text-gray-500 font-medium py-2 px-2">Tags</th>}
-                  {isColVisible('firstSeen') && <th className="text-start text-gray-500 font-medium py-2 px-2">First Seen</th>}
-                  {isColVisible('labels') && <th className="text-start text-gray-500 font-medium py-2 px-2">Labels</th>}
-                  <th className="text-end text-gray-500 font-medium py-2 ps-2">Actions</th>
+                  {isColVisible('clsLevel') && <PlainHeader columnKey="clsLevel" label="CLS" className="text-start text-gray-500 font-medium py-2 px-2" title="Classification" />}
+                  {isColVisible('updatedAt') && <PlainHeader columnKey="updatedAt" label="Updated" className="text-start text-gray-500 font-medium py-2 px-2" />}
+                  {isColVisible('analystNotes') && <PlainHeader columnKey="analystNotes" label="Notes" className="text-start text-gray-500 font-medium py-2 px-2" />}
+                  {isColVisible('tags') && <PlainHeader columnKey="tags" label="Tags" className="text-start text-gray-500 font-medium py-2 px-2" />}
+                  {isColVisible('firstSeen') && <PlainHeader columnKey="firstSeen" label="First Seen" className="text-start text-gray-500 font-medium py-2 px-2" />}
+                  {isColVisible('lastSeen') && <PlainHeader columnKey="lastSeen" label="Last Seen" className="text-start text-gray-500 font-medium py-2 px-2" />}
+                  {isColVisible('labels') && <PlainHeader columnKey="labels" label="Labels" className="text-start text-gray-500 font-medium py-2 px-2" />}
+                  <PlainHeader columnKey="actions" label="Actions" className="text-end text-gray-500 font-medium py-2 ps-2" />
                 </tr>
               )}
               itemContent={(_index, row) => {
@@ -1494,9 +1759,16 @@ function AllIOCsTab({
                 };
                 const clsLevel = si?.clsLevel;
                 const clsColor = clsLevel ? CLS_COLORS[clsLevel] || '#6b7280' : undefined;
+                const metadataFields = buildMetadataFields(row);
+                const isExpanded = expandedRows.has(row.id);
+                const groupedMetadata = metadataFields.reduce<Record<string, typeof metadataFields>>((acc, field) => {
+                  acc[field.group] = acc[field.group] || [];
+                  acc[field.group].push(field);
+                  return acc;
+                }, {});
                 return (
                   <>
-                    <td className="py-2 pe-1 w-8">
+                    <td className="py-2 pe-1 w-8 border-b border-r" style={IOC_TABLE_BORDER_STYLE}>
                       <input
                         type="checkbox"
                         checked={selectedIds.has(row.id)}
@@ -1504,30 +1776,71 @@ function AllIOCsTab({
                         className="rounded border-gray-600 bg-gray-800 text-accent focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer"
                       />
                     </td>
-                    <td className="py-2 pe-2 text-gray-200 font-mono max-w-[220px] truncate">{row.value}</td>
+                    <td className="py-2 pe-2 text-gray-200 font-mono align-top border-b border-r border-gray-700" style={colStyle('value')}>
+                      <div className="flex items-center gap-1 min-w-0">
+                        <button
+                          onClick={() => toggleExpanded(row.id)}
+                          className={`inline-flex items-center gap-1 rounded px-1 py-0.5 ${metadataFields.length > 0 ? 'text-accent hover:bg-accent/10' : 'text-gray-500 hover:bg-gray-800'}`}
+                          title={metadataFields.length > 0 ? 'Show IOC metadata' : 'Show IOC details'}
+                        >
+                          {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                          <span className="text-[10px]">Details</span>
+                        </button>
+                        <span className="block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap" title={row.value}>{row.value}</span>
+                      </div>
+                      {isExpanded && (
+                        <div className="mt-2 rounded border border-gray-700 bg-gray-950/60 p-2 font-sans text-[11px] text-gray-400 min-w-[520px] max-w-[780px]" style={IOC_TABLE_BORDER_STYLE}>
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <span className="text-[10px] uppercase tracking-wide text-gray-500">Researched metadata</span>
+                            <span className="text-[10px] text-gray-600">{row.type}</span>
+                          </div>
+                          {metadataFields.length > 0 ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {Object.entries(groupedMetadata).map(([group, fields]) => (
+                              <div key={group} className="rounded bg-gray-900/70 border border-gray-700 p-2" style={IOC_TABLE_BORDER_STYLE}>
+                                <div className="text-[10px] uppercase tracking-wide text-gray-500 mb-1">{group}</div>
+                                <div className="space-y-1">
+                                  {fields.map((field) => (
+                                    <div key={`${group}-${field.label}`} className="grid grid-cols-[92px_1fr] gap-2">
+                                      <span className="text-gray-600">{field.label}</span>
+                                      <span className="text-gray-300 break-words">{displayMetaValue(field.value)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          ) : (
+                            <div className="rounded bg-gray-900/70 border border-gray-700 p-2 text-gray-500" style={IOC_TABLE_BORDER_STYLE}>
+                              No enrichment metadata has been stored for this IOC yet.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </td>
                     {isColVisible('type') && (
-                      <td className="py-2 px-2">
+                      <td className="py-2 px-2 align-top border-b border-r border-gray-700" style={colStyle('type')}>
                         <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: typeInfo.color + '22', color: typeInfo.color }}>
                           {typeInfo.label}
                         </span>
                       </td>
                     )}
                     {isColVisible('confidence') && (
-                      <td className="py-2 px-2">
+                      <td className="py-2 px-2 align-top border-b border-r border-gray-700" style={colStyle('confidence')}>
                         <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: confInfo.color + '22', color: confInfo.color }}>
                           {confInfo.label}
                         </span>
                       </td>
                     )}
                     {isColVisible('source') && (
-                      <td className="py-2 px-2">
+                      <td className="py-2 px-2 align-top border-b border-r border-gray-700" style={colStyle('source')}>
                         <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: sColor + '18', color: sColor }}>
-                          {row.source}
+                          <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={row.source}>{row.source}</span>
                         </span>
                       </td>
                     )}
                     {isColVisible('iocStatus') && (
-                      <td className="py-2 px-2">
+                      <td className="py-2 px-2 align-top border-b border-r border-gray-700" style={colStyle('iocStatus')}>
                         {row.iocStatus ? (
                           <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: statusColor + '22', color: statusColor }}>
                             {STATUS_LABELS[row.iocStatus] || row.iocStatus}
@@ -1538,10 +1851,10 @@ function AllIOCsTab({
                       </td>
                     )}
                     {isColVisible('attribution') && (
-                      <td className="py-2 px-2 text-gray-400 max-w-[120px] truncate">{row.attribution || '--'}</td>
+                      <td className="py-2 px-2 text-gray-400 truncate align-top border-b border-r border-gray-700" style={colStyle('attribution')}>{row.attribution || '--'}</td>
                     )}
                     {isColVisible('clsLevel') && (
-                      <td className="py-2 px-2">
+                      <td className="py-2 px-2 align-top border-b border-r border-gray-700" style={colStyle('clsLevel')}>
                         {clsLevel ? (
                           <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: clsColor + '22', color: clsColor }}>
                             {clsLevel}
@@ -1552,15 +1865,15 @@ function AllIOCsTab({
                       </td>
                     )}
                     {isColVisible('updatedAt') && (
-                      <td className="py-2 px-2 text-gray-500">{formatDate(row.updatedAt)}</td>
+                      <td className="py-2 px-2 text-gray-500 align-top border-b border-r border-gray-700" style={colStyle('updatedAt')}>{formatDate(row.updatedAt)}</td>
                     )}
                     {isColVisible('analystNotes') && (
-                      <td className="py-2 px-2 text-gray-400 max-w-[180px] truncate" title={si?.analystNotes || ''}>
-                        {si?.analystNotes || <span className="text-gray-600">--</span>}
+                      <td className="py-2 px-2 text-gray-400 align-top border-b border-r border-gray-700" style={colStyle('analystNotes')} title={si?.analystNotes || ''}>
+                        <span className="block overflow-hidden text-ellipsis whitespace-nowrap">{si?.analystNotes || '--'}</span>
                       </td>
                     )}
                     {isColVisible('tags') && (
-                      <td className="py-2 px-2">
+                      <td className="py-2 px-2 align-top border-b border-r border-gray-700" style={colStyle('tags')}>
                         {si && si.tags.length > 0 ? (
                           <div className="flex gap-0.5 flex-wrap max-w-[120px]">
                             {si.tags.slice(0, 3).map(t => (
@@ -1574,22 +1887,28 @@ function AllIOCsTab({
                       </td>
                     )}
                     {isColVisible('firstSeen') && (
-                      <td className="py-2 px-2 text-gray-500">
-                        {si ? formatDate(si.createdAt) : '--'}
+                      <td className="py-2 px-2 text-gray-500 align-top border-b border-r border-gray-700" style={colStyle('firstSeen')}>
+                        {formatDate(row.firstSeen)}
+                      </td>
+                    )}
+                    {isColVisible('lastSeen') && (
+                      <td className="py-2 px-2 text-gray-500 align-top border-b border-r border-gray-700" style={colStyle('lastSeen')}>
+                        {formatDate(row.lastSeen)}
                       </td>
                     )}
                     {isColVisible('labels') && (
-                      <td className="py-2 px-2">
+                      <td className="py-2 px-2 align-top border-b border-r border-gray-700" style={colStyle('labels')}>
                         <EnrichmentLabels enrichment={si?.enrichment} maxVisible={4} compact />
                       </td>
                     )}
-                    <td className="py-2 ps-2">
+                    <td className="py-2 ps-2 align-top border-b border-gray-700" style={colStyle('actions')}>
                       <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                         {row.sourceType === 'standalone' && row.standaloneIOC ? (
                           <>
                             <RunIntegrationMenu
                               ioc={{ id: row.standaloneIOC.id, value: row.standaloneIOC.value, type: row.standaloneIOC.type, confidence: row.standaloneIOC.confidence }}
                               investigation={currentFolderId ? { id: currentFolderId, name: currentFolderName || '' } : undefined}
+                              folderId={row.standaloneIOC.folderId || currentFolderId || defaultFolderId}
                               matching={getInstallationsForIOCType(row.standaloneIOC.type)}
                               addRun={addRun}
                               onOpenSettings={onOpenSettings}
@@ -1642,6 +1961,8 @@ function AllIOCsTab({
                             <RunIntegrationMenu
                               ioc={{ id: row.id, value: row.value, type: row.type, confidence: row.confidence }}
                               investigation={currentFolderId ? { id: currentFolderId, name: currentFolderName || '' } : undefined}
+                              folderId={currentFolderId || defaultFolderId}
+                              source={{ kind: row.sourceType as 'note' | 'task' | 'event', id: row.sourceId, title: row.source.replace(/^(Note|Task|Event):\s*/, '') }}
                               matching={getInstallationsForIOCType(row.type)}
                               addRun={addRun}
                               onOpenSettings={onOpenSettings}

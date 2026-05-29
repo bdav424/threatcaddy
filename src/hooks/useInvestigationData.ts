@@ -7,6 +7,7 @@ import type {
   TimelineEvent,
   Whiteboard,
   StandaloneIOC,
+  EvidenceItem,
   ChatThread,
   InvestigationDataMode,
 } from '../types';
@@ -17,6 +18,7 @@ export interface InvestigationData {
   events: TimelineEvent[];
   whiteboards: Whiteboard[];
   iocs: StandaloneIOC[];
+  evidenceItems: EvidenceItem[];
   chats: ChatThread[];
   loading: boolean;
   error: string | null;
@@ -30,6 +32,7 @@ const EMPTY: InvestigationData = {
   events: [],
   whiteboards: [],
   iocs: [],
+  evidenceItems: [],
   chats: [],
   loading: false,
   error: null,
@@ -46,6 +49,7 @@ export function useInvestigationData(
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [whiteboards, setWhiteboards] = useState<Whiteboard[]>([]);
   const [iocs, setIOCs] = useState<StandaloneIOC[]>([]);
+  const [evidenceItems, setEvidenceItems] = useState<EvidenceItem[]>([]);
   const [chats, setChats] = useState<ChatThread[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,16 +64,18 @@ export function useInvestigationData(
     setEvents([]);
     setWhiteboards([]);
     setIOCs([]);
+    setEvidenceItems([]);
     setChats([]);
   }, []);
 
   const loadLocal = useCallback(async (id: string) => {
-    const [n, t, e, w, i, c] = await Promise.all([
+    const [n, t, e, w, i, evidence, c] = await Promise.all([
       db.notes.where('folderId').equals(id).toArray(),
       db.tasks.where('folderId').equals(id).toArray(),
       db.timelineEvents.where('folderId').equals(id).toArray(),
       db.whiteboards.where('folderId').equals(id).toArray(),
       db.standaloneIOCs.where('folderId').equals(id).toArray(),
+      db.evidenceItems.where('folderId').equals(id).toArray(),
       db.chatThreads.where('folderId').equals(id).toArray(),
     ]);
 
@@ -84,6 +90,7 @@ export function useInvestigationData(
     setEvents(filterActive(e));
     setWhiteboards(filterActive(w));
     setIOCs(filterActive(i));
+    setEvidenceItems(filterActive(evidence));
     setChats(filterActive(c));
   }, []);
 
@@ -100,6 +107,7 @@ export function useInvestigationData(
     setEvents(filterActive((snapshot.timelineEvents ?? []) as TimelineEvent[]));
     setWhiteboards(filterActive((snapshot.whiteboards ?? []) as Whiteboard[]));
     setIOCs(filterActive((snapshot.standaloneIOCs ?? []) as StandaloneIOC[]));
+    setEvidenceItems(filterActive((snapshot.evidenceItems ?? []) as EvidenceItem[]));
     setChats(filterActive((snapshot.chatThreads ?? []) as ChatThread[]));
   }, []);
 
@@ -138,6 +146,7 @@ export function useInvestigationData(
         events,
         whiteboards,
         iocs,
+        evidenceItems,
         chats,
         loading,
         error,

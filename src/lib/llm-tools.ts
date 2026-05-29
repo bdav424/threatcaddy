@@ -14,9 +14,11 @@ import { executeForensicateScan } from './forensicate-tool';
 // Read tools
 import {
   executeSearchNotes, executeSearchAll, executeReadNote,
+  executeListEvidence, executeSearchEvidence, executeReadEvidence,
   executeReadTask, executeReadIOC, executeReadTimelineEvent,
   executeListTasks, executeListIOCs, executeListTimelineEvents,
   executeGetInvestigationSummary,
+  executeListProductBaselines,
   executeListInvestigations, executeGetInvestigationDetails,
   executeSearchAcrossInvestigations, executeCompareInvestigations,
 } from './llm-tools-read';
@@ -27,12 +29,14 @@ import {
   executeCreateIOC, executeUpdateIOC, executeBulkCreateIOCs,
   executeCreateTimelineEvent, executeUpdateTimelineEvent,
   executeLinkEntities, executeGenerateReport, executeCreateInInvestigation,
+  executeCreateProductBaseline, executeRenderProductBaseline,
 } from './llm-tools-write';
 
 // Analysis tools
 import {
   executeAnalyzeGraph, executeExtractIOCs, executeFetchUrl,
 } from './llm-tools-analysis';
+import { persistIOCIntegrationUpdate } from './ioc-enrichment-persistence';
 
 // ── System Prompt Builder ──────────────────────────────────────────────
 
@@ -78,11 +82,11 @@ Understand the IR lifecycle (NIST SP 800-61): Preparation, Detection & Analysis,
 
 ## Available Tools
 
-You have 46 tools organized into these categories:
+You have tools organized into these categories:
 
-**Search & Read** (11): search_notes, search_all, read_note, read_task, read_ioc, read_timeline_event, list_tasks, list_iocs, list_timeline_events, get_investigation_summary, list_folders.
+**Search & Read** (15): search_notes, search_all, read_note, list_evidence, search_evidence, read_evidence, list_product_baselines, read_task, read_ioc, read_timeline_event, list_tasks, list_iocs, list_timeline_events, get_investigation_summary, list_folders.
 
-**Create & Update** (14): create_note, update_note, create_task, update_task, create_ioc, update_ioc, bulk_create_iocs, create_timeline_event, update_timeline_event, link_entities, generate_report, create_in_investigation, create_note_folder, ingest_alert.
+**Create & Update** (16): create_note, update_note, create_task, update_task, create_ioc, update_ioc, bulk_create_iocs, create_timeline_event, update_timeline_event, link_entities, generate_report, create_product_baseline, render_product_baseline, create_in_investigation, create_note_folder, ingest_alert.
 
 **Modify** (3): delete_note_folder, move_to_folder, update_timeline_event.
 
@@ -90,7 +94,7 @@ You have 46 tools organized into these categories:
 
 **Web & External** (5): fetch_url (search the web via \`https://www.google.com/search?q=your+query\`), run_remote_command, query_siem, create_ticket, forensicate_scan.
 
-**Enrichment** (3): enrich_ioc (vendor integrations), list_integrations, extract_iocs.
+**Enrichment** (3): enrich_ioc (stored IOC enrichment or ephemeral raw-value VirusTotal lookup), list_integrations, extract_iocs.
 
 **Knowledge & Memory** (2): update_knowledge, recall_knowledge.
 
@@ -101,16 +105,19 @@ You have 46 tools organized into these categories:
 ### Tool Usage Guidelines
 - When creating or updating entities, confirm exactly what you did with clickable entity links.
 - When searching, provide precise findings. Don't summarize away important details.
+- Evidence uploads are source material, not notes. Use list_evidence, search_evidence, and read_evidence to inspect imported PDFs, Office documents, RTFs, spreadsheets, text files, and reports. Create notes only when the analyst asks you to extract findings, summaries, or interesting lines from that evidence.
 - When asked to search online or research a topic, use fetch_url with a search engine URL, then follow up by fetching relevant result links.
 - When fetching URLs, summarize key intelligence value and offer to create notes or extract IOCs.
 - When asked to triage an alert, use a systematic workflow: extract IOCs → create them with confidence levels → create timeline events with ATT&CK mappings → create tasks for follow-up actions → link related entities → summarize findings.
 - Use bulk_create_iocs when processing threat reports or indicator feeds with multiple IOCs.
 - Use link_entities to build the investigation graph — connected investigations are more valuable than isolated data points.
 - Use generate_report for formal deliverables with executive summaries and structured sections.
+- Use list_product_baselines and render_product_baseline when the analyst wants a reusable house-style product such as an Report, intelligence note, executive brief, or research paper. Rendered products are draft deliverables and should be reviewed before release.
 - Use list_investigations and get_investigation_details when the user asks about their overall caseload or a specific investigation.
 - Use search_across_investigations to find patterns, shared IOCs, or related activity across multiple cases.
 - Use compare_investigations to identify overlapping TTPs and shared infrastructure between investigations.
 - Use create_in_investigation when you need to add entities to a specific investigation that isn't currently selected.
+- For quick reputation checks, call enrich_ioc with value/provider instead of creating a temporary IOC. Create an IOC only after the analyst decides the observable belongs in the case.
 
 ## Entity Linking Format
 
@@ -175,14 +182,18 @@ export async function buildSystemPrompt(folder?: Folder, customPrompt?: string, 
     if (folder.papLevel) prompt += `\nPAP: ${folder.papLevel}`;
 
     // Add entity counts for context
-    const [noteCount, taskCount, iocCount, eventCount] = await Promise.all([
+    const [noteCount, evidenceCount, taskCount, iocCount, eventCount] = await Promise.all([
       db.notes.where('folderId').equals(folder.id).and(n => !n.trashed).count(),
+      db.evidenceItems.where('folderId').equals(folder.id).and(evidence => !evidence.trashed).count(),
       db.tasks.where('folderId').equals(folder.id).and(t => !t.trashed).count(),
       db.standaloneIOCs.where('folderId').equals(folder.id).and(i => !i.trashed).count(),
       db.timelineEvents.where('folderId').equals(folder.id).and(e => !e.trashed).count(),
     ]);
 
-    prompt += `\n\nEntity counts: ${noteCount} notes, ${taskCount} tasks, ${iocCount} IOCs, ${eventCount} timeline events`;
+    prompt += `\n\nEntity counts: ${noteCount} notes, ${evidenceCount} evidence items, ${taskCount} tasks, ${iocCount} IOCs, ${eventCount} timeline events`;
+    if (evidenceCount > 0) {
+      prompt += '\nImported evidence files are stored separately from notes with extracted text. Use list_evidence, search_evidence, or read_evidence when the analyst asks about uploaded source files.';
+    }
   }
 
   return prompt;
@@ -196,6 +207,15 @@ const _creatorStack: string[] = [];
 /** Get the current creator label for entity attribution. */
 function getCreator(): string | undefined { return _creatorStack.length > 0 ? _creatorStack[_creatorStack.length - 1] : undefined; }
 
+function getLocalStorageItem(key: string): string | null {
+  try {
+    if (typeof localStorage === 'undefined' || typeof localStorage.getItem !== 'function') return null;
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
 // ── Dispatcher ─────────────────────────────────────────────────────────
 
 export async function executeTool(
@@ -206,12 +226,12 @@ export async function executeTool(
   const { name, input } = toolUse;
   const inp = input as Record<string, unknown>;
   // Read settings once per tool call instead of per-function
-  const _settings: Settings = JSON.parse(localStorage.getItem('threatcaddy-settings') || '{}');
+  const _settings: Settings = JSON.parse(getLocalStorageItem('threatcaddy-settings') || '{}');
 
   // Resolve the human operator's name (used for both human and agent attribution)
   let operatorName = 'Analyst';
   try {
-    const stored = JSON.parse(localStorage.getItem('threatcaddy-auth') || 'null');
+    const stored = JSON.parse(getLocalStorageItem('threatcaddy-auth') || 'null');
     operatorName = stored?.user?.displayName || _settings.displayName || 'Analyst';
   } catch { operatorName = _settings.displayName || 'Analyst'; }
 
@@ -253,6 +273,10 @@ export async function executeTool(
       case 'search_notes':            result = await executeSearchNotes(inp, folderId); break;
       case 'search_all':              result = await executeSearchAll(inp, folderId); break;
       case 'read_note':               result = await executeReadNote(inp, folderId); break;
+      case 'list_evidence':           result = await executeListEvidence(inp, folderId); break;
+      case 'search_evidence':         result = await executeSearchEvidence(inp, folderId); break;
+      case 'read_evidence':           result = await executeReadEvidence(inp, folderId); break;
+      case 'list_product_baselines':  result = await executeListProductBaselines(inp); break;
       case 'read_task':               result = await executeReadTask(inp, folderId); break;
       case 'read_ioc':                result = await executeReadIOC(inp, folderId); break;
       case 'read_timeline_event':     result = await executeReadTimelineEvent(inp, folderId); break;
@@ -272,6 +296,8 @@ export async function executeTool(
       case 'update_timeline_event':   result = await executeUpdateTimelineEvent(inp); break;
       case 'link_entities':           result = await executeLinkEntities(inp); break;
       case 'generate_report':         result = await executeGenerateReport(inp, folderId); break;
+      case 'create_product_baseline': result = await executeCreateProductBaseline(inp); break;
+      case 'render_product_baseline': result = await executeRenderProductBaseline(inp, folderId); break;
       case 'extract_iocs':            result = executeExtractIOCs(inp); break;
       case 'fetch_url':               result = await executeFetchUrl(inp); break;
       case 'list_investigations':           result = await executeListInvestigations(inp); break;
@@ -279,7 +305,7 @@ export async function executeTool(
       case 'search_across_investigations':  result = await executeSearchAcrossInvestigations(inp); break;
       case 'create_in_investigation':       result = await executeCreateInInvestigation(inp); break;
       case 'compare_investigations':        result = await executeCompareInvestigations(inp); break;
-      case 'enrich_ioc':                    result = await executeEnrichIOC(inp, folderId); break;
+      case 'enrich_ioc':                    result = await executeEnrichIOC(inp, folderId, _settings); break;
       case 'list_integrations':             result = await executeListIntegrations(inp); break;
       case 'review_completed_task':          result = await executeReviewCompletedTask(inp, folderId, agentContext?.profileId); break;
       case 'delegate_task':                 result = await executeDelegateTask(inp, folderId); break;
@@ -309,9 +335,9 @@ export async function executeTool(
       case 'read_soul':                      result = await executeReadSoul(inp, agentContext?.profileId, agentRole); break;
       case 'forensicate_scan':              result = await executeForensicateScan({ text: String(inp.text || ''), threshold: inp.threshold ? Number(inp.threshold) : undefined }); break;
       default: {
-        // Dynamic skill tools: local:<skill> or host:<name>:<skill>
-        if (name.startsWith('host:') || name.startsWith('local:')) {
-          const { executeHostSkill } = await import('./agent-hosts');
+        // Dynamic skill tools: local:<skill>, host:<name>:<skill>, or LLM-safe aliases.
+        const { executeHostSkill, isHostOrLocalToolName } = await import('./agent-hosts');
+        if (isHostOrLocalToolName(name)) {
           result = await executeHostSkill(name, inp, _settings);
         } else {
           result = JSON.stringify({ error: `Unknown tool: ${name}` });
@@ -640,9 +666,18 @@ async function executeListAgentActivity(inp: Record<string, unknown>, folderId?:
 
 // ── Integration / Enrichment Tools ────────────────────────────────────
 
-async function executeEnrichIOC(inp: Record<string, unknown>, folderId?: string): Promise<string> {
+async function executeEnrichIOC(inp: Record<string, unknown>, folderId?: string, settings?: Settings): Promise<string> {
   const iocId = String(inp.iocId || '');
-  if (!iocId) return JSON.stringify({ error: 'iocId is required' });
+  const rawValue = String(inp.value || inp.ioc || inp.observable || '').trim();
+  if (!iocId && rawValue) {
+    return executeEphemeralIOCEnrichment(inp, rawValue, settings);
+  }
+  if (!iocId) {
+    return JSON.stringify({
+      error: 'iocId or value is required',
+      hint: 'Use iocId for stored IOC enrichment, or value with provider="virustotal" for an ephemeral lookup that does not create an IOC.',
+    });
+  }
 
   const ioc = await db.standaloneIOCs.get(iocId);
   if (!ioc) return JSON.stringify({ error: `IOC not found: ${iocId}` });
@@ -721,7 +756,11 @@ async function executeEnrichIOC(inp: Record<string, unknown>, folderId?: string)
           },
           onUpdateEntity: async (type, id, fields) => {
             if (type === 'ioc' || type === 'standaloneIOC') {
-              await db.standaloneIOCs.update(id, { ...fields, updatedAt: Date.now() });
+              await persistIOCIntegrationUpdate({
+                ioc: { id, value: ioc.value, type: ioc.type, confidence: ioc.confidence },
+                fields,
+                folderId,
+              });
             }
           },
         },
@@ -750,6 +789,102 @@ async function executeEnrichIOC(inp: Record<string, unknown>, folderId?: string)
     integrationsRun: results.length,
     results,
   });
+}
+
+async function executeEphemeralIOCEnrichment(
+  inp: Record<string, unknown>,
+  value: string,
+  settings?: Settings,
+): Promise<string> {
+  const provider = String(inp.provider || inp.source || 'virustotal').trim().toLowerCase();
+  if (!['virustotal', 'vt'].includes(provider)) {
+    return JSON.stringify({
+      error: `Ephemeral enrichment currently supports provider="virustotal" only. Received provider="${provider}".`,
+      saved: false,
+    });
+  }
+
+  const {
+    CTI_VIRUSTOTAL_TOOL,
+    DEFAULT_CTI_SOURCE_TEMPLATES,
+    normalizeCtiSourceRunResult,
+    renderCtiEvidenceMarkdown,
+  } = await import('./cti-source-formatting');
+  const { executeHostSkill, fetchHostSkills, getHostToolDefinitions } = await import('./agent-hosts');
+
+  let settingsForTools: Settings = settings || JSON.parse(localStorage.getItem('threatcaddy-settings') || '{}');
+  let hostTools = getHostToolDefinitions(settingsForTools);
+  if (!hostTools.some(t => t.name === CTI_VIRUSTOTAL_TOOL)) {
+    const localCtiHost = {
+      id: 'local-cti',
+      name: 'cti',
+      displayName: 'CTI Agent Host',
+      url: 'http://127.0.0.1:8766',
+      apiKey: 'codex-local-dev',
+      enabled: true,
+      skills: [],
+    };
+    try {
+      const skills = await fetchHostSkills(localCtiHost);
+      settingsForTools = {
+        ...settingsForTools,
+        agentHosts: [...(settingsForTools.agentHosts || []), { ...localCtiHost, skills, skillsFetchedAt: Date.now() }],
+      };
+      hostTools = getHostToolDefinitions(settingsForTools);
+    } catch {
+      // The explicit tool availability error below is clearer for the model.
+    }
+  }
+
+  if (!hostTools.some(t => t.name === CTI_VIRUSTOTAL_TOOL)) {
+    return JSON.stringify({
+      error: 'VirusTotal Agent Host tool is not available. Enable the CTI Agent Host at http://127.0.0.1:8766 and refresh skills.',
+      provider: 'virustotal',
+      observable: value,
+      saved: false,
+    });
+  }
+
+  const input = {
+    ioc: value,
+    ioc_type: normalizeEphemeralIOCType(inp.ioc_type ?? inp.iocType),
+    match_keywords: typeof inp.match_keywords === 'string' ? inp.match_keywords : typeof inp.matchKeywords === 'string' ? inp.matchKeywords : undefined,
+    include_vendor_results: Boolean(inp.include_vendor_results ?? inp.includeVendorResults),
+  };
+  const result = await executeHostSkill(CTI_VIRUSTOTAL_TOOL, input, settingsForTools);
+  const plan = {
+    source: 'virustotal' as const,
+    sourceLabel: 'VirusTotal',
+    tool: CTI_VIRUSTOTAL_TOOL,
+    input,
+    templateId: DEFAULT_CTI_SOURCE_TEMPLATES.virustotal.id,
+  };
+  const run = normalizeCtiSourceRunResult(plan, result);
+  const markdown = renderCtiEvidenceMarkdown(run.evidence, DEFAULT_CTI_SOURCE_TEMPLATES.virustotal);
+  return JSON.stringify({
+    mode: 'ephemeral',
+    saved: false,
+    message: 'Ephemeral VirusTotal enrichment completed without creating a ThreatCaddy IOC. Create an IOC only if the analyst decides this observable is relevant.',
+    provider: 'virustotal',
+    observable: value,
+    status: run.evidence.status,
+    evidence: run.evidence,
+    markdown,
+  });
+}
+
+function normalizeEphemeralIOCType(value: unknown): string | undefined {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return undefined;
+  const aliases: Record<string, string> = {
+    ipv4: 'ip',
+    ipv6: 'ip',
+    ip_address: 'ip',
+    sha256: 'hash',
+    sha1: 'hash',
+    md5: 'hash',
+  };
+  return aliases[raw] || raw;
 }
 
 async function executeListIntegrations(inp: Record<string, unknown>): Promise<string> {

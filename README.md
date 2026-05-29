@@ -27,6 +27,14 @@
 
 ---
 
+## AI Reporter Entry Point
+
+Future AI reporters producing analyst-style intelligence notes must read
+[`docs/intel-note-reporting-procedure.md`](docs/intel-note-reporting-procedure.md)
+before drafting or rendering a report. That procedure is the standing source of
+truth for Word template fidelity, source-note formatting, table geometry, and
+visual QA.
+
 ## Why ThreatCaddy?
 
 Most investigation tools lock your data in a cloud you don't control, cost per seat, and force you into rigid workflows. ThreatCaddy is different:
@@ -90,7 +98,7 @@ docker compose up -d   # Starts Hono server + PostgreSQL
 
 Human-driven conversational AI assistant with a deep toolset for threat investigation.
 
-- **Multi-provider** — Anthropic (Claude Opus 4, Sonnet 4, Haiku 3.5), OpenAI (GPT-5.4, GPT-5.4 Pro, GPT-5.2, GPT-5 Mini, o3, o4-mini, GPT-4.1, GPT-4.1 Mini, GPT-4o), Google Gemini (2.5 Pro, 2.5 Flash), Mistral (Large, Small, Codestral), and local models (Ollama / LM Studio / vLLM)
+- **Multi-provider** — Anthropic (Claude Opus 4, Sonnet 4, Haiku 3.5), OpenAI (GPT-5.4, GPT-5.4 Pro, GPT-5.2, GPT-5 Mini, o3, o4-mini, GPT-4.1, GPT-4.1 Mini, GPT-4o), Google Gemini (2.5 Pro, 2.5 Flash), Mistral (Large, Small, Codestral), and local OpenAI-compatible models (Ollama / LM Studio / vLLM / Codex via `everybody_llmbo`)
 - **58 tools** — 46 core tools to search, read, create, and update all entities; 7 delegation tools for Lead Analyst coordination; 5 executive tools for CISO/Chief of Staff. Covers IOC extraction, URL fetching, report generation, and cross-investigation analysis
 - **Slash commands** — `/fetch`, `/search`, `/note`, `/task`, `/iocs`, `/summary`, `/timeline`, `/report`, `/triage`, `/graph`, `/link`
 - **Customizable system prompt** — Editable in Settings with CTI/IR tradecraft baked into the default (MITRE ATT&CK, Diamond Model, Kill Chain, Pyramid of Pain, estimative language, TLP/PAP)
@@ -157,7 +165,7 @@ Connect any REST API as an agent skill source:
 - **Entity graph** — Interactive force-directed graph of IOCs, notes, tasks, and timeline events with drag-to-link, filtering, and multiple layouts
 - **IOC dashboard** — Aggregate stats: type/confidence distribution, top actors, timeline, frequency tables
 - **TLP/PAP classification** — Traffic Light Protocol and Permissible Actions Protocol levels on entities and investigations
-- **Export** — JSON, CSV (grouped or flat), STIX 2.1 bundles; push to OCI object storage
+- **Export** — JSON, CSV (grouped or flat), STIX 2.1 bundles; push to Cloud object storage
 
 ### Timeline & Whiteboard
 
@@ -180,7 +188,7 @@ Connect any REST API as an agent skill source:
 ### Security & Backup
 
 - **Encryption at rest** — Passphrase-based AES-256-GCM via PBKDF2 (600k iterations) with configurable session duration and recovery phrase
-- **Cloud backup** — OCI Object Storage, AWS S3, Azure Blob Storage, or Google Cloud Storage via pre-authenticated URLs
+- **Cloud backup** — Cloud Object Storage, AWS S3, Azure Blob Storage, or Google Cloud Storage via pre-authenticated URLs
 - **Export & import** — Full JSON backup/restore; per-investigation export; includes note templates and playbooks
 
 ### Team Server
@@ -242,7 +250,7 @@ To send clips to an offline `file://` build, enable **"Allow access to file URLs
 - **21 languages** — UI fully translated into Arabic, Chinese (Simplified), Dutch, English, Farsi, French, German, Hebrew, Hindi, Indonesian, Italian, Japanese, Korean, Polish, Portuguese (Brazil), Russian, Spanish, Thai, Turkish, Ukrainian, and Vietnamese — including full RTL support
 - **Guided tour** — Interactive onboarding walkthrough
 - **Browser navigation** — Back/forward with persistent state across refresh
-- **Standalone HTML** — Single-file offline version (`pnpm build:single`) with all assets and locale packs inlined. Language switcher included. Fully functional from `file://`
+- **Standalone HTML** — Offline version (`pnpm build:single`) with the app and locale packs bundled for `file://` use. Run `pnpm update:standalone` to refresh the sibling workspace copy at `/Users/brdavies/workspace/threatcaddy-standalone.html`
 - **Keyboard shortcuts** — `Ctrl+N` (new note), `Ctrl+O` (open file), `Ctrl+K` (search), `Ctrl+S` (backup), `Ctrl+Shift+T` (new task), `Ctrl+E` (toggle editor mode), `` Ctrl+` `` (toggle preview), `Ctrl+1-4` (switch view), `Ctrl+/` (show shortcuts), `Ctrl+B/I` (bold/italic)
 - **PWA** — Installable progressive web app with offline support via service worker; registers as an OS-level file handler for `.md` and `.txt` files
 
@@ -293,8 +301,37 @@ pnpm tsc -b           # Type check
 
 ```bash
 pnpm build            # Production build → dist/
-pnpm build:single     # Standalone HTML → dist-single/index.html
+pnpm build:single     # Standalone bundle -> dist-single/
+pnpm update:standalone # Refresh ../threatcaddy-standalone.html + standalone sidecars
 ```
+
+### Local storage note
+
+ThreatCaddy stores data in the browser bucket for the exact address that opened it. `http://127.0.0.1:5173`, `http://localhost:5173`, hosted HTTPS, and `file://` standalone files each have separate IndexedDB/localStorage. If notes appear in one address but not another, export from the address where they are visible and merge-import into the address you want to use going forward.
+
+During development, `pnpm dev` serves the latest built standalone at `http://127.0.0.1:5173/threatcaddy-standalone.html` after `pnpm build:single`. That route uses the same `127.0.0.1:5173` storage bucket as the dev app. Opening `/Users/brdavies/workspace/threatcaddy-standalone.html` from disk uses a separate `file://` bucket.
+
+### Local CaddyAI bridge
+
+For the current standalone AI helper setup, configure ThreatCaddy's Local LLM provider as:
+
+| Field | Value |
+|---|---|
+| Endpoint | `http://127.0.0.1:11434/v1` |
+| API key | `codex-local-dev` |
+| Model | `gpt-5.4` |
+
+That endpoint is served by `everybody_llmbo` as an OpenAI-compatible bridge to Codex. The CTI Agent Host is separate and stays at `http://127.0.0.1:8766` under **Settings > AI > Agent Hosts**.
+
+Check both local AI services with:
+
+```bash
+pnpm check:caddyai-bridges
+```
+
+If CaddyAI says "The model completed its action, but did not return a written response," verify the bridge completion path before changing note/storage settings. If notes are missing after switching between the dev server and the loose standalone file, follow the local storage note above: it is usually an origin split, not an LLM issue. Detailed runbook: [docs/agent-hosts.md](docs/agent-hosts.md).
+
+AI maintainers should read [AGENTS.md](AGENTS.md) before changing storage, build, sync, extension, CaddyAI, or standalone behavior, and append a short maintenance note there when those areas change.
 
 ## Browser Extension
 
@@ -321,6 +358,7 @@ docker compose up -d   # Starts Hono server + PostgreSQL
 ```
 
 Optionally add `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, or `MISTRAL_API_KEY` to `.env` for server-side LLM proxying.
+For a local Codex bridge, run `everybody_llmbo` on loopback and set `LOCAL_LLM_ENDPOINT=http://127.0.0.1:11434`, `LOCAL_LLM_MODEL=gpt-5.4`, and `LOCAL_LLM_API_KEY=codex-local-dev` or the bridge token in use. ThreatCaddy treats it as the `local` OpenAI-compatible provider.
 
 ## Privacy
 

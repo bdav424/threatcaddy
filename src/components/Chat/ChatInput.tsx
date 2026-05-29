@@ -16,6 +16,15 @@ const SLASH_COMMAND_DEFS = [
   { command: '/timeline', descKey: 'slash.timeline', placeholder: '', icon: Clock },
   { command: '/report', descKey: 'slash.report', placeholder: '', icon: ClipboardList },
   { command: '/triage', descKey: 'slash.triage', placeholder: '<paste alert>', icon: Zap },
+  { command: '/virustotal', descKey: 'slash.virustotal', placeholder: '<ioc>', icon: Shield },
+  { command: '/vt', descKey: 'slash.vt', placeholder: '<ioc>', icon: Shield },
+  { command: '/vt-hunt', descKey: 'slash.vtHunt', placeholder: '<ioc>', icon: Shield },
+  { command: '/vt-search', descKey: 'slash.vtSearch', placeholder: '<query>', icon: Search },
+  { command: '/censys', descKey: 'slash.censys', placeholder: '<ip/domain/query>', icon: Network },
+  { command: '/flashpoint', descKey: 'slash.flashpoint', placeholder: '<ioc/query>', icon: Search },
+  { command: '/cti', descKey: 'slash.cti', placeholder: '<ioc/query>', icon: BarChart3 },
+  { command: '/cti-enrichment', descKey: 'slash.ctiEnrichment', placeholder: '<ioc/query>', icon: BarChart3 },
+  { command: '/all', descKey: 'slash.allCti', placeholder: '<ioc/query>', icon: Zap },
   { command: '/graph', descKey: 'slash.graph', placeholder: '', icon: Network },
   { command: '/link', descKey: 'slash.link', placeholder: '<description>', icon: Link2 },
   { command: '/loop', descKey: 'slash.loop', placeholder: '<interval> <prompt>', icon: RefreshCw },
@@ -43,19 +52,19 @@ interface ChatInputProps {
 
 export function ChatInput({ onSend, onStop, isStreaming, extensionAvailable, model, onModelChange, disabled, localModelName, configuredProviders, onOpenSettings, folderId, customCommands, onImageAttach, attachedImages, onClearImages }: ChatInputProps) {
   const { t } = useTranslation('chat');
-  // Can send if extension is available OR a local LLM is configured (direct fetch, no extension needed)
-  const canSend = extensionAvailable || !!localModelName;
+  const effectiveLocalModelName = localModelName?.trim();
+  const canSend = extensionAvailable || !!effectiveLocalModelName;
   const MODELS = useMemo(() => {
     let models = [...STATIC_MODELS];
-    if (localModelName) {
-      models.push({ label: `Local: ${localModelName}`, value: localModelName, provider: 'local' as LLMProvider, group: 'Local' });
+    if (effectiveLocalModelName) {
+      models.push({ label: `Local: ${effectiveLocalModelName}`, value: effectiveLocalModelName, provider: 'local' as LLMProvider, group: 'Local' });
     }
     // Only show models for providers that have an API key configured
     if (configuredProviders) {
       models = models.filter(m => configuredProviders.has(m.provider));
     }
     return models;
-  }, [localModelName, configuredProviders]);
+  }, [effectiveLocalModelName, configuredProviders]);
 
   // Auto-switch to a valid model when the current one isn't in the filtered list
   useEffect(() => {
@@ -313,7 +322,7 @@ export function ChatInput({ onSend, onStop, isStreaming, extensionAvailable, mod
           canSend ? 'text-accent-green' : 'text-text-muted'
         )}>
           {canSend ? <Wifi size={10} /> : <WifiOff size={10} />}
-          {extensionAvailable ? t('input.extensionStatus') : localModelName ? t('input.localLlmStatus') : t('input.noConnection')}
+          {extensionAvailable ? t('input.extensionStatus') : effectiveLocalModelName ? t('input.localLlmStatus') : t('input.noConnection')}
         </div>
       </div>
 

@@ -11,6 +11,67 @@ There are two flavours:
 
 The protocol, authentication, and execution path are identical for both.
 
+## Local CaddyAI Port Map
+
+For the local CTI enrichment setup used during development, keep the chat model bridge and enrichment host on separate ports:
+
+| Service | URL | Configure in |
+|---|---|---|
+| Local LLM bridge (`everybody_llmbo`) | `http://127.0.0.1:11434/v1` | Settings -> AI/LLM -> Local LLM |
+| CTI Agent Host (`flashpoint-caddyai-bridge`) | `http://127.0.0.1:8766` | Settings -> AI -> Agent Hosts |
+
+The Local LLM bridge must answer `GET /health` plus OpenAI-compatible paths such as `GET /v1/models` and `POST /v1/chat/completions`. The CTI Agent Host must answer `GET /health`, `GET /skills`, and `POST /execute`.
+
+If `http://127.0.0.1:8766` is entered as the Local LLM endpoint, chat calls will fail because the CTI host does not implement `/v1/chat/completions`. If `http://127.0.0.1:11434/v1` is entered as an Agent Host, skill discovery will fail because the LLM bridge is not the CTI skill catalog.
+
+Run this local diagnostic when either side looks confused:
+
+```bash
+pnpm check:caddyai-bridges
+```
+
+Expected settings for the current local setup:
+
+| Field | Value |
+|---|---|
+| Local LLM endpoint | `http://127.0.0.1:11434/v1` |
+| Local LLM API key | `codex-local-dev` |
+| Local LLM model | `gpt-5.4` |
+| CTI Agent Host URL | `http://127.0.0.1:8766` |
+
+### Current local `everybody_llmbo` implementation
+
+The current standalone AI helper uses `everybody_llmbo` as a local OpenAI-compatible bridge for CaddyAI. It is managed outside the repo by a macOS LaunchAgent:
+
+| Piece | Current path/value |
+|---|---|
+| LaunchAgent label | `com.brdavies.everybody-llmbo` |
+| LaunchAgent plist | `/Users/brdavies/Library/LaunchAgents/com.brdavies.everybody-llmbo.plist` |
+| Bridge server | `/Users/brdavies/.codex/packages/everybody_llmbo-zip/everybody_llmbo/codex_rest_server.py` |
+| Codex executable wrapper | `/Users/brdavies/.codex/bin/codex-chatgpt-exec` |
+| Served model name | `gpt-5.4` |
+| Bearer token | `codex-local-dev` |
+
+The wrapper calls `/opt/homebrew/bin/codex exec --ignore-user-config` for `exec` requests and passes other Codex subcommands through. Keep that behavior unless the workstation auth model changes: it prevents the bridge from inheriting an non-OpenAI provider (`oca`) provider config that can make completions fail with upstream `401 NotAuthenticated` even when `/v1/models` still works.
+
+### Standalone notes and local AI are separate issues
+
+The `file://` standalone app can call the loopback bridge directly when the bridge allows the standalone origin (`Origin: null`) and returns CORS headers. This has no effect on note visibility. If notes disappear when moving between `file:///Users/brdavies/workspace/threatcaddy-standalone.html`, `http://127.0.0.1:5173`, and `http://127.0.0.1:5173/threatcaddy-standalone.html`, suspect browser-origin storage first. Export from the origin where the notes are visible and merge-import into the origin you want to keep using.
+
+### Completion smoke test
+
+Use the bridge diagnostic first. If health and models pass but chat returns "The model completed its action, but did not return a written response," test the completion path directly:
+
+```bash
+curl -s -i http://127.0.0.1:11434/v1/chat/completions \
+  -H 'Origin: null' \
+  -H 'Authorization: Bearer codex-local-dev' \
+  -H 'Content-Type: application/json' \
+  --data '{"model":"gpt-5.4","stream":false,"messages":[{"role":"user","content":"Reply with exactly OK."}],"max_tokens":8}'
+```
+
+Expected result: HTTP 200 with a non-empty assistant message. If the response is empty or the server logs show `401 NotAuthenticated`, the problem is upstream Codex CLI auth/provider selection, not ThreatCaddy note rendering.
+
 ## Protocol
 
 A host implements two endpoints:

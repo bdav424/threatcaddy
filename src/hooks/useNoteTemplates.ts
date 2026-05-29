@@ -36,6 +36,7 @@ export function useNoteTemplates() {
       description: partial.description,
       tags: partial.tags,
       clsLevel: partial.clsLevel,
+      productBaseline: partial.productBaseline,
       createdAt: now,
       updatedAt: now,
     };
@@ -66,6 +67,7 @@ export function useNoteTemplates() {
       description: builtin.description,
       tags: builtin.tags,
       clsLevel: builtin.clsLevel,
+      productBaseline: builtin.productBaseline,
     });
   }, [createTemplate]);
 

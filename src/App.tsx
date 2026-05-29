@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useEffect, useRef, lazy, Suspense, memo, type ReactNode } from 'react';
+import { useCallback, useMemo, useEffect, useRef, useState, lazy, Suspense, memo, type ReactNode } from 'react';
 import { AppLayout } from './components/Layout/AppLayout';
 import { Header } from './components/Layout/Header';
 import { Sidebar } from './components/Layout/Sidebar';
@@ -8,10 +8,14 @@ import { UIModalProvider, useUIModals } from './contexts/UIModalContext';
 const NoteList = lazy(() => import('./components/Notes/NoteList').then(m => ({ default: m.NoteList })));
 const NoteEditor = lazy(() => import('./components/Notes/NoteEditor').then(m => ({ default: m.NoteEditor })));
 const TaskListView = lazy(() => import('./components/Tasks/TaskList').then(m => ({ default: m.TaskListView })));
+const EvidenceView = lazy(() => import('./components/Evidence/EvidenceView').then(m => ({ default: m.EvidenceView })));
+const ProductView = lazy(() => import('./components/Products/ProductView').then(m => ({ default: m.ProductView })));
 const TimelineView = lazy(() => import('./components/Timeline/TimelineView').then(m => ({ default: m.TimelineView })));
 const WhiteboardView = lazy(() => import('./components/Whiteboard/WhiteboardView').then(m => ({ default: m.WhiteboardView })));
 const ActivityLogView = lazy(() => import('./components/Activity/ActivityLogView').then(m => ({ default: m.ActivityLogView })));
 const QuickCapture = lazy(() => import('./components/Clips/QuickCapture').then(m => ({ default: m.QuickCapture })));
+const InvestigationTemplatePicker = lazy(() => import('./components/Notes/InvestigationTemplatePicker').then(m => ({ default: m.InvestigationTemplatePicker })));
+const NoteTemplateCreator = lazy(() => import('./components/Notes/NoteTemplateCreator').then(m => ({ default: m.NoteTemplateCreator })));
 const SettingsPanel = lazy(() => import('./components/Settings/SettingsPanel').then(m => ({ default: m.SettingsPanel })));
 import { useNotes } from './hooks/useNotes';
 import { useTasks } from './hooks/useTasks';
@@ -19,6 +23,8 @@ import { useTimeline } from './hooks/useTimeline';
 import { useTimelines } from './hooks/useTimelines';
 import { useWhiteboards } from './hooks/useWhiteboards';
 import { useStandaloneIOCs } from './hooks/useStandaloneIOCs';
+import { useIntegrations } from './hooks/useIntegrations';
+import { useEvidenceItems } from './hooks/useEvidenceItems';
 import { useChats } from './hooks/useChats';
 import { useFolders } from './hooks/useFolders';
 import { useTags } from './hooks/useTags';
@@ -36,7 +42,7 @@ import { clipBuffer } from './lib/clipBuffer';
 import { formatBytes, openFilePicker, getDroppedFiles, dispatchFile, type FileOpenDetail } from './lib/file-handler';
 import { hasPendingChanges } from './lib/pending-changes';
 import { useInvestigationData } from './hooks/useInvestigationData';
-import type { Note, Task, TimelineEvent, ChatThread } from './types';
+import type { ConfidenceLevel, EvidenceItem, IOCType, Note, NoteTemplate, Task, TimelineEvent, ChatThread, ChatAttachment, StandaloneIOC } from './types';
 import { DEFAULT_QUICK_LINKS } from './types';
 const DashboardView = lazy(() => import('./components/Dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
 import { FileText, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
@@ -45,6 +51,9 @@ import { exportJSON, importJSON, mergeImportJSON, downloadFile, exportInvestigat
 import { ConfirmDialog } from './components/Common/ConfirmDialog';
 const SearchOverlay = lazy(() => import('./components/Search/SearchOverlay').then(m => ({ default: m.SearchOverlay })));
 import { extractIOCs, mergeIOCAnalysis } from './lib/ioc-extractor';
+import { buildEvidenceItemDrafts, evidenceFileKeyFromFile, evidenceFileKeyFromItem, findDuplicateEvidenceItemIds, MAX_EVIDENCE_IMPORT_FILES } from './lib/evidence-import';
+import { extractEvidenceTableIOCCandidates, type EvidenceTableIOCCandidate } from './lib/evidence-ioc-candidates';
+import { BUILTIN_PRODUCT_BASELINES, importProductBaselinePackage, isProductBaselineTemplate, isProductNote } from './lib/product-baselines';
 import { generateSampleInvestigation, isSampleEntity } from './lib/sample-investigation';
 import { db } from './db';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
@@ -68,6 +77,10 @@ import { TourTooltip } from './components/Tour/TourTooltip';
 const DemoWelcomeModal = lazy(() => import('./components/Common/DemoWelcomeModal').then(m => ({ default: m.DemoWelcomeModal })));
 const DataImportModal = lazy(() => import('./components/Import/DataImportModal').then(m => ({ default: m.DataImportModal })));
 import type { ImportResult } from './lib/data-import';
+
+function normalizeInvestigationName(name?: string): string {
+  return (name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
 import { ToastProvider, useToast } from './contexts/ToastContext';
 import { useTranslation } from 'react-i18next';
 import { ToastContainer } from './components/Common/Toast';
@@ -85,6 +98,8 @@ const ConflictDialog = lazy(() => import('./components/Common/ConflictDialog').t
 const KeyboardShortcutsPanel = lazy(() => import('./components/Common/KeyboardShortcutsPanel').then(m => ({ default: m.KeyboardShortcutsPanel })));
 const ServerOnboardingModal = lazy(() => import('./components/Settings/ServerOnboardingModal').then(m => ({ default: m.ServerOnboardingModal })));
 import { installSyncHooks, initLocalOnlyFlags } from './lib/sync-middleware';
+import { autoEnrichImportedIOCs } from './lib/ioc-auto-enrichment';
+import { upsertIOCObservations } from './lib/ioc-observations';
 
 // Install Dexie hooks once at module load so every write is captured
 installSyncHooks();
@@ -93,6 +108,7 @@ import { useLoggedActions } from './hooks/useLoggedActions';
 import { useServerSync } from './hooks/useServerSync';
 import { useRemoteInvestigations } from './hooks/useRemoteInvestigations';
 
+const VALID_RASTER_IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp', 'image/avif']);
 
 export default function App() {
   return (
@@ -117,6 +133,8 @@ function AppDataLayer() {
   const { timelines, createTimeline, updateTimeline, deleteTimeline, reload: reloadTimelines } = useTimelines();
   const { whiteboards, createWhiteboard, updateWhiteboard, deleteWhiteboard, trashWhiteboard, restoreWhiteboard, toggleArchiveWhiteboard, emptyTrashWhiteboards, getFilteredWhiteboards, whiteboardCounts, reload: reloadWhiteboards } = useWhiteboards();
   const standaloneIOCsHook = useStandaloneIOCs();
+  const integrations = useIntegrations();
+  const evidenceItemsHook = useEvidenceItems();
   const chatsHook = useChats();
   const { folders, loading: foldersLoading, createFolder, findOrCreateFolder, updateFolder, deleteFolder, deleteFolderWithContents, trashFolderContents, archiveFolder, unarchiveFolder, reload: reloadFolders } = useFolders();
   const { tags, createTag, updateTag, deleteTag, reload: reloadTags } = useTags();
@@ -140,6 +158,7 @@ function AppDataLayer() {
     timelines: reloadTimelines,
     whiteboards: reloadWhiteboards,
     standaloneIOCs: standaloneIOCsHook.reload,
+    evidenceItems: evidenceItemsHook.reload,
     chats: chatsHook.reload,
     folders: reloadFolders,
     tags: reloadTags,
@@ -155,12 +174,13 @@ function AppDataLayer() {
     reloadTimelines();
     reloadWhiteboards();
     standaloneIOCsHook.reload();
+    evidenceItemsHook.reload();
     chatsHook.reload();
     reloadTags();
     noteTemplatesHook.reload();
     playbooksHook.reload();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reloadFolders, notes.reload, tasks.reload, timeline.reload, reloadTimelines, reloadWhiteboards, standaloneIOCsHook.reload, chatsHook.reload, reloadTags, noteTemplatesHook.reload, playbooksHook.reload]);
+  }, [reloadFolders, notes.reload, tasks.reload, timeline.reload, reloadTimelines, reloadWhiteboards, standaloneIOCsHook.reload, evidenceItemsHook.reload, chatsHook.reload, reloadTags, noteTemplatesHook.reload, playbooksHook.reload]);
 
   // Reload folders when agent tools modify folder state (e.g. deploy_agent enables agentEnabled)
   useEffect(() => {
@@ -171,11 +191,11 @@ function AppDataLayer() {
 
   // Reload UI when external agents write data via the agent bridge
   useEffect(() => {
-    const handler = () => { notes.reload(); tasks.reload(); timeline.reload(); standaloneIOCsHook.reload(); chatsHook.reload(); reloadTags(); };
+    const handler = () => { notes.reload(); tasks.reload(); timeline.reload(); standaloneIOCsHook.reload(); evidenceItemsHook.reload(); chatsHook.reload(); reloadTags(); };
     window.addEventListener('threatcaddy:entities-changed', handler);
     return () => window.removeEventListener('threatcaddy:entities-changed', handler);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notes.reload, tasks.reload, timeline.reload, standaloneIOCsHook.reload]);
+  }, [notes.reload, tasks.reload, timeline.reload, standaloneIOCsHook.reload, evidenceItemsHook.reload]);
 
   const syncedFolderIds = useMemo(() => {
     const localIds = new Set(folders.map(f => f.id));
@@ -185,7 +205,7 @@ function AppDataLayer() {
   const isMobile = useIsMobile();
 
   // Compute safe default view from settings for NavigationProvider
-  const safeDefaultView = settings.defaultView === 'dashboard' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' || settings.defaultView === 'chat' || settings.defaultView === 'caddyshack' || settings.defaultView === 'investigations' ? settings.defaultView : 'notes';
+  const safeDefaultView = settings.defaultView === 'dashboard' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'evidence' || settings.defaultView === 'products' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' || settings.defaultView === 'chat' || settings.defaultView === 'caddyshack' || settings.defaultView === 'investigations' ? settings.defaultView : 'notes';
 
   return (
     <InvestigationProvider
@@ -234,6 +254,8 @@ function AppDataLayer() {
             whiteboardCounts={whiteboardCounts}
             reloadWhiteboards={reloadWhiteboards}
             standaloneIOCsHook={standaloneIOCsHook}
+            integrations={integrations}
+            evidenceItemsHook={evidenceItemsHook}
             chatsHook={chatsHook}
             folders={folders}
             foldersLoading={foldersLoading}
@@ -334,6 +356,8 @@ type AppInnerProps = {
   whiteboardCounts: ReturnType<typeof useWhiteboards>['whiteboardCounts'];
   reloadWhiteboards: ReturnType<typeof useWhiteboards>['reload'];
   standaloneIOCsHook: ReturnType<typeof useStandaloneIOCs>;
+  integrations: ReturnType<typeof useIntegrations>;
+  evidenceItemsHook: ReturnType<typeof useEvidenceItems>;
   chatsHook: ReturnType<typeof useChats>;
   folders: ReturnType<typeof useFolders>['folders'];
   foldersLoading: boolean;
@@ -381,7 +405,7 @@ const AppInner = memo(function AppInner({
   whiteboards, createWhiteboard, updateWhiteboard, deleteWhiteboard,
   trashWhiteboard, restoreWhiteboard, toggleArchiveWhiteboard,
   emptyTrashWhiteboards, getFilteredWhiteboards, whiteboardCounts, reloadWhiteboards,
-  standaloneIOCsHook, chatsHook,
+  standaloneIOCsHook, integrations, evidenceItemsHook, chatsHook,
   folders, foldersLoading, createFolder, findOrCreateFolder, updateFolder, deleteFolder,
   deleteFolderWithContents, trashFolderContents, archiveFolder, unarchiveFolder, reloadFolders,
   tags, createTag, updateTag, deleteTag, reloadTags,
@@ -396,6 +420,20 @@ const AppInner = memo(function AppInner({
   const inv = useInvestigation();
   const ui = useUIModals();
   const { t: tExec } = useTranslation('exec');
+  const [startupGraceExpired, setStartupGraceExpired] = useState(false);
+  const [pendingChatDraft, setPendingChatDraft] = useState<{
+    id: string;
+    threadId: string;
+    text: string;
+    attachments?: ChatAttachment[];
+  } | null>(null);
+  const [showInvestigationTemplatePicker, setShowInvestigationTemplatePicker] = useState(false);
+  const [showNoteTemplateCreator, setShowNoteTemplateCreator] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setStartupGraceExpired(true), 6000);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   // Destructure frequently-used context values
   const {
@@ -412,7 +450,7 @@ const AppInner = memo(function AppInner({
 
   const {
     selectedFolderId, setSelectedFolderId,
-    investigationMode,
+    investigationMode, setInvestigationMode,
     selectedTag, setSelectedTag,
     showTrash, setShowTrash, showArchive, setShowArchive,
     selectedIOCTypes, setSelectedIOCTypes,
@@ -445,12 +483,23 @@ const AppInner = memo(function AppInner({
     showFileEncryptionWarning, fileEncryptionDismissed, dismissFileEncryptionWarning,
   } = ui;
 
+  const resolveLocalFolderForRemote = useCallback((folderId: string) => {
+    const remote = remoteInvestigations.find((item) => item.folderId === folderId);
+    if (!remote) return undefined;
+    const remoteName = normalizeInvestigationName(remote.folder.name);
+    if (!remoteName) return undefined;
+    const matches = folders.filter((folder) => normalizeInvestigationName(folder.name) === remoteName);
+    if (matches.length === 0) return undefined;
+    return matches.find((folder) => notes.notes.some((note) => note.folderId === folder.id && !note.trashed && !note.archived)) || matches[0];
+  }, [folders, notes.notes, remoteInvestigations]);
+
   // Wrap InvestigationContext's handleOpenInvestigation to add navigation
   // (InvestigationProvider can't receive navigateTo because NavigationProvider is nested inside it)
   const handleOpenInvestigation = useCallback((folderId: string, mode: import('./types').InvestigationDataMode) => {
-    ctxHandleOpenInvestigation(folderId, mode);
+    const localFolder = mode === 'remote' ? resolveLocalFolderForRemote(folderId) : undefined;
+    ctxHandleOpenInvestigation(localFolder?.id ?? folderId, localFolder ? 'local' : mode);
     navigateTo('notes');
-  }, [ctxHandleOpenInvestigation, navigateTo]);
+  }, [ctxHandleOpenInvestigation, navigateTo, resolveLocalFolderForRemote]);
 
   const tour = useTour({
     onComplete: () => updateSettings({ tourCompleted: true }),
@@ -471,6 +520,8 @@ const AppInner = memo(function AppInner({
     loggedTrashWhiteboard, loggedRestoreWhiteboard, loggedToggleArchiveWhiteboard,
     loggedCreateIOC, loggedTrashIOC, loggedRestoreIOC,
     loggedToggleArchiveIOC, loggedDeleteIOC,
+    loggedTrashEvidenceItem, loggedRestoreEvidenceItem,
+    loggedToggleArchiveEvidenceItem, loggedDeleteEvidenceItem,
     loggedCreateFolder, loggedDeleteFolder,
     loggedArchiveFolder, loggedUnarchiveFolder,
     loggedCreateTag, loggedDeleteTag,
@@ -484,10 +535,65 @@ const AppInner = memo(function AppInner({
     { timelines, createTimeline, deleteTimeline },
     { whiteboards, createWhiteboard, deleteWhiteboard, trashWhiteboard, restoreWhiteboard, toggleArchiveWhiteboard, emptyTrashWhiteboards, reload: reloadWhiteboards },
     standaloneIOCsHook,
+    evidenceItemsHook,
     { createThread: chatsHook.createThread, reload: chatsHook.reload },
     { folders, createFolder, deleteFolder, deleteFolderWithContents, trashFolderContents, archiveFolder, unarchiveFolder },
     { tags, createTag, deleteTag },
   );
+
+  const autoEnrichCreatedIOCs = useCallback((createdIOCs: StandaloneIOC[]) => {
+    if (settings.tiAutoEnrichImportedIOCs === false || createdIOCs.length === 0) return;
+    const executionOptions = auth.connected && auth.serverUrl
+      ? { useServerProxy: { serverUrl: auth.serverUrl, getAccessToken: auth.getAccessToken } }
+      : undefined;
+    void autoEnrichImportedIOCs(createdIOCs, {
+      maxIOCs: settings.tiAutoEnrichImportedIOCMax ?? 50,
+      investigation: selectedFolder ? { id: selectedFolder.id, name: selectedFolder.name } : undefined,
+      getInstallationsForIOCType: integrations.getInstallationsForIOCType,
+      addRun: integrations.addRun,
+      executionOptions,
+      onComplete: (stats) => {
+        standaloneIOCsHook.reload();
+        if (stats.missingIntegration > 0 && stats.enriched === 0 && stats.errors === 0) {
+          addToast(
+            'warning',
+            `Imported IOCs were extracted, but VirusTotal auto-check could not run because no enabled VirusTotal integration matched ${stats.missingIntegration} IOC${stats.missingIntegration === 1 ? '' : 's'}.`,
+            7000,
+          );
+        } else if (stats.queued > 0) {
+          addToast(
+            stats.errors > 0 ? 'warning' : 'success',
+            `VirusTotal auto-check finished for imported IOCs: ${stats.enriched} enriched, ${stats.errors} error${stats.errors === 1 ? '' : 's'}${stats.missingIntegration > 0 ? `, ${stats.missingIntegration} skipped without a matching VirusTotal integration` : ''}.`,
+            5000,
+          );
+        }
+      },
+    });
+  }, [addToast, auth.connected, auth.getAccessToken, auth.serverUrl, integrations.addRun, integrations.getInstallationsForIOCType, selectedFolder, settings.tiAutoEnrichImportedIOCMax, settings.tiAutoEnrichImportedIOCs, standaloneIOCsHook]);
+
+  const loggedCreateIOCWithAuto = useCallback(async (partial?: Partial<StandaloneIOC>) => {
+    const ioc = await loggedCreateIOC(partial);
+    autoEnrichCreatedIOCs([ioc]);
+    return ioc;
+  }, [autoEnrichCreatedIOCs, loggedCreateIOC]);
+
+  const handleUpdateNoteWithIOCObservation = useCallback((id: string, updates: Partial<Note>) => {
+    notes.updateNote(id, updates);
+    if (!updates.iocAnalysis?.iocs?.length) return;
+
+    const note = notes.notes.find((candidate) => candidate.id === id);
+    const folderId = updates.folderId ?? note?.folderId;
+    void upsertIOCObservations(updates.iocAnalysis.iocs, {
+      folderId,
+      clsLevel: updates.clsLevel ?? note?.clsLevel,
+      source: { kind: 'note', id, title: updates.title ?? note?.title },
+      defaultConfidence: settings.tiDefaultConfidence as ConfidenceLevel | undefined,
+    }).then((result) => {
+      if (result.touched.length === 0) return;
+      standaloneIOCsHook.reload();
+      autoEnrichCreatedIOCs(result.touched);
+    });
+  }, [autoEnrichCreatedIOCs, notes, settings.tiDefaultConfidence, standaloneIOCsHook]);
 
   const demoProcessedRef = useRef(false);
 
@@ -510,6 +616,35 @@ const AppInner = memo(function AppInner({
     activityLog.log('chat', 'trash', `Trashed chat thread "${thread?.title || 'Untitled'}"`, id, thread?.title);
     if (selectedChatThreadId === id) setSelectedChatThreadId(undefined);
   }, [chatsHook, activityLog, selectedChatThreadId, setSelectedChatThreadId]);
+
+  const handleSearchNavigateToNote = useCallback((id: string) => {
+    const openNote = async () => {
+      noteNavGraceRef.current = true;
+      const note = notes.notes.find((n) => n.id === id) || await db.notes.get(id);
+      if (note) setInvestigationMode('local');
+      setSelectedFolderId(note?.folderId);
+      setSelectedTag(undefined);
+      setShowTrash(!!note?.trashed);
+      setShowArchive(!note?.trashed && !!note?.archived);
+      setSelectedNoteId(id);
+      setTimeout(() => { noteNavGraceRef.current = false; }, 2000);
+    };
+    void openNote();
+    navigateTo('notes', { selectedNoteId: id });
+  }, [navigateTo, noteNavGraceRef, notes.notes, setInvestigationMode, setSelectedFolderId, setSelectedNoteId, setSelectedTag, setShowArchive, setShowTrash]);
+
+  useEffect(() => {
+    if (investigationMode !== 'remote' || !selectedFolderId) return;
+    if (folders.some((folder) => folder.id === selectedFolderId)) {
+      setInvestigationMode('synced');
+      return;
+    }
+    const localFolder = resolveLocalFolderForRemote(selectedFolderId);
+    if (localFolder) {
+      setSelectedFolderId(localFolder.id);
+      setInvestigationMode('local');
+    }
+  }, [folders, investigationMode, resolveLocalFolderForRemote, selectedFolderId, setInvestigationMode, setSelectedFolderId]);
 
   // Resolve timeline deep-link once events are loaded
   const deepLinkTimelineResolved = useCallback(() => {
@@ -540,20 +675,18 @@ const AppInner = memo(function AppInner({
   // Reload hooks and navigate after integration creates entities in Dexie
   useEffect(() => {
     const handler = async (e: Event) => {
-      const { noteId } = (e as CustomEvent).detail ?? {};
+      const { noteId, iocId } = (e as CustomEvent).detail ?? {};
       if (noteId) {
         await notes.reload();
-        setSelectedNoteId(noteId);
-        setSelectedFolderId(undefined);
-        setSelectedTag(undefined);
-        setShowTrash(false);
-        setShowArchive(false);
-        navigateTo('notes', { selectedNoteId: noteId });
+        handleSearchNavigateToNote(noteId);
+      }
+      if (iocId) {
+        standaloneIOCsHook.reload();
       }
     };
     window.addEventListener('integration-entity-created', handler);
     return () => window.removeEventListener('integration-entity-created', handler);
-  }, [notes, navigateTo, setSelectedFolderId]);
+  }, [notes, standaloneIOCsHook, handleSearchNavigateToNote]);
 
   // Listen for clip imports from the Chrome extension via postMessage
   useEffect(() => {
@@ -665,13 +798,11 @@ const AppInner = memo(function AppInner({
           } else if (lastEntityType === 'timeline-event') {
             navigateTo('timeline');
           } else {
-            setSelectedNoteId(lastEntityId);
-            navigateTo('notes', { selectedNoteId: lastEntityId });
+            if (lastEntityId) handleSearchNavigateToNote(lastEntityId);
           }
         } else {
           // Mixed batch — default to notes, select last note
-          setSelectedNoteId(lastEntityId);
-          navigateTo('notes', { selectedNoteId: lastEntityId });
+          if (lastEntityId) handleSearchNavigateToNote(lastEntityId);
         }
       } catch (error) {
         console.error('Failed to import clips:', error);
@@ -684,7 +815,7 @@ const AppInner = memo(function AppInner({
     clipBuffer.flush();
     return () => window.removeEventListener('message', handler);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- setSelectedFolderId is stable; settings deps intentionally omitted to avoid re-registering handler
-  }, [findOrCreateFolder, loggedCreateNote, loggedCreateTask, loggedCreateEvent, timelines, navigateTo, addToast, setSelectedFolderId]);
+  }, [findOrCreateFolder, loggedCreateNote, loggedCreateTask, loggedCreateEvent, timelines, navigateTo, addToast, setSelectedFolderId, handleSearchNavigateToNote]);
 
   // Handle files opened via PWA File Handling API (double-click .md on desktop)
   useEffect(() => {
@@ -709,8 +840,7 @@ const AppInner = memo(function AppInner({
           iocAnalysis,
           iocTypes,
         });
-        setSelectedNoteId(note.id);
-        navigateTo('notes', { selectedNoteId: note.id });
+        handleSearchNavigateToNote(note.id);
         addToast('success', tt('clip.openedAsNote', { name }));
       } catch (err) {
         console.error('Failed to import file as note:', err);
@@ -720,7 +850,7 @@ const AppInner = memo(function AppInner({
     window.addEventListener('threatcaddy:file-open', handler);
     return () => window.removeEventListener('threatcaddy:file-open', handler);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- settings deps intentionally omitted
-  }, [loggedCreateNote, selectedFolderId, navigateTo, addToast]);
+  }, [loggedCreateNote, selectedFolderId, handleSearchNavigateToNote, addToast]);
 
   // Global drag-and-drop for markdown/text files
   useEffect(() => {
@@ -728,6 +858,7 @@ const AppInner = memo(function AppInner({
       if (e.dataTransfer?.types.includes('Files')) e.preventDefault();
     };
     const onDrop = async (e: DragEvent) => {
+      if (e.defaultPrevented) return;
       const files = getDroppedFiles(e);
       if (files.length === 0) return;
       e.preventDefault();
@@ -743,7 +874,7 @@ const AppInner = memo(function AppInner({
     };
   }, []);
 
-  // Track Clips folder ID for OCI envelope type detection
+  // Track Clips folder ID for Cloud envelope type detection
   const clipsFolderId = useMemo(
     () => folders.find((f) => f.name === 'Clips')?.id,
     [folders]
@@ -814,6 +945,16 @@ const AppInner = memo(function AppInner({
     [standaloneIOCsHook.getFilteredIOCs, selectedFolderId, selectedTag]
   );
 
+  const filteredEvidenceItems = useMemo(
+    () => evidenceItemsHook.getFilteredEvidenceItems({
+      folderId: selectedFolderId,
+      tag: selectedTag,
+      showTrashed: false,
+      showArchived: false,
+    }),
+    [evidenceItemsHook.getFilteredEvidenceItems, selectedFolderId, selectedTag],
+  );
+
   // Filtered chat threads
   const filteredChatThreads = useMemo(
     () => chatsHook.getFilteredThreads({
@@ -832,11 +973,15 @@ const AppInner = memo(function AppInner({
   );
 
   // Resolved entity arrays — pick remote data when in remote mode, local otherwise
-  const resolvedNotes = investigationMode === 'remote' ? remoteData.notes : filteredNotes;
+  const resolvedNotes = useMemo(
+    () => investigationMode === 'remote' ? remoteData.notes : filteredNotes,
+    [investigationMode, remoteData.notes, filteredNotes],
+  );
   const resolvedTasks = investigationMode === 'remote' ? remoteData.tasks : filteredTasks;
   const resolvedTimelineEvents = investigationMode === 'remote' ? remoteData.events : filteredTimelineEvents;
   const resolvedWhiteboards = investigationMode === 'remote' ? remoteData.whiteboards : filteredWhiteboards;
   const resolvedStandaloneIOCs = investigationMode === 'remote' ? remoteData.iocs : filteredStandaloneIOCs;
+  const resolvedEvidenceItems = investigationMode === 'remote' ? remoteData.evidenceItems : filteredEvidenceItems;
   const resolvedChatThreads = investigationMode === 'remote' ? remoteData.chats : filteredChatThreads;
 
   // Auto-deselect whiteboard when trashed/archived/filtered out
@@ -867,6 +1012,10 @@ const AppInner = memo(function AppInner({
     () => screenshareMaxLevel ? standaloneIOCsHook.iocs.filter((i) => !isAboveClsThreshold(i.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : standaloneIOCsHook.iocs,
     [standaloneIOCsHook.iocs, screenshareMaxLevel, effectiveClsLevels]
   );
+  const screensafeEvidenceItems = useMemo(
+    () => screenshareMaxLevel ? evidenceItemsHook.evidenceItems.filter((item) => !isAboveClsThreshold(item.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : evidenceItemsHook.evidenceItems,
+    [evidenceItemsHook.evidenceItems, screenshareMaxLevel, effectiveClsLevels]
+  );
   const screensafeChatThreads = useMemo(
     () => screenshareMaxLevel ? chatsHook.threads.filter((t) => !isAboveClsThreshold(t.clsLevel ?? undefined, screenshareMaxLevel, effectiveClsLevels)) : chatsHook.threads,
     [chatsHook.threads, screenshareMaxLevel, effectiveClsLevels]
@@ -878,6 +1027,14 @@ const AppInner = memo(function AppInner({
     () => screenshareMaxLevel ? resolvedNotes.filter((n) => !isAboveClsThreshold(n.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : resolvedNotes,
     [resolvedNotes, screenshareMaxLevel, effectiveClsLevels]
   );
+  const hiddenLocalNotesHint = useMemo(() => {
+    const activeLocalCount = notes.notes.filter((note) => !note.trashed && !note.archived).length;
+    if (ssFilteredNotes.length > 0 || activeLocalCount === 0) return undefined;
+    if (investigationMode === 'remote') {
+      return `${activeLocalCount} local notes are stored, but this view is showing the remote server snapshot. Open the local investigation or clear the investigation filter.`;
+    }
+    return `${activeLocalCount} local notes are stored, but the current filters hide them. Clear investigation, tag, IOC, archive/trash, and screenshare filters.`;
+  }, [investigationMode, notes.notes, ssFilteredNotes.length]);
   const ssFilteredTasks = useMemo(
     () => screenshareMaxLevel ? resolvedTasks.filter((t) => !isAboveClsThreshold(t.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : resolvedTasks,
     [resolvedTasks, screenshareMaxLevel, effectiveClsLevels]
@@ -893,6 +1050,10 @@ const AppInner = memo(function AppInner({
   const ssFilteredStandaloneIOCs = useMemo(
     () => screenshareMaxLevel ? resolvedStandaloneIOCs.filter((i) => !isAboveClsThreshold(i.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : resolvedStandaloneIOCs,
     [resolvedStandaloneIOCs, screenshareMaxLevel, effectiveClsLevels]
+  );
+  const ssFilteredEvidenceItems = useMemo(
+    () => screenshareMaxLevel ? resolvedEvidenceItems.filter((item) => !isAboveClsThreshold(item.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : resolvedEvidenceItems,
+    [resolvedEvidenceItems, screenshareMaxLevel, effectiveClsLevels]
   );
   const ssFilteredChatThreads = useMemo(
     () => screenshareMaxLevel ? resolvedChatThreads.filter((t) => !isAboveClsThreshold(t.clsLevel ?? undefined, screenshareMaxLevel, effectiveClsLevels)) : resolvedChatThreads,
@@ -921,6 +1082,10 @@ const AppInner = memo(function AppInner({
     () => investigationMode === 'remote' ? remoteData.iocs : selectedFolderId ? screensafeStandaloneIOCs.filter((i) => i.folderId === selectedFolderId) : screensafeStandaloneIOCs,
     [investigationMode, remoteData.iocs, screensafeStandaloneIOCs, selectedFolderId]
   );
+  const investigationEvidenceItems = useMemo(
+    () => investigationMode === 'remote' ? remoteData.evidenceItems : selectedFolderId ? screensafeEvidenceItems.filter((item) => item.folderId === selectedFolderId) : screensafeEvidenceItems,
+    [investigationMode, remoteData.evidenceItems, screensafeEvidenceItems, selectedFolderId]
+  );
 
   const investigationScopedCounts = useMemo(() => {
     if (!selectedFolderId) return null;
@@ -941,6 +1106,32 @@ const AppInner = memo(function AppInner({
     };
   }, [selectedFolderId, investigationNotes, investigationTasks, investigationTimelineEvents, investigationWhiteboards]);
 
+  const activeEvidenceItems = useMemo(
+    () => investigationEvidenceItems.filter((item) => !item.trashed && !item.archived),
+    [investigationEvidenceItems],
+  );
+  const activeProducts = useMemo(
+    () => investigationNotes.filter((note) => !note.trashed && !note.archived && isProductNote(note)),
+    [investigationNotes],
+  );
+  const productBaselines = useMemo(
+    () => [
+      ...BUILTIN_PRODUCT_BASELINES,
+      ...noteTemplatesHook.templates.filter((template) => template.source !== 'builtin' && isProductBaselineTemplate(template)),
+    ],
+    [noteTemplatesHook.templates],
+  );
+  const handleImportProductBaseline = useCallback(async (json: string, fileName: string): Promise<NoteTemplate> => {
+    const template = await importProductBaselinePackage(json, fileName);
+    await noteTemplatesHook.reload();
+    addToast('success', `Imported product baseline "${template.name}".`);
+    return template;
+  }, [addToast, noteTemplatesHook]);
+  const handleUpdateProductBaseline = useCallback(async (id: string, updates: Partial<NoteTemplate>) => {
+    await noteTemplatesHook.updateTemplate(id, updates);
+    addToast('success', 'Updated product baseline.');
+  }, [addToast, noteTemplatesHook]);
+
   // Screenshare context value
   const screenshareCtx = useMemo(
     () => ({ maxLevel: screenshareMaxLevel, effectiveLevels: effectiveClsLevels }),
@@ -960,6 +1151,18 @@ const AppInner = memo(function AppInner({
   const selectedNote = useMemo(
     () => resolvedNotes.find((n) => n.id === selectedNoteId),
     [resolvedNotes, selectedNoteId]
+  );
+
+  const noteTemplateMap = useMemo(
+    () => new Map(noteTemplatesHook.templates.map((template) => [template.id, template])),
+    [noteTemplatesHook.templates],
+  );
+
+  const attachedInvestigationTemplates = useMemo(
+    () => (selectedFolder?.noteTemplateIds ?? [])
+      .map((templateId) => noteTemplateMap.get(templateId))
+      .filter((template): template is NoteTemplate => Boolean(template)),
+    [noteTemplateMap, selectedFolder?.noteTemplateIds],
   );
 
   // Auto-deselect when selected note is no longer in filtered list
@@ -984,12 +1187,12 @@ const AppInner = memo(function AppInner({
 
   // Combined trash/archive counts across all entity types
   const combinedTrashedCount = useMemo(() =>
-    noteCounts.trashed + tasks.taskCounts.trashed + timeline.eventCounts.trashed + whiteboardCounts.trashed + standaloneIOCsHook.iocCounts.trashed,
-    [noteCounts.trashed, tasks.taskCounts.trashed, timeline.eventCounts.trashed, whiteboardCounts.trashed, standaloneIOCsHook.iocCounts.trashed]
+    noteCounts.trashed + tasks.taskCounts.trashed + timeline.eventCounts.trashed + whiteboardCounts.trashed + standaloneIOCsHook.iocCounts.trashed + evidenceItemsHook.evidenceCounts.trashed,
+    [noteCounts.trashed, tasks.taskCounts.trashed, timeline.eventCounts.trashed, whiteboardCounts.trashed, standaloneIOCsHook.iocCounts.trashed, evidenceItemsHook.evidenceCounts.trashed]
   );
   const combinedArchivedCount = useMemo(() =>
-    noteCounts.archived + tasks.taskCounts.archived + timeline.eventCounts.archived + whiteboardCounts.archived + standaloneIOCsHook.iocCounts.archived,
-    [noteCounts.archived, tasks.taskCounts.archived, timeline.eventCounts.archived, whiteboardCounts.archived, standaloneIOCsHook.iocCounts.archived]
+    noteCounts.archived + tasks.taskCounts.archived + timeline.eventCounts.archived + whiteboardCounts.archived + standaloneIOCsHook.iocCounts.archived + evidenceItemsHook.evidenceCounts.archived,
+    [noteCounts.archived, tasks.taskCounts.archived, timeline.eventCounts.archived, whiteboardCounts.archived, standaloneIOCsHook.iocCounts.archived, evidenceItemsHook.evidenceCounts.archived]
   );
 
   const handleNewNote = useCallback(async () => {
@@ -1001,9 +1204,50 @@ const AppInner = memo(function AppInner({
       folderId: selectedFolderId,
       clsLevel: folder?.clsLevel,
     });
-    setSelectedNoteId(note.id);
-    navigateTo('notes', { selectedNoteId: note.id });
-  }, [loggedCreateNote, selectedFolderId, showQuickCapture, navigateTo, folders]);
+    handleSearchNavigateToNote(note.id);
+  }, [loggedCreateNote, selectedFolderId, showQuickCapture, folders, handleSearchNavigateToNote]);
+
+  const handleCreateNoteFromTemplate = useCallback(async (templateId: string) => {
+    const template = noteTemplateMap.get(templateId);
+    if (!template) {
+      addToast('error', 'Template is no longer available.');
+      return;
+    }
+    setShowTrash(false);
+    setShowArchive(false);
+    const folder = selectedFolderId ? folders.find((f) => f.id === selectedFolderId) : undefined;
+    const note = await loggedCreateNote({
+      title: template.name,
+      content: template.content,
+      folderId: selectedFolderId,
+      tags: template.tags ?? [],
+      clsLevel: template.clsLevel ?? folder?.clsLevel,
+    });
+    handleSearchNavigateToNote(note.id);
+  }, [addToast, folders, handleSearchNavigateToNote, loggedCreateNote, noteTemplateMap, selectedFolderId, setShowArchive, setShowTrash]);
+
+  const handleSaveInvestigationTemplateIds = useCallback(async (templateIds: string[]) => {
+    if (!selectedFolderId) {
+      addToast('warning', 'Open an investigation before attaching templates.');
+      return;
+    }
+    const uniqueIds = Array.from(new Set(templateIds)).filter((templateId) => noteTemplateMap.has(templateId));
+    await updateFolder(selectedFolderId, { noteTemplateIds: uniqueIds });
+    addToast('success', uniqueIds.length === 0 ? 'No templates attached to this investigation.' : `${uniqueIds.length} template${uniqueIds.length === 1 ? '' : 's'} attached to this investigation.`);
+  }, [addToast, noteTemplateMap, selectedFolderId, updateFolder]);
+
+  const handleCreateNoteTemplate = useCallback(async (data: Partial<NoteTemplate> & { name: string; content: string }) => {
+    const template = await noteTemplatesHook.createTemplate(data);
+    if (selectedFolderId) {
+      const currentTemplateIds = selectedFolder?.noteTemplateIds ?? [];
+      await updateFolder(selectedFolderId, {
+        noteTemplateIds: Array.from(new Set([...currentTemplateIds, template.id])),
+      });
+      addToast('success', `Saved "${template.name}" as a template and attached it to this investigation.`);
+    } else {
+      addToast('success', `Saved "${template.name}" as a template.`);
+    }
+  }, [addToast, noteTemplatesHook, selectedFolder?.noteTemplateIds, selectedFolderId, updateFolder]);
 
   const handleNewTask = useCallback(async () => {
     setShowTrash(false);
@@ -1045,11 +1289,12 @@ const AppInner = memo(function AppInner({
       timelines: timelines.filter((tl) => folder.timelineId === tl.id),
       whiteboards: whiteboards.filter((w) => w.folderId === folderId && !w.trashed),
       iocs: standaloneIOCsHook.iocs.filter((i) => i.folderId === folderId && !i.trashed),
+      evidenceItems: evidenceItemsHook.evidenceItems.filter((item) => item.folderId === folderId && !item.trashed),
       chatThreads: chatsHook.threads.filter((c) => c.folderId === folderId && !c.trashed),
       tags,
     };
     setShareLinkPayload({ v: 1, s: 'investigation', t: Date.now(), d: bundle });
-  }, [folders, notes.notes, tasks.tasks, timeline.events, timelines, whiteboards, standaloneIOCsHook.iocs, chatsHook.threads, tags]);
+  }, [folders, notes.notes, tasks.tasks, timeline.events, timelines, whiteboards, standaloneIOCsHook.iocs, evidenceItemsHook.evidenceItems, chatsHook.threads, tags]);
 
   const handleShareChatThread = useCallback((thread: ChatThread) => {
     // Trim thread for sharing — strip large tool call results to reduce payload size
@@ -1070,13 +1315,14 @@ const AppInner = memo(function AppInner({
   const handleSaveSharedPayload = useCallback(async (payload: SharePayload) => {
     if (payload.s === 'investigation') {
       const bundle = payload.d as InvestigationBundle;
-      await db.transaction('rw', [db.folders, db.notes, db.tasks, db.timelineEvents, db.whiteboards, db.standaloneIOCs, db.chatThreads, db.timelines, db.tags], async () => {
+      await db.transaction('rw', [db.folders, db.notes, db.tasks, db.timelineEvents, db.whiteboards, db.standaloneIOCs, db.evidenceItems, db.chatThreads, db.timelines, db.tags], async () => {
         await db.folders.put(bundle.folder);
         await db.notes.bulkPut(bundle.notes);
         await db.tasks.bulkPut(bundle.tasks);
         await db.timelineEvents.bulkPut(bundle.events);
         await db.whiteboards.bulkPut(bundle.whiteboards);
         await db.standaloneIOCs.bulkPut(bundle.iocs);
+        if (bundle.evidenceItems) await db.evidenceItems.bulkPut(bundle.evidenceItems);
         if (bundle.chatThreads) await db.chatThreads.bulkPut(bundle.chatThreads);
         await db.timelines.bulkPut(bundle.timelines);
         await db.tags.bulkPut(bundle.tags);
@@ -1124,6 +1370,248 @@ const AppInner = memo(function AppInner({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activityLog, addToast, notes.reload, timeline.reload, standaloneIOCsHook.reload, reloadTimelines, reloadTags, navigateTo]);
 
+  const handleEvidenceImport = useCallback(async (files: File[]): Promise<EvidenceItem[]> => {
+    if (!selectedFolderId) {
+      throw new Error('Select an investigation before importing evidence.');
+    }
+    if (files.length > MAX_EVIDENCE_IMPORT_FILES) {
+      throw new Error(`Import up to ${MAX_EVIDENCE_IMPORT_FILES} evidence files at once.`);
+    }
+
+    const createdItems: EvidenceItem[] = [];
+    const activeEvidenceKeys = new Set(
+      evidenceItemsHook.evidenceItems
+        .filter((item) => item.folderId === selectedFolderId && !item.trashed)
+        .map(evidenceFileKeyFromItem),
+    );
+    const selectedEvidenceKeys = new Set<string>();
+    const filesToImport: File[] = [];
+    let skippedDuplicateFiles = 0;
+
+    for (const file of files) {
+      const key = evidenceFileKeyFromFile(file);
+      const scopedKey = `${selectedFolderId}|${key}`;
+      if (activeEvidenceKeys.has(scopedKey) || selectedEvidenceKeys.has(scopedKey)) {
+        skippedDuplicateFiles += 1;
+        continue;
+      }
+      selectedEvidenceKeys.add(scopedKey);
+      filesToImport.push(file);
+    }
+
+    if (filesToImport.length === 0) {
+      throw new Error('All selected evidence files are already imported for this investigation.');
+    }
+
+    let createdIOCCount = 0;
+    const failedFiles: Array<{ name: string; message: string }> = [];
+    for (const file of filesToImport) {
+      let drafts: Awaited<ReturnType<typeof buildEvidenceItemDrafts>>;
+      try {
+        drafts = await buildEvidenceItemDrafts(file, {
+          folderName: selectedFolder?.name,
+        });
+      } catch (err) {
+        failedFiles.push({
+          name: file.name,
+          message: err instanceof Error ? err.message : 'import failed',
+        });
+        continue;
+      }
+
+      for (const draft of drafts) {
+        const item = await evidenceItemsHook.createEvidenceItem({
+          ...draft,
+          folderId: selectedFolderId,
+          clsLevel: selectedFolder?.clsLevel,
+        });
+
+        const enabledIOCTypes = settings.tiEnabledIOCTypes as IOCType[] | undefined;
+        const defaultIOCConfidence = settings.tiDefaultConfidence as ConfidenceLevel | undefined;
+        const tableCandidates = extractEvidenceTableIOCCandidates(draft.content, {
+          enabledTypes: enabledIOCTypes,
+          defaultConfidence: defaultIOCConfidence,
+        });
+        const freshIOCs = extractIOCs(draft.content, {
+          enabledTypes: settings.tiEnabledIOCTypes,
+          defaultConfidence: settings.tiDefaultConfidence,
+        });
+        const tableIOCs = tableCandidates.map((candidate) => ({
+          id: `evidence-table-${candidate.type}-${candidate.value.toLowerCase()}`,
+          type: candidate.type,
+          value: candidate.value,
+          confidence: candidate.confidence,
+          firstSeen: Date.now(),
+          dismissed: false,
+          analystNotes: `${candidate.notes}\n\nEvidence file: "${draft.fileName}".`,
+        }));
+        const observationResult = await upsertIOCObservations([...tableIOCs, ...freshIOCs], {
+          folderId: selectedFolderId,
+          clsLevel: selectedFolder?.clsLevel,
+          source: { kind: 'evidence', id: item.id, title: item.title, fileName: draft.fileName },
+          defaultConfidence: defaultIOCConfidence,
+        });
+        const linkedIOCIds = observationResult.touched.map((ioc) => ioc.id);
+        createdIOCCount += observationResult.created.length;
+        autoEnrichCreatedIOCs(observationResult.touched);
+
+        if (linkedIOCIds.length > 0) {
+          await evidenceItemsHook.updateEvidenceItem(item.id, { linkedIOCIds });
+        }
+        createdItems.push(linkedIOCIds.length > 0 ? { ...item, linkedIOCIds } : item);
+      }
+
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+    }
+
+    if (createdItems.length === 0 && failedFiles.length > 0) {
+      const summary = failedFiles.slice(0, 3).map((item) => `${item.name}: ${item.message}`).join('; ');
+      throw new Error(`Evidence import failed. ${summary}`);
+    }
+
+    evidenceItemsHook.reload();
+    standaloneIOCsHook.reload();
+    reloadTags();
+    activityLog.log(
+      'evidence',
+      'import',
+      `Imported ${filesToImport.length} evidence file${filesToImport.length === 1 ? '' : 's'} as ${createdItems.length} evidence item${createdItems.length === 1 ? '' : 's'} and extracted ${createdIOCCount} IOC${createdIOCCount === 1 ? '' : 's'}${skippedDuplicateFiles > 0 ? `; skipped ${skippedDuplicateFiles} duplicate file${skippedDuplicateFiles === 1 ? '' : 's'}` : ''}${failedFiles.length > 0 ? `; failed ${failedFiles.length} file${failedFiles.length === 1 ? '' : 's'}` : ''}`,
+      selectedFolderId,
+      selectedFolder?.name,
+    );
+    addToast('success', `Imported ${createdItems.length} evidence item${createdItems.length === 1 ? '' : 's'}${createdIOCCount > 0 ? ` and extracted ${createdIOCCount} IOC${createdIOCCount === 1 ? '' : 's'}` : ''}${skippedDuplicateFiles > 0 ? `; skipped ${skippedDuplicateFiles} duplicate file${skippedDuplicateFiles === 1 ? '' : 's'}` : ''}`);
+    if (failedFiles.length > 0) {
+      addToast('warning', `${failedFiles.length} evidence file${failedFiles.length === 1 ? '' : 's'} could not be imported.`, 7000);
+    }
+    return createdItems;
+  }, [selectedFolderId, selectedFolder, standaloneIOCsHook, evidenceItemsHook, settings.tiEnabledIOCTypes, settings.tiDefaultConfidence, loggedCreateIOCWithAuto, reloadTags, activityLog, addToast]);
+
+  const handleDeduplicateEvidence = useCallback(async (): Promise<number> => {
+    if (!selectedFolderId) {
+      throw new Error('Select an investigation before deduplicating evidence.');
+    }
+
+    const duplicateIds = findDuplicateEvidenceItemIds(evidenceItemsHook.evidenceItems, selectedFolderId);
+    if (duplicateIds.length === 0) {
+      addToast('info', 'No duplicate evidence found.');
+      return 0;
+    }
+
+    for (const id of duplicateIds) {
+      await evidenceItemsHook.updateEvidenceItem(id, { trashed: true, trashedAt: Date.now() });
+    }
+
+    evidenceItemsHook.reload();
+    activityLog.log(
+      'evidence',
+      'deduplicate',
+      `Moved ${duplicateIds.length} duplicate evidence item${duplicateIds.length === 1 ? '' : 's'} to trash`,
+      selectedFolderId,
+      selectedFolder?.name,
+    );
+    addToast('success', `Moved ${duplicateIds.length} duplicate evidence item${duplicateIds.length === 1 ? '' : 's'} to trash.`);
+    return duplicateIds.length;
+  }, [activityLog, addToast, evidenceItemsHook, selectedFolder?.name, selectedFolderId]);
+
+  const handleCreateTableIOCsFromEvidence = useCallback(async (
+    item: EvidenceItem,
+    candidates: EvidenceTableIOCCandidate[],
+  ): Promise<number> => {
+    const folderId = item.folderId || selectedFolderId;
+    if (!folderId) {
+      throw new Error('Select an investigation before adding table IOCs.');
+    }
+    if (candidates.length === 0) return 0;
+
+    const existingIOCKeys = new Set(
+      standaloneIOCsHook.iocs
+        .filter((ioc) => ioc.folderId === folderId && !ioc.trashed)
+        .map((ioc) => `${ioc.type}:${ioc.value.toLowerCase()}`),
+    );
+    const linkedIOCIds = new Set(item.linkedIOCIds || []);
+    let created = 0;
+
+    for (const candidate of candidates) {
+      const key = `${candidate.type}:${candidate.value.toLowerCase()}`;
+      if (existingIOCKeys.has(key)) continue;
+      const ioc = await loggedCreateIOCWithAuto({
+        type: candidate.type,
+        value: candidate.value,
+        confidence: candidate.confidence,
+        folderId,
+        clsLevel: item.clsLevel || selectedFolder?.clsLevel,
+        tags: ['source:evidence', 'source:table'],
+        analystNotes: `${candidate.notes}\n\nEvidence file: "${item.fileName}".`,
+      });
+      existingIOCKeys.add(key);
+      linkedIOCIds.add(ioc.id);
+      created += 1;
+    }
+
+    if (created > 0) {
+      await evidenceItemsHook.updateEvidenceItem(item.id, { linkedIOCIds: Array.from(linkedIOCIds) });
+      evidenceItemsHook.reload();
+      standaloneIOCsHook.reload();
+      reloadTags();
+      activityLog.log(
+        'evidence',
+        'update',
+        `Added ${created} IOC${created === 1 ? '' : 's'} from evidence table "${item.fileName}"`,
+        folderId,
+        selectedFolder?.name,
+      );
+      addToast('success', `Added ${created} IOC${created === 1 ? '' : 's'} from table evidence.`);
+    }
+
+    return created;
+  }, [activityLog, addToast, evidenceItemsHook, loggedCreateIOCWithAuto, reloadTags, selectedFolder?.clsLevel, selectedFolder?.name, selectedFolderId, standaloneIOCsHook]);
+
+  const handleAnalyzeImageEvidence = useCallback(async (item: EvidenceItem) => {
+    if (!selectedFolderId) {
+      addToast('error', 'Select an investigation before analyzing image evidence.');
+      return;
+    }
+    if (!item.imageData || !item.imageDataMimeType || !VALID_RASTER_IMAGE_MIME_TYPES.has(item.imageDataMimeType.toLowerCase())) {
+      addToast('error', 'This image only has metadata stored. Re-import a smaller image to analyze pixels in CaddyAI.');
+      return;
+    }
+
+    const thread = await loggedCreateChatThread({
+      title: `Analyze image: ${item.fileName}`,
+      folderId: selectedFolderId,
+      model: settings.llmDefaultModel || 'claude-sonnet-4-6',
+      provider: (settings.llmDefaultProvider as ChatThread['provider']) || 'anthropic',
+      tags: ['evidence-analysis'],
+    });
+    const text = [
+      `Analyze this ThreatCaddy image evidence: ${item.fileName}`,
+      '',
+      'Identify what the image shows, transcribe visible text, extract IOCs or other security-relevant entities, and call out uncertainty.',
+      '',
+      'Evidence metadata:',
+      `- Investigation: ${selectedFolder?.name || selectedFolderId}`,
+      `- File type: ${item.fileType}`,
+      `- MIME: ${item.imageDataMimeType}`,
+      `- Size: ${formatBytes(item.size)}`,
+      item.imageWidth && item.imageHeight ? `- Dimensions: ${item.imageWidth} x ${item.imageHeight}px` : undefined,
+      item.imageAspectRatio ? `- Aspect ratio: ${item.imageAspectRatio}` : undefined,
+      item.extractionWarning ? `- Import note: ${item.extractionWarning}` : undefined,
+    ].filter(Boolean).join('\n');
+    setPendingChatDraft({
+      id: `image-analysis-${item.id}-${Date.now()}`,
+      threadId: thread.id,
+      text,
+      attachments: [{
+        type: 'image',
+        data: item.imageData,
+        mimeType: item.imageDataMimeType,
+        name: item.fileName,
+      }],
+    });
+    setSelectedChatThreadId(thread.id);
+    navigateTo('chat');
+  }, [addToast, loggedCreateChatThread, navigateTo, selectedFolder?.name, selectedFolderId, setSelectedChatThreadId, settings.llmDefaultModel, settings.llmDefaultProvider]);
+
   const handleQuickCapture = useCallback(async (data: Partial<Note>) => {
     const folder = selectedFolderId ? folders.find((f) => f.id === selectedFolderId) : undefined;
     const note = await loggedCreateNote({
@@ -1131,13 +1619,21 @@ const AppInner = memo(function AppInner({
       folderId: data.folderId ?? selectedFolderId,
       clsLevel: data.clsLevel ?? folder?.clsLevel,
     });
-    setSelectedNoteId(note.id);
-    navigateTo('notes', { selectedNoteId: note.id });
-  }, [loggedCreateNote, navigateTo, selectedFolderId, folders]);
+    handleSearchNavigateToNote(note.id);
+  }, [loggedCreateNote, selectedFolderId, folders, handleSearchNavigateToNote]);
 
   const handleImportComplete = useCallback(() => {
+    setInvestigationMode('local');
+    setSelectedFolderId(undefined);
+    setSelectedNoteId(undefined);
+    setSelectedTag(undefined);
+    setSelectedIOCTypes([]);
+    setShowTrash(false);
+    setShowArchive(false);
     reloadAll();
-  }, [reloadAll]);
+    closeSettings();
+    navigateTo('notes');
+  }, [closeSettings, navigateTo, reloadAll, setInvestigationMode, setSelectedFolderId, setSelectedIOCTypes, setSelectedNoteId, setSelectedTag, setShowTrash, setShowArchive]);
 
   const handleQuickSave = useCallback(async () => {
     try {
@@ -1175,7 +1671,15 @@ const AppInner = memo(function AppInner({
       const result = await mergeImportJSON(text);
       setPendingImportFile(null);
       handleImportComplete();
-      addToast('success', tt('backup.mergeComplete', { added: result.added, updated: result.updated, skipped: result.skipped }));
+      const notesMerged = (result.tables.notes?.added ?? 0) + (result.tables.notes?.updated ?? 0);
+      const investigationsWithNotes = result.noteInvestigations.filter((item) => item.notes > 0).length;
+      addToast('success', tt('backup.mergeCompleteDetailed', {
+        notes: notesMerged,
+        investigations: investigationsWithNotes,
+        added: result.added,
+        updated: result.updated,
+        skipped: result.skipped,
+      }));
     } catch {
       addToast('error', tt('backup.mergeFailed'));
       setPendingImportFile(null);
@@ -1252,15 +1756,6 @@ const AppInner = memo(function AppInner({
 
   // Keyboard shortcuts
   // Search overlay navigation callbacks
-  const handleSearchNavigateToNote = useCallback((id: string) => {
-    setSelectedNoteId(id);
-    setSelectedFolderId(undefined);
-    setSelectedTag(undefined);
-    setShowTrash(false);
-    setShowArchive(false);
-    navigateTo('notes', { selectedNoteId: id });
-  }, [navigateTo, setSelectedFolderId]);
-
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleSearchNavigateToTask = useCallback((_id: string) => {
     setSelectedFolderId(undefined);
@@ -1331,15 +1826,17 @@ const AppInner = memo(function AppInner({
     onRenameTag: (id: string, name: string) => updateTag(id, { name }),
     onDeleteTag: loggedDeleteTag,
     investigationScopedCounts,
+    evidenceCount: activeEvidenceItems.length,
+    productCount: activeProducts.length,
     chatCount: chatsHook.threadCounts.total,
     serverConnected: auth.connected,
-  }), [noteCounts, combinedTrashedCount, combinedArchivedCount, tasks.taskCounts, timeline.eventCounts, timelines, selectedTimelineId, loggedCreateTimeline, loggedDeleteTimeline, updateTimeline, timelineEventCounts, whiteboards, selectedFolderId, selectedWhiteboardId, loggedCreateWhiteboard, loggedDeleteWhiteboard, updateWhiteboard, whiteboardCounts, updateTag, loggedDeleteTag, investigationScopedCounts, chatsHook.threadCounts.total, auth.connected]);
+  }), [noteCounts, combinedTrashedCount, combinedArchivedCount, tasks.taskCounts, timeline.eventCounts, timelines, selectedTimelineId, loggedCreateTimeline, loggedDeleteTimeline, updateTimeline, timelineEventCounts, whiteboards, selectedFolderId, selectedWhiteboardId, loggedCreateWhiteboard, loggedDeleteWhiteboard, updateWhiteboard, whiteboardCounts, updateTag, loggedDeleteTag, investigationScopedCounts, activeEvidenceItems.length, activeProducts.length, chatsHook.threadCounts.total, auth.connected]);
 
   // CaddyAgent hook — manages auto-repeating loop
   const caddyAgent = useCaddyAgent({
     folder: selectedFolder,
     settings,
-    onEntitiesChanged: () => { notes.reload(); tasks.reload(); timeline.reload(); standaloneIOCsHook.reload(); chatsHook.reload(); },
+    onEntitiesChanged: () => { notes.reload(); tasks.reload(); timeline.reload(); standaloneIOCsHook.reload(); evidenceItemsHook.reload(); chatsHook.reload(); },
   });
 
   const agentProfilesHook = useAgentProfiles();
@@ -1390,9 +1887,17 @@ const AppInner = memo(function AppInner({
   }
 
   // Wait for core data before rendering to prevent empty-content flash on refresh
-  const dataReady = !notes.loading && !foldersLoading && !tasks.loading;
+  const dataReady = startupGraceExpired || (!notes.loading && !foldersLoading && !tasks.loading);
   if (!dataReady) {
-    return <div className="min-h-screen bg-gray-950 dark:bg-gray-950" />;
+    return (
+      <div className="min-h-screen bg-gray-950 dark:bg-gray-950 flex items-center justify-center text-gray-400">
+        <div className="text-center">
+          <div className="mx-auto mb-3 h-8 w-8 rounded-full border-2 border-gray-700 border-t-purple animate-spin" />
+          <p className="text-sm font-medium text-gray-300">Loading ThreatCaddy</p>
+          <p className="mt-1 text-xs text-gray-500">Opening the local workspace database...</p>
+        </div>
+      </div>
+    );
   }
 
   // Mobile exec mode — replace entire UI with executive dashboard
@@ -1472,6 +1977,7 @@ const AppInner = memo(function AppInner({
         bgImagePosX={settings.bgImagePosX}
         bgImagePosY={settings.bgImagePosY}
         bgImageZoom={settings.bgImageZoom}
+        bgImageBlur={settings.bgImageBlur}
         theme={settings.theme}
         header={
           <ErrorBoundary region="header">
@@ -1484,6 +1990,8 @@ const AppInner = memo(function AppInner({
             onNewTimelineEvent={handleNewTimelineEvent}
             onNewWhiteboard={handleNewWhiteboard}
             onNewIOC={handleNewIOC}
+            onNewNoteTemplate={() => setShowNoteTemplateCreator(true)}
+            onImportNoteTemplate={selectedFolder ? () => setShowInvestigationTemplatePicker(true) : undefined}
             onOpenFile={openFilePicker}
             onImportData={() => setShowDataImport(true)}
             onToggleSidebar={() => updateSettings({ sidebarCollapsed: !settings.sidebarCollapsed })}
@@ -1564,6 +2072,7 @@ const AppInner = memo(function AppInner({
             timelineEvents={screensafeTimelineEvents}
             whiteboards={screensafeWhiteboards}
             standaloneIOCs={screensafeStandaloneIOCs}
+            evidenceItems={screensafeEvidenceItems}
             chatThreads={screensafeChatThreads}
             folders={folders}
             onRestoreNote={loggedRestoreNote}
@@ -1586,6 +2095,10 @@ const AppInner = memo(function AppInner({
             onDeleteIOCPermanently={loggedDeleteIOC}
             onTrashIOC={loggedTrashIOC}
             onUnarchiveIOC={loggedToggleArchiveIOC}
+            onRestoreEvidenceItem={loggedRestoreEvidenceItem}
+            onDeleteEvidenceItemPermanently={loggedDeleteEvidenceItem}
+            onTrashEvidenceItem={loggedTrashEvidenceItem}
+            onUnarchiveEvidenceItem={loggedToggleArchiveEvidenceItem}
             onRestoreThread={chatsHook.restoreThread}
             onDeleteThreadPermanently={chatsHook.deleteThread}
             onTrashThread={chatsHook.trashThread}
@@ -1622,7 +2135,7 @@ const AppInner = memo(function AppInner({
             allTags={tags}
             allStandaloneIOCs={screensafeStandaloneIOCs}
             filteredStandaloneIOCs={ssFilteredStandaloneIOCs}
-            onCreateIOC={loggedCreateIOC}
+            onCreateIOC={loggedCreateIOCWithAuto}
             onUpdateIOC={standaloneIOCsHook.updateIOC}
             onDeleteIOC={loggedDeleteIOC}
             onTrashIOC={loggedTrashIOC}
@@ -1631,11 +2144,7 @@ const AppInner = memo(function AppInner({
             onOpenSettings={() => { openSettings('integrations'); }}
             onNavigateToSource={(sourceType, sourceId) => {
               if (sourceType === 'note') {
-                noteNavGraceRef.current = true;
-                setSelectedNoteId(sourceId);
-                navigateTo('notes', { selectedNoteId: sourceId });
-                // Clear grace after Dexie live query has time to propagate the new note
-                setTimeout(() => { noteNavGraceRef.current = false; }, 2000);
+                handleSearchNavigateToNote(sourceId);
               } else if (sourceType === 'task') {
                 navigateTo('tasks');
               } else if (sourceType === 'event') {
@@ -1660,6 +2169,27 @@ const AppInner = memo(function AppInner({
           />
         ) : activeView === 'graph' ? (
           null /* GraphView is always-mounted below for layout persistence */
+        ) : activeView === 'evidence' ? (
+          <EvidenceView
+            folderId={selectedFolderId}
+            folderName={selectedFolder?.name}
+            items={ssFilteredEvidenceItems}
+            onImportFiles={handleEvidenceImport}
+            onDeduplicate={handleDeduplicateEvidence}
+            onCreateTableIOCs={handleCreateTableIOCsFromEvidence}
+            onOpenChat={() => navigateTo('chat')}
+            onAnalyzeImage={handleAnalyzeImageEvidence}
+          />
+        ) : activeView === 'products' ? (
+          <ProductView
+            folderName={selectedFolder?.name}
+            products={activeProducts}
+            baselines={productBaselines}
+            onOpenSourceNote={(id) => handleSearchNavigateToNote(id)}
+            onOpenChat={() => navigateTo('chat')}
+            onImportBaseline={handleImportProductBaseline}
+            onUpdateBaseline={handleUpdateProductBaseline}
+          />
         ) : activeView === 'timeline' ? (
           <TimelineView
             events={ssFilteredTimelineEvents}
@@ -1752,11 +2282,9 @@ const AppInner = memo(function AppInner({
                 setActiveView('chat');
               }}
               onNavigateToNote={(noteId) => {
-                // Navigate to the note
-                setSelectedNoteId(noteId);
-                setActiveView('notes');
+                handleSearchNavigateToNote(noteId);
               }}
-              onEntitiesChanged={() => { notes.reload(); tasks.reload(); timeline.reload(); standaloneIOCsHook.reload(); chatsHook.reload(); }}
+              onEntitiesChanged={() => { notes.reload(); tasks.reload(); timeline.reload(); standaloneIOCsHook.reload(); evidenceItemsHook.reload(); chatsHook.reload(); }}
               onOpenSettings={(tab) => { openSettings(tab); }}
               onFolderChanged={reloadFolders}
               profiles={agentProfilesHook.profiles}
@@ -1820,7 +2348,11 @@ const AppInner = memo(function AppInner({
                 selectedIOCTypes={selectedIOCTypes}
                 onIOCTypesChange={setSelectedIOCTypes}
                 folders={folders}
+                emptyHint={hiddenLocalNotesHint}
                 onCreate={handleNewNote}
+                attachedTemplates={selectedFolder ? attachedInvestigationTemplates : []}
+                onCreateFromTemplate={handleCreateNoteFromTemplate}
+                onManageTemplates={selectedFolder ? () => setShowInvestigationTemplatePicker(true) : undefined}
                 tiExportConfig={{
                   defaultClsLevel: settings.tiDefaultClsLevel,
                   defaultReportSource: settings.tiDefaultReportSource,
@@ -1883,7 +2415,7 @@ const AppInner = memo(function AppInner({
               {selectedNote ? (
                 <NoteEditor
                   note={selectedNote}
-                  onUpdate={notes.updateNote}
+                  onUpdate={handleUpdateNoteWithIOCObservation}
                   onTrash={loggedTrashNote}
                   onRestore={loggedRestoreNote}
                   onTogglePin={loggedTogglePin}
@@ -1928,7 +2460,9 @@ const AppInner = memo(function AppInner({
             scopedNotes={investigationNotes}
             scopedTasks={investigationTasks}
             scopedTimelineEvents={investigationTimelineEvents}
-            onNavigateToNote={(id) => { setSelectedNoteId(id); setSelectedFolderId(undefined); setSelectedTag(undefined); setShowTrash(false); setShowArchive(false); navigateTo('notes', { selectedNoteId: id }); }}
+            standaloneIOCs={screensafeStandaloneIOCs}
+            scopedStandaloneIOCs={selectedFolderId ? screensafeStandaloneIOCs.filter((ioc) => ioc.folderId === selectedFolderId) : screensafeStandaloneIOCs}
+            onNavigateToNote={handleSearchNavigateToNote}
             onNavigateToTask={() => { setSelectedFolderId(undefined); setSelectedTag(undefined); navigateTo('tasks'); }}
             onNavigateToTimelineEvent={(id) => { const ev = timeline.events.find((e) => e.id === id); if (ev) { setSelectedTimelineId(ev.timelineId); navigateTo('timeline', { selectedTimelineId: ev.timelineId }); } else { navigateTo('timeline'); } }}
             onUpdateNote={notes.updateNote}
@@ -1946,14 +2480,17 @@ const AppInner = memo(function AppInner({
             onTrashThread={loggedTrashChatThread}
             onShareThread={handleShareChatThread}
             settings={settings}
-            onEntitiesChanged={() => { notes.reload(); tasks.reload(); timeline.reload(); standaloneIOCsHook.reload(); chatsHook.reload(); }}
+            onUpdateSettings={updateSettings}
+            onEntitiesChanged={() => { notes.reload(); tasks.reload(); timeline.reload(); standaloneIOCsHook.reload(); evidenceItemsHook.reload(); chatsHook.reload(); }}
             onNavigateToEntity={(type, id) => {
-              if (type === 'note') { setSelectedNoteId(id); navigateTo('notes', { selectedNoteId: id }); }
+              if (type === 'note') { handleSearchNavigateToNote(id); }
               else if (type === 'task') { navigateTo('tasks'); }
               else if (type === 'event') { const ev = timeline.events.find((e) => e.id === id); setSelectedTimelineId(ev?.timelineId); navigateTo('timeline', { selectedTimelineId: ev?.timelineId }); }
               else if (type === 'ioc') { navigateTo('graph'); }
             }}
             onOpenSettings={(tab) => { openSettings(tab); }}
+            pendingDraft={pendingChatDraft}
+            onPendingDraftConsumed={(id) => setPendingChatDraft((current) => current?.id === id ? null : current)}
           />
         </div>
         </Suspense>
@@ -1985,6 +2522,28 @@ const AppInner = memo(function AppInner({
           folders={folders}
           defaultFolderId={selectedFolderId}
           templates={noteTemplatesHook.templates}
+        />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <InvestigationTemplatePicker
+          open={showInvestigationTemplatePicker}
+          onClose={() => setShowInvestigationTemplatePicker(false)}
+          templates={noteTemplatesHook.templates}
+          selectedTemplateIds={selectedFolder?.noteTemplateIds ?? []}
+          investigationName={selectedFolder?.name}
+          onSave={handleSaveInvestigationTemplateIds}
+        />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <NoteTemplateCreator
+          open={showNoteTemplateCreator}
+          onClose={() => setShowNoteTemplateCreator(false)}
+          categories={noteTemplatesHook.categories}
+          defaultClsLevel={selectedFolder?.clsLevel}
+          attachInvestigationName={selectedFolder?.name}
+          onCreate={handleCreateNoteTemplate}
         />
       </Suspense>
 
@@ -2029,7 +2588,7 @@ const AppInner = memo(function AppInner({
           open={showIOCForm}
           onClose={() => setShowIOCForm(false)}
           onSubmit={async (data) => {
-            await loggedCreateIOC(data);
+            await loggedCreateIOCWithAuto(data);
             navigateTo('ioc-stats');
           }}
           folders={folders}

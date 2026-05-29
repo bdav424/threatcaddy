@@ -25,7 +25,7 @@ function summarizeResults(results: DestinationPutResult[]): { allOk: boolean; er
   return { allOk: false, errorMsg: `${failed.length} of ${results.length} destinations failed` };
 }
 
-/** Handles multi-cloud backup operations (OCI, S3, Azure Blob, GCS). Returns push helpers, progress state, and per-destination results. */
+/** Handles multi-cloud backup operations (Cloud, S3, Azure Blob, GCS). Returns push helpers, progress state, and per-destination results. */
 export function useCloudSync(backupDestinations?: BackupDestination[]) {
   const [syncing, setSyncing] = useState(false);
   const [progress, setProgress] = useState('');

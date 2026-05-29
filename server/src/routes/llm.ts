@@ -35,7 +35,7 @@ app.post('/chat', requireRole('admin', 'analyst'), async (c) => {
   }
 
   // Validate provider and model strings to prevent URL/path injection
-  const VALID_PROVIDERS = ['anthropic', 'openai', 'gemini', 'mistral'];
+  const VALID_PROVIDERS = ['anthropic', 'openai', 'gemini', 'mistral', 'local'];
   if (typeof body.provider !== 'string' || !VALID_PROVIDERS.includes(body.provider)) {
     return c.json({ error: 'Invalid provider' }, 400);
   }

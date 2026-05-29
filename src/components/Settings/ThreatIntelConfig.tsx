@@ -20,7 +20,7 @@ const SIMPLE_CATEGORIES: ConfigCategory[] = [
   { key: 'tiIocStatuses', labelKey: 'intel.iocStatuses' },
 ];
 
-const BULK_KEY_MAP: Record<string, 'tiClsLevels' | 'tiIocStatuses' | 'attributionActors' | 'tiIocSubtypes' | 'tiRelationshipTypes' | 'tiDefaultClsLevel' | 'tiDefaultReportSource' | 'ociLabel' | 'tiAutoExtractEnabled' | 'tiAutoExtractDebounceMs' | 'tiEnabledIOCTypes' | 'tiDefaultConfidence'> = {
+const BULK_KEY_MAP: Record<string, 'tiClsLevels' | 'tiIocStatuses' | 'attributionActors' | 'tiIocSubtypes' | 'tiRelationshipTypes' | 'tiDefaultClsLevel' | 'tiDefaultReportSource' | 'cloudLabel' | 'tiAutoExtractEnabled' | 'tiAutoExtractDebounceMs' | 'tiEnabledIOCTypes' | 'tiDefaultConfidence'> = {
   cls_levels: 'tiClsLevels',
   ioc_subtypes: 'tiIocSubtypes',
   relationship_types: 'tiRelationshipTypes',
@@ -28,7 +28,7 @@ const BULK_KEY_MAP: Record<string, 'tiClsLevels' | 'tiIocStatuses' | 'attributio
   attribution_actors: 'attributionActors',
   default_cls_level: 'tiDefaultClsLevel',
   default_report_source: 'tiDefaultReportSource',
-  oci_label: 'ociLabel',
+  cloud_label: 'cloudLabel',
   auto_extract_enabled: 'tiAutoExtractEnabled',
   auto_extract_debounce_ms: 'tiAutoExtractDebounceMs',
   enabled_ioc_types: 'tiEnabledIOCTypes',
@@ -175,7 +175,7 @@ export function ThreatIntelConfig() {
             updates[settingsKey] = merged;
           } else if (settingsKey === 'tiRelationshipTypes' && data[jsonKey] && typeof data[jsonKey] === 'object' && !Array.isArray(data[jsonKey])) {
             updates[settingsKey] = { ...customRelTypes, ...data[jsonKey] };
-          } else if (typeof data[jsonKey] === 'string' && (settingsKey === 'tiDefaultClsLevel' || settingsKey === 'tiDefaultReportSource' || settingsKey === 'ociLabel' || settingsKey === 'tiDefaultConfidence')) {
+          } else if (typeof data[jsonKey] === 'string' && (settingsKey === 'tiDefaultClsLevel' || settingsKey === 'tiDefaultReportSource' || settingsKey === 'cloudLabel' || settingsKey === 'tiDefaultConfidence')) {
             updates[settingsKey] = data[jsonKey] || undefined;
           } else if (settingsKey === 'tiAutoExtractEnabled' && typeof data[jsonKey] === 'boolean') {
             updates[settingsKey] = data[jsonKey];
@@ -222,7 +222,7 @@ export function ThreatIntelConfig() {
     if (customRelTypes && Object.keys(customRelTypes).length > 0) config.relationship_types = customRelTypes;
     if (settings.tiDefaultClsLevel) config.default_cls_level = settings.tiDefaultClsLevel;
     if (settings.tiDefaultReportSource) config.default_report_source = settings.tiDefaultReportSource;
-    if (settings.ociLabel) config.oci_label = settings.ociLabel;
+    if (settings.cloudLabel) config.cloud_label = settings.cloudLabel;
     if (settings.tiAutoExtractEnabled !== undefined) config.auto_extract_enabled = settings.tiAutoExtractEnabled;
     if (settings.tiAutoExtractDebounceMs !== undefined) config.auto_extract_debounce_ms = settings.tiAutoExtractDebounceMs;
     if (settings.tiEnabledIOCTypes) config.enabled_ioc_types = settings.tiEnabledIOCTypes;

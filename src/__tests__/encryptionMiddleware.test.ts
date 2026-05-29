@@ -94,9 +94,10 @@ describe('ENCRYPTED_FIELDS', () => {
     expect(tables).toContain('activityLog');
     expect(tables).toContain('chatThreads');
     expect(tables).toContain('standaloneIOCs');
+    expect(tables).toContain('evidenceItems');
     expect(tables).toContain('installedIntegrations');
     expect(tables).toContain('integrationRuns');
-    expect(tables).toHaveLength(12);
+    expect(tables).toHaveLength(13);
   });
 
   it('notes table encrypts sensitive fields', () => {

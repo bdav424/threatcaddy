@@ -20,6 +20,7 @@ const EXEC = [
 ];
 const HOSTS = [
   { name: 'host:soc1:scan' },
+  { name: 'host__cti__virustotal_ioc_bundle' },
 ];
 
 const CLASS: Record<string, string> = {
@@ -34,6 +35,7 @@ const CLASS: Record<string, string> = {
   spawn_agent: 'create',
   dismiss_agent: 'modify',
   'host:soc1:scan': 'fetch',
+  host__cti__virustotal_ioc_bundle: 'enrich',
 };
 
 const cls = (name: string) => CLASS[name] || 'modify';
@@ -148,5 +150,15 @@ describe('buildAgentToolset', () => {
       allowedTools: ['search_notes'], // host:soc1:scan not listed
     });
     expect(availableTools.find(t => t.name === 'host:soc1:scan')).toBeUndefined();
+  });
+
+  it('allows explicit read-only VirusTotal host tools for specialist profiles', () => {
+    const { availableTools } = build({
+      role: 'specialist',
+      allowedTools: ['search_notes', 'host__cti__virustotal_ioc_bundle'],
+    });
+    const names = availableTools.map(t => t.name);
+    expect(names).toContain('host__cti__virustotal_ioc_bundle');
+    expect(names).not.toContain('host:soc1:scan');
   });
 });

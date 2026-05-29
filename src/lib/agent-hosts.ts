@@ -13,6 +13,8 @@ import type { AgentHost, AgentHostSkill, Settings } from '../types';
 const SKILLS_TIMEOUT_MS = 30_000;
 const EXECUTE_TIMEOUT_MS = 60_000;
 const MAX_ERROR_BODY_CHARS = 500;
+const LOCAL_CTI_AGENT_HOST_TOKEN = 'codex-local-dev';
+const HIDDEN_HOST_SKILLS = new Set(['flashpoint_request', 'censys_request', 'virustotal_request']);
 
 /**
  * Strip bearer tokens, authorization headers, and credential-like params from a
@@ -77,20 +79,67 @@ type ToolDef = {
   input_schema: { type: 'object'; properties: Record<string, unknown>; required: string[] };
 };
 
+const HOST_TOOL_PREFIX = 'host:';
+const LOCAL_TOOL_PREFIX = 'local:';
+const LLM_HOST_TOOL_PREFIX = 'host__';
+const LLM_LOCAL_TOOL_PREFIX = 'local__';
+
+type HostToolDefinitionOptions = {
+  /** Use OpenAI-compatible function names for LLM tool schemas. */
+  llmSafeNames?: boolean;
+};
+
+export function toLLMSafeHostToolName(toolName: string): string {
+  if (toolName.startsWith(LOCAL_TOOL_PREFIX)) {
+    return `${LLM_LOCAL_TOOL_PREFIX}${toolName.slice(LOCAL_TOOL_PREFIX.length)}`;
+  }
+  if (toolName.startsWith(HOST_TOOL_PREFIX)) {
+    const parts = toolName.split(':');
+    if (parts.length >= 3) {
+      return `${LLM_HOST_TOOL_PREFIX}${parts[1]}__${parts.slice(2).join(':')}`;
+    }
+  }
+  return toolName;
+}
+
+export function fromLLMSafeHostToolName(toolName: string): string {
+  if (toolName.startsWith(LLM_LOCAL_TOOL_PREFIX)) {
+    return `${LOCAL_TOOL_PREFIX}${toolName.slice(LLM_LOCAL_TOOL_PREFIX.length)}`;
+  }
+  if (toolName.startsWith(LLM_HOST_TOOL_PREFIX)) {
+    const rest = toolName.slice(LLM_HOST_TOOL_PREFIX.length);
+    const delimiter = rest.indexOf('__');
+    if (delimiter > 0) {
+      const hostName = rest.slice(0, delimiter);
+      const skillName = rest.slice(delimiter + 2);
+      if (hostName && skillName) return `${HOST_TOOL_PREFIX}${hostName}:${skillName}`;
+    }
+  }
+  return toolName;
+}
+
+export function isHostOrLocalToolName(toolName: string): boolean {
+  return toolName.startsWith(HOST_TOOL_PREFIX) ||
+    toolName.startsWith(LOCAL_TOOL_PREFIX) ||
+    toolName.startsWith(LLM_HOST_TOOL_PREFIX) ||
+    toolName.startsWith(LLM_LOCAL_TOOL_PREFIX);
+}
+
 /**
  * Generate LLM tool definitions from:
  * 1. Local LLM endpoint skills (prefix: local:<skill>)
  * 2. Additional agent hosts' cached skills (prefix: host:<hostName>:<skill>)
  */
-export function getHostToolDefinitions(settings: Settings): ToolDef[] {
+export function getHostToolDefinitions(settings: Settings, options: HostToolDefinitionOptions = {}): ToolDef[] {
   const tools: ToolDef[] = [];
 
   // Local LLM skills — discovered from the same endpoint used for chat
   const localSkills = settings.llmLocalSkills || [];
   if (settings.llmLocalEndpoint && localSkills.length > 0) {
     for (const skill of localSkills) {
+      const canonicalName = `local:${skill.name}`;
       tools.push({
-        name: `local:${skill.name}`,
+        name: options.llmSafeNames ? toLLMSafeHostToolName(canonicalName) : canonicalName,
         description: `[Local Agent] ${skill.description}`,
         input_schema: {
           type: 'object' as const,
@@ -105,8 +154,10 @@ export function getHostToolDefinitions(settings: Settings): ToolDef[] {
   const hosts = (settings.agentHosts || []).filter(h => h.enabled && h.skills.length > 0);
   for (const host of hosts) {
     for (const skill of host.skills) {
+      if (HIDDEN_HOST_SKILLS.has(skill.name)) continue;
+      const canonicalName = `host:${host.name}:${skill.name}`;
       tools.push({
-        name: `host:${host.name}:${skill.name}`,
+        name: options.llmSafeNames ? toLLMSafeHostToolName(canonicalName) : canonicalName,
         description: `[${host.displayName}] ${skill.description}`,
         input_schema: {
           type: 'object' as const,
@@ -133,10 +184,11 @@ export async function executeHostSkill(
   settings?: Settings,
 ): Promise<string> {
   const s: Settings = settings || JSON.parse(localStorage.getItem('threatcaddy-settings') || '{}');
+  const canonicalToolName = fromLLMSafeHostToolName(toolName);
 
   // local:<skill> — route to the local LLM endpoint
-  if (toolName.startsWith('local:')) {
-    const skillName = toolName.slice(6);
+  if (canonicalToolName.startsWith('local:')) {
+    const skillName = canonicalToolName.slice(6);
     if (!s.llmLocalEndpoint) return JSON.stringify({ error: 'No local LLM endpoint configured. Set it in Settings > AI.' });
 
     const baseUrl = s.llmLocalEndpoint.replace(/\/+$/, '').replace(/\/v1\/?$/, '');
@@ -144,7 +196,7 @@ export async function executeHostSkill(
   }
 
   // host:<name>:<skill> — route to a named agent host
-  const parts = toolName.split(':');
+  const parts = canonicalToolName.split(':');
   if (parts.length < 3 || parts[0] !== 'host') {
     return JSON.stringify({ error: `Invalid host tool name: ${toolName}` });
   }
@@ -170,7 +222,9 @@ async function callHostExecute(
 ): Promise<string> {
   const url = `${baseUrl.replace(/\/+$/, '')}/execute`;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (apiKey && apiKey !== 'local') headers['Authorization'] = `Bearer ${apiKey}`;
+  const normalizedBase = baseUrl.replace(/\/+$/, '');
+  const effectiveApiKey = apiKey || (/^https?:\/\/(?:127\.0\.0\.1|localhost):8766$/i.test(normalizedBase) ? LOCAL_CTI_AGENT_HOST_TOKEN : undefined);
+  if (effectiveApiKey && effectiveApiKey !== 'local') headers['Authorization'] = `Bearer ${effectiveApiKey}`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), EXECUTE_TIMEOUT_MS);
@@ -206,16 +260,17 @@ async function callHostExecute(
  */
 export function getHostSkillActionClass(toolName: string): string {
   const settings: Settings = JSON.parse(localStorage.getItem('threatcaddy-settings') || '{}');
+  const canonicalToolName = fromLLMSafeHostToolName(toolName);
 
   // local:<skill>
-  if (toolName.startsWith('local:')) {
-    const skillName = toolName.slice(6);
+  if (canonicalToolName.startsWith('local:')) {
+    const skillName = canonicalToolName.slice(6);
     const skill = (settings.llmLocalSkills || []).find(s => s.name === skillName);
     return skill?.actionClass || 'modify';
   }
 
   // host:<name>:<skill>
-  const parts = toolName.split(':');
+  const parts = canonicalToolName.split(':');
   if (parts.length >= 3) {
     const hostName = parts[1];
     const skillName = parts.slice(2).join(':');

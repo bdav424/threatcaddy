@@ -7,6 +7,12 @@ const DB_NAME = 'ThreatCaddyThemeAssets';
 const STORE_NAME = 'assets';
 const BG_KEY = 'background-image';
 const DB_VERSION = 1;
+export const BG_IMAGE_CHANGED_EVENT = 'threatcaddy:bg-image-changed';
+
+function notifyBgImageChanged() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event(BG_IMAGE_CHANGED_EVENT));
+}
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -28,13 +34,13 @@ export async function saveBgImage(blob: Blob): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     tx.objectStore(STORE_NAME).put(blob, BG_KEY);
-    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.oncomplete = () => { db.close(); notifyBgImageChanged(); resolve(); };
     tx.onerror = () => { db.close(); reject(tx.error); };
   });
 }
 
-/** Load the stored background image as an object URL. Returns null if none set. */
-export async function loadBgImage(): Promise<string | null> {
+/** Load the stored background image blob. Returns null if none is set. */
+export async function loadBgImageBlob(): Promise<Blob | null> {
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
@@ -42,15 +48,20 @@ export async function loadBgImage(): Promise<string | null> {
       const req = tx.objectStore(STORE_NAME).get(BG_KEY);
       req.onsuccess = () => {
         db.close();
-        const blob = req.result as Blob | undefined;
-        if (blob) {
-          resolve(URL.createObjectURL(blob));
-        } else {
-          resolve(null);
-        }
+        resolve((req.result as Blob | undefined) || null);
       };
       req.onerror = () => { db.close(); reject(req.error); };
     });
+  } catch {
+    return null;
+  }
+}
+
+/** Load the stored background image as an object URL. Returns null if none set. */
+export async function loadBgImage(): Promise<string | null> {
+  try {
+    const blob = await loadBgImageBlob();
+    return blob ? URL.createObjectURL(blob) : null;
   } catch {
     return null;
   }
@@ -62,7 +73,7 @@ export async function removeBgImage(): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     tx.objectStore(STORE_NAME).delete(BG_KEY);
-    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.oncomplete = () => { db.close(); notifyBgImageChanged(); resolve(); };
     tx.onerror = () => { db.close(); reject(tx.error); };
   });
 }

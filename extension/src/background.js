@@ -1,6 +1,58 @@
 // Background service worker for ThreatCaddy extension
 
 const MAX_CAPTURES = 500;
+const LOCAL_MAX_CONTEXT_MESSAGES = 12;
+const LOCAL_SYSTEM_PROMPT = `You are CaddyAI running inside ThreatCaddy with tool access to the current investigation.
+
+You can access ThreatCaddy notes, tasks, IOCs, timeline events, and investigation metadata through the provided tools.
+Do not say you cannot access ThreatCaddy data unless a tool call actually fails.
+Do not ask the user to paste notes or investigation content that can be read with the available tools.
+
+When the user asks about existing ThreatCaddy content:
+1. Start by using a read tool such as get_investigation_summary, search_all, search_notes, list_tasks, list_iocs, list_timeline_events, read_note, read_task, read_ioc, or read_timeline_event.
+2. Use the returned ThreatCaddy data to answer or continue the task.
+3. Only ask the user for missing information if the required data is not present in ThreatCaddy and no tool can retrieve it.
+
+For local models, emit tool calls exactly as:
+<tool_call>
+{"name":"tool_name","arguments":{"key":"value"}}
+</tool_call>
+
+Prefer short, schema-faithful tool arguments and avoid extra wrapper objects.`;
+const SHOW_REASONING = true;
+
+function formatReasoningChunk(chunk) {
+  return String(chunk || '').replace(/\r/g, '');
+}
+
+function normalizeLocalEndpoint(rawEndpoint) {
+  const fallback = 'http://localhost:11434/v1';
+  const trimmed = String(rawEndpoint || fallback).trim();
+  const withScheme = /^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(trimmed)
+    ? trimmed
+    : `http://${trimmed}`;
+  const parsed = new URL(withScheme);
+
+  if (
+    parsed.hostname === 'localhost' ||
+    parsed.hostname === '127.0.0.1' ||
+    parsed.hostname === '::1'
+  ) {
+    parsed.protocol = 'http:';
+  }
+
+  if (parsed.pathname === '/' || parsed.pathname === '') {
+    parsed.pathname = '/v1';
+  } else if (
+    parsed.pathname === '/api' ||
+    parsed.pathname === '/api/' ||
+    parsed.pathname === '/api/generate'
+  ) {
+    parsed.pathname = '/v1';
+  }
+
+  return parsed.toString().replace(/\/+$/, '');
+}
 
 // ── Dynamic bridge.js registration (MV3) ────────────────────────────────
 // Static content_scripts only cover threatcaddy.com. For self-hosted,
@@ -801,49 +853,242 @@ async function streamAnthropic(send, payload, signal) {
 function parseToolCallsFromText(text, toolNames) {
   const calls = [];
   const nameSet = new Set(toolNames || []);
+  const spans = [];
+
+  function addSpan(start, end) {
+    if (typeof start !== 'number' || typeof end !== 'number' || end <= start) return;
+    spans.push({ start, end });
+  }
+
+  function mergeSpans(items) {
+    if (items.length === 0) return [];
+    const sorted = [...items].sort((a, b) => a.start - b.start);
+    const merged = [sorted[0]];
+    for (let i = 1; i < sorted.length; i++) {
+      const current = sorted[i];
+      const last = merged[merged.length - 1];
+      if (current.start <= last.end) {
+        last.end = Math.max(last.end, current.end);
+      } else {
+        merged.push({ ...current });
+      }
+    }
+    return merged;
+  }
+
+  function stripSpans(source, items) {
+    const merged = mergeSpans(items);
+    if (merged.length === 0) return source.trim();
+    let out = '';
+    let cursor = 0;
+    for (const span of merged) {
+      out += source.slice(cursor, span.start);
+      if (!out.endsWith('\n')) out += '\n';
+      cursor = span.end;
+    }
+    out += source.slice(cursor);
+    return out
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  function isCovered(start, end) {
+    return spans.some((span) => start >= span.start && end <= span.end);
+  }
+
+  function extractTopLevelJsonObjects(source) {
+    const objects = [];
+    let depth = 0;
+    let start = -1;
+    let inString = false;
+    let escaped = false;
+
+    for (let i = 0; i < source.length; i++) {
+      const ch = source[i];
+
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (ch === '\\') {
+          escaped = true;
+        } else if (ch === '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (ch === '"') {
+        inString = true;
+        continue;
+      }
+
+      if (ch === '{') {
+        if (depth === 0) start = i;
+        depth++;
+        continue;
+      }
+
+      if (ch === '}') {
+        if (depth === 0) continue;
+        depth--;
+        if (depth === 0 && start !== -1) {
+          objects.push({ start, end: i + 1, text: source.slice(start, i + 1) });
+          start = -1;
+        }
+      }
+    }
+
+    return objects;
+  }
+
+  function normalizeCallObject(obj) {
+    if (!obj || typeof obj !== 'object') return null;
+
+    const name = obj.name || obj.function;
+    const args = obj.arguments || obj.parameters || obj.input || {};
+    if (name && nameSet.has(name)) {
+      return { name, arguments: typeof args === 'string' ? JSON.parse(args) : args };
+    }
+
+    // Heuristic fallback for smaller local models that emit bare argument JSON
+    // instead of proper tool_call wrappers or structured tool_calls.
+    if (
+      nameSet.has('create_in_investigation') &&
+      typeof obj.entityType === 'string' &&
+      obj.data &&
+      typeof obj.data === 'object' &&
+      (typeof obj.investigationId === 'string' || typeof obj.investigationName === 'string')
+    ) {
+      return {
+        name: 'create_in_investigation',
+        arguments: {
+          investigationId: typeof obj.investigationId === 'string' ? obj.investigationId : undefined,
+          investigationName: typeof obj.investigationName === 'string' ? obj.investigationName : undefined,
+          entityType: obj.entityType,
+          data: obj.data,
+        },
+      };
+    }
+
+    if (
+      nameSet.has('create_note') &&
+      typeof obj.title === 'string' &&
+      typeof obj.content === 'string'
+    ) {
+      return {
+        name: 'create_note',
+        arguments: {
+          title: obj.title,
+          content: obj.content,
+          tags: Array.isArray(obj.tags) ? obj.tags : undefined,
+        },
+      };
+    }
+
+    return null;
+  }
 
   // Pattern 1: <tool_call>JSON</tool_call> or <function_call>JSON</function_call>
   const tagPattern = /<(?:tool_call|function_call)>\s*([\s\S]*?)\s*<\/(?:tool_call|function_call)>/gi;
   let match;
   while ((match = tagPattern.exec(text)) !== null) {
     try {
-      const obj = JSON.parse(match[1]);
-      const name = obj.name || obj.function;
-      const args = obj.arguments || obj.parameters || obj.input || {};
-      if (name && nameSet.has(name)) {
-        calls.push({ name, arguments: typeof args === 'string' ? JSON.parse(args) : args });
+      const normalized = normalizeCallObject(JSON.parse(match[1]));
+      if (normalized) {
+        calls.push(normalized);
+        addSpan(match.index, match.index + match[0].length);
       }
     } catch {}
   }
-  if (calls.length > 0) return calls;
 
   // Pattern 2: JSON blocks (```json or bare) containing {name, arguments/parameters}
   const jsonBlockPattern = /```(?:json)?\s*\n?([\s\S]*?)\n?```/gi;
   while ((match = jsonBlockPattern.exec(text)) !== null) {
     try {
-      const obj = JSON.parse(match[1]);
-      const name = obj.name || obj.function;
-      const args = obj.arguments || obj.parameters || obj.input || {};
-      if (name && nameSet.has(name)) {
-        calls.push({ name, arguments: typeof args === 'string' ? JSON.parse(args) : args });
+      const normalized = normalizeCallObject(JSON.parse(match[1]));
+      if (normalized) {
+        calls.push(normalized);
+        addSpan(match.index, match.index + match[0].length);
       }
     } catch {}
   }
 
-  return calls;
+  // Pattern 3: one or more bare top-level JSON objects in the assistant text.
+  for (const candidate of extractTopLevelJsonObjects(text)) {
+    if (isCovered(candidate.start, candidate.end)) continue;
+    try {
+      const normalized = normalizeCallObject(JSON.parse(candidate.text));
+      if (normalized) {
+        calls.push(normalized);
+        addSpan(candidate.start, candidate.end);
+      }
+    } catch {}
+  }
+
+  return {
+    calls,
+    cleanedText: stripSpans(text, spans),
+  };
+}
+
+function truncateMessageHistory(messages, maxMessages) {
+  if (!Array.isArray(messages) || messages.length <= maxMessages) {
+    return Array.isArray(messages) ? messages : [];
+  }
+
+  const keepFromStart = 2;
+  const keepFromEnd = Math.max(1, maxMessages - keepFromStart - 1);
+  const firstMessages = messages.slice(0, keepFromStart);
+  const recentMessages = messages.slice(-keepFromEnd);
+
+  return [
+    ...firstMessages,
+    { role: 'user', content: '[System: Earlier conversation truncated for local model context window]' },
+    ...recentMessages,
+  ];
+}
+
+function compactLocalSystemPrompt(systemPrompt) {
+  const raw = typeof systemPrompt === 'string' ? systemPrompt.trim() : '';
+  const contextIndex = raw.indexOf('## Current Investigation Context');
+  const contextSection = contextIndex >= 0 ? raw.slice(contextIndex).trim() : '';
+  return contextSection ? `${LOCAL_SYSTEM_PROMPT}\n\n${contextSection}` : LOCAL_SYSTEM_PROMPT;
+}
+
+const RASTER_IMAGE_MIME_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+  'image/bmp',
+  'image/avif',
+]);
+
+function getAnthropicImageData(block) {
+  if (!block || block.type !== 'image' || !block.source) return null;
+  const mimeType = String(block.source.media_type || '').trim().toLowerCase();
+  const data = String(block.source.data || '').trim();
+  if (!RASTER_IMAGE_MIME_TYPES.has(mimeType) || !data) return null;
+  return { mimeType, data };
 }
 
 // Shared streamer for OpenAI-compatible APIs (OpenAI, Mistral, Local/Ollama/vLLM)
 async function streamOpenAICompatible(send, payload, signal, endpoint, headers, providerLabel, options = {}) {
   await ensureLLMPermission(endpoint);
 
+  const sourceMessages = options.maxMessages
+    ? truncateMessageHistory(payload.messages, options.maxMessages)
+    : (Array.isArray(payload.messages) ? payload.messages : []);
   const messages = [];
-  if (payload.systemPrompt) {
-    messages.push({ role: 'system', content: payload.systemPrompt });
+  const systemPrompt = options.compactSystemPrompt
+    ? compactLocalSystemPrompt(payload.systemPrompt)
+    : payload.systemPrompt;
+  if (systemPrompt) {
+    messages.push({ role: 'system', content: systemPrompt });
   }
 
   // Convert structured messages for OpenAI format
-  for (const m of payload.messages) {
+  for (const m of sourceMessages) {
     if (m.role === 'assistant' && Array.isArray(m.content)) {
       let textContent = '';
       const toolCalls = [];
@@ -857,10 +1102,28 @@ async function streamOpenAICompatible(send, payload, signal, endpoint, headers, 
       if (toolCalls.length > 0) msg.tool_calls = toolCalls;
       messages.push(msg);
     } else if (m.role === 'user' && Array.isArray(m.content)) {
+      const parts = [];
+      let hasImage = false;
       for (const block of m.content) {
+        if (block.type === 'text' && block.text) {
+          parts.push({ type: 'text', text: block.text });
+          continue;
+        }
+        const image = getAnthropicImageData(block);
+        if (image) {
+          hasImage = true;
+          parts.push({ type: 'image_url', image_url: { url: `data:${image.mimeType};base64,${image.data}` } });
+          continue;
+        }
         if (block.type === 'tool_result') {
           messages.push({ role: 'tool', tool_call_id: block.tool_use_id, content: block.content });
         }
+      }
+      if (parts.length > 0) {
+        messages.push({
+          role: 'user',
+          content: hasImage ? parts : parts.map(part => part.text || '').join(''),
+        });
       }
     } else {
       messages.push({ role: m.role, content: m.content });
@@ -873,6 +1136,10 @@ async function streamOpenAICompatible(send, payload, signal, endpoint, headers, 
     messages,
   };
 
+  if (options.disableThinking) {
+    body.think = false;
+  }
+
   // Convert Anthropic tool format → OpenAI function format
   if (payload.tools && payload.tools.length > 0) {
     body.tools = payload.tools.map(t => ({
@@ -881,12 +1148,21 @@ async function streamOpenAICompatible(send, payload, signal, endpoint, headers, 
     }));
   }
 
-  const resp = await fetch(endpoint, {
-    method: 'POST',
-    signal,
-    headers: { 'Content-Type': 'application/json', ...headers },
-    body: JSON.stringify(body),
-  });
+  let resp;
+  try {
+    resp = await fetch(endpoint, {
+      method: 'POST',
+      signal,
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    send({
+      type: 'error',
+      error: `${providerLabel} could not reach ${endpoint}: ${String(error?.message || error)}`,
+    });
+    return;
+  }
 
   if (!resp.ok) {
     const respBody = await resp.text().catch(() => '');
@@ -898,8 +1174,11 @@ async function streamOpenAICompatible(send, payload, signal, endpoint, headers, 
   const decoder = new TextDecoder();
   let buffer = '';
   let fullText = '';
+  let reasoningFallback = '';
   let stopReason = null;
   let usage = null;
+  let reasoningOpened = false;
+  let answerOpened = false;
   const toolCallAccum = {};
 
   while (true) {
@@ -921,8 +1200,24 @@ async function streamOpenAICompatible(send, payload, signal, endpoint, headers, 
 
         const content = choice.delta?.content;
         if (content) {
+          if (SHOW_REASONING && reasoningOpened && !answerOpened) {
+            answerOpened = true;
+            send({ type: 'chunk', content: '\n\nAnswer:\n\n' });
+          }
           fullText += content;
           send({ type: 'chunk', content });
+        }
+
+        const reasoning = choice.delta?.reasoning || choice.delta?.thinking;
+        if (reasoning) {
+          reasoningFallback += reasoning;
+          if (SHOW_REASONING) {
+            if (!reasoningOpened) {
+              reasoningOpened = true;
+              send({ type: 'chunk', content: 'Thinking:\n\n' });
+            }
+            send({ type: 'chunk', content: formatReasoningChunk(reasoning) });
+          }
         }
 
         if (choice.delta?.tool_calls) {
@@ -953,6 +1248,17 @@ async function streamOpenAICompatible(send, payload, signal, endpoint, headers, 
   }
 
   const contentBlocks = [];
+  if (!fullText && reasoningFallback) {
+    fullText = reasoningFallback;
+    if (!SHOW_REASONING) {
+      send({ type: 'chunk', content: reasoningFallback });
+    }
+  }
+
+  if (SHOW_REASONING && reasoningOpened && !answerOpened) {
+    send({ type: 'chunk', content: '\n' });
+  }
+
   const toolEntries = Object.values(toolCallAccum);
   if (toolEntries.length > 0) {
     for (const tc of toolEntries) {
@@ -962,24 +1268,31 @@ async function streamOpenAICompatible(send, payload, signal, endpoint, headers, 
     }
   }
 
+  let visibleText = fullText;
+
   // Fallback: if no structured tool calls were found and text-based parsing is enabled,
   // try to extract tool calls from the model's text output. Many local LLMs output
-  // tool calls as <tool_call>JSON</tool_call> or ```json blocks instead of using
-  // the OpenAI tool_calls streaming protocol.
-  if (contentBlocks.length === 0 && options.textToolParsing && fullText) {
+  // tool calls as <tool_call>JSON</tool_call>, adjacent bare JSON objects, or ```json
+  // blocks instead of using the OpenAI tool_calls streaming protocol.
+  if (toolEntries.length === 0 && options.textToolParsing && fullText) {
     const toolNames = (payload.tools || []).map(t => t.name);
-    const textCalls = parseToolCallsFromText(fullText, toolNames);
-    if (textCalls.length > 0) {
-      for (let i = 0; i < textCalls.length; i++) {
+    const parsedTextCalls = parseToolCallsFromText(fullText, toolNames);
+    if (parsedTextCalls.calls.length > 0) {
+      visibleText = parsedTextCalls.cleanedText;
+      for (let i = 0; i < parsedTextCalls.calls.length; i++) {
         contentBlocks.push({
           type: 'tool_use',
           id: `text_tc_${Date.now()}_${i}`,
-          name: textCalls[i].name,
-          input: textCalls[i].arguments,
+          name: parsedTextCalls.calls[i].name,
+          input: parsedTextCalls.calls[i].arguments,
         });
       }
       stopReason = 'tool_calls';
     }
+  }
+
+  if (visibleText) {
+    contentBlocks.unshift({ type: 'text', text: visibleText });
   }
 
   const normalizedStop = stopReason === 'tool_calls' ? 'tool_use'
@@ -1008,7 +1321,7 @@ async function streamMistral(send, payload, signal) {
 }
 
 async function streamLocal(send, payload, signal) {
-  const base = (payload.endpoint || 'http://localhost:11434/v1').replace(/\/+$/, '');
+  const base = normalizeLocalEndpoint(payload.endpoint);
   const endpoint = `${base}/chat/completions`;
 
   // localhost/127.0.0.1 are in required host_permissions and don't need an extra check.
@@ -1032,7 +1345,12 @@ async function streamLocal(send, payload, signal) {
     endpoint,
     headers,
     'Local LLM',
-    { textToolParsing: true }
+    {
+      textToolParsing: true,
+      disableThinking: true,
+      maxMessages: LOCAL_MAX_CONTEXT_MESSAGES,
+      compactSystemPrompt: true,
+    }
   );
 }
 
@@ -1052,10 +1370,15 @@ async function streamGemini(send, payload, signal) {
       for (const block of m.content) {
         if (block.type === 'text') {
           parts.push({ text: block.text });
-        } else if (block.type === 'tool_use') {
-          parts.push({ functionCall: { name: block.name, args: block.input } });
-        } else if (block.type === 'tool_result') {
-          parts.push({ functionResponse: { name: block.tool_use_id, response: { result: block.content } } });
+        } else {
+          const image = getAnthropicImageData(block);
+          if (image) {
+            parts.push({ inlineData: { mimeType: image.mimeType, data: image.data } });
+          } else if (block.type === 'tool_use') {
+            parts.push({ functionCall: { name: block.name, args: block.input } });
+          } else if (block.type === 'tool_result') {
+            parts.push({ functionResponse: { name: block.tool_use_id, response: { result: block.content } } });
+          }
         }
       }
       contents.push({ role, parts });

@@ -1,7 +1,7 @@
 import React, { Suspense, useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader2, Search, Network, Maximize2, ChevronDown, ChevronRight, HelpCircle, X as XIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
-import type { Note, Task, TimelineEvent, Settings, IOCType } from '../../types';
+import type { Note, Task, TimelineEvent, Settings, IOCType, StandaloneIOC } from '../../types';
 import { IOC_TYPE_LABELS } from '../../types';
 import { buildGraphData } from '../../lib/graph-data';
 import type { GraphNode, GraphEdge } from '../../lib/graph-data';
@@ -31,10 +31,12 @@ interface GraphViewProps {
   scopedNotes?: Note[];
   scopedTasks?: Task[];
   scopedTimelineEvents?: TimelineEvent[];
+  standaloneIOCs?: StandaloneIOC[];
+  scopedStandaloneIOCs?: StandaloneIOC[];
   visible?: boolean;
 }
 
-type NodeTypeFilter = 'ioc' | 'note' | 'task' | 'timeline-event';
+type NodeTypeFilter = 'ioc' | 'note' | 'task' | 'timeline-event' | 'actor';
 type EdgeTypeFilter = GraphEdge['type'];
 
 const ALL_EDGE_TYPES: { key: EdgeTypeFilter; labelKey: string; color: string }[] = [
@@ -42,9 +44,10 @@ const ALL_EDGE_TYPES: { key: EdgeTypeFilter; labelKey: string; color: string }[]
   { key: 'ioc-relationship', labelKey: 'view.iocRelations', color: '#f59e0b' },
   { key: 'timeline-link', labelKey: 'view.timelineLinks', color: '#6366f1' },
   { key: 'entity-link', labelKey: 'view.entityLinks', color: '#22c55e' },
+  { key: 'attribution', labelKey: 'view.attribution', color: '#a855f7' },
 ];
 
-export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateToNote, onNavigateToTask, onNavigateToTimelineEvent, onUpdateNote, onUpdateTask, onUpdateEvent, scopedNotes, scopedTasks, scopedTimelineEvents, visible = true }: GraphViewProps) {
+export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateToNote, onNavigateToTask, onNavigateToTimelineEvent, onUpdateNote, onUpdateTask, onUpdateEvent, scopedNotes, scopedTasks, scopedTimelineEvents, standaloneIOCs = [], scopedStandaloneIOCs, visible = true }: GraphViewProps) {
   const { t } = useTranslation('graph');
   const { graphLayout: layout, setGraphLayout: handleLayoutChange } = useNavigation();
   const { selectedFolderId, selectedFolder } = useInvestigation();
@@ -53,9 +56,9 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
   const [scopeMode, setScopeMode] = useState<'investigation' | 'global'>('investigation');
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [visibleNodeTypes, setVisibleNodeTypes] = useState<Set<NodeTypeFilter>>(new Set(['ioc', 'note', 'task', 'timeline-event']));
+  const [visibleNodeTypes, setVisibleNodeTypes] = useState<Set<NodeTypeFilter>>(new Set(['ioc', 'note', 'task', 'timeline-event', 'actor']));
   const [visibleIOCTypes, setVisibleIOCTypes] = useState<Set<IOCType>>(new Set(ALL_IOC_TYPES));
-  const [visibleEdgeTypes, setVisibleEdgeTypes] = useState<Set<EdgeTypeFilter>>(new Set(['contains-ioc', 'ioc-relationship', 'timeline-link', 'entity-link']));
+  const [visibleEdgeTypes, setVisibleEdgeTypes] = useState<Set<EdgeTypeFilter>>(new Set(['contains-ioc', 'ioc-relationship', 'timeline-link', 'entity-link', 'attribution']));
   const [editingIOCNode, setEditingIOCNode] = useState<GraphNode | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [linkDialogState, setLinkDialogState] = useState<{ sourceNodeId: string; targetNodeId: string } | null>(null);
@@ -71,6 +74,7 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
   const effectiveNotes = selectedFolderId && scopeMode === 'investigation' && scopedNotes ? scopedNotes : notes;
   const effectiveTasks = selectedFolderId && scopeMode === 'investigation' && scopedTasks ? scopedTasks : tasks;
   const effectiveEvents = selectedFolderId && scopeMode === 'investigation' && scopedTimelineEvents ? scopedTimelineEvents : timelineEvents;
+  const effectiveStandaloneIOCs = selectedFolderId && scopeMode === 'investigation' && scopedStandaloneIOCs ? scopedStandaloneIOCs : standaloneIOCs;
 
   // Stable ref to full graph data for use in cytoscape callbacks
   const fullGraphDataRef = React.useRef<ReturnType<typeof buildGraphData>>({ nodes: [], edges: [] });
@@ -78,8 +82,8 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
   // Build full graph data — skip expensive computation when not visible
   const fullGraphData = useMemo(() => {
     if (!visible) return { nodes: [] as GraphNode[], edges: [] as GraphEdge[] };
-    return buildGraphData(effectiveNotes, effectiveTasks, effectiveEvents, settings);
-  }, [visible, effectiveNotes, effectiveTasks, effectiveEvents, settings]);
+    return buildGraphData(effectiveNotes, effectiveTasks, effectiveEvents, settings, effectiveStandaloneIOCs);
+  }, [visible, effectiveNotes, effectiveTasks, effectiveEvents, settings, effectiveStandaloneIOCs]);
 
   // Keep ref in sync for use in cytoscape callbacks (outside render)
   React.useEffect(() => {
@@ -199,7 +203,7 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
   }, []);
 
   const nodeTypeCounts = useMemo(() => {
-    const counts = { ioc: 0, note: 0, task: 0, 'timeline-event': 0 };
+    const counts = { ioc: 0, note: 0, task: 0, 'timeline-event': 0, actor: 0 };
     for (const n of fullGraphData.nodes) counts[n.type]++;
     return counts;
   }, [fullGraphData.nodes]);
@@ -271,12 +275,13 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
         {/* Node type filters */}
         <div className="p-3 space-y-2">
           <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{t('view.nodeTypes')}</span>
-          {([
-            { key: 'note' as const, labelKey: 'view.notes', color: '#3b82f6' },
-            { key: 'task' as const, labelKey: 'view.tasks', color: '#22c55e' },
-            { key: 'ioc' as const, labelKey: 'view.iocs', color: '#f59e0b' },
-            { key: 'timeline-event' as const, labelKey: 'view.events', color: '#6366f1' },
-          ]).map(({ key, labelKey, color }) => (
+            {([
+              { key: 'note' as const, labelKey: 'view.notes', color: '#3b82f6' },
+              { key: 'task' as const, labelKey: 'view.tasks', color: '#22c55e' },
+              { key: 'ioc' as const, labelKey: 'view.iocs', color: '#f59e0b' },
+              { key: 'timeline-event' as const, labelKey: 'view.events', color: '#6366f1' },
+              { key: 'actor' as const, labelKey: 'view.actors', color: '#a855f7' },
+            ]).map(({ key, labelKey, color }) => (
             <label key={key} className="flex items-center gap-2 text-xs cursor-pointer">
               <input
                 type="checkbox"

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, ChevronDown, FileText, FilePlus, ListChecks, Clock, PenTool, Shield, Database, FolderOpen } from 'lucide-react';
+import { Plus, ChevronDown, FileText, FilePlus, ListChecks, Clock, PenTool, Shield, Database, FolderOpen, Library } from 'lucide-react';
 import { useDropdownKeyboard } from '../../hooks/useDropdownKeyboard';
 
 interface CreateDropdownProps {
@@ -10,11 +10,13 @@ interface CreateDropdownProps {
   onNewTimelineEvent: () => void;
   onNewWhiteboard: () => void;
   onNewIOC?: () => void;
+  onNewNoteTemplate?: () => void;
+  onImportNoteTemplate?: () => void;
   onOpenFile?: () => void;
   onImportData?: () => void;
 }
 
-export function CreateDropdown({ onQuickNote, onNewNote, onNewTask, onNewTimelineEvent, onNewWhiteboard, onNewIOC, onOpenFile, onImportData }: CreateDropdownProps) {
+export function CreateDropdown({ onQuickNote, onNewNote, onNewTask, onNewTimelineEvent, onNewWhiteboard, onNewIOC, onNewNoteTemplate, onImportNoteTemplate, onOpenFile, onImportData }: CreateDropdownProps) {
   const { t } = useTranslation('common');
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -32,10 +34,12 @@ export function CreateDropdown({ onQuickNote, onNewNote, onNewTask, onNewTimelin
   const items = [
     { icon: FilePlus, label: t('createDropdown.quickNote'), action: onQuickNote },
     { icon: FileText, label: t('createDropdown.noteTemplates'), action: onNewNote },
+    ...(onNewNoteTemplate ? [{ icon: Library, label: t('createDropdown.newNoteTemplate', { defaultValue: 'New Note Template' }), action: onNewNoteTemplate }] : []),
     { icon: ListChecks, label: t('createDropdown.task'), action: onNewTask },
     { icon: Clock, label: t('createDropdown.timelineEvent'), action: onNewTimelineEvent },
     { icon: PenTool, label: t('createDropdown.whiteboard'), action: onNewWhiteboard },
     ...(onNewIOC ? [{ icon: Shield, label: t('createDropdown.ioc'), action: onNewIOC }] : []),
+    ...(onImportNoteTemplate ? [{ icon: Library, label: t('createDropdown.addTemplateToInvestigation', { defaultValue: 'Add Template to Investigation' }), action: onImportNoteTemplate }] : []),
     ...(onOpenFile ? [{ icon: FolderOpen, label: t('createDropdown.openFile'), action: onOpenFile }] : []),
     ...(onImportData ? [{ icon: Database, label: t('createDropdown.importData'), action: onImportData }] : []),
   ];

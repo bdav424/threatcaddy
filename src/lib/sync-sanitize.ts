@@ -12,6 +12,7 @@ import {
   sanitizeTimeline,
   sanitizeWhiteboard,
   sanitizeStandaloneIOC,
+  sanitizeEvidenceItem,
   sanitizeChatThread,
 } from './export';
 
@@ -27,6 +28,7 @@ const TABLE_SANITIZERS: Record<string, Sanitizer> = {
   timelines: sanitizeTimeline,
   whiteboards: sanitizeWhiteboard,
   standaloneIOCs: sanitizeStandaloneIOC,
+  evidenceItems: sanitizeEvidenceItem,
   chatThreads: sanitizeChatThread,
 };
 

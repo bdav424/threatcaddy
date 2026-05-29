@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Plus, Trash2, RefreshCw, CheckCircle2, AlertTriangle, ChevronDown, ChevronRight, Loader2, Server } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, CheckCircle2, AlertTriangle, ChevronDown, ChevronRight, Loader2, Server, Pencil, Save, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { nanoid } from 'nanoid';
 import type { Settings, AgentHost, AgentHostSkill } from '../../types';
@@ -16,6 +16,7 @@ export function AgentHostsConfig({ settings, onUpdateSettings }: AgentHostsConfi
   const hosts = settings.agentHosts || [];
   const [adding, setAdding] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ id: string; ok: boolean; msg: string } | null>(null);
 
@@ -24,6 +25,10 @@ export function AgentHostsConfig({ settings, onUpdateSettings }: AgentHostsConfi
   const [formDisplayName, setFormDisplayName] = useState('');
   const [formUrl, setFormUrl] = useState('');
   const [formApiKey, setFormApiKey] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editDisplayName, setEditDisplayName] = useState('');
+  const [editUrl, setEditUrl] = useState('');
+  const [editApiKey, setEditApiKey] = useState('');
 
   const updateHosts = useCallback((newHosts: AgentHost[]) => {
     onUpdateSettings({ agentHosts: newHosts });
@@ -56,6 +61,45 @@ export function AgentHostsConfig({ settings, onUpdateSettings }: AgentHostsConfi
     updateHosts(hosts.filter(h => h.id !== id));
     if (expandedId === id) setExpandedId(null);
   }, [hosts, expandedId, updateHosts, t]);
+
+  const startEditing = useCallback((host: AgentHost) => {
+    setEditingId(host.id);
+    setExpandedId(null);
+    setEditName(host.name);
+    setEditDisplayName(host.displayName);
+    setEditUrl(host.url);
+    setEditApiKey(host.apiKey || '');
+    setTestResult(null);
+  }, []);
+
+  const cancelEditing = useCallback(() => {
+    setEditingId(null);
+    setEditName('');
+    setEditDisplayName('');
+    setEditUrl('');
+    setEditApiKey('');
+  }, []);
+
+  const saveEditing = useCallback((host: AgentHost) => {
+    const slug = editName.toLowerCase().replace(/[^a-z0-9-]/g, '').substring(0, 20);
+    const normalizedUrl = editUrl.replace(/\/+$/, '');
+    if (!slug || !normalizedUrl) return;
+
+    updateHosts(hosts.map(h => {
+      if (h.id !== host.id) return h;
+      const urlChanged = h.url !== normalizedUrl;
+      return {
+        ...h,
+        name: slug,
+        displayName: editDisplayName || slug,
+        url: normalizedUrl,
+        apiKey: editApiKey || undefined,
+        skills: urlChanged ? [] : h.skills,
+        skillsFetchedAt: urlChanged ? undefined : h.skillsFetchedAt,
+      };
+    }));
+    cancelEditing();
+  }, [cancelEditing, editApiKey, editDisplayName, editName, editUrl, hosts, updateHosts]);
 
   const toggleEnabled = useCallback((id: string) => {
     updateHosts(hosts.map(h => h.id === id ? { ...h, enabled: !h.enabled } : h));
@@ -143,7 +187,7 @@ export function AgentHostsConfig({ settings, onUpdateSettings }: AgentHostsConfi
             <label className="text-[10px] text-text-muted block mb-0.5">{t('agents.url')}</label>
             <input
               className={inputClass}
-              placeholder="http://192.168.1.50:8080"
+              placeholder="http://127.0.0.1:8766"
               value={formUrl}
               onChange={e => setFormUrl(e.target.value)}
             />
@@ -186,6 +230,66 @@ export function AgentHostsConfig({ settings, onUpdateSettings }: AgentHostsConfi
       <div className="space-y-2">
         {hosts.map(host => (
           <div key={host.id} className="border border-border-default rounded-lg overflow-hidden">
+            {editingId === host.id ? (
+              <div className="px-3 py-3 space-y-2 bg-surface-raised">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-text-muted block mb-0.5">{t('agents.nameSlug')}</label>
+                    <input
+                      className={inputClass}
+                      value={editName}
+                      onChange={e => setEditName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').substring(0, 20))}
+                      maxLength={20}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-text-muted block mb-0.5">{t('agents.displayName')}</label>
+                    <input
+                      className={inputClass}
+                      value={editDisplayName}
+                      onChange={e => setEditDisplayName(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] text-text-muted block mb-0.5">{t('agents.url')}</label>
+                  <input
+                    className={inputClass}
+                    placeholder="http://127.0.0.1:8766"
+                    value={editUrl}
+                    onChange={e => setEditUrl(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-text-muted block mb-0.5">{t('agents.apiKeyOptional')}</label>
+                  <input
+                    className={inputClass}
+                    type="password"
+                    placeholder={t('agents.bearerTokenPlaceholder')}
+                    value={editApiKey}
+                    onChange={e => setEditApiKey(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => saveEditing(host)}
+                    disabled={!editName || !editUrl}
+                    className="inline-flex items-center gap-1 text-xs px-3 py-1 rounded bg-accent-blue text-white hover:bg-accent-blue/80 disabled:opacity-40 transition-colors"
+                  >
+                    <Save size={12} />
+                    {tc('save')}
+                  </button>
+                  <button
+                    onClick={cancelEditing}
+                    className="inline-flex items-center gap-1 text-xs px-3 py-1 rounded bg-surface-raised text-text-muted hover:text-text-primary transition-colors"
+                  >
+                    <X size={12} />
+                    {tc('cancel')}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
             {/* Host Header */}
             <div className="flex items-center gap-2 px-3 py-2">
               <button
@@ -216,14 +320,26 @@ export function AgentHostsConfig({ settings, onUpdateSettings }: AgentHostsConfi
                   {t('agents.fetchSkills')}
                 </button>
                 <button
+                  onClick={() => startEditing(host)}
+                  className="text-text-muted hover:text-text-primary transition-colors"
+                  aria-label={`${tc('edit')} ${host.displayName}`}
+                  title={tc('edit')}
+                >
+                  <Pencil size={12} />
+                </button>
+                <button
                   onClick={() => toggleEnabled(host.id)}
                   className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${host.enabled ? 'bg-accent-blue' : 'bg-gray-600'}`}
                   role="switch"
                   aria-checked={host.enabled}
                   aria-label={t(host.enabled ? 'agents.disableHost' : 'agents.enableHost', { name: host.displayName })}
+                  title={t(host.enabled ? 'agents.hostEnabled' : 'agents.hostDisabled')}
                 >
                   <span className={`inline-block h-2.5 w-2.5 rounded-full bg-white transition-transform ${host.enabled ? 'translate-x-[14px]' : 'translate-x-[3px]'}`} />
                 </button>
+                <span className={`text-[10px] ${host.enabled ? 'text-green-400' : 'text-text-muted'}`}>
+                  {t(host.enabled ? 'agents.hostEnabled' : 'agents.hostDisabled')}
+                </span>
                 <button
                   onClick={() => removeHost(host.id)}
                   className="text-text-muted hover:text-red-400 transition-colors"
@@ -259,6 +375,8 @@ export function AgentHostsConfig({ settings, onUpdateSettings }: AgentHostsConfi
                 )}
               </div>
             )}
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -267,7 +385,7 @@ export function AgentHostsConfig({ settings, onUpdateSettings }: AgentHostsConfi
 }
 
 function SkillRow({ skill, hostName }: { skill: AgentHostSkill; hostName: string }) {
-  const toolName = `host:${hostName}:${skill.name}`;
+  const toolName = `host__${hostName}__${skill.name}`;
   const paramNames = Object.keys(skill.parameters?.properties || {});
   const actionClass = skill.actionClass || 'fetch';
   const classColor = actionClass === 'read' ? 'text-green-400' : actionClass === 'modify' ? 'text-amber-400' : 'text-blue-400';
@@ -286,7 +404,7 @@ function SkillRow({ skill, hostName }: { skill: AgentHostSkill; hostName: string
           </p>
         )}
       </div>
-      <div className="text-[9px] text-text-muted font-mono shrink-0 mt-0.5">{toolName}</div>
+      <div className="text-[9px] text-text-muted font-mono shrink-0 mt-0.5">CaddyAI: {toolName}</div>
     </div>
   );
 }

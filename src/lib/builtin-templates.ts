@@ -627,14 +627,14 @@ export const BUILTIN_NOTE_TEMPLATES: NoteTemplate[] = [
     updatedAt: 0,
   },
   {
-    id: 'bt-oci-user',
-    get name() { return i18n.t('builtinTemplate.ociUser.name', { ns: 'notes' }); },
+    id: 'bt-cloud-user',
+    get name() { return i18n.t('builtinTemplate.cloudUser.name', { ns: 'notes' }); },
     icon: '\uD83D\uDD11',
     get category() { return i18n.t('builtinTemplateCategory.cloud', { ns: 'notes' }); },
     source: 'builtin',
-    content: `# OCI User Details
+    content: `# Cloud User Details
 
-**User OCID:** ocid1.user.oc1..
+**User Cloud ID:** cloudid.user.region1..
 **Tenancy:**
 **Email:** user@domain.com
 **Created:**
@@ -681,14 +681,14 @@ export const BUILTIN_NOTE_TEMPLATES: NoteTemplate[] = [
     updatedAt: 0,
   },
   {
-    id: 'bt-oci-tenancy',
-    get name() { return i18n.t('builtinTemplate.ociTenancy.name', { ns: 'notes' }); },
+    id: 'bt-cloud-tenancy',
+    get name() { return i18n.t('builtinTemplate.cloudTenant.name', { ns: 'notes' }); },
     icon: '\uD83C\uDFE2',
     get category() { return i18n.t('builtinTemplateCategory.cloud', { ns: 'notes' }); },
     source: 'builtin',
-    content: `# OCI Tenancy Details
+    content: `# Cloud Tenancy Details
 
-**Tenancy OCID:** ocid1.tenancy.oc1..
+**Tenancy Cloud ID:** cloudid.tenancy.region1..
 **Tenancy Name:**
 **Home Region:**
 **Created:**

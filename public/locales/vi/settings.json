@@ -324,7 +324,7 @@
   "intel.disableAll": "Tắt tất cả",
   "intel.bulkJsonImport": "Nhập JSON hàng loạt",
   "intel.exportConfig": "Xuất cấu hình",
-  "intel.bulkImportHelp": "Chấp nhận { cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, oci_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }",
+  "intel.bulkImportHelp": "Chấp nhận { cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, cloud_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }",
   "intel.defaultClsLevel": "Mức phân loại mặc định",
   "intel.usingTlpDefaults": "Đang dùng mặc định TLP",
   "intel.defaultReportSource": "Nguồn báo cáo mặc định",

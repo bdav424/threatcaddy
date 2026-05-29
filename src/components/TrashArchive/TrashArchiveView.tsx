@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Trash2, Archive, RotateCcw, ChevronDown, ChevronRight,
-  FileText, ListChecks, Clock, PenTool, Search, MessageSquare,
+  FileText, ListChecks, Clock, PenTool, Search, FileSearch, MessageSquare,
 } from 'lucide-react';
-import type { Note, Task, TimelineEvent, Whiteboard, StandaloneIOC, ChatThread, Folder } from '../../types';
+import type { Note, Task, TimelineEvent, Whiteboard, StandaloneIOC, EvidenceItem, ChatThread, Folder } from '../../types';
 import { IOC_TYPE_LABELS } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { formatDate, cn } from '../../lib/utils';
@@ -16,6 +16,7 @@ interface TrashArchiveViewProps {
   timelineEvents: TimelineEvent[];
   whiteboards: Whiteboard[];
   standaloneIOCs: StandaloneIOC[];
+  evidenceItems: EvidenceItem[];
   chatThreads: ChatThread[];
   folders: Folder[];
   // Note actions
@@ -43,6 +44,11 @@ interface TrashArchiveViewProps {
   onDeleteIOCPermanently: (id: string) => void;
   onTrashIOC: (id: string) => void;
   onUnarchiveIOC: (id: string) => void;
+  // Evidence actions
+  onRestoreEvidenceItem: (id: string) => void;
+  onDeleteEvidenceItemPermanently: (id: string) => void;
+  onTrashEvidenceItem: (id: string) => void;
+  onUnarchiveEvidenceItem: (id: string) => void;
   // Chat thread actions
   onRestoreThread: (id: string) => void;
   onDeleteThreadPermanently: (id: string) => void;
@@ -138,6 +144,7 @@ export function TrashArchiveView({
   timelineEvents,
   whiteboards,
   standaloneIOCs,
+  evidenceItems,
   chatThreads,
   folders,
   onRestoreNote,
@@ -160,6 +167,10 @@ export function TrashArchiveView({
   onDeleteIOCPermanently,
   onTrashIOC,
   onUnarchiveIOC,
+  onRestoreEvidenceItem,
+  onDeleteEvidenceItemPermanently,
+  onTrashEvidenceItem,
+  onUnarchiveEvidenceItem,
   onRestoreThread,
   onDeleteThreadPermanently,
   onTrashThread,
@@ -176,6 +187,7 @@ export function TrashArchiveView({
   const trashedEvents = timelineEvents.filter((e) => e.trashed);
   const trashedWhiteboards = whiteboards.filter((w) => w.trashed);
   const trashedIOCs = standaloneIOCs.filter((i) => i.trashed);
+  const trashedEvidenceItems = evidenceItems.filter((item) => item.trashed);
   const trashedThreads = chatThreads.filter((c) => c.trashed && !c.isFolder);
 
   const archivedNotes = notes.filter((n) => n.archived && !n.trashed);
@@ -183,13 +195,14 @@ export function TrashArchiveView({
   const archivedEvents = timelineEvents.filter((e) => e.archived && !e.trashed);
   const archivedWhiteboards = whiteboards.filter((w) => w.archived && !w.trashed);
   const archivedIOCs = standaloneIOCs.filter((i) => i.archived && !i.trashed);
+  const archivedEvidenceItems = evidenceItems.filter((item) => item.archived && !item.trashed);
   const archivedThreads = chatThreads.filter((c) => (c.archived && !c.trashed) && !c.isFolder);
 
   const items = isTrash
-    ? { notes: trashedNotes, tasks: trashedTasks, events: trashedEvents, whiteboards: trashedWhiteboards, iocs: trashedIOCs, threads: trashedThreads }
-    : { notes: archivedNotes, tasks: archivedTasks, events: archivedEvents, whiteboards: archivedWhiteboards, iocs: archivedIOCs, threads: archivedThreads };
+    ? { notes: trashedNotes, tasks: trashedTasks, events: trashedEvents, whiteboards: trashedWhiteboards, iocs: trashedIOCs, evidence: trashedEvidenceItems, threads: trashedThreads }
+    : { notes: archivedNotes, tasks: archivedTasks, events: archivedEvents, whiteboards: archivedWhiteboards, iocs: archivedIOCs, evidence: archivedEvidenceItems, threads: archivedThreads };
 
-  const totalCount = items.notes.length + items.tasks.length + items.events.length + items.whiteboards.length + items.iocs.length + items.threads.length;
+  const totalCount = items.notes.length + items.tasks.length + items.events.length + items.whiteboards.length + items.iocs.length + items.evidence.length + items.threads.length;
 
   const folderMap = new Map(folders.map((f) => [f.id, f.name]));
   const getFolderName = (folderId?: string) => folderId ? folderMap.get(folderId) : undefined;
@@ -346,6 +359,23 @@ export function TrashArchiveView({
                     title={`${ioc.value} (${typeLabel})`}
                     folderName={getFolderName(ioc.folderId)}
                     timestamp={isTrash ? ioc.trashedAt : ioc.updatedAt}
+                    primaryAction={actions.primary}
+                    secondaryAction={actions.secondary}
+                  />
+                );
+              })}
+            </EntitySection>
+
+            <EntitySection icon={<FileSearch size={16} />} label="Evidence" count={items.evidence.length}>
+              {items.evidence.map((item) => {
+                const actions = makeActions(item.id, onRestoreEvidenceItem, onDeleteEvidenceItemPermanently, onUnarchiveEvidenceItem, onTrashEvidenceItem);
+                return (
+                  <ItemRow
+                    key={item.id}
+                    icon={<FileSearch size={14} />}
+                    title={item.title || item.fileName || 'Untitled Evidence'}
+                    folderName={getFolderName(item.folderId)}
+                    timestamp={isTrash ? item.trashedAt : item.updatedAt}
                     primaryAction={actions.primary}
                     secondaryAction={actions.secondary}
                   />

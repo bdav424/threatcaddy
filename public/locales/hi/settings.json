@@ -324,7 +324,7 @@
   "intel.disableAll": "सभी अक्षम करें",
   "intel.bulkJsonImport": "बल्क JSON आयात",
   "intel.exportConfig": "कॉन्फ़िग निर्यात करें",
-  "intel.bulkImportHelp": "स्वीकार करता है { cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, oci_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }",
+  "intel.bulkImportHelp": "स्वीकार करता है { cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, cloud_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }",
   "intel.defaultClsLevel": "डिफ़ॉल्ट वर्गीकरण स्तर",
   "intel.usingTlpDefaults": "TLP डिफ़ॉल्ट उपयोग कर रहे हैं",
   "intel.defaultReportSource": "डिफ़ॉल्ट रिपोर्ट स्रोत",

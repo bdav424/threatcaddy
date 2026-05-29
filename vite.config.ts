@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 // fs/promises imported dynamically in stripHeavyAssets to avoid top-level await
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 /**
@@ -40,10 +40,71 @@ function cloudflareAnalytics(): Plugin {
   }
 }
 
+function serveStandaloneBundle(): Plugin {
+  const standaloneDir = resolve('dist-single')
+  const indexPath = resolve(standaloneDir, 'index.html')
+
+  const contentType = (fileName: string) => {
+    if (fileName.endsWith('.html')) return 'text/html; charset=utf-8'
+    if (fileName.endsWith('.js')) return 'text/javascript; charset=utf-8'
+    return 'application/octet-stream'
+  }
+
+  const resolveStandaloneFile = (rawUrl: string | undefined) => {
+    const pathname = (rawUrl || '').split('?')[0]
+    if (pathname === '/threatcaddy-standalone.html') return indexPath
+
+    let decoded: string
+    try {
+      decoded = decodeURIComponent(pathname)
+    } catch {
+      return null
+    }
+
+    const fileName = decoded.startsWith('/') ? decoded.slice(1) : decoded
+    if (!fileName || fileName.includes('/') || fileName.includes('\\')) return null
+    if (!fileName.endsWith('.js')) return null
+
+    return resolve(standaloneDir, fileName)
+  }
+
+  return {
+    name: 'serve-standalone-bundle',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.method && req.method !== 'GET' && req.method !== 'HEAD') return next()
+
+        const filePath = resolveStandaloneFile(req.url)
+        if (!filePath) return next()
+
+        const isStandaloneIndex = filePath === indexPath
+        if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+          if (!isStandaloneIndex) return next()
+          res.statusCode = 404
+          res.setHeader('Content-Type', 'text/html; charset=utf-8')
+          res.end('Standalone bundle not built yet. Run <code>pnpm build:single</code>, then reload this URL.')
+          return
+        }
+
+        res.statusCode = 200
+        res.setHeader('Cache-Control', 'no-store')
+        res.setHeader('Content-Type', contentType(filePath))
+        if (req.method === 'HEAD') {
+          res.end()
+          return
+        }
+        res.end(readFileSync(filePath))
+      })
+    },
+  }
+}
+
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    serveStandaloneBundle(),
     cloudflareAnalytics(),
     stripHeavyAssets(),
     VitePWA({

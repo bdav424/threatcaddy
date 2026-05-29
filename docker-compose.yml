@@ -19,6 +19,9 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      LOCAL_LLM_ENDPOINT: ${LOCAL_LLM_ENDPOINT:-http://host.docker.internal:11434}
+      LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-gpt-5.4}
+      LOCAL_LLM_API_KEY: ${LOCAL_LLM_API_KEY:-}
     volumes:
       - file-data:/data/files
     depends_on:

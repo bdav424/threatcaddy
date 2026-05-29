@@ -98,6 +98,7 @@ function viewLabel(view: string, entityId?: string): string {
     notes: 'Viewing notes',
     editor: 'Editing a note',
     tasks: 'Managing tasks',
+    evidence: 'Reviewing evidence',
     timeline: 'On timeline',
     whiteboard: 'On whiteboard',
     chat: 'In AI chat',

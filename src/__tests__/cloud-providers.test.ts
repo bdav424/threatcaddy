@@ -1,41 +1,41 @@
 import { describe, it, expect } from 'vitest';
 import { CLOUD_PROVIDERS, detectProvider, sanitizePath } from '../lib/cloud-providers';
 
-// ---- OCI Validation ----
+// ---- Cloud Validation ----
 
-describe('OCI provider', () => {
-  const provider = CLOUD_PROVIDERS['oci'];
+describe('Cloud provider', () => {
+  const provider = CLOUD_PROVIDERS['cloudstore'];
 
-  it('accepts a valid OCI PAR URL', () => {
-    const url = 'https://objectstorage.us-ashburn-1.oraclecloud.com/p/abc123/n/ns/b/bucket/o/';
+  it('accepts a valid Cloud PAR URL', () => {
+    const url = 'https://storage.us-ashburn-1.examplecloud.com/p/abc123/n/ns/b/bucket/o/';
     expect(provider.validateUrl(url)).toEqual({ valid: true });
   });
 
   it('rejects http:// URLs', () => {
-    const url = 'http://objectstorage.us-ashburn-1.oraclecloud.com/p/abc123/n/ns/b/bucket/o/';
+    const url = 'http://storage.us-ashburn-1.examplecloud.com/p/abc123/n/ns/b/bucket/o/';
     expect(provider.validateUrl(url).valid).toBe(false);
     expect(provider.validateUrl(url).error).toContain('HTTPS');
   });
 
-  it('rejects non-OCI hostnames', () => {
+  it('rejects non-Cloud hostnames', () => {
     const url = 'https://evil.com/p/token/n/ns/b/bucket/o/';
     expect(provider.validateUrl(url).valid).toBe(false);
-    expect(provider.validateUrl(url).error).toContain('oraclecloud.com');
+    expect(provider.validateUrl(url).error).toContain('examplecloud.com');
   });
 
   it('rejects URLs without /p/ and /o/', () => {
-    const url = 'https://objectstorage.us-ashburn-1.oraclecloud.com/n/ns/b/bucket/';
+    const url = 'https://storage.us-ashburn-1.examplecloud.com/n/ns/b/bucket/';
     expect(provider.validateUrl(url).valid).toBe(false);
   });
 
   it('builds object URL by appending path', () => {
-    const base = 'https://objectstorage.us-ashburn-1.oraclecloud.com/p/token/n/ns/b/bucket/o/';
+    const base = 'https://storage.us-ashburn-1.examplecloud.com/p/token/n/ns/b/bucket/o/';
     const url = provider.buildObjectUrl(base, 'threatcaddy/test.json');
     expect(url).toBe(base + 'threatcaddy/test.json');
   });
 
   it('adds trailing slash to base URL if missing', () => {
-    const base = 'https://objectstorage.us-ashburn-1.oraclecloud.com/p/token/n/ns/b/bucket/o';
+    const base = 'https://storage.us-ashburn-1.examplecloud.com/p/token/n/ns/b/bucket/o';
     const url = provider.buildObjectUrl(base, 'test.json');
     expect(url).toBe(base + '/test.json');
   });
@@ -161,8 +161,8 @@ describe('GCS provider', () => {
 // ---- detectProvider ----
 
 describe('detectProvider', () => {
-  it('detects OCI from hostname', () => {
-    expect(detectProvider('https://objectstorage.us-ashburn-1.oraclecloud.com/p/token/n/ns/b/bucket/o/')).toBe('oci');
+  it('detects Cloud from hostname', () => {
+    expect(detectProvider('https://storage.us-ashburn-1.examplecloud.com/p/token/n/ns/b/bucket/o/')).toBe('cloudstore');
   });
 
   it('detects AWS S3 from virtual-hosted hostname', () => {

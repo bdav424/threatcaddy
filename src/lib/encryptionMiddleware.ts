@@ -24,6 +24,7 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   activityLog: ['detail', 'itemTitle'],
   chatThreads: ['title', 'messages'],
   standaloneIOCs: ['value', 'analystNotes', 'clsLevel'],
+  evidenceItems: ['title', 'fileName', 'mimeType', 'content', 'extractionWarning', 'linkedIOCIds', 'clsLevel', 'imageData', 'imageDataMimeType', 'imageAnalysis', 'imageOcrText'],
   installedIntegrations: ['config', 'lastError'],
   integrationRuns: ['log', 'error', 'displayResults'],
 };

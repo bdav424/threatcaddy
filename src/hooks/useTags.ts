@@ -33,9 +33,9 @@ export function useTags() {
   }, [tags]);
 
   const updateTag = useCallback(async (id: string, updates: Partial<Tag>) => {
-    await db.transaction('rw', [db.tags, db.notes, db.tasks, db.timelineEvents, db.whiteboards], async () => {
+    await db.transaction('rw', [db.tags, db.notes, db.tasks, db.timelineEvents, db.whiteboards, db.evidenceItems], async () => {
       await db.tags.update(id, updates);
-      // If renaming, update all notes, tasks, timeline events, and whiteboards that reference the old tag name
+      // If renaming, update all tagged entities that reference the old tag name.
       if (updates.name) {
         const oldTag = tags.find((t) => t.id === id);
         if (oldTag && oldTag.name !== updates.name) {
@@ -44,6 +44,7 @@ export function useTags() {
           const tasksWithTag = await db.tasks.filter((t) => t.tags.includes(oldTag.name)).toArray();
           const eventsWithTag = await db.timelineEvents.filter((e) => e.tags.includes(oldTag.name)).toArray();
           const boardsWithTag = await db.whiteboards.filter((w) => w.tags.includes(oldTag.name)).toArray();
+          const evidenceWithTag = await db.evidenceItems.filter((e) => e.tags.includes(oldTag.name)).toArray();
           await Promise.all([
             ...notesWithTag.map((n) =>
               db.notes.update(n.id, { tags: n.tags.map((t) => (t === oldTag.name ? newName : t)) })
@@ -57,6 +58,9 @@ export function useTags() {
             ...boardsWithTag.map((w) =>
               db.whiteboards.update(w.id, { tags: w.tags.map((t) => (t === oldTag.name ? newName : t)) })
             ),
+            ...evidenceWithTag.map((e) =>
+              db.evidenceItems.update(e.id, { tags: e.tags.map((t) => (t === oldTag.name ? newName : t)) })
+            ),
           ]);
         }
       }
@@ -67,12 +71,13 @@ export function useTags() {
   const deleteTag = useCallback(async (id: string) => {
     const tag = tags.find((t) => t.id === id);
     if (!tag) return;
-    await db.transaction('rw', [db.tags, db.notes, db.tasks, db.timelineEvents, db.whiteboards], async () => {
-      // Remove tag from all notes, tasks, timeline events, and whiteboards
+    await db.transaction('rw', [db.tags, db.notes, db.tasks, db.timelineEvents, db.whiteboards, db.evidenceItems], async () => {
+      // Remove tag from all tagged entities.
       const notesWithTag = await db.notes.filter((n) => n.tags.includes(tag.name)).toArray();
       const tasksWithTag = await db.tasks.filter((t) => t.tags.includes(tag.name)).toArray();
       const eventsWithTag = await db.timelineEvents.filter((e) => e.tags.includes(tag.name)).toArray();
       const boardsWithTag = await db.whiteboards.filter((w) => w.tags.includes(tag.name)).toArray();
+      const evidenceWithTag = await db.evidenceItems.filter((e) => e.tags.includes(tag.name)).toArray();
       await Promise.all([
         ...notesWithTag.map((n) =>
           db.notes.update(n.id, { tags: n.tags.filter((t) => t !== tag.name) })
@@ -85,6 +90,9 @@ export function useTags() {
         ),
         ...boardsWithTag.map((w) =>
           db.whiteboards.update(w.id, { tags: w.tags.filter((t) => t !== tag.name) })
+        ),
+        ...evidenceWithTag.map((e) =>
+          db.evidenceItems.update(e.id, { tags: e.tags.filter((t) => t !== tag.name) })
         ),
       ]);
       await db.tags.delete(id);

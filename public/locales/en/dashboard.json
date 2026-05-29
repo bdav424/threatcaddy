@@ -11,6 +11,8 @@
   "view.notesDesc": "Investigation notes & IOC extraction",
   "view.tasks": "Tasks",
   "view.tasksDesc": "Task board with kanban & list views",
+  "view.products": "Products",
+  "view.productsDesc": "Draft reports and deliverables",
   "view.timeline": "Timeline",
   "view.timelineDesc": "Chronological event tracking",
   "view.whiteboards": "Whiteboards",

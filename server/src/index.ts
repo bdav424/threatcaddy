@@ -10,6 +10,8 @@ import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { access, readFile } from 'node:fs/promises';
+import dns from 'node:dns/promises';
+import net from 'node:net';
 
 import authRoutes from './routes/auth.js';
 import syncRoutes from './routes/sync.js';
@@ -39,6 +41,7 @@ import { sessions } from './db/schema.js';
 import { rateLimiter } from './middleware/rate-limit.js';
 import { requestId } from './middleware/request-id.js';
 import { globalErrorHandler } from './middleware/error-handler.js';
+import { requireAuth } from './middleware/auth.js';
 import { logger } from './lib/logger.js';
 
 const app = new Hono();
@@ -160,6 +163,90 @@ app.get('/health', async (c) => {
 app.get('/api/server/info', async (c) => {
   const serverName = await getServerName();
   return c.json({ serverName });
+});
+
+function isPrivateProxyAddress(address: string): boolean {
+  if (net.isIPv4(address)) {
+    return (
+      address === '127.0.0.1' ||
+      address === '0.0.0.0' ||
+      address.startsWith('10.') ||
+      address.startsWith('192.168.') ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(address) ||
+      /^169\.254\./.test(address)
+    );
+  }
+  if (net.isIPv6(address)) {
+    const lower = address.toLowerCase();
+    return lower === '::1' || lower.startsWith('fc') || lower.startsWith('fd') || lower.startsWith('fe80');
+  }
+  return true;
+}
+
+function assertProxyDomain(url: URL, requiredDomains: unknown): void {
+  const domains = Array.isArray(requiredDomains)
+    ? requiredDomains.map((domain) => String(domain).trim().toLowerCase()).filter(Boolean)
+    : [];
+  if (domains.length === 0) {
+    throw new Error('requiredDomains must include at least one allowed host');
+  }
+  const host = url.hostname.toLowerCase();
+  const allowed = domains.some((domain) => host === domain || host.endsWith(`.${domain}`));
+  if (!allowed) {
+    throw new Error(`Blocked request to ${host} - not in allowed domains: ${domains.join(', ')}`);
+  }
+}
+
+app.post('/api/proxy-fetch', requireAuth as never, async (c) => {
+  const payload = await c.req.json().catch(() => null) as {
+    url?: unknown;
+    method?: unknown;
+    headers?: unknown;
+    body?: unknown;
+    requiredDomains?: unknown;
+  } | null;
+
+  try {
+    const target = new URL(String(payload?.url || ''));
+    if (!['http:', 'https:'].includes(target.protocol)) {
+      throw new Error(`Blocked URL scheme: ${target.protocol}`);
+    }
+    assertProxyDomain(target, payload?.requiredDomains);
+
+    const answers = await dns.lookup(target.hostname, { all: true });
+    if (answers.some((answer) => isPrivateProxyAddress(answer.address))) {
+      throw new Error(`Blocked private address for host: ${target.hostname}`);
+    }
+
+    const method = String(payload?.method || 'GET').toUpperCase();
+    if (!['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'].includes(method)) {
+      throw new Error(`Unsupported proxy method: ${method}`);
+    }
+    const headers = payload?.headers && typeof payload.headers === 'object'
+      ? payload.headers as Record<string, string>
+      : {};
+    const upstream = await fetch(target, {
+      method,
+      headers,
+      body: method === 'GET' || method === 'HEAD' ? undefined : String(payload?.body ?? ''),
+    });
+    const contentType = upstream.headers.get('content-type') || '';
+    const data = contentType.includes('application/json')
+      ? await upstream.json().catch(() => null)
+      : await upstream.text();
+    const responseHeaders: Record<string, string> = {};
+    upstream.headers.forEach((value, key) => {
+      responseHeaders[key] = value;
+    });
+    return c.json({
+      status: upstream.status,
+      statusText: upstream.statusText,
+      headers: responseHeaders,
+      data,
+    });
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+  }
 });
 
 // API routes

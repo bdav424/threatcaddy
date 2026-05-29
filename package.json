@@ -9,6 +9,11 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:single": "tsc -b && vite build --config vite.config.single.ts",
+    "copy:standalone": "node scripts/copy-standalone-artifacts.mjs --dist",
+    "update:standalone": "pnpm build:single && node scripts/copy-standalone-artifacts.mjs --workspace",
+    "desktop:dev:renderer": "vite --host 127.0.0.1 --port 4173",
+    "desktop:dev:main": "TC_DESKTOP_DEV_URL=http://127.0.0.1:4173 electron ./desktop/main.mjs",
+    "desktop:start": "electron ./desktop/main.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
@@ -20,10 +25,12 @@
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "translate": "node scripts/translate-i18n.mjs",
+    "check:caddyai-bridges": "node scripts/check-caddyai-local-bridges.mjs",
+    "integration-proxy": "node scripts/integration-proxy.mjs",
     "translate:dry": "node scripts/translate-i18n.mjs --dry-run",
     "translate:sync": "node scripts/translate-i18n.mjs --sync",
     "translate:sync:dry": "node scripts/translate-i18n.mjs --sync --dry-run",
-    "deploy": "pnpm build && pnpm build:single && cp dist-single/index.html dist/threatcaddy-standalone.html && touch dist/.nojekyll && npx gh-pages -d dist --dotfiles -m \"Deploy $(git rev-parse --short HEAD)\""
+    "deploy": "pnpm build && pnpm build:single && pnpm copy:standalone && touch dist/.nojekyll && npx gh-pages -d dist --dotfiles -m \"Deploy $(git rev-parse --short HEAD)\""
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.0",
@@ -66,6 +73,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
     "@vitest/coverage-v8": "^4.0.18",
+    "electron": "^37.3.0",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",

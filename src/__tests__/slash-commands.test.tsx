@@ -50,13 +50,13 @@ describe('ChatInput slash command menu', () => {
       expect(screen.getByText('/timeline')).toBeInTheDocument();
     });
 
-    it('shows all 13 commands when only "/" is typed', async () => {
+    it('shows all 22 commands when only "/" is typed', async () => {
       renderInput();
       await userEvent.type(getTextarea(), '/');
       const options = screen.getAllByRole('option').filter(
         (b) => b.textContent?.startsWith('/')
       );
-      expect(options).toHaveLength(13);
+      expect(options).toHaveLength(22);
     });
 
     it('hides menu when text does not start with "/"', async () => {
@@ -163,8 +163,8 @@ describe('ChatInput slash command menu', () => {
       renderInput();
       const textarea = getTextarea();
       await userEvent.type(textarea, '/');
-      // Press ArrowDown 13 times to wrap back to first
-      for (let i = 0; i < 13; i++) {
+      // Press ArrowDown once per command to wrap back to first
+      for (let i = 0; i < 22; i++) {
         fireEvent.keyDown(textarea, { key: 'ArrowDown' });
       }
       fireEvent.keyDown(textarea, { key: 'Enter' });
@@ -218,13 +218,15 @@ describe('ChatInput slash command menu', () => {
       expect(screen.getByText('Extract IOCs from text')).toBeInTheDocument();
       expect(screen.getByText('Summarize this investigation')).toBeInTheDocument();
       expect(screen.getByText('List timeline events')).toBeInTheDocument();
+      expect(screen.getByText('Hunt VT relationships for an IOC')).toBeInTheDocument();
+      expect(screen.getByText('Search VT Intelligence')).toBeInTheDocument();
     });
 
     it('shows placeholders for commands that take arguments', async () => {
       renderInput();
       await userEvent.type(getTextarea(), '/');
       expect(screen.getByText('<url>')).toBeInTheDocument();
-      expect(screen.getByText('<query>')).toBeInTheDocument();
+      expect(screen.getAllByText('<query>').length).toBeGreaterThanOrEqual(1);
     });
   });
 

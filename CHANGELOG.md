@@ -4,6 +4,7 @@
 
 ### Features
 
+- Added server-side local OpenAI-compatible LLM routing. The team server now exposes a `local` provider when `LOCAL_LLM_ENDPOINT` or `CODEX_API_ENDPOINT` is configured, allowing `everybody_llmbo` to serve Codex through ThreatCaddy's `/api/llm/chat` route.
 - **Open markdown files as notes** — Open `.md` and `.txt` files directly in the browser via `Ctrl+O` / `Cmd+O` file picker, drag-and-drop anywhere on the app, or the "Open File" item in the New dropdown menu. File name, size, and creation date are captured in the note title. IOCs are auto-extracted on import. Also registers as a PWA file handler for OS-level "Open with" support when installed.
 - **AgentCaddy hardening pass (April 2026)** — six-phase architectural sweep grounded in 2025-2026 multi-agent failure research:
   - **Phase 0 — Observability**: per-cycle `AgentCycleSummary` (cost in USD, tool histogram, error histogram, outcome) emitted to the audit ChatThread and rendered inline. Per-deployment metrics now expose cost, tokens, and top-tool at a glance.

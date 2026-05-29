@@ -32,7 +32,7 @@
 ThreatCaddy is a collaborative threat investigation platform. The API runs on two separate servers:
 
 - **Main API** -- serves all client-facing endpoints (`/api/*`, `/health`, `/ws`)
-- **Admin API** -- serves the admin panel on an internal-only port (`/admin/*`)
+- **Admin API** -- serves the admin panel on a private admin port (`/admin/*`)
 
 The OpenAPI 3.1 specification is available in [`api-reference.yml`](./api-reference.yml).
 

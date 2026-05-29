@@ -90,11 +90,25 @@ describe('getAvailableProviders()', () => {
     expect(names).toContain('mistral');
   });
 
+  it('detects configured local OpenAI-compatible endpoint', () => {
+    process.env.ANTHROPIC_API_KEY = '';
+    process.env.OPENAI_API_KEY = '';
+    process.env.GEMINI_API_KEY = '';
+    process.env.MISTRAL_API_KEY = '';
+    process.env.LOCAL_LLM_ENDPOINT = 'http://127.0.0.1:11434/v1';
+    process.env.LOCAL_LLM_MODEL = 'gpt-5.4';
+
+    const providers = getAvailableProviders();
+    expect(providers).toHaveLength(1);
+    expect(providers[0]).toEqual({ provider: 'local', models: ['gpt-5.4'] });
+  });
+
   it('returns empty array when no API keys are set', () => {
     process.env.ANTHROPIC_API_KEY = '';
     process.env.OPENAI_API_KEY = '';
     process.env.GEMINI_API_KEY = '';
     process.env.MISTRAL_API_KEY = '';
+    process.env.LOCAL_LLM_ENDPOINT = '';
 
     const providers = getAvailableProviders();
     expect(providers).toHaveLength(0);
@@ -169,6 +183,7 @@ describe('streamOpenAI() SSE parsing', () => {
 
   it('parses delta content events and calls onChunk', async () => {
     const chunks: string[] = [];
+    const doneBlocks: unknown[][] = [];
 
     mockFetch.mockResolvedValueOnce(makeStreamResponse([
       'data: {"choices":[{"delta":{"content":"Hello"}}]}',
@@ -180,13 +195,129 @@ describe('streamOpenAI() SSE parsing', () => {
       { provider: 'openai', model: 'gpt-4o', messages: [{ role: 'user', content: 'Hi' }] },
       {
         onChunk: (text) => chunks.push(text),
-        onDone: () => {},
+        onDone: (_reason, blocks) => doneBlocks.push(blocks || []),
         onError: () => {},
       },
       AbortSignal.timeout(5000),
     );
 
     expect(chunks).toEqual(['Hello', ' world']);
+    expect(doneBlocks[0]).toEqual([{ type: 'text', text: 'Hello world' }]);
+  });
+
+  it('converts Anthropic-style image blocks to OpenAI image_url parts', async () => {
+    mockFetch.mockResolvedValueOnce(makeStreamResponse(['data: [DONE]']));
+
+    await streamLLM(
+      {
+        provider: 'openai',
+        model: 'gpt-4o',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'abc123' } },
+            { type: 'text', text: 'Analyze this image.' },
+          ],
+        }],
+      },
+      { onChunk: () => {}, onDone: () => {}, onError: () => {} },
+      AbortSignal.timeout(5000),
+    );
+
+    const body = JSON.parse(String(mockFetch.mock.calls[0][1]?.body));
+    expect(body.messages[0].content).toEqual([
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,abc123' } },
+      { type: 'text', text: 'Analyze this image.' },
+    ]);
+  });
+});
+
+describe('streamLocal() SSE parsing', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.LOCAL_LLM_ENDPOINT = 'http://127.0.0.1:11434';
+    process.env.LOCAL_LLM_API_KEY = 'local-token';
+  });
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it('routes local provider to OpenAI-compatible endpoint', async () => {
+    const chunks: string[] = [];
+    const doneReasons: string[] = [];
+
+    mockFetch.mockResolvedValueOnce(makeStreamResponse([
+      'data: {"choices":[{"delta":{"content":"Local"}}]}',
+      'data: {"choices":[{"delta":{"content":" Codex"}}]}',
+      'data: [DONE]',
+    ]));
+
+    await streamLLM(
+      { provider: 'local', model: 'gpt-5.4', messages: [{ role: 'user', content: 'Hi' }] },
+      {
+        onChunk: (text) => chunks.push(text),
+        onDone: (reason) => doneReasons.push(reason),
+        onError: () => {},
+      },
+      AbortSignal.timeout(5000),
+    );
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'http://127.0.0.1:11434/v1/chat/completions',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ Authorization: 'Bearer local-token' }),
+      }),
+    );
+    expect(chunks).toEqual(['Local', ' Codex']);
+    expect(doneReasons).toEqual(['end_turn']);
+  });
+});
+
+describe('streamGemini() request conversion', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.GEMINI_API_KEY = 'gem-key';
+  });
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it('converts Anthropic-style image blocks to Gemini inlineData parts', async () => {
+    const chunks: string[] = [];
+    const doneBlocks: unknown[][] = [];
+
+    mockFetch.mockResolvedValueOnce(makeStreamResponse([
+      'data: {"candidates":[{"content":{"parts":[{"text":"ok"}]},"finishReason":"STOP"}]}',
+    ]));
+
+    await streamLLM(
+      {
+        provider: 'gemini',
+        model: 'gemini-2.0-flash',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Analyze this image.' },
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'def456' } },
+          ],
+        }],
+      },
+      {
+        onChunk: (text) => chunks.push(text),
+        onDone: (_reason, blocks) => doneBlocks.push(blocks || []),
+        onError: () => {},
+      },
+      AbortSignal.timeout(5000),
+    );
+
+    const body = JSON.parse(String(mockFetch.mock.calls[0][1]?.body));
+    expect(body.contents[0].parts).toEqual([
+      { text: 'Analyze this image.' },
+      { inlineData: { mimeType: 'image/jpeg', data: 'def456' } },
+    ]);
+    expect(chunks).toEqual(['ok']);
+    expect(doneBlocks[0]).toEqual([{ type: 'text', text: 'ok' }]);
   });
 });
 

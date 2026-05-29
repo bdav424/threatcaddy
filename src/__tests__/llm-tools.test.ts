@@ -14,7 +14,7 @@ function makeToolUse(name: string, input: Record<string, unknown> = {}): ToolUse
 
 describe('TOOL_DEFINITIONS', () => {
   it('has the expected number of tool definitions', () => {
-    expect(TOOL_DEFINITIONS.length).toBe(46);
+    expect(TOOL_DEFINITIONS.length).toBe(52);
   });
 
   it('each tool has name, description, and input_schema', () => {
@@ -84,6 +84,11 @@ describe('isWriteTool', () => {
     expect(isWriteTool('generate_report')).toBe(true);
   });
 
+  it('returns true for product render tools', () => {
+    expect(isWriteTool('create_product_baseline')).toBe(true);
+    expect(isWriteTool('render_product_baseline')).toBe(true);
+  });
+
   it('returns false for read tools', () => {
     expect(isWriteTool('search_notes')).toBe(false);
     expect(isWriteTool('read_note')).toBe(false);
@@ -97,6 +102,7 @@ describe('isWriteTool', () => {
     expect(isWriteTool('extract_iocs')).toBe(false);
     expect(isWriteTool('search_all')).toBe(false);
     expect(isWriteTool('analyze_graph')).toBe(false);
+    expect(isWriteTool('list_product_baselines')).toBe(false);
   });
 
   it('returns false for unknown tools', () => {
@@ -253,6 +259,7 @@ describe('executeTool — write tools', () => {
     const parsed = JSON.parse(result);
     expect(parsed.success).toBe(true);
     expect(parsed.title).toBe('AI Note');
+    expect(parsed.folderId).toBe('f1');
 
     const stored = await db.notes.get(parsed.id);
     expect(stored).toBeDefined();

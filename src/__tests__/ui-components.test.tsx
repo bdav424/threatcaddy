@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ConfirmDialog } from '../components/Common/ConfirmDialog';
 import { TagPills } from '../components/Common/TagPills';
 import { ErrorBoundary } from '../components/Common/ErrorBoundary';
@@ -8,6 +8,7 @@ import { IOCBadge } from '../components/Analysis/IOCBadge';
 import { ClsBadge } from '../components/Common/ClsBadge';
 import { ActiveFilterBar } from '../components/Common/ActiveFilterBar';
 import { CreateDropdown } from '../components/Common/CreateDropdown';
+import { NoteTemplateCreator } from '../components/Notes/NoteTemplateCreator';
 import type { IOCType } from '../types';
 
 // Mock contexts (same pattern as existing tests)
@@ -694,7 +695,7 @@ describe('CreateDropdown', () => {
     fireEvent.click(screen.getByTitle('Create new...'));
 
     expect(screen.getByText('Quick Note')).toBeInTheDocument();
-    expect(screen.getByText('Note Templates')).toBeInTheDocument();
+    expect(screen.getByText('New Note from Template')).toBeInTheDocument();
     expect(screen.getByText('Task')).toBeInTheDocument();
     expect(screen.getByText('Timeline Event')).toBeInTheDocument();
     expect(screen.getByText('Whiteboard')).toBeInTheDocument();
@@ -710,12 +711,22 @@ describe('CreateDropdown', () => {
     expect(screen.queryByText('Task')).not.toBeInTheDocument();
   });
 
-  it('calls onNewNote when Note Templates is clicked', () => {
+  it('calls onNewNote when New Note from Template is clicked', () => {
     render(<CreateDropdown {...defaultProps} />);
     fireEvent.click(screen.getByTitle('Create new...'));
-    fireEvent.click(screen.getByText('Note Templates'));
+    fireEvent.click(screen.getByText('New Note from Template'));
 
     expect(defaultProps.onNewNote).toHaveBeenCalledOnce();
+  });
+
+  it('shows New Note Template option when provided', () => {
+    const onNewNoteTemplate = vi.fn();
+    render(<CreateDropdown {...defaultProps} onNewNoteTemplate={onNewNoteTemplate} />);
+    fireEvent.click(screen.getByTitle('Create new...'));
+
+    expect(screen.getByText('New Note Template')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('New Note Template'));
+    expect(onNewNoteTemplate).toHaveBeenCalledOnce();
   });
 
   it('calls onNewTask when Task is clicked', () => {
@@ -769,6 +780,16 @@ describe('CreateDropdown', () => {
     expect(onImportData).toHaveBeenCalledOnce();
   });
 
+  it('shows Add Template to Investigation option when provided', () => {
+    const onImportNoteTemplate = vi.fn();
+    render(<CreateDropdown {...defaultProps} onImportNoteTemplate={onImportNoteTemplate} />);
+    fireEvent.click(screen.getByTitle('Create new...'));
+
+    expect(screen.getByText('Add Template to Investigation')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Add Template to Investigation'));
+    expect(onImportNoteTemplate).toHaveBeenCalledOnce();
+  });
+
   it('toggles dropdown open and closed', () => {
     render(<CreateDropdown {...defaultProps} />);
 
@@ -802,6 +823,53 @@ describe('CreateDropdown', () => {
     render(<CreateDropdown {...defaultProps} />);
     const trigger = screen.getByTitle('Create new...');
     expect(trigger.getAttribute('data-tour')).toBe('new-note');
+  });
+});
+
+// ---------- NoteTemplateCreator ----------
+
+describe('NoteTemplateCreator', () => {
+  it('creates a custom note template from the form', async () => {
+    const onCreate = vi.fn().mockResolvedValue(undefined);
+    render(
+      <NoteTemplateCreator
+        open={true}
+        onClose={() => {}}
+        categories={['Custom', 'Investigation']}
+        defaultClsLevel="TLP:AMBER"
+        attachInvestigationName="Iran Watch"
+        onCreate={onCreate}
+      />
+    );
+
+    expect(screen.getByText('This template will be saved and attached to Iran Watch.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Template name'), { target: { value: 'SITREP Template' } });
+    fireEvent.change(screen.getByLabelText('Template content'), { target: { value: '# SITREP\n\n## NSTR' } });
+    fireEvent.change(screen.getByLabelText('Tags'), { target: { value: 'sitrep, iran' } });
+    fireEvent.click(screen.getByText('Save template'));
+
+    await waitFor(() => {
+      expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({
+        name: 'SITREP Template',
+        content: '# SITREP\n\n## NSTR',
+        category: 'Custom',
+        tags: ['sitrep', 'iran'],
+        clsLevel: 'TLP:AMBER',
+      }));
+    });
+  });
+
+  it('does not render when closed', () => {
+    render(
+      <NoteTemplateCreator
+        open={false}
+        onClose={() => {}}
+        categories={[]}
+        onCreate={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText('New Note Template')).not.toBeInTheDocument();
   });
 });
 

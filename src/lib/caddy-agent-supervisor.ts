@@ -14,6 +14,7 @@ import { executeTool, buildSystemPrompt } from './llm-tools';
 import { resolveRoutingMode, sendViaExtension, sendViaServer } from './llm-router';
 import { postMessageOrigin } from './utils';
 import { parseToolCallsFromText } from './caddy-agent';
+import { resolveLocalLLMApiKey } from './local-llm-auth';
 
 // ── Constants ───────────────────────────────────────────────────────────
 
@@ -66,7 +67,7 @@ function getApiKeyForProvider(provider: LLMProvider, settings: Settings): string
     case 'openai':    return settings.llmOpenAIApiKey?.trim();
     case 'gemini':    return settings.llmGeminiApiKey?.trim();
     case 'mistral':   return settings.llmMistralApiKey?.trim();
-    case 'local':     return settings.llmLocalApiKey?.trim() || 'local';
+    case 'local':     return resolveLocalLLMApiKey(settings.llmLocalApiKey, settings.llmLocalEndpoint) || 'local';
     default:          return undefined;
   }
 }

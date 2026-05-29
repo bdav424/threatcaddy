@@ -1,12 +1,15 @@
 import { db } from '../db';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, StandaloneIOC, ChatThread, ChatMessage, NoteTemplate, PlaybookTemplate, PlaybookStep, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel, IOCAnalysis, IOCEntry, IOCRelationship, TaskComment, NoteAnnotation, QuickLink, LLMProvider, IOCType, TemplateSource, PlaybookStepEntity, AgentAction } from '../types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, StandaloneIOC, EvidenceItem, ChatThread, ChatMessage, NoteTemplate, PlaybookTemplate, PlaybookStep, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel, IOCAnalysis, IOCEntry, IOCRelationship, TaskComment, NoteAnnotation, QuickLink, LLMProvider, IOCType, TemplateSource, PlaybookStepEntity, AgentAction, EvidenceExtractionStatus, EvidenceKind, ProductBaselineMetadata } from '../types';
 import { TIMELINE_EVENT_TYPE_LABELS, CONFIDENCE_LEVELS, IOC_TYPE_LABELS } from '../types';
 import { nanoid } from 'nanoid';
+import { normalizeIOCEnrichment } from './ioc-enrichment-persistence';
+import { MAX_PRODUCT_BASELINE_ASSET_DATA } from './product-baselines';
 
 export async function exportJSON(): Promise<string> {
   // Load tables sequentially to reduce peak memory usage (avoids loading
   // all 15 tables into memory simultaneously on large datasets).
-  const notes = await db.notes.toArray();
+  const allNotes = collapseEvidenceNoteSeries(await db.notes.toArray());
+  const notes = allNotes.filter((note) => !isBackupEvidenceNote(note));
   const tasks = await db.tasks.toArray();
   const folders = await db.folders.toArray();
   const tags = await db.tags.toArray();
@@ -14,6 +17,7 @@ export async function exportJSON(): Promise<string> {
   const timelines = await db.timelines.toArray();
   const whiteboards = await db.whiteboards.toArray();
   const standaloneIOCs = await db.standaloneIOCs.toArray();
+  const evidenceItems = mergeEvidenceItemLists(await db.evidenceItems.toArray(), evidenceItemsFromNotes(allNotes));
   const chatThreads = await db.chatThreads.toArray();
   const noteTemplates = await db.noteTemplates.toArray();
   const playbookTemplates = await db.playbookTemplates.toArray();
@@ -43,6 +47,7 @@ export async function exportJSON(): Promise<string> {
     timelines,
     whiteboards,
     standaloneIOCs,
+    evidenceItems: evidenceItems.length > 0 ? evidenceItems : undefined,
     chatThreads,
     agentActions: agentActions.length > 0 ? agentActions : undefined,
     agentProfiles: agentProfiles.length > 0 ? agentProfiles : undefined,
@@ -61,8 +66,25 @@ const MAX_ITEMS = 100_000;
 
 /** Max string length for imported fields (matches server sync-service 500KB cap). */
 const MAX_IMPORT_STRING = 500_000;
+const MAX_IMPORT_IMAGE_DATA = 4_250_000;
+const VALID_RASTER_IMAGE_MIME_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+  'image/bmp',
+  'image/avif',
+]);
 function str(v: unknown, fallback = ''): string {
   return typeof v === 'string' ? v.substring(0, MAX_IMPORT_STRING) : fallback;
+}
+function boundedStr(v: unknown, max: number): string | undefined {
+  return typeof v === 'string' && v.length <= max ? v : undefined;
+}
+function rasterImageMime(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined;
+  const mimeType = v.toLowerCase().trim();
+  return VALID_RASTER_IMAGE_MIME_TYPES.has(mimeType) ? mimeType : undefined;
 }
 function num(v: unknown, fallback = 0): number {
   return typeof v === 'number' && isFinite(v) ? v : fallback;
@@ -230,6 +252,8 @@ export function sanitizeTask(raw: unknown): Task | null {
 
 const VALID_INVESTIGATION_STATUS = ['active', 'closed', 'archived'];
 const VALID_CLOSURE_RESOLUTIONS = ['resolved', 'false-positive', 'escalated', 'duplicate', 'inconclusive'];
+const VALID_EVIDENCE_KINDS: EvidenceKind[] = ['pdf', 'docx', 'doc', 'rtf', 'xlsx', 'xls', 'image', 'text', 'spreadsheet', 'unknown'];
+const VALID_EVIDENCE_STATUSES: EvidenceExtractionStatus[] = ['extracted', 'partial', 'metadata-only'];
 
 export function sanitizeFolder(raw: unknown): Folder | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -249,6 +273,7 @@ export function sanitizeFolder(raw: unknown): Folder | null {
     papLevel: r.papLevel != null ? str(r.papLevel) : undefined,
     updatedAt: r.updatedAt != null ? num(r.updatedAt) : undefined,
     tags: Array.isArray(r.tags) ? strArr(r.tags) : undefined,
+    noteTemplateIds: Array.isArray(r.noteTemplateIds) ? strArr(r.noteTemplateIds) : undefined,
     timelineId: r.timelineId != null ? str(r.timelineId) : undefined,
     closureResolution: r.closureResolution != null && VALID_CLOSURE_RESOLUTIONS.includes(str(r.closureResolution))
       ? str(r.closureResolution) as Folder['closureResolution']
@@ -367,7 +392,11 @@ export function sanitizeStandaloneIOC(raw: unknown): StandaloneIOC | null {
     linkedNoteIds: Array.isArray(r.linkedNoteIds) ? strArr(r.linkedNoteIds) : undefined,
     linkedTaskIds: Array.isArray(r.linkedTaskIds) ? strArr(r.linkedTaskIds) : undefined,
     linkedTimelineEventIds: Array.isArray(r.linkedTimelineEventIds) ? strArr(r.linkedTimelineEventIds) : undefined,
+    linkedEvidenceIds: Array.isArray(r.linkedEvidenceIds) ? strArr(r.linkedEvidenceIds) : undefined,
     comments: Array.isArray(r.comments) ? (r.comments as unknown[]).map(sanitizeComment).filter((c): c is TaskComment => c !== null) as unknown as StandaloneIOC['comments'] : undefined,
+    enrichment: normalizeIOCEnrichment(r.enrichment, num(r.updatedAt, Date.now()), 'import'),
+    firstSeen: r.firstSeen != null ? num(r.firstSeen) : undefined,
+    lastSeen: r.lastSeen != null ? num(r.lastSeen) : undefined,
     assigneeId: r.assigneeId != null ? str(r.assigneeId) : undefined,
     assigneeName: r.assigneeName != null ? str(r.assigneeName) : undefined,
     trashed: bool(r.trashed),
@@ -376,6 +405,265 @@ export function sanitizeStandaloneIOC(raw: unknown): StandaloneIOC | null {
     createdAt: num(r.createdAt, Date.now()),
     updatedAt: num(r.updatedAt, Date.now()),
   };
+}
+
+export function sanitizeEvidenceItem(raw: unknown): EvidenceItem | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const fileType = str(r.fileType, 'unknown');
+  const extractionStatus = str(r.extractionStatus, 'metadata-only');
+  const imageData = boundedStr(r.imageData, MAX_IMPORT_IMAGE_DATA);
+  const imageDataMimeType = rasterImageMime(r.imageDataMimeType);
+  return {
+    id: str(r.id),
+    title: str(r.title),
+    folderId: r.folderId != null ? str(r.folderId) : undefined,
+    fileName: str(r.fileName, str(r.title, 'unknown')),
+    fileType: (VALID_EVIDENCE_KINDS.includes(fileType as EvidenceKind) ? fileType : 'unknown') as EvidenceKind,
+    mimeType: r.mimeType != null ? str(r.mimeType) : undefined,
+    size: num(r.size),
+    lastModified: r.lastModified != null ? num(r.lastModified) : undefined,
+    imageWidth: r.imageWidth != null ? num(r.imageWidth) : undefined,
+    imageHeight: r.imageHeight != null ? num(r.imageHeight) : undefined,
+    imageAspectRatio: r.imageAspectRatio != null ? str(r.imageAspectRatio) : undefined,
+    imagePixelCount: r.imagePixelCount != null ? num(r.imagePixelCount) : undefined,
+    imageData: imageData && imageDataMimeType && /^[A-Za-z0-9+/]+={0,2}$/.test(imageData) ? imageData : undefined,
+    imageDataMimeType: imageData && imageDataMimeType ? imageDataMimeType : undefined,
+    imageAnalysis: r.imageAnalysis != null ? str(r.imageAnalysis) : undefined,
+    imageOcrText: r.imageOcrText != null ? str(r.imageOcrText) : undefined,
+    content: str(r.content),
+    extractionStatus: (VALID_EVIDENCE_STATUSES.includes(extractionStatus as EvidenceExtractionStatus) ? extractionStatus : 'metadata-only') as EvidenceExtractionStatus,
+    extractionWarning: r.extractionWarning != null ? str(r.extractionWarning) : undefined,
+    importedAt: num(r.importedAt, num(r.createdAt, Date.now())),
+    chunkIndex: num(r.chunkIndex, 1),
+    chunkCount: num(r.chunkCount, 1),
+    tags: strArr(r.tags),
+    linkedIOCIds: Array.isArray(r.linkedIOCIds) ? strArr(r.linkedIOCIds) : undefined,
+    clsLevel: r.clsLevel != null ? str(r.clsLevel) : undefined,
+    trashed: bool(r.trashed),
+    trashedAt: r.trashedAt != null ? num(r.trashedAt) : undefined,
+    archived: bool(r.archived),
+    createdBy: r.createdBy != null ? str(r.createdBy) : undefined,
+    updatedBy: r.updatedBy != null ? str(r.updatedBy) : undefined,
+    createdAt: num(r.createdAt, Date.now()),
+    updatedAt: num(r.updatedAt, Date.now()),
+  };
+}
+
+function evidenceItemsFromNotes(notes: Note[]): EvidenceItem[] {
+  return collapseEvidenceNoteSeries(notes)
+    .filter(isBackupEvidenceNote)
+    .map((note) => {
+      const extractionTag = note.tags.find((tag) => tag.startsWith('extraction:'));
+      const extractionStatus = extractionTag?.slice('extraction:'.length) as EvidenceExtractionStatus | undefined;
+      const fileName = getBackupEvidenceFileName(note);
+      return {
+        id: `evidence_${note.id}`,
+        title: stripBackupEvidenceTitle(note.title),
+        folderId: note.folderId,
+        fileName,
+        fileType: evidenceKindFromBackupFileName(fileName),
+        size: 0,
+        content: note.content,
+        extractionStatus: extractionStatus && VALID_EVIDENCE_STATUSES.includes(extractionStatus) ? extractionStatus : 'partial',
+        importedAt: note.createdAt,
+        chunkIndex: 1,
+        chunkCount: 1,
+        tags: note.tags.filter((tag) => tag !== 'evidence' && tag !== 'source:file'),
+        clsLevel: note.clsLevel,
+        linkedIOCIds: [],
+        trashed: note.trashed,
+        trashedAt: note.trashedAt,
+        archived: note.archived,
+        createdBy: note.createdBy,
+        updatedBy: note.updatedBy,
+        createdAt: note.createdAt,
+        updatedAt: note.updatedAt,
+      };
+    });
+}
+
+function mergeEvidenceItemLists(...lists: EvidenceItem[][]): EvidenceItem[] {
+  return collapseEvidenceItems(lists.flat());
+}
+
+function collapseEvidenceItems(items: EvidenceItem[]): EvidenceItem[] {
+  const groups = new Map<string, EvidenceItem[]>();
+  for (const item of items) {
+    if (!item.id) continue;
+    const key = `${item.folderId || ''}::${(item.fileName || item.title).toLowerCase()}`;
+    const group = groups.get(key) || [];
+    group.push(item);
+    groups.set(key, group);
+  }
+
+  const collapsed: EvidenceItem[] = [];
+  for (const group of groups.values()) {
+    if (group.length === 1 && (group[0].chunkCount || 1) <= 1) {
+      collapsed.push(group[0]);
+      continue;
+    }
+
+    const sorted = [...group].sort((a, b) =>
+      (a.chunkIndex || 1) - (b.chunkIndex || 1) ||
+      (a.createdAt || 0) - (b.createdAt || 0)
+    );
+    const first = sorted[0];
+    const metadata = extractBackupEvidenceMetadata(first.content)
+      .split('\n')
+      .filter((line) => !/^\*\*Part:\*\*/i.test(line.trim()))
+      .join('\n')
+      .trim();
+    const bodies = sorted
+      .map((item) => extractBackupEvidenceBody(item.content))
+      .filter(Boolean);
+    const content = `${metadata}\n\n## Extracted Text\n\n${dedupeBackupEvidenceBodies(bodies).join('\n\n') || 'No extracted text is available for this file.'}`;
+
+    collapsed.push({
+      ...first,
+      title: stripBackupEvidenceTitle(first.title) || first.fileName,
+      content,
+      extractionStatus: getBestBackupEvidenceStatus(sorted.map((item) => item.extractionStatus)),
+      chunkIndex: 1,
+      chunkCount: 1,
+      tags: Array.from(new Set(sorted.flatMap((item) => item.tags))),
+      linkedIOCIds: Array.from(new Set(sorted.flatMap((item) => item.linkedIOCIds || []))),
+      trashed: sorted.every((item) => item.trashed),
+      archived: sorted.every((item) => item.archived),
+      createdAt: Math.min(...sorted.map((item) => item.createdAt)),
+      updatedAt: Math.max(...sorted.map((item) => item.updatedAt)),
+    });
+  }
+
+  return collapsed;
+}
+
+function collapseEvidenceNoteSeries(notes: Note[]): Note[] {
+  const passthrough: Note[] = [];
+  const groups = new Map<string, Note[]>();
+
+  for (const note of notes) {
+    if (!isBackupEvidenceNote(note)) {
+      passthrough.push(note);
+      continue;
+    }
+    const key = `${note.folderId || ''}::${getBackupEvidenceFileName(note).toLowerCase()}`;
+    const group = groups.get(key) || [];
+    group.push(note);
+    groups.set(key, group);
+  }
+
+  for (const group of groups.values()) {
+    if (group.length === 1) {
+      passthrough.push(group[0]);
+    } else {
+      passthrough.push(combineBackupEvidenceNotes(group));
+    }
+  }
+
+  return passthrough;
+}
+
+function dedupeBackupEvidenceBodies(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const trimmed = value.trim();
+    if (!trimmed || /^No extracted text is available/i.test(trimmed)) continue;
+    const key = trimmed.toLowerCase().replace(/\s+/g, ' ');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(trimmed);
+  }
+  return result;
+}
+
+function getBestBackupEvidenceStatus(statuses: EvidenceExtractionStatus[]): EvidenceExtractionStatus {
+  if (statuses.includes('extracted')) return 'extracted';
+  if (statuses.includes('partial')) return 'partial';
+  return 'metadata-only';
+}
+
+function combineBackupEvidenceNotes(group: Note[]): Note {
+  const sorted = [...group].sort((a, b) => getBackupEvidencePart(a) - getBackupEvidencePart(b));
+  const canonical = sorted[0];
+  const fileName = getBackupEvidenceFileName(canonical);
+  const metadata = extractBackupEvidenceMetadata(canonical.content)
+    .split('\n')
+    .filter((line) => !/^\*\*Part:\*\*/i.test(line.trim()))
+    .join('\n')
+    .trim();
+  const body = sorted
+    .map((note) => extractBackupEvidenceBody(note.content))
+    .filter(Boolean)
+    .join('\n\n')
+    .trim() || 'No extracted text is available for this file.';
+
+  return {
+    ...canonical,
+    title: canonical.title.replace(/\s+\(\d+\s+of\s+\d+\)$/i, ''),
+    content: `${metadata}\n\n## Extracted Text\n\n${body}`,
+    sourceTitle: fileName,
+    tags: Array.from(new Set(group.flatMap((note) => note.tags))),
+    iocTypes: Array.from(new Set(group.flatMap((note) => note.iocTypes || []))),
+    linkedNoteIds: Array.from(new Set(group.flatMap((note) => note.linkedNoteIds || []))),
+    linkedTaskIds: Array.from(new Set(group.flatMap((note) => note.linkedTaskIds || []))),
+    linkedTimelineEventIds: Array.from(new Set(group.flatMap((note) => note.linkedTimelineEventIds || []))),
+    createdAt: Math.min(...group.map((note) => note.createdAt)),
+    updatedAt: Math.max(...group.map((note) => note.updatedAt)),
+  };
+}
+
+function isBackupEvidenceNote(note: Note): boolean {
+  const hasEvidenceFileTags = note.tags.includes('evidence') &&
+    (note.tags.includes('source:file') || note.tags.some((tag) => tag.startsWith('extraction:') || tag.startsWith('file:')));
+
+  return hasEvidenceFileTags;
+}
+
+function getBackupEvidenceFileName(note: Note): string {
+  return (
+    note.sourceTitle ||
+    note.content.match(/^# Evidence:\s*(.+)$/m)?.[1] ||
+    stripBackupEvidenceTitle(note.title) ||
+    note.id
+  ).trim();
+}
+
+function stripBackupEvidenceTitle(title: string): string {
+  return title
+    .replace(/^Evidence\s*-\s*/i, '')
+    .replace(/\s+\(\d+\s+of\s+\d+\)$/i, '')
+    .trim();
+}
+
+function getBackupEvidencePart(note: Note): number {
+  const contentPart = note.content.match(/\*\*Part:\*\*\s*(\d+)\s+of\s+\d+/i);
+  const titlePart = note.title.match(/\((\d+)\s+of\s+\d+\)$/i);
+  return Number(contentPart?.[1] || titlePart?.[1] || 1);
+}
+
+function extractBackupEvidenceMetadata(content: string): string {
+  return (content.split(/\n## Extracted Text\b/i)[0] || content).trim();
+}
+
+function extractBackupEvidenceBody(content: string): string {
+  const parts = content.split(/\n## Extracted Text\b/i);
+  return parts.length > 1 ? parts.slice(1).join('\n## Extracted Text').trim() : '';
+}
+
+function evidenceKindFromBackupFileName(fileName: string): EvidenceKind {
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith('.pdf')) return 'pdf';
+  if (lower.endsWith('.docx')) return 'docx';
+  if (lower.endsWith('.doc')) return 'doc';
+  if (lower.endsWith('.rtf') || lower.endsWith('.rtfs')) return 'rtf';
+  if (lower.endsWith('.xlsx')) return 'xlsx';
+  if (lower.endsWith('.xls')) return 'xls';
+  if (/\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(lower)) return 'image';
+  if (lower.endsWith('.csv') || lower.endsWith('.tsv')) return 'spreadsheet';
+  if (/\.(txt|md|markdown|json|xml|yaml|yml|log)$/i.test(lower)) return 'text';
+  return 'unknown';
 }
 
 function sanitizeChatMessage(raw: unknown): ChatMessage | null {
@@ -575,9 +863,99 @@ function sanitizeNoteTemplate(raw: unknown): NoteTemplate | null {
     tags: Array.isArray(r.tags) ? strArr(r.tags) : undefined,
     clsLevel: r.clsLevel != null ? str(r.clsLevel) : undefined,
     source: (VALID_TEMPLATE_SOURCES.includes(source) ? source : 'user') as TemplateSource,
+    productBaseline: sanitizeProductBaselineMetadata(r.productBaseline),
     createdAt: num(r.createdAt, Date.now()),
     updatedAt: num(r.updatedAt, Date.now()),
   };
+}
+
+function sanitizeProductBaselineMetadata(raw: unknown): ProductBaselineMetadata | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  const kind = str(r.kind);
+  const productType = str(r.productType);
+  const renderer = str(r.renderer);
+  const visualFidelity = str(r.visualFidelity);
+  return {
+    schemaVersion: 1,
+    kind: kind === 'docx-template' ? 'docx-template' : 'markdown',
+    productType: productType === 'custom-report' ||
+      productType === 'custom-intel-note' ||
+      productType === 'executive-brief' ||
+      productType === 'custom'
+      ? productType
+      : 'custom',
+    importedAt: r.importedAt != null ? num(r.importedAt) : undefined,
+    importedFrom: r.importedFrom != null ? str(r.importedFrom) : undefined,
+    renderer: renderer === 'docx-template' ? 'docx-template' : 'markdown',
+    visualFidelity: visualFidelity === 'word-template' || visualFidelity === 'structural' ? visualFidelity : 'placeholder',
+    sourceDocuments: sanitizeProductBaselineSourceDocuments(r.sourceDocuments),
+    testFixtures: sanitizeProductBaselineTestFixtures(r.testFixtures),
+    assets: sanitizeProductBaselineAssets(r.assets),
+    layoutNotes: strArr(r.layoutNotes),
+    sourceNoteRules: strArr(r.sourceNoteRules),
+    requiredFields: strArr(r.requiredFields),
+  };
+}
+
+function sanitizeProductBaselineSourceDocuments(raw: unknown): ProductBaselineMetadata['sourceDocuments'] {
+  if (!Array.isArray(raw)) return undefined;
+  const docs = raw.flatMap((item): NonNullable<ProductBaselineMetadata['sourceDocuments']> => {
+    if (!item || typeof item !== 'object') return [];
+    const r = item as Record<string, unknown>;
+    const name = str(r.name).trim();
+    if (!name) return [];
+    const type = str(r.type);
+    return [{
+      name,
+      type: type === 'docx' || type === 'pdf' || type === 'markdown' || type === 'json' ? type : type ? 'other' : undefined,
+      path: r.path != null ? str(r.path) : undefined,
+      sha256: r.sha256 != null ? str(r.sha256) : undefined,
+      role: r.role != null ? str(r.role) : undefined,
+      notes: r.notes != null ? str(r.notes) : undefined,
+    }];
+  });
+  return docs.length > 0 ? docs : undefined;
+}
+
+function sanitizeProductBaselineTestFixtures(raw: unknown): ProductBaselineMetadata['testFixtures'] {
+  if (!Array.isArray(raw)) return undefined;
+  const fixtures = raw.flatMap((item): NonNullable<ProductBaselineMetadata['testFixtures']> => {
+    if (!item || typeof item !== 'object') return [];
+    const r = item as Record<string, unknown>;
+    const name = str(r.name).trim();
+    if (!name) return [];
+    const type = str(r.type);
+    return [{
+      name,
+      type: type === 'docx' || type === 'pdf' || type === 'markdown' || type === 'json' ? type : type ? 'other' : undefined,
+      path: r.path != null ? str(r.path) : undefined,
+      sha256: r.sha256 != null ? str(r.sha256) : undefined,
+      role: r.role != null ? str(r.role) : undefined,
+      notes: r.notes != null ? str(r.notes) : undefined,
+    }];
+  });
+  return fixtures.length > 0 ? fixtures : undefined;
+}
+
+function sanitizeProductBaselineAssets(raw: unknown): ProductBaselineMetadata['assets'] {
+  if (!Array.isArray(raw)) return undefined;
+  const assets = raw.flatMap((item): NonNullable<ProductBaselineMetadata['assets']> => {
+    if (!item || typeof item !== 'object') return [];
+    const r = item as Record<string, unknown>;
+    const name = str(r.name).trim();
+    if (!name) return [];
+    const role = str(r.role);
+    return [{
+      name,
+      role: role === 'docx-template' || role === 'preview' || role === 'image' || role === 'context' ? role : role ? 'other' : undefined,
+      mimeType: r.mimeType != null ? str(r.mimeType) : undefined,
+      data: r.data != null ? boundedStr(r.data, MAX_PRODUCT_BASELINE_ASSET_DATA) : undefined,
+      path: r.path != null ? str(r.path) : undefined,
+      notes: r.notes != null ? str(r.notes) : undefined,
+    }];
+  });
+  return assets.length > 0 ? assets : undefined;
 }
 
 function sanitizePlaybookStep(raw: unknown): PlaybookStep | null {
@@ -636,7 +1014,7 @@ function sanitizeQuickLink(raw: unknown): QuickLink | null {
   };
 }
 
-export async function importJSON(json: string): Promise<{ notes: number; tasks: number; folders: number; tags: number; timelineEvents: number; timelines: number; whiteboards: number; standaloneIOCs: number; chatThreads: number; noteTemplates: number; playbookTemplates: number; agentActions: number; agentProfiles: number; agentDeployments: number; agentMeetings: number }> {
+export async function importJSON(json: string): Promise<{ notes: number; tasks: number; folders: number; tags: number; timelineEvents: number; timelines: number; whiteboards: number; standaloneIOCs: number; evidenceItems: number; chatThreads: number; noteTemplates: number; playbookTemplates: number; agentActions: number; agentProfiles: number; agentDeployments: number; agentMeetings: number }> {
   if (json.length > MAX_IMPORT_SIZE) {
     throw new Error(`Backup file too large (max ${MAX_IMPORT_SIZE / 1024 / 1024} MB)`);
   }
@@ -652,9 +1030,11 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
   }
 
   // Sanitize all imported objects through allowlisted field extractors
-  const notes = data.notes.map(sanitizeNote).filter((n: Note | null): n is Note => n !== null && !!n.id);
+  const allNotes = collapseEvidenceNoteSeries(data.notes.map(sanitizeNote).filter((n: Note | null): n is Note => n !== null && !!n.id));
+  const notes = allNotes.filter((note) => !isBackupEvidenceNote(note));
   const tasks = data.tasks.map(sanitizeTask).filter((t: Task | null): t is Task => t !== null && !!t.id);
-  const folders = data.folders.map(sanitizeFolder).filter((f: Folder | null): f is Folder => f !== null && !!f.id);
+  const folders = (Array.isArray(data.folders) ? data.folders : [])
+    .map(sanitizeFolder).filter((f: Folder | null): f is Folder => f !== null && !!f.id);
   const tags = data.tags.map(sanitizeTag).filter((t: Tag | null): t is Tag => t !== null && !!t.id);
   const timelineEvents = (Array.isArray(data.timelineEvents) ? data.timelineEvents : [])
     .map(sanitizeTimelineEvent)
@@ -670,6 +1050,11 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
   const standaloneIOCs = (Array.isArray(data.standaloneIOCs) ? data.standaloneIOCs : [])
     .map(sanitizeStandaloneIOC)
     .filter((i: StandaloneIOC | null): i is StandaloneIOC => i !== null && !!i.id);
+
+  const importedEvidenceItems = (Array.isArray(data.evidenceItems) ? data.evidenceItems : [])
+    .map(sanitizeEvidenceItem)
+    .filter((item: EvidenceItem | null): item is EvidenceItem => item !== null && !!item.id);
+  const evidenceItems = mergeEvidenceItemLists(importedEvidenceItems, evidenceItemsFromNotes(allNotes));
 
   const chatThreads = (Array.isArray(data.chatThreads) ? data.chatThreads : [])
     .map(sanitizeChatThread)
@@ -707,7 +1092,7 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
   const importedDeployments = (Array.isArray(data.agentDeployments) ? data.agentDeployments : []).map(sanitizeAgentDeployment).filter(Boolean);
   const importedMeetings = (Array.isArray(data.agentMeetings) ? data.agentMeetings : []).map(sanitizeAgentMeeting).filter(Boolean);
 
-  await db.transaction('rw', [db.notes, db.tasks, db.folders, db.tags, db.timelineEvents, db.timelines, db.whiteboards, db.standaloneIOCs, db.chatThreads, db.noteTemplates, db.playbookTemplates, db.agentActions, db.agentProfiles, db.agentDeployments, db.agentMeetings], async () => {
+  await db.transaction('rw', [db.notes, db.tasks, db.folders, db.tags, db.timelineEvents, db.timelines, db.whiteboards, db.standaloneIOCs, db.evidenceItems, db.chatThreads, db.noteTemplates, db.playbookTemplates, db.agentActions, db.agentProfiles, db.agentDeployments, db.agentMeetings], async () => {
     await db.notes.clear();
     await db.tasks.clear();
     await db.folders.clear();
@@ -716,6 +1101,7 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     await db.timelines.clear();
     await db.whiteboards.clear();
     await db.standaloneIOCs.clear();
+    await db.evidenceItems.clear();
     await db.chatThreads.clear();
     await db.noteTemplates.clear();
     await db.playbookTemplates.clear();
@@ -732,6 +1118,7 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     await db.timelines.bulkAdd(timelines);
     await db.whiteboards.bulkAdd(whiteboards);
     await db.standaloneIOCs.bulkAdd(standaloneIOCs);
+    if (evidenceItems.length > 0) await db.evidenceItems.bulkAdd(evidenceItems);
     await db.chatThreads.bulkAdd(chatThreads);
     if (noteTemplatesRaw.length > 0) await db.noteTemplates.bulkAdd(noteTemplatesRaw);
     if (playbookTemplatesRaw.length > 0) await db.playbookTemplates.bulkAdd(playbookTemplatesRaw);
@@ -760,6 +1147,7 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     timelines: timelines.length,
     whiteboards: whiteboards.length,
     standaloneIOCs: standaloneIOCs.length,
+    evidenceItems: evidenceItems.length,
     chatThreads: chatThreads.length,
     noteTemplates: noteTemplatesRaw.length,
     playbookTemplates: playbookTemplatesRaw.length,
@@ -771,7 +1159,7 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
 }
 
 export async function exportInvestigationJSON(folderId: string): Promise<string> {
-  const [folder, allNotes, allTasks, allTags, allEvents, allTimelines, allWhiteboards, allIOCs, allChats, allAgentActions, allAgentDeployments, allAgentMeetings] = await Promise.all([
+  const [folder, allNotes, allTasks, allTags, allEvents, allTimelines, allWhiteboards, allIOCs, allEvidenceItems, allChats, allAgentActions, allAgentDeployments, allAgentMeetings] = await Promise.all([
     db.folders.get(folderId),
     db.notes.where('folderId').equals(folderId).toArray(),
     db.tasks.where('folderId').equals(folderId).toArray(),
@@ -780,6 +1168,7 @@ export async function exportInvestigationJSON(folderId: string): Promise<string>
     db.timelines.toArray(),
     db.whiteboards.where('folderId').equals(folderId).toArray(),
     db.standaloneIOCs.where('folderId').equals(folderId).toArray(),
+    db.evidenceItems.where('folderId').equals(folderId).toArray(),
     db.chatThreads.where('folderId').equals(folderId).toArray(),
     db.agentActions.where('investigationId').equals(folderId).toArray(),
     db.agentDeployments.where('investigationId').equals(folderId).toArray(),
@@ -787,14 +1176,18 @@ export async function exportInvestigationJSON(folderId: string): Promise<string>
   ]);
 
   if (!folder) throw new Error('Investigation not found');
+  const collapsedNotes = collapseEvidenceNoteSeries(allNotes);
+  const notes = collapsedNotes.filter((note) => !isBackupEvidenceNote(note));
+  const evidenceItems = mergeEvidenceItemLists(allEvidenceItems, evidenceItemsFromNotes(collapsedNotes));
 
   // Collect all tag names used in this investigation's entities
   const usedTagNames = new Set<string>();
-  for (const n of allNotes) n.tags.forEach((t) => usedTagNames.add(t));
+  for (const n of notes) n.tags.forEach((t) => usedTagNames.add(t));
   for (const t of allTasks) t.tags.forEach((tg) => usedTagNames.add(tg));
   for (const e of allEvents) e.tags.forEach((tg) => usedTagNames.add(tg));
   for (const w of allWhiteboards) w.tags.forEach((tg) => usedTagNames.add(tg));
   for (const i of allIOCs) i.tags.forEach((tg) => usedTagNames.add(tg));
+  for (const evidence of evidenceItems) evidence.tags.forEach((tg) => usedTagNames.add(tg));
   for (const c of allChats) c.tags.forEach((tg) => usedTagNames.add(tg));
   if (folder.tags) folder.tags.forEach((t) => usedTagNames.add(t));
 
@@ -808,7 +1201,7 @@ export async function exportInvestigationJSON(folderId: string): Promise<string>
   const data: ExportData = {
     version: 1,
     exportedAt: Date.now(),
-    notes: allNotes,
+    notes,
     tasks: allTasks,
     folders: [folder],
     tags,
@@ -816,6 +1209,7 @@ export async function exportInvestigationJSON(folderId: string): Promise<string>
     timelines,
     whiteboards: allWhiteboards,
     standaloneIOCs: allIOCs,
+    evidenceItems: evidenceItems.length > 0 ? evidenceItems : undefined,
     chatThreads: allChats,
     agentActions: allAgentActions.length > 0 ? allAgentActions : undefined,
     agentDeployments: allAgentDeployments.length > 0 ? allAgentDeployments : undefined,
@@ -962,7 +1356,7 @@ export async function mergeTimelineInto(parsed: TimelineExportData, targetTimeli
 
 // --- Merge / Investigation import ---
 
-export async function importInvestigationJSON(json: string): Promise<{ folderId: string; notes: number; tasks: number; timelineEvents: number; standaloneIOCs: number }> {
+export async function importInvestigationJSON(json: string): Promise<{ folderId: string; notes: number; tasks: number; timelineEvents: number; standaloneIOCs: number; evidenceItems: number }> {
   if (json.length > MAX_IMPORT_SIZE) {
     throw new Error(`File too large (max ${MAX_IMPORT_SIZE / 1024 / 1024} MB)`);
   }
@@ -993,7 +1387,8 @@ export async function importInvestigationJSON(json: string): Promise<{ folderId:
   if (newFolder.timelineId) newFolder.timelineId = remapId(newFolder.timelineId);
 
   // Sanitize entities and remap IDs
-  const notes = (data.notes || []).map(sanitizeNote).filter((n: Note | null): n is Note => n !== null && !!n.id)
+  const allNotes = collapseEvidenceNoteSeries((data.notes || []).map(sanitizeNote).filter((n: Note | null): n is Note => n !== null && !!n.id));
+  const notes = allNotes.filter((note) => !isBackupEvidenceNote(note))
     .map((n: Note) => {
       const newId = remapId(n.id);
       return {
@@ -1056,6 +1451,19 @@ export async function importInvestigationJSON(json: string): Promise<{ folderId:
       linkedTimelineEventIds: i.linkedTimelineEventIds?.map(remapId),
     }));
 
+  const evidenceItems = mergeEvidenceItemLists(
+    (Array.isArray(data.evidenceItems) ? data.evidenceItems : [])
+      .map(sanitizeEvidenceItem)
+      .filter((item: EvidenceItem | null): item is EvidenceItem => item !== null && !!item.id),
+    evidenceItemsFromNotes(allNotes),
+  )
+    .map((item: EvidenceItem) => ({
+      ...item,
+      id: remapId(item.id),
+      folderId: newFolderId,
+      linkedIOCIds: item.linkedIOCIds?.map(remapId),
+    }));
+
   const whiteboards = (Array.isArray(data.whiteboards) ? data.whiteboards : [])
     .map(sanitizeWhiteboard)
     .filter((w: Whiteboard | null): w is Whiteboard => w !== null && !!w.id)
@@ -1066,9 +1474,10 @@ export async function importInvestigationJSON(json: string): Promise<{ folderId:
     .filter((c: ChatThread | null): c is ChatThread => c !== null && !!c.id)
     .map((c: ChatThread) => ({ ...c, id: remapId(c.id), folderId: newFolderId }));
 
-  const tags = (data.tags || []).map(sanitizeTag).filter((t: Tag | null): t is Tag => t !== null && !!t.id);
+  const tags = (Array.isArray(data.tags) ? data.tags : [])
+    .map(sanitizeTag).filter((t: Tag | null): t is Tag => t !== null && !!t.id);
 
-  await db.transaction('rw', [db.notes, db.tasks, db.folders, db.tags, db.timelineEvents, db.timelines, db.whiteboards, db.standaloneIOCs, db.chatThreads], async () => {
+  await db.transaction('rw', [db.notes, db.tasks, db.folders, db.tags, db.timelineEvents, db.timelines, db.whiteboards, db.standaloneIOCs, db.evidenceItems, db.chatThreads], async () => {
     await db.folders.add(newFolder);
     if (notes.length > 0) await db.notes.bulkAdd(notes);
     if (tasks.length > 0) await db.tasks.bulkAdd(tasks);
@@ -1076,10 +1485,11 @@ export async function importInvestigationJSON(json: string): Promise<{ folderId:
     if (timelines.length > 0) await db.timelines.bulkAdd(timelines);
     if (whiteboards.length > 0) await db.whiteboards.bulkAdd(whiteboards);
     if (standaloneIOCs.length > 0) await db.standaloneIOCs.bulkAdd(standaloneIOCs);
+    if (evidenceItems.length > 0) await db.evidenceItems.bulkAdd(evidenceItems);
     if (chatThreads.length > 0) await db.chatThreads.bulkAdd(chatThreads);
     // Merge tags: only add new ones
     for (const tag of tags) {
-      const existing = await db.tags.where('name').equals(tag.name).first();
+      const existing = await db.tags.get(tag.id);
       if (!existing) await db.tags.add(tag);
     }
   });
@@ -1090,10 +1500,56 @@ export async function importInvestigationJSON(json: string): Promise<{ folderId:
     tasks: tasks.length,
     timelineEvents: timelineEvents.length,
     standaloneIOCs: standaloneIOCs.length,
+    evidenceItems: evidenceItems.length,
   };
 }
 
-export async function mergeImportJSON(json: string): Promise<{ added: number; skipped: number; updated: number }> {
+export interface MergeImportTableResult {
+  incoming: number;
+  added: number;
+  updated: number;
+  skipped: number;
+}
+
+export interface MergeImportInvestigationNoteSummary {
+  folderId?: string;
+  folderName: string;
+  notes: number;
+  activeNotes: number;
+}
+
+export interface MergeImportResult {
+  added: number;
+  skipped: number;
+  updated: number;
+  tables: Record<string, MergeImportTableResult>;
+  noteInvestigations: MergeImportInvestigationNoteSummary[];
+}
+
+function countImportedNotesByInvestigation(
+  notes: Note[],
+  folders: Folder[],
+): MergeImportInvestigationNoteSummary[] {
+  const folderNames = new Map(folders.map((folder) => [folder.id, folder.name]));
+  const counts = new Map<string, MergeImportInvestigationNoteSummary>();
+
+  for (const note of notes) {
+    const key = note.folderId || '__unfiled__';
+    const existing = counts.get(key) || {
+      folderId: note.folderId,
+      folderName: note.folderId ? folderNames.get(note.folderId) || 'Unknown investigation' : 'No investigation',
+      notes: 0,
+      activeNotes: 0,
+    };
+    existing.notes += 1;
+    if (!note.trashed && !note.archived) existing.activeNotes += 1;
+    counts.set(key, existing);
+  }
+
+  return Array.from(counts.values()).sort((a, b) => b.notes - a.notes || a.folderName.localeCompare(b.folderName));
+}
+
+export async function mergeImportJSON(json: string): Promise<MergeImportResult> {
   if (json.length > MAX_IMPORT_SIZE) {
     throw new Error(`Backup file too large (max ${MAX_IMPORT_SIZE / 1024 / 1024} MB)`);
   }
@@ -1106,37 +1562,48 @@ export async function mergeImportJSON(json: string): Promise<{ added: number; sk
   let added = 0;
   let skipped = 0;
   let updated = 0;
+  const tables: Record<string, MergeImportTableResult> = {};
 
   async function mergeTable(
+    name: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     table: { get: (id: string) => Promise<any>; add: (item: any) => Promise<unknown>; update: (id: string, changes: any) => Promise<number> },
     items: { id: string; updatedAt?: number }[],
   ) {
+    const tableResult: MergeImportTableResult = { incoming: items.length, added: 0, updated: 0, skipped: 0 };
     for (const item of items) {
-      if (!item.id) { skipped++; continue; }
+      if (!item.id) { skipped++; tableResult.skipped++; continue; }
       const existing = await table.get(item.id);
       if (existing) {
         if (item.updatedAt && existing.updatedAt && item.updatedAt > existing.updatedAt) {
           await table.update(item.id, item);
           updated++;
+          tableResult.updated++;
         } else {
           skipped++;
+          tableResult.skipped++;
         }
       } else {
         try {
           await table.add(item);
           added++;
+          tableResult.added++;
         } catch {
           skipped++;
+          tableResult.skipped++;
         }
       }
     }
+    tables[name] = tableResult;
   }
 
-  const notes = data.notes.map(sanitizeNote).filter((n: Note | null): n is Note => n !== null && !!n.id);
+  const allNotes = collapseEvidenceNoteSeries(data.notes.map(sanitizeNote).filter((n: Note | null): n is Note => n !== null && !!n.id));
+  const notes = allNotes.filter((note) => !isBackupEvidenceNote(note));
   const tasks = data.tasks.map(sanitizeTask).filter((t: Task | null): t is Task => t !== null && !!t.id);
-  const folders = data.folders.map(sanitizeFolder).filter((f: Folder | null): f is Folder => f !== null && !!f.id);
-  const tags = (data.tags || []).map(sanitizeTag).filter((t: Tag | null): t is Tag => t !== null && !!t.id);
+  const folders = (Array.isArray(data.folders) ? data.folders : [])
+    .map(sanitizeFolder).filter((f: Folder | null): f is Folder => f !== null && !!f.id);
+  const tags = (Array.isArray(data.tags) ? data.tags : [])
+    .map(sanitizeTag).filter((t: Tag | null): t is Tag => t !== null && !!t.id);
   const timelineEvents = (Array.isArray(data.timelineEvents) ? data.timelineEvents : [])
     .map(sanitizeTimelineEvent).filter((e: TimelineEvent | null): e is TimelineEvent => e !== null && !!e.id);
   const timelines = (Array.isArray(data.timelines) ? data.timelines : [])
@@ -1145,22 +1612,28 @@ export async function mergeImportJSON(json: string): Promise<{ added: number; sk
     .map(sanitizeWhiteboard).filter((w: Whiteboard | null): w is Whiteboard => w !== null && !!w.id);
   const standaloneIOCs = (Array.isArray(data.standaloneIOCs) ? data.standaloneIOCs : [])
     .map(sanitizeStandaloneIOC).filter((i: StandaloneIOC | null): i is StandaloneIOC => i !== null && !!i.id);
+  const importedEvidenceItems = (Array.isArray(data.evidenceItems) ? data.evidenceItems : [])
+    .map(sanitizeEvidenceItem).filter((item: EvidenceItem | null): item is EvidenceItem => item !== null && !!item.id);
+  const evidenceItems = mergeEvidenceItemLists(importedEvidenceItems, evidenceItemsFromNotes(allNotes));
   const chatThreads = (Array.isArray(data.chatThreads) ? data.chatThreads : [])
     .map(sanitizeChatThread).filter((c: ChatThread | null): c is ChatThread => c !== null && !!c.id);
 
-  await db.transaction('rw', [db.notes, db.tasks, db.folders, db.tags, db.timelineEvents, db.timelines, db.whiteboards, db.standaloneIOCs, db.chatThreads], async () => {
-    await mergeTable(db.folders, folders);
-    await mergeTable(db.tags, tags);
-    await mergeTable(db.notes, notes);
-    await mergeTable(db.tasks, tasks);
-    await mergeTable(db.timelineEvents, timelineEvents);
-    await mergeTable(db.timelines, timelines);
-    await mergeTable(db.whiteboards, whiteboards);
-    await mergeTable(db.standaloneIOCs, standaloneIOCs);
-    await mergeTable(db.chatThreads, chatThreads);
+  const noteInvestigations = countImportedNotesByInvestigation(notes, folders);
+
+  await db.transaction('rw', [db.notes, db.tasks, db.folders, db.tags, db.timelineEvents, db.timelines, db.whiteboards, db.standaloneIOCs, db.evidenceItems, db.chatThreads], async () => {
+    await mergeTable('folders', db.folders, folders);
+    await mergeTable('tags', db.tags, tags);
+    await mergeTable('notes', db.notes, notes);
+    await mergeTable('tasks', db.tasks, tasks);
+    await mergeTable('timelineEvents', db.timelineEvents, timelineEvents);
+    await mergeTable('timelines', db.timelines, timelines);
+    await mergeTable('whiteboards', db.whiteboards, whiteboards);
+    await mergeTable('standaloneIOCs', db.standaloneIOCs, standaloneIOCs);
+    await mergeTable('evidenceItems', db.evidenceItems, evidenceItems);
+    await mergeTable('chatThreads', db.chatThreads, chatThreads);
   });
 
-  return { added, skipped, updated };
+  return { added, skipped, updated, tables, noteInvestigations };
 }
 
 export function downloadFile(content: string, filename: string, type: string) {

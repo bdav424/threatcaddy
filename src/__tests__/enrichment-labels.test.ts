@@ -38,6 +38,20 @@ describe('computeEnrichmentLabels', () => {
     expect(texts).toContain('Unknown');
   });
 
+  it('derives VT total from analysis stats when total is omitted', () => {
+    const labels = computeEnrichmentLabels({
+      virusTotal: [{ malicious: 2, suspicious: 1, harmless: 40, undetected: 27, ts: Date.now() }],
+    });
+    expect(labelTexts(labels)).toContain('VT: 2/70');
+  });
+
+  it('reads legacy object-shaped VT enrichment snapshots', () => {
+    const labels = computeEnrichmentLabels({
+      virusTotal: { malicious: 2, suspicious: 1, harmless: 40, undetected: 27, ts: Date.now() },
+    });
+    expect(labelTexts(labels)).toContain('VT: 2/70');
+  });
+
   it('produces High Risk + Abuse label for AbuseIPDB ≥75', () => {
     const labels = computeEnrichmentLabels({
       abuseIPDB: [{ abuseConfidenceScore: 85, ts: Date.now() }],

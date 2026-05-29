@@ -8,6 +8,7 @@
 // ---------------------------------------------------------------------------
 
 const TEMPLATE_RE = /\{\{([^}]+)\}\}/g;
+const SINGLE_TEMPLATE_RE = /^\{\{([^}]+)\}\}$/;
 
 /**
  * Walk a dot-separated path into an object, supporting numeric array indices.
@@ -47,6 +48,15 @@ export function resolveVariables(
     const val = walkPath(context, path);
     return valueToString(val);
   });
+}
+
+function resolveTemplateValue(
+  template: string,
+  context: Record<string, unknown>,
+): unknown {
+  const match = SINGLE_TEMPLATE_RE.exec(template.trim());
+  if (!match) return resolveVariables(template, context);
+  return walkPath(context, match[1]);
 }
 
 // ---------------------------------------------------------------------------
@@ -239,7 +249,7 @@ export function resolveDeep(
   context: Record<string, unknown>,
 ): unknown {
   if (typeof obj === 'string') {
-    return resolveVariables(obj, context);
+    return resolveTemplateValue(obj, context);
   }
   if (Array.isArray(obj)) {
     return obj.map((item) => resolveDeep(item, context));

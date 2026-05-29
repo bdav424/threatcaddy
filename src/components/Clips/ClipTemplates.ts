@@ -293,12 +293,12 @@ export const CLIP_TEMPLATES: ClipTemplate[] = [
 `,
   },
   {
-    name: 'OCI User Details',
+    name: 'Cloud User Details',
     icon: '🔑',
     category: 'Cloud',
-    content: `# OCI User Details
+    content: `# Cloud User Details
 
-**User OCID:** ocid1.user.oc1..
+**User Cloud ID:** cloudid.user.region1..
 **Tenancy:**
 **Email:** user@domain.com
 **Created:**
@@ -343,12 +343,12 @@ export const CLIP_TEMPLATES: ClipTemplate[] = [
 `,
   },
   {
-    name: 'OCI Tenancy Details',
+    name: 'Cloud Tenancy Details',
     icon: '🏢',
     category: 'Cloud',
-    content: `# OCI Tenancy Details
+    content: `# Cloud Tenancy Details
 
-**Tenancy OCID:** ocid1.tenancy.oc1..
+**Tenancy Cloud ID:** cloudid.tenancy.region1..
 **Tenancy Name:**
 **Home Region:**
 **Created:**

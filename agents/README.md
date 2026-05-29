@@ -2,6 +2,14 @@
 
 External AI agents can read and write data in a live ThreatCaddy session. All 29 CaddyAI tools are accessible — search, create, update, analyze, and report across investigations.
 
+## Required Reporting Procedure
+
+Any agent producing an analyst-style intelligence note must read
+[`../docs/intel-note-reporting-procedure.md`](../docs/intel-note-reporting-procedure.md)
+before drafting, templating, or rendering the report. This is required so
+agent-generated reports preserve the existing Internal Word template, source-note
+style, table geometry, spacing, and visual QA expectations.
+
 ## How It Works
 
 ThreatCaddy exposes `window.threatcaddy` in the browser. AI agents connect via Chrome DevTools Protocol and call tools by evaluating JavaScript in the page context. Data stays in IndexedDB — nothing leaves the machine.

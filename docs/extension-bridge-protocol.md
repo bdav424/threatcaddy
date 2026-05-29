@@ -157,7 +157,7 @@ Accepts long-lived port connections (name prefix `llm-`) and streams responses f
 | OpenAI | `api.openai.com/v1/chat/completions` | `Bearer` token |
 | Gemini | `generativelanguage.googleapis.com/v1beta/models` | URL query param `key` |
 | Mistral | `api.mistral.ai/v1/chat/completions` | `Bearer` token |
-| Local | User-configured endpoint (default `localhost:11434/v1`) | Optional `Bearer` token |
+| Local | User-configured OpenAI-compatible `/v1` endpoint | Optional `Bearer` token |
 
 All providers use SSE streaming. Responses are normalized to a common format: `chunk` messages with text content, followed by a `done` message with `stopReason` (`end_turn`, `tool_use`, or `max_tokens`) and `contentBlocks` (text and tool_use blocks). Tool call arguments are accumulated across deltas and parsed into JSON on completion.
 

@@ -1,4 +1,4 @@
-import type { Note, Task, TimelineEvent, Settings, IOCEntry, IOCType, TimelineEventType } from '../types';
+import type { Note, Task, TimelineEvent, Settings, IOCEntry, IOCType, TimelineEventType, StandaloneIOC } from '../types';
 import { IOC_TYPE_LABELS, TIMELINE_EVENT_TYPE_LABELS, DEFAULT_RELATIONSHIP_TYPES } from '../types';
 import type { IOCRelationshipDef } from '../types';
 import { getNodeIcon } from './graph-icons';
@@ -16,7 +16,7 @@ export function parseIOCNodeId(nodeId: string): { iocType: IOCType; normalizedVa
 export interface GraphNode {
   id: string;
   label: string;
-  type: 'ioc' | 'note' | 'task' | 'timeline-event';
+  type: 'ioc' | 'note' | 'task' | 'timeline-event' | 'actor';
   color: string;
   shape: 'round-rectangle';
   icon: string;
@@ -31,7 +31,7 @@ export interface GraphEdge {
   source: string;
   target: string;
   label: string;
-  type: 'contains-ioc' | 'ioc-relationship' | 'timeline-link' | 'entity-link';
+  type: 'contains-ioc' | 'ioc-relationship' | 'timeline-link' | 'entity-link' | 'attribution';
 }
 
 export interface GraphData {
@@ -48,6 +48,7 @@ export function buildGraphData(
   tasks: Task[],
   timelineEvents: TimelineEvent[],
   settings?: Settings,
+  standaloneIOCs: StandaloneIOC[] = [],
 ): GraphData {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
@@ -87,6 +88,47 @@ export function buildGraphData(
     return node;
   }
 
+  function addEdge(edge: GraphEdge): void {
+    if (edgeIdSet.has(edge.id)) return;
+    edgeIdSet.add(edge.id);
+    edges.push(edge);
+  }
+
+  function getOrCreateActorNode(actor: string): GraphNode {
+    const normalized = actor.trim().toLowerCase();
+    const actorNodeId = `actor:${normalized}`;
+    let node = nodes.find((candidate) => candidate.id === actorNodeId);
+    if (!node) {
+      node = {
+        id: actorNodeId,
+        label: actor,
+        type: 'actor',
+        color: '#a855f7',
+        shape: 'round-rectangle',
+        icon: getNodeIcon('note', '#a855f7'),
+        sourceEntityIds: [],
+      };
+      nodeIdSet.add(actorNodeId);
+      nodes.push(node);
+    }
+    return node;
+  }
+
+  function addAttributionEdge(sourceNodeId: string, actor?: string, sourceEntityId?: string): void {
+    if (!actor?.trim()) return;
+    const actorNode = getOrCreateActorNode(actor.trim());
+    if (sourceEntityId && !actorNode.sourceEntityIds.includes(sourceEntityId)) {
+      actorNode.sourceEntityIds.push(sourceEntityId);
+    }
+    addEdge({
+      id: `attr:${sourceNodeId}->${actorNode.id}`,
+      source: sourceNodeId,
+      target: actorNode.id,
+      label: 'attributed to',
+      type: 'attribution',
+    });
+  }
+
   // Process notes
   const activeNotes = notes.filter((n) => !n.trashed);
   for (const note of activeNotes) {
@@ -109,18 +151,14 @@ export function buildGraphData(
         if (!iocNode.sourceEntityIds.includes(note.id)) {
           iocNode.sourceEntityIds.push(note.id);
         }
-        // Note ↔ IOC edge
-        const edgeId = `${noteNodeId}--${iocNode.id}`;
-        if (!edgeIdSet.has(edgeId)) {
-          edgeIdSet.add(edgeId);
-          edges.push({
-            id: edgeId,
-            source: noteNodeId,
-            target: iocNode.id,
-            label: 'contains',
-            type: 'contains-ioc',
-          });
-        }
+        addEdge({
+          id: `${noteNodeId}--${iocNode.id}`,
+          source: noteNodeId,
+          target: iocNode.id,
+          label: 'contains',
+          type: 'contains-ioc',
+        });
+        addAttributionEdge(iocNode.id, ioc.attribution, note.id);
       }
     }
   }
@@ -147,17 +185,14 @@ export function buildGraphData(
         if (!iocNode.sourceEntityIds.includes(task.id)) {
           iocNode.sourceEntityIds.push(task.id);
         }
-        const edgeId = `${taskNodeId}--${iocNode.id}`;
-        if (!edgeIdSet.has(edgeId)) {
-          edgeIdSet.add(edgeId);
-          edges.push({
-            id: edgeId,
-            source: taskNodeId,
-            target: iocNode.id,
-            label: 'contains',
-            type: 'contains-ioc',
-          });
-        }
+        addEdge({
+          id: `${taskNodeId}--${iocNode.id}`,
+          source: taskNodeId,
+          target: iocNode.id,
+          label: 'contains',
+          type: 'contains-ioc',
+        });
+        addAttributionEdge(iocNode.id, ioc.attribution, task.id);
       }
     }
   }
@@ -188,19 +223,17 @@ export function buildGraphData(
         if (!iocNode.sourceEntityIds.includes(event.id)) {
           iocNode.sourceEntityIds.push(event.id);
         }
-        const edgeId = `${eventNodeId}--${iocNode.id}`;
-        if (!edgeIdSet.has(edgeId)) {
-          edgeIdSet.add(edgeId);
-          edges.push({
-            id: edgeId,
-            source: eventNodeId,
-            target: iocNode.id,
-            label: 'contains',
-            type: 'contains-ioc',
-          });
-        }
+        addEdge({
+          id: `${eventNodeId}--${iocNode.id}`,
+          source: eventNodeId,
+          target: iocNode.id,
+          label: 'contains',
+          type: 'contains-ioc',
+        });
+        addAttributionEdge(iocNode.id, ioc.attribution || event.actor, event.id);
       }
     }
+    addAttributionEdge(eventNodeId, event.actor, event.id);
 
     // Timeline → Note links
     for (const noteId of event.linkedNoteIds) {
@@ -249,6 +282,43 @@ export function buildGraphData(
     }
   }
 
+  // Process standalone IOC rows promoted from notes/evidence/imports.
+  const activeStandaloneIOCs = standaloneIOCs.filter((ioc) => !ioc.trashed);
+  for (const standalone of activeStandaloneIOCs) {
+    const iocEntry: IOCEntry = {
+      id: standalone.id,
+      type: standalone.type,
+      value: standalone.value,
+      confidence: standalone.confidence,
+      analystNotes: standalone.analystNotes,
+      attribution: standalone.attribution,
+      firstSeen: standalone.firstSeen ?? standalone.createdAt,
+      dismissed: false,
+      iocSubtype: standalone.iocSubtype,
+      iocStatus: standalone.iocStatus,
+      clsLevel: standalone.clsLevel,
+      relationships: standalone.relationships,
+    };
+    const iocNode = getOrCreateIOCNode(iocEntry);
+    if (!iocNode.sourceEntityIds.includes(standalone.id)) {
+      iocNode.sourceEntityIds.push(standalone.id);
+    }
+    addAttributionEdge(iocNode.id, standalone.attribution, standalone.id);
+
+    for (const noteId of standalone.linkedNoteIds || []) {
+      const noteNodeId = `note:${noteId}`;
+      if (nodeIdSet.has(noteNodeId)) {
+        addEdge({
+          id: `${noteNodeId}--${iocNode.id}`,
+          source: noteNodeId,
+          target: iocNode.id,
+          label: 'contains',
+          type: 'contains-ioc',
+        });
+      }
+    }
+  }
+
   // IOC → IOC relationship edges (from all IOCEntry instances)
   const allIOCEntries: IOCEntry[] = [];
   for (const note of activeNotes) {
@@ -259,6 +329,17 @@ export function buildGraphData(
   }
   for (const event of timelineEvents) {
     if (event.iocAnalysis?.iocs) allIOCEntries.push(...event.iocAnalysis.iocs);
+  }
+  for (const standalone of activeStandaloneIOCs) {
+    allIOCEntries.push({
+      id: standalone.id,
+      type: standalone.type,
+      value: standalone.value,
+      confidence: standalone.confidence,
+      firstSeen: standalone.firstSeen ?? standalone.createdAt,
+      dismissed: false,
+      relationships: standalone.relationships,
+    });
   }
 
   const seenRelEdges = new Set<string>();
@@ -283,7 +364,7 @@ export function buildGraphData(
       seenRelEdges.add(edgeKey);
 
       const def = allRelDefs[rel.relationshipType];
-      edges.push({
+      addEdge({
         id: `rel:${edgeKey}`,
         source: sourceNodeId,
         target: targetNodeId,
@@ -301,7 +382,7 @@ export function buildGraphData(
     if (seenEntityLinks.has(key)) return;
     if (!nodeIdSet.has(sourceNodeId) || !nodeIdSet.has(targetNodeId)) return;
     seenEntityLinks.add(key);
-    edges.push({
+    addEdge({
       id: `link:${key}`,
       source: sourceNodeId,
       target: targetNodeId,
@@ -335,12 +416,14 @@ export function computeGraphHash(
   tasks: Task[],
   timelineEvents: TimelineEvent[],
   settings?: Settings,
+  standaloneIOCs: StandaloneIOC[] = [],
 ): string {
   // Build a compact fingerprint: id:updatedAt pairs joined by ','
   const parts: string[] = [];
   for (const n of notes) parts.push(`n:${n.id}:${n.updatedAt}`);
   for (const t of tasks) parts.push(`t:${t.id}:${t.updatedAt}`);
   for (const e of timelineEvents) parts.push(`e:${e.id}:${e.updatedAt}`);
+  for (const i of standaloneIOCs) parts.push(`i:${i.id}:${i.updatedAt}:${i.lastSeen ?? ''}`);
   // Include custom relationship types in hash so graph updates when they change
   if (settings?.tiRelationshipTypes) {
     parts.push(`rel:${Object.keys(settings.tiRelationshipTypes).sort().join(',')}`);
@@ -361,12 +444,13 @@ export function buildGraphDataMemoized(
   tasks: Task[],
   timelineEvents: TimelineEvent[],
   settings?: Settings,
+  standaloneIOCs: StandaloneIOC[] = [],
 ): GraphData {
-  const hash = computeGraphHash(notes, tasks, timelineEvents, settings);
+  const hash = computeGraphHash(notes, tasks, timelineEvents, settings, standaloneIOCs);
   if (hash === _cachedHash && _cachedGraph.nodes.length > 0) {
     return _cachedGraph;
   }
   _cachedHash = hash;
-  _cachedGraph = buildGraphData(notes, tasks, timelineEvents, settings);
+  _cachedGraph = buildGraphData(notes, tasks, timelineEvents, settings, standaloneIOCs);
   return _cachedGraph;
 }

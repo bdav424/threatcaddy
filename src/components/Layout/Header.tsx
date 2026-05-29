@@ -25,6 +25,8 @@ interface HeaderProps {
   onNewTimelineEvent: () => void;
   onNewWhiteboard: () => void;
   onNewIOC?: () => void;
+  onNewNoteTemplate?: () => void;
+  onImportNoteTemplate?: () => void;
   onOpenFile?: () => void;
   onImportData?: () => void;
   onToggleSidebar: () => void;
@@ -47,6 +49,8 @@ export function Header({
   onNewTimelineEvent,
   onNewWhiteboard,
   onNewIOC,
+  onNewNoteTemplate,
+  onImportNoteTemplate,
   onOpenFile,
   onImportData,
   onToggleSidebar,
@@ -87,7 +91,7 @@ export function Header({
     return ` · ${t('header.built', { when: d === 0 ? t('header.today') : t('header.daysAgo', { count: d }) })}`;
   });
   return (
-    <header data-tour="header" className={cn("h-12 sm:h-14 border-b border-gray-800 flex items-center px-2 sm:px-4 gap-2 sm:gap-3 bg-gray-900/50 backdrop-blur-sm shrink-0 relative z-20", screenshareMaxLevel && "pt-0.5")}>
+    <header data-tour="header" className={cn("app-window-titlebar h-12 sm:h-14 border-b border-gray-800 flex items-center px-2 sm:px-4 gap-2 sm:gap-3 bg-gray-900/50 backdrop-blur-sm shrink-0 relative z-20", screenshareMaxLevel && "pt-0.5")}>
       {screenshareMaxLevel && <div className="absolute top-0 left-0 right-0 h-0.5 bg-red-500" />}
       {/* Mobile: toggle mobile overlay sidebar */}
       <button
@@ -273,6 +277,8 @@ export function Header({
           onNewTimelineEvent={onNewTimelineEvent}
           onNewWhiteboard={onNewWhiteboard}
           onNewIOC={onNewIOC}
+          onNewNoteTemplate={onNewNoteTemplate}
+          onImportNoteTemplate={onImportNoteTemplate}
           onOpenFile={onOpenFile}
           onImportData={onImportData}
         />

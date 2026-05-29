@@ -92,7 +92,7 @@ export class AgentBot extends GenericBot {
       if (provider === 'anthropic') {
         const result = await this.handleAnthropicResponse(response, toolMap, execCtx, messages);
         if (!result.continueLoop) break;
-      } else if (provider === 'openai') {
+      } else if (provider === 'openai' || provider === 'local') {
         const result = await this.handleOpenAIResponse(response, toolMap, execCtx, messages);
         if (!result.continueLoop) break;
       } else {
@@ -131,8 +131,19 @@ export class AgentBot extends GenericBot {
       case 'openai': return process.env.OPENAI_API_KEY || '';
       case 'gemini': return process.env.GEMINI_API_KEY || '';
       case 'mistral': return process.env.MISTRAL_API_KEY || '';
+      case 'local': return process.env.LOCAL_LLM_API_KEY || process.env.CODEX_API_TOKEN || '';
       default: return '';
     }
+  }
+
+  private getLocalEndpoint(): string {
+    const raw = process.env.LOCAL_LLM_ENDPOINT || process.env.THREATCADDY_LOCAL_LLM_ENDPOINT || process.env.CODEX_API_ENDPOINT || '';
+    const trimmed = raw.trim().replace(/\/+$/, '');
+    if (!trimmed) return '';
+    if (trimmed.endsWith('/v1')) return trimmed;
+    if (trimmed.endsWith('/v1/chat/completions')) return trimmed.slice(0, -'/chat/completions'.length);
+    if (trimmed.endsWith('/chat/completions')) return trimmed.slice(0, -'/chat/completions'.length);
+    return `${trimmed}/v1`;
   }
 
   private async callLLM(
@@ -145,8 +156,12 @@ export class AgentBot extends GenericBot {
   ): Promise<unknown> {
     if (provider === 'anthropic') {
       return this.callAnthropic(model, apiKey, systemPrompt, messages, tools);
-    } else if (provider === 'openai') {
-      return this.callOpenAI(model, apiKey, systemPrompt, messages, tools);
+    } else if (provider === 'openai' || provider === 'local') {
+      const endpoint = provider === 'local' ? `${this.getLocalEndpoint()}/chat/completions` : 'https://api.openai.com/v1/chat/completions';
+      if (provider === 'local' && !this.getLocalEndpoint()) {
+        throw new Error('LOCAL_LLM_ENDPOINT or CODEX_API_ENDPOINT not configured for agent bot.');
+      }
+      return this.callOpenAI(model, apiKey, systemPrompt, messages, tools, endpoint, provider === 'local' ? 'Local LLM' : 'OpenAI');
     }
     // Fallback for non-tool-calling providers: just get text
     return this.callGenericLLM(provider, model, apiKey, systemPrompt, messages);
@@ -192,6 +207,8 @@ export class AgentBot extends GenericBot {
     systemPrompt: string,
     messages: Array<{ role: string; content: string | unknown[] }>,
     tools: BotTool[],
+    endpoint = 'https://api.openai.com/v1/chat/completions',
+    providerLabel = 'OpenAI',
   ): Promise<unknown> {
     const openaiMessages = [
       { role: 'system', content: systemPrompt },
@@ -210,19 +227,21 @@ export class AgentBot extends GenericBot {
       max_tokens: MAX_RESPONSE_TOKENS,
     };
 
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
+    const resp = await fetch(endpoint, {
       method: 'POST',
       signal: AbortSignal.timeout(60_000),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
+      headers,
       body: JSON.stringify(body),
     });
 
     if (!resp.ok) {
       const errText = await resp.text();
-      throw new Error(`OpenAI API error ${resp.status}: ${errText}`);
+      throw new Error(`${providerLabel} API error ${resp.status}: ${errText}`);
     }
 
     return resp.json();
@@ -453,7 +472,7 @@ export class AgentBot extends GenericBot {
       const r = response as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
       return r.candidates?.[0]?.content?.parts?.[0]?.text || '';
     }
-    if (provider === 'mistral') {
+    if (provider === 'mistral' || provider === 'local') {
       const r = response as { choices?: Array<{ message?: { content?: string } }> };
       return r.choices?.[0]?.message?.content || '';
     }

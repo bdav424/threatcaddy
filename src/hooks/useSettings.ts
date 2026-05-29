@@ -5,7 +5,6 @@ import { applyColorScheme } from '../lib/theme-schemes';
 import i18n, { RTL_LANGS } from '../i18n';
 
 const SETTINGS_KEY = 'threatcaddy-settings';
-
 function migrateSettings(raw: Record<string, unknown>): Record<string, unknown> {
   // Migrate flat tiIocSubtypes array → per-type map
   if (Array.isArray(raw.tiIocSubtypes)) {
@@ -24,15 +23,18 @@ function migrateSettings(raw: Record<string, unknown>): Record<string, unknown> 
   if (Array.isArray(raw.tiRelationshipTypes)) {
     raw.tiRelationshipTypes = undefined;
   }
-  // Migrate legacy OCI PAR fields → backupDestinations array
-  if (raw.ociWritePAR && typeof raw.ociWritePAR === 'string' && !raw.backupDestinations) {
+  // Migrate legacy Cloud PAR fields → backupDestinations array
+  if (raw.cloudWriteUrl && typeof raw.cloudWriteUrl === 'string' && !raw.backupDestinations) {
     raw.backupDestinations = [{
-      id: 'migrated-oci',
-      provider: 'oci',
-      label: (raw.ociLabel as string) || 'OCI Backup',
-      url: raw.ociWritePAR as string,
+      id: 'migrated-cloud',
+      provider: 'cloudstore',
+      label: (raw.cloudLabel as string) || 'Cloud Backup',
+      url: raw.cloudWriteUrl as string,
       enabled: true,
     }];
+  }
+  if (!raw.llmRoutingMode) {
+    raw.llmRoutingMode = 'auto';
   }
   return raw;
 }
@@ -53,31 +55,56 @@ function loadSettings(): Settings {
 /** Reads and persists user settings from localStorage. Returns the current settings object and an update function. */
 export function useSettings() {
   const [settings, setSettingsState] = useState<Settings>(loadSettings);
+  const isDesktopShell = typeof window !== 'undefined' && !!window.threatcaddyDesktop?.isDesktop;
 
   useEffect(() => {
     const root = document.documentElement;
+    root.classList.toggle('tc-desktop-shell', isDesktopShell);
+    document.body.classList.toggle('tc-desktop-shell-body', isDesktopShell);
     if (settings.theme === 'dark') {
       root.classList.add('dark');
       root.classList.remove('light');
-      document.body.classList.add('bg-gray-950', 'text-gray-100');
-      document.body.classList.remove('bg-white', 'text-gray-900');
+      document.body.classList.add('text-gray-100');
+      document.body.classList.remove('text-gray-900');
+      if (isDesktopShell) {
+        document.body.classList.remove('bg-gray-950', 'bg-white');
+      } else {
+        document.body.classList.add('bg-gray-950');
+        document.body.classList.remove('bg-white');
+      }
     } else {
       root.classList.remove('dark');
       root.classList.add('light');
-      document.body.classList.remove('bg-gray-950', 'text-gray-100');
-      document.body.classList.add('bg-white', 'text-gray-900');
+      document.body.classList.remove('text-gray-100');
+      document.body.classList.add('text-gray-900');
+      if (isDesktopShell) {
+        document.body.classList.remove('bg-gray-950', 'bg-white');
+      } else {
+        document.body.classList.remove('bg-gray-950');
+        document.body.classList.add('bg-white');
+      }
     }
-  }, [settings.theme]);
+  }, [isDesktopShell, settings.theme]);
 
   // Apply color scheme whenever theme or scheme changes
   useEffect(() => {
-    applyColorScheme(settings.colorScheme ?? 'indigo', settings.theme);
-  }, [settings.colorScheme, settings.theme]);
-
-  // Toggle background-image mode class on root
-  useEffect(() => {
-    document.documentElement.classList.toggle('has-bg-image', !!(settings.bgImageEnabled));
-  }, [settings.bgImageEnabled]);
+    const selectedCustomTheme = settings.customAppearanceThemes?.find((theme) => theme.id === settings.colorScheme);
+    const resolvedFontFamily = settings.appearanceFontFamily || selectedCustomTheme?.fontFamily;
+    const resolvedFontTargets = settings.appearanceFontTargets ?? selectedCustomTheme?.fontTargets ?? {};
+    applyColorScheme(
+      settings.colorScheme ?? 'indigo',
+      settings.theme,
+      settings.customAppearanceThemes,
+      resolvedFontFamily,
+      settings.appearanceFontScale,
+    );
+    const root = document.documentElement;
+    root.style.setProperty('--tc-font-family-headings', resolvedFontTargets.headings || resolvedFontFamily || 'var(--tc-font-family)');
+    root.style.setProperty('--tc-font-family-body', resolvedFontTargets.body || resolvedFontFamily || 'var(--tc-font-family)');
+    root.style.setProperty('--tc-font-family-controls', resolvedFontTargets.controls || resolvedFontFamily || 'var(--tc-font-family)');
+    root.style.setProperty('--tc-font-family-navigation', resolvedFontTargets.navigation || resolvedFontFamily || 'var(--tc-font-family)');
+    root.style.setProperty('--tc-font-family-code', resolvedFontTargets.code || 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace');
+  }, [settings.colorScheme, settings.theme, settings.customAppearanceThemes, settings.appearanceFontFamily, settings.appearanceFontScale, settings.appearanceFontTargets]);
 
   // Apply language and text direction
   useEffect(() => {
@@ -87,6 +114,43 @@ export function useSettings() {
     }
     document.documentElement.dir = RTL_LANGS.has(lang) ? 'rtl' : 'ltr';
   }, [settings.language]);
+
+  // Apply glass styling only to bordered panels, not the app shell or background image.
+  useEffect(() => {
+    const root = document.documentElement;
+    const transparency = Math.max(0, Math.min(100, settings.windowGlassTransparency ?? 0));
+    const blur = Math.max(0, Math.min(40, settings.windowGlassBlur ?? 0));
+    const ratio = 1 - transparency / 100;
+    const panelOpacity = (base: number) => Math.max(0, base * ratio).toFixed(1);
+    const enabled = transparency > 0 || blur > 0;
+
+    root.classList.toggle('has-panel-glass', enabled);
+    root.classList.remove('has-window-glass', 'has-window-blur');
+    root.style.setProperty('--tc-panel-glass-surface', `color-mix(in srgb, var(--color-bg-surface) ${panelOpacity(100)}%, transparent)`);
+    root.style.setProperty('--tc-panel-glass-surface-80', `color-mix(in srgb, var(--color-bg-surface) ${panelOpacity(80)}%, transparent)`);
+    root.style.setProperty('--tc-panel-glass-surface-50', `color-mix(in srgb, var(--color-bg-surface) ${panelOpacity(50)}%, transparent)`);
+    root.style.setProperty('--tc-panel-glass-surface-40', `color-mix(in srgb, var(--color-bg-surface) ${panelOpacity(40)}%, transparent)`);
+    root.style.setProperty('--tc-panel-glass-surface-30', `color-mix(in srgb, var(--color-bg-surface) ${panelOpacity(30)}%, transparent)`);
+    root.style.setProperty('--tc-panel-glass-raised', `color-mix(in srgb, var(--color-bg-raised) ${panelOpacity(100)}%, transparent)`);
+    root.style.setProperty('--tc-panel-glass-raised-60', `color-mix(in srgb, var(--color-bg-raised) ${panelOpacity(60)}%, transparent)`);
+    root.style.setProperty('--tc-panel-glass-raised-50', `color-mix(in srgb, var(--color-bg-raised) ${panelOpacity(50)}%, transparent)`);
+    root.style.setProperty('--tc-panel-glass-raised-40', `color-mix(in srgb, var(--color-bg-raised) ${panelOpacity(40)}%, transparent)`);
+    root.style.setProperty('--tc-panel-glass-active', `color-mix(in srgb, var(--color-bg-active) ${panelOpacity(100)}%, transparent)`);
+    root.style.setProperty('--tc-panel-glass-active-50', `color-mix(in srgb, var(--color-bg-active) ${panelOpacity(50)}%, transparent)`);
+    root.style.setProperty('--tc-panel-glass-active-30', `color-mix(in srgb, var(--color-bg-active) ${panelOpacity(30)}%, transparent)`);
+    root.style.setProperty('--tc-panel-glass-sidebar', `color-mix(in srgb, var(--color-bg-surface) ${panelOpacity(100)}%, transparent)`);
+    root.style.setProperty('--tc-panel-glass-border', `color-mix(in srgb, var(--color-border-medium) ${Math.max(22, 100 - transparency * 0.45).toFixed(1)}%, transparent)`);
+    root.style.setProperty('--tc-panel-glass-blur', `${blur}px`);
+    root.style.setProperty('--tc-window-ambient-opacity', '0');
+    root.style.setProperty('--tc-window-frost-strength', '0');
+    root.style.setProperty('--tc-window-blur', '0px');
+
+    if (isDesktopShell) {
+      void window.threatcaddyDesktop?.setWindowGlass({ transparency: 0, blur: 0 }).catch(() => {
+        // The desktop wrapper may still be starting up; keep the web UI responsive regardless.
+      });
+    }
+  }, [isDesktopShell, settings.windowGlassTransparency, settings.windowGlassBlur]);
 
   const updateSettings = useCallback((updates: Partial<Settings>) => {
     setSettingsState((prev) => {

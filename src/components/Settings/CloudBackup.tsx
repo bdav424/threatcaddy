@@ -11,7 +11,7 @@ import { useToast } from '../../contexts/ToastContext';
 import type { CloudProvider, BackupDestination } from '../../types';
 
 const PROVIDER_OPTIONS: { value: CloudProvider; label: string }[] = [
-  { value: 'oci', label: 'Oracle Cloud (OCI)' },
+  { value: 'cloudstore', label: 'Cloud Object Storage' },
   { value: 'aws-s3', label: 'AWS S3' },
   { value: 'azure-blob', label: 'Azure Blob Storage' },
   { value: 'gcs', label: 'Google Cloud Storage' },
@@ -28,7 +28,7 @@ export function CloudBackup() {
   const destinations = settings.backupDestinations ?? [];
 
   // Add-destination form state
-  const [addProvider, setAddProvider] = useState<CloudProvider>('oci');
+  const [addProvider, setAddProvider] = useState<CloudProvider>('cloudstore');
   const [addLabel, setAddLabel] = useState('');
   const [addUrl, setAddUrl] = useState('');
   const [addError, setAddError] = useState('');
@@ -126,8 +126,8 @@ export function CloudBackup() {
   };
 
   const providerBadge = (provider: CloudProvider) => {
-    const labels: Record<CloudProvider, string> = { 'oci': 'OCI', 'aws-s3': 'S3', 'azure-blob': 'Azure', 'gcs': 'GCS' };
-    const colors: Record<CloudProvider, string> = { 'oci': 'bg-red-900/30 text-red-400', 'aws-s3': 'bg-orange-900/30 text-orange-400', 'azure-blob': 'bg-blue-900/30 text-blue-400', 'gcs': 'bg-green-900/30 text-green-400' };
+    const labels: Record<CloudProvider, string> = { 'cloudstore': 'Cloud', 'aws-s3': 'S3', 'azure-blob': 'Azure', 'gcs': 'GCS' };
+    const colors: Record<CloudProvider, string> = { 'cloudstore': 'bg-red-900/30 text-red-400', 'aws-s3': 'bg-orange-900/30 text-orange-400', 'azure-blob': 'bg-blue-900/30 text-blue-400', 'gcs': 'bg-green-900/30 text-green-400' };
     return <span className={`text-[10px] px-1.5 py-0.5 rounded ${colors[provider]}`}>{labels[provider]}</span>;
   };
 

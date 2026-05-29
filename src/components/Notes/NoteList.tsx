@@ -1,6 +1,6 @@
-import { ArrowUpDown, FileText, Download, FolderPlus, Pencil } from 'lucide-react';
+import { ArrowUpDown, FileText, Download, FolderPlus, Pencil, FilePlus, Plus } from 'lucide-react';
 import { useTranslation, Trans } from 'react-i18next';
-import type { Note, SortOption, IOCType, Folder } from '../../types';
+import type { Note, SortOption, IOCType, Folder, NoteTemplate } from '../../types';
 import { cn } from '../../lib/utils';
 import { NoteCard } from './NoteCard';
 import { IOCFilterBar } from '../Clips/IOCFilterBar';
@@ -27,9 +27,13 @@ interface NoteListProps {
   onRenameFolder?: (noteId: string, newName: string) => void;
   onDeleteFolder?: (noteId: string, action: 'trash_contents' | 'move_out') => void;
   onCreate?: () => void;
+  attachedTemplates?: NoteTemplate[];
+  onCreateFromTemplate?: (templateId: string) => void;
+  onManageTemplates?: () => void;
+  emptyHint?: string;
 }
 
-export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, title, selectedIOCTypes, onIOCTypesChange, folders, tiExportConfig, onTrash, onCreateFolder, onMoveToFolder, onRenameFolder, onDeleteFolder, onCreate }: NoteListProps) {
+export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, title, selectedIOCTypes, onIOCTypesChange, folders, tiExportConfig, onTrash, onCreateFolder, onMoveToFolder, onRenameFolder, onDeleteFolder, onCreate, attachedTemplates = [], onCreateFromTemplate, onManageTemplates, emptyHint }: NoteListProps) {
   const { t } = useTranslation('notes');
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showSortMenu, setShowSortMenu] = useState(false);
@@ -110,8 +114,43 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
 
   return (
     <div className="w-full border-r border-gray-800 flex flex-col h-full overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800 shrink-0">
-        <span className="text-sm font-medium text-gray-300">{t('list.titleWithCount', { title: title || t('list.defaultTitle'), count: notes.length })}</span>
+      <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-800 shrink-0">
+        <div className="min-w-0 flex flex-wrap items-center gap-1.5">
+          <span className="text-sm font-medium text-gray-300 truncate me-1">{t('list.titleWithCount', { title: title || t('list.defaultTitle'), count: notes.length })}</span>
+          {onCreate && (
+            <button
+              onClick={onCreate}
+              className="inline-flex h-6 items-center gap-1 rounded-md border border-gray-700 bg-gray-800 px-2 text-[11px] font-medium text-gray-300 transition-colors hover:border-accent/50 hover:bg-accent/10 hover:text-accent"
+              title="Create a blank note"
+              aria-label="Create blank note"
+            >
+              <FilePlus size={12} />
+              <span>New Note</span>
+            </button>
+          )}
+          {attachedTemplates.map((template) => (
+            <button
+              key={template.id}
+              onClick={() => onCreateFromTemplate?.(template.id)}
+              className="inline-flex h-6 max-w-[140px] items-center gap-1 rounded-md border border-accent/30 bg-accent/10 px-2 text-[11px] font-medium text-accent transition-colors hover:border-accent/60 hover:bg-accent/20"
+              title={`Create note from ${template.name}`}
+              aria-label={`Create note from ${template.name}`}
+            >
+              {template.icon && <span className="shrink-0">{template.icon}</span>}
+              <span className="truncate">{template.name}</span>
+            </button>
+          ))}
+          {onManageTemplates && (
+            <button
+              onClick={onManageTemplates}
+              className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-gray-700 bg-gray-800 text-gray-500 transition-colors hover:border-accent/50 hover:bg-accent/10 hover:text-accent"
+              title="Add templates to this investigation"
+              aria-label="Add templates to this investigation"
+            >
+              <Plus size={12} />
+            </button>
+          )}
+        </div>
         <div className="flex items-center gap-1">
           {onCreateFolder && (
             <button
@@ -229,6 +268,9 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
           <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-500">
             <FileText size={40} strokeWidth={1.5} className="text-gray-600" />
             <p className="text-sm">{t('emptyState')}</p>
+            {emptyHint && (
+              <p className="max-w-xs text-center text-xs leading-relaxed text-gray-500">{emptyHint}</p>
+            )}
             {onCreate && (
               <button
                 onClick={onCreate}

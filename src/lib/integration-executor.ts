@@ -52,6 +52,7 @@ async function serverProxyFetch(
   method: string,
   headers: Record<string, string>,
   body: string | null,
+  requiredDomains: string[],
 ): Promise<{ ok: boolean; status: number; statusText: string; data: unknown; headers: Record<string, string> }> {
   const token = await getAccessToken();
   const controller = new AbortController();
@@ -63,12 +64,41 @@ async function serverProxyFetch(
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ url, method, headers, body }),
+    body: JSON.stringify({ url, method, headers, body, requiredDomains }),
   });
   clearTimeout(timer);
   const result = await resp.json();
   if (!resp.ok) {
     throw new Error(result.error || `Server proxy error: ${resp.status}`);
+  }
+  return {
+    ok: result.status >= 200 && result.status < 300,
+    status: result.status,
+    statusText: result.statusText || '',
+    data: result.data,
+    headers: result.headers || {},
+  };
+}
+
+async function localIntegrationProxyFetch(
+  url: string,
+  method: string,
+  headers: Record<string, string>,
+  body: string | null,
+  requiredDomains: string[],
+): Promise<{ ok: boolean; status: number; statusText: string; data: unknown; headers: Record<string, string> }> {
+  const resp = await fetch('http://127.0.0.1:8767/api/proxy-fetch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, method, headers, body, requiredDomains }),
+  });
+  const result = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    throw new Error(
+      typeof result?.error === 'string'
+        ? result.error
+        : `Local integration proxy error: ${resp.status}`,
+    );
   }
   return {
     ok: result.status >= 200 && result.status < 300,
@@ -230,6 +260,25 @@ export function syncProxyAllowedDomains(templates: IntegrationTemplate[]): void 
   } catch { /* extension not present */ }
 }
 
+export function validateIntegrationConfig(
+  template: IntegrationTemplate,
+  installation: InstalledIntegration,
+): string[] {
+  return template.configSchema
+    .filter((field) => field.required)
+    .filter((field) => {
+      const value = installation.config?.[field.key];
+      if (typeof value === 'string') return value.trim().length === 0;
+      return value === null || value === undefined || value === false;
+    })
+    .map((field) => field.label || field.key);
+}
+
+export function buildIntegrationConfigError(template: IntegrationTemplate, missingFields: string[]): string {
+  const missing = missingFields.join(', ');
+  return `${template.name} needs configuration before it can run. Missing required field${missingFields.length === 1 ? '' : 's'}: ${missing}. Open Integrations, edit this installation, and add the required API key or setting.`;
+}
+
 /** Check if the extension bridge supports proxy_fetch */
 function hasBridgeProxyFetch(): boolean {
   try {
@@ -269,6 +318,7 @@ export class IntegrationExecutor {
     };
 
     const secrets = collectSecretValues(template, installation.config);
+    const missingConfig = validateIntegrationConfig(template, installation);
 
     const addLog = (entry: IntegrationRunLogEntry) => {
       // Redact any secret values that leaked into log detail strings
@@ -283,6 +333,10 @@ export class IntegrationExecutor {
     const timeoutId = setTimeout(() => timeoutController.abort(), MAX_EXECUTION_MS);
 
     try {
+      if (missingConfig.length > 0) {
+        throw new Error(buildIntegrationConfigError(template, missingConfig));
+      }
+
       for (const step of template.steps) {
         const stepResult = await this.executeStep(
           step,
@@ -591,7 +645,7 @@ export class IntegrationExecutor {
         const proxyResult = await serverProxyFetch(
           options.useServerProxy.serverUrl,
           options.useServerProxy.getAccessToken,
-          url.toString(), step.method, proxyHeaders, serializeBody(),
+          url.toString(), step.method, proxyHeaders, serializeBody(), template.requiredDomains,
         );
         responseStatus = proxyResult.status;
         responseStatusText = proxyResult.statusText;
@@ -609,16 +663,48 @@ export class IntegrationExecutor {
         responseData = step.responseType === 'text' ? String(proxyResult.data) : proxyResult.data;
         responseHeaders = proxyResult.headers;
       } else {
-        // Direct fetch (standalone mode)
-        const response = await fetch(url.toString(), fetchOptions);
-        responseStatus = response.status;
-        responseStatusText = response.statusText;
-        responseData = step.responseType === 'text'
-          ? await response.text()
-          : await response.json().catch(() => null);
-        response.headers.forEach((value, key) => {
-          responseHeaders[key] = value;
-        });
+        // Direct fetch first for normal web/dev contexts. If the browser blocks
+        // the provider with CORS/CSP, fall back to the bundled local proxy.
+        let response: Response;
+        try {
+          response = await fetch(url.toString(), fetchOptions);
+          responseStatus = response.status;
+          responseStatusText = response.statusText;
+          responseData = step.responseType === 'text'
+            ? await response.text()
+            : await response.json().catch(() => null);
+          response.headers.forEach((value, key) => {
+            responseHeaders[key] = value;
+          });
+        } catch (directErr) {
+          const proxyHeaders = { ...(fetchOptions.headers as Record<string, string>) };
+          if (fetchOptions.body instanceof URLSearchParams && !proxyHeaders['Content-Type'] && !proxyHeaders['content-type']) {
+            proxyHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+          }
+          try {
+            const proxyResult = await localIntegrationProxyFetch(url.toString(), step.method, proxyHeaders, serializeBody(), template.requiredDomains);
+            responseStatus = proxyResult.status;
+            responseStatusText = proxyResult.statusText;
+            responseData = step.responseType === 'text' ? String(proxyResult.data) : proxyResult.data;
+            responseHeaders = proxyResult.headers;
+          } catch (proxyErr) {
+            const message = directErr instanceof Error ? directErr.message : String(directErr);
+            const proxyMessage = proxyErr instanceof Error ? proxyErr.message : String(proxyErr);
+            const proxyHint = [
+              `Direct browser request failed for ${url.hostname}: ${message}.`,
+              `The bundled local integration proxy at http://127.0.0.1:8767 also was not available: ${proxyMessage}.`,
+              'Start the ThreatCaddy integration proxy with `pnpm integration-proxy`, open the extension-enabled app, or connect to a team server, then rerun the integration.',
+            ].join(' ');
+            throw new Error(proxyHint);
+          }
+        }
+        if (responseStatus === undefined) {
+          const proxyHint = [
+            `Integration transport failed for ${url.hostname}.`,
+            'Start the ThreatCaddy integration proxy with `pnpm integration-proxy`, open the extension-enabled app, or connect to a team server, then rerun the integration.',
+          ].join(' ');
+          throw new Error(proxyHint);
+        }
       }
 
       addLog({

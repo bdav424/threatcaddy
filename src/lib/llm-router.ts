@@ -5,6 +5,13 @@
 import { nanoid } from 'nanoid';
 import { postMessageOrigin } from './utils';
 import { streamLLMChat } from './server-api';
+import {
+  compactMessagesForLocal,
+  compactSystemPromptForLocal,
+  estimateLocalPromptChars,
+  LOCAL_PROMPT_CHAR_LIMIT,
+} from './llm-prompt-budget';
+import { getLocalLLMAuthHeaders } from './local-llm-auth';
 
 export type LLMRoutingMode = 'extension' | 'server' | 'auto';
 
@@ -24,6 +31,19 @@ export interface LLMRouteCallbacks {
   onError: (error: string) => void;
 }
 
+function compactLocalRouteRequest(request: LLMRouteRequest): LLMRouteRequest {
+  if (request.provider !== 'local') return request;
+  const systemPrompt = compactSystemPromptForLocal(request.systemPrompt);
+  return {
+    ...request,
+    systemPrompt,
+    messages: compactMessagesForLocal((request.messages as { role: string; content: unknown }[]) || [], {
+      systemPrompt,
+      tools: request.tools,
+    }),
+  };
+}
+
 /**
  * Determine the effective routing mode based on settings and availability.
  */
@@ -37,7 +57,11 @@ export function sendDirectToLocal(
   signal?: AbortSignal,
 ): string {
   const requestId = nanoid();
-  const rawEndpoint = (request.endpoint || 'http://localhost:11434/v1').replace(/\/+$/, '');
+  if (!request.endpoint?.trim()) {
+    callbacks.onError('No Local LLM endpoint configured. Add one in Settings > AI/LLM.');
+    return requestId;
+  }
+  const rawEndpoint = request.endpoint.trim().replace(/\/+$/, '');
   // Validate endpoint is a safe http/https URL before using it
   let parsedEndpoint: URL;
   try {
@@ -52,11 +76,45 @@ export function sendDirectToLocal(
   }
   const base = rawEndpoint;
   const url = `${base}/chat/completions`;
+  const systemPrompt = compactSystemPromptForLocal(request.systemPrompt);
+  let localMessages = compactMessagesForLocal((request.messages as { role: string; content: unknown }[]) || [], {
+    systemPrompt,
+    tools: request.tools,
+  });
+  let estimatedPromptChars = estimateLocalPromptChars({
+    model: request.model,
+    systemPrompt,
+    messages: localMessages,
+    tools: request.tools,
+  });
+
+  if (estimatedPromptChars > LOCAL_PROMPT_CHAR_LIMIT) {
+    localMessages = compactMessagesForLocal(localMessages, {
+      systemPrompt,
+      tools: request.tools,
+      targetChars: 120_000,
+      maxMessageChars: 12_000,
+      maxRecentMessageChars: 16_000,
+      maxToolResultChars: 6_000,
+      preserveRecentMessages: 4,
+    });
+    estimatedPromptChars = estimateLocalPromptChars({
+      model: request.model,
+      systemPrompt,
+      messages: localMessages,
+      tools: request.tools,
+    });
+  }
+
+  if (estimatedPromptChars > LOCAL_PROMPT_CHAR_LIMIT) {
+    callbacks.onError(`Local LLM prompt is still too large after CaddyAI compacted cached tool results (${estimatedPromptChars.toLocaleString()} estimated characters; local limit ${LOCAL_PROMPT_CHAR_LIMIT.toLocaleString()}). Start a fresh chat, reduce attached context, or temporarily disable broad tool access for this turn.`);
+    return requestId;
+  }
 
   // Build OpenAI-compatible messages
   const messages: { role: string; content: string }[] = [];
-  if (request.systemPrompt) messages.push({ role: 'system', content: request.systemPrompt });
-  for (const m of request.messages as { role: string; content: unknown }[]) {
+  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+  for (const m of localMessages) {
     if (typeof m.content === 'string') messages.push({ role: m.role, content: m.content });
     else messages.push({ role: m.role, content: JSON.stringify(m.content) });
   }
@@ -69,14 +127,29 @@ export function sendDirectToLocal(
     }));
   }
 
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (request.apiKey && request.apiKey !== 'local') headers['Authorization'] = `Bearer ${request.apiKey}`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...getLocalLLMAuthHeaders(request.apiKey, rawEndpoint),
+  };
 
   (async () => {
     try {
       const resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal });
       if (!resp.ok) {
-        callbacks.onError(`Local LLM ${resp.status}: ${await resp.text().catch(() => '')}`);
+        const text = await resp.text().catch(() => '');
+        if (resp.status === 401) {
+          callbacks.onError(`Local LLM 401: Unauthorized. Check the Local LLM API key in Settings > AI/LLM matches the token required by the local bridge. ${text}`);
+          return;
+        }
+        if (resp.status === 404) {
+          callbacks.onError(`Local LLM 404: ${text}. This usually means the endpoint is not an OpenAI-compatible /v1 chat endpoint, or an Agent Host URL was entered as the Local LLM endpoint.`);
+          return;
+        }
+        if (resp.status === 400 && /prompt|context|token|limit|exceed/i.test(text)) {
+          callbacks.onError(`Local LLM 400: the local model rejected the prompt after CaddyAI compaction (${estimatedPromptChars.toLocaleString()} estimated characters). Try a fresh chat or a narrower tool/profile selection. Raw response: ${text}`);
+          return;
+        }
+        callbacks.onError(`Local LLM ${resp.status}: ${text}`);
         return;
       }
 
@@ -138,8 +211,15 @@ export function sendDirectToLocal(
           contentBlocks.push({ type: 'tool_use', id: tc.id || `tc_${Date.now()}`, name: tc.name, input: parsedArgs });
         }
       } else if (fullText) {
-        // Fallback: parse tool calls from text output (for models that don't support function calling)
         const toolNames = ((request.tools || []) as { name: string }[]).map(t => t.name);
+        const jsonBlocks = parseLocalContentBlocksFromText(fullText, toolNames);
+        if (jsonBlocks.length > 0) {
+          contentBlocks.push(...jsonBlocks);
+          if (jsonBlocks.some((b) => b.type === 'tool_use')) {
+            stopReason = 'tool_calls';
+          }
+        } else {
+        // Fallback: parse tool calls from text output (for models that don't support function calling)
         const textCalls = parseTextToolCalls(fullText, toolNames);
         if (textCalls.length > 0) {
           // Strip tool_call tags from displayed text
@@ -154,6 +234,7 @@ export function sendDirectToLocal(
           stopReason = 'tool_calls';
         } else {
           contentBlocks.push({ type: 'text', text: fullText });
+        }
         }
       }
 
@@ -172,6 +253,78 @@ export function sendDirectToLocal(
 }
 
 /** Parse tool calls from text output for local LLMs that don't support structured function calling. */
+export function parseLocalContentBlocksFromText(
+  text: string,
+  toolNames: string[],
+): ({ type: 'text'; text: string } | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> })[] {
+  const parsed = parseJsonish(text);
+  const blocks = Array.isArray(parsed)
+    ? parsed
+    : isRecord(parsed) && Array.isArray(parsed.contentBlocks) ? parsed.contentBlocks
+      : isRecord(parsed) && Array.isArray(parsed.content) ? parsed.content
+        : null;
+  if (!blocks) return [];
+
+  const allowedTools = new Set(toolNames);
+  const contentBlocks: ({ type: 'text'; text: string } | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> })[] = [];
+  let toolIndex = 0;
+  for (const block of blocks) {
+    if (!isRecord(block)) continue;
+    if (block.type === 'text' && typeof block.text === 'string' && block.text.trim()) {
+      contentBlocks.push({ type: 'text', text: block.text });
+      continue;
+    }
+    if (block.type !== 'tool_use' || typeof block.name !== 'string') continue;
+    if (allowedTools.size > 0 && !allowedTools.has(block.name)) continue;
+    contentBlocks.push({
+      type: 'tool_use',
+      id: typeof block.id === 'string' && block.id ? block.id : `dtc_json_${Date.now()}_${toolIndex++}`,
+      name: block.name,
+      input: isRecord(block.input) ? block.input : {},
+    });
+  }
+
+  return contentBlocks;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function parseJsonish(text: string): unknown {
+  const candidates = jsonCandidates(text);
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as unknown;
+      if (typeof parsed === 'string') {
+        try { return JSON.parse(parsed) as unknown; } catch { return parsed; }
+      }
+      return parsed;
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  return null;
+}
+
+function jsonCandidates(text: string): string[] {
+  const trimmed = text.trim();
+  const candidates = [trimmed];
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fenced) candidates.push(fenced[1].trim());
+  const firstArray = trimmed.indexOf('[');
+  const lastArray = trimmed.lastIndexOf(']');
+  if (firstArray !== -1 && lastArray > firstArray) {
+    candidates.push(trimmed.slice(firstArray, lastArray + 1));
+  }
+  const firstObject = trimmed.indexOf('{');
+  const lastObject = trimmed.lastIndexOf('}');
+  if (firstObject !== -1 && lastObject > firstObject) {
+    candidates.push(trimmed.slice(firstObject, lastObject + 1));
+  }
+  return Array.from(new Set(candidates));
+}
+
 function parseTextToolCalls(text: string, toolNames: string[]): { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }[] {
   const calls: { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }[] = [];
   const nameSet = new Set(toolNames);
@@ -213,7 +366,7 @@ export function resolveRoutingMode(
   serverConnected: boolean,
 ): 'extension' | 'server' {
   if (mode === 'server') return serverConnected ? 'server' : 'extension';
-  if (mode === 'extension') return extensionAvailable ? 'extension' : 'server';
+  if (mode === 'extension') return extensionAvailable ? 'extension' : (serverConnected ? 'server' : 'extension');
   // auto: prefer server when connected, fallback to extension
   if (serverConnected) return 'server';
   return 'extension';
@@ -228,6 +381,7 @@ export function sendViaExtension(
   signal?: AbortSignal,
 ): string {
   const requestId = nanoid();
+  const routeRequest = compactLocalRouteRequest(request);
 
   function handler(event: MessageEvent) {
     if (event.source !== window || !event.data) return;
@@ -261,13 +415,13 @@ export function sendViaExtension(
     type: 'TC_LLM_REQUEST',
     requestId,
     payload: {
-      provider: request.provider,
-      model: request.model,
-      messages: request.messages,
-      apiKey: request.apiKey,
-      systemPrompt: request.systemPrompt,
-      tools: request.tools,
-      endpoint: request.endpoint,
+      provider: routeRequest.provider,
+      model: routeRequest.model,
+      messages: routeRequest.messages,
+      apiKey: routeRequest.apiKey,
+      systemPrompt: routeRequest.systemPrompt,
+      tools: routeRequest.tools,
+      endpoint: routeRequest.endpoint,
     },
   }, postMessageOrigin());
 
@@ -284,17 +438,18 @@ export function sendViaServer(
   signal?: AbortSignal,
 ): string {
   const requestId = nanoid();
+  const routeRequest = compactLocalRouteRequest(request);
 
   // Accumulate text content to build contentBlocks on done
   let accumulatedText = '';
 
   streamLLMChat(
     {
-      provider: request.provider,
-      model: request.model,
-      messages: request.messages as { role: string; content: string }[],
-      systemPrompt: request.systemPrompt,
-      tools: request.tools,
+      provider: routeRequest.provider,
+      model: routeRequest.model,
+      messages: routeRequest.messages as { role: string; content: string }[],
+      systemPrompt: routeRequest.systemPrompt,
+      tools: routeRequest.tools,
     },
     (text) => {
       accumulatedText += text;

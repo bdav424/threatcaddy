@@ -1,3 +1,5 @@
+import type { CustomAppearanceTheme } from '../types';
+
 /** Color scheme presets. Each scheme provides CSS variable overrides for dark and light modes. */
 
 export interface ColorScheme {
@@ -8,6 +10,96 @@ export interface ColorScheme {
   dark: Record<string, string>;
   light: Record<string, string>;
 }
+
+export type AppearanceColorVariable =
+  | '--color-accent'
+  | '--color-accent-hover'
+  | '--color-accent-dim'
+  | '--color-bg-deep'
+  | '--color-bg-surface'
+  | '--color-bg-raised'
+  | '--color-bg-hover'
+  | '--color-bg-active'
+  | '--color-border-subtle'
+  | '--color-border-medium'
+  | '--color-text-primary'
+  | '--color-text-secondary'
+  | '--color-text-muted'
+  | '--color-purple'
+  | '--color-accent-blue'
+  | '--color-accent-green'
+  | '--color-accent-amber'
+  | '--color-accent-pink';
+
+export const APPEARANCE_COLOR_VARIABLES: { key: AppearanceColorVariable; label: string }[] = [
+  { key: '--color-accent', label: 'Accent' },
+  { key: '--color-accent-hover', label: 'Accent hover' },
+  { key: '--color-accent-dim', label: 'Accent dim' },
+  { key: '--color-bg-deep', label: 'Deep background' },
+  { key: '--color-bg-surface', label: 'Surface' },
+  { key: '--color-bg-raised', label: 'Raised surface' },
+  { key: '--color-bg-hover', label: 'Hover surface' },
+  { key: '--color-bg-active', label: 'Active surface' },
+  { key: '--color-border-subtle', label: 'Subtle border' },
+  { key: '--color-border-medium', label: 'Medium border' },
+  { key: '--color-text-primary', label: 'Primary text' },
+  { key: '--color-text-secondary', label: 'Secondary text' },
+  { key: '--color-text-muted', label: 'Muted text' },
+  { key: '--color-purple', label: 'Primary highlight' },
+  { key: '--color-accent-blue', label: 'Blue accent' },
+  { key: '--color-accent-green', label: 'Green accent' },
+  { key: '--color-accent-amber', label: 'Amber accent' },
+  { key: '--color-accent-pink', label: 'Pink accent' },
+];
+
+export const DEFAULT_DARK_THEME_COLORS: Record<AppearanceColorVariable, string> = {
+  '--color-accent': '#6366f1',
+  '--color-accent-hover': '#818cf8',
+  '--color-accent-dim': '#4f46e5',
+  '--color-bg-deep': '#0d0b14',
+  '--color-bg-surface': '#13111c',
+  '--color-bg-raised': '#1a1726',
+  '--color-bg-hover': '#211d30',
+  '--color-bg-active': '#262040',
+  '--color-border-subtle': '#272234',
+  '--color-border-medium': '#39314a',
+  '--color-text-primary': '#e4e0f0',
+  '--color-text-secondary': '#9590a8',
+  '--color-text-muted': '#918ba8',
+  '--color-purple': '#7c6bf0',
+  '--color-accent-blue': '#38bdf8',
+  '--color-accent-green': '#4ade80',
+  '--color-accent-amber': '#fbbf24',
+  '--color-accent-pink': '#f472b6',
+};
+
+export const DEFAULT_LIGHT_THEME_COLORS: Record<AppearanceColorVariable, string> = {
+  '--color-accent': '#4f46e5',
+  '--color-accent-hover': '#6366f1',
+  '--color-accent-dim': '#4338ca',
+  '--color-bg-deep': '#f8f7fc',
+  '--color-bg-surface': '#f0eef8',
+  '--color-bg-raised': '#e8e5f5',
+  '--color-bg-hover': '#ddd9ef',
+  '--color-bg-active': '#d4cee8',
+  '--color-border-subtle': '#e5e1ef',
+  '--color-border-medium': '#d7d1e4',
+  '--color-text-primary': '#1a1726',
+  '--color-text-secondary': '#5f5878',
+  '--color-text-muted': '#716b88',
+  '--color-purple': '#6d5ce0',
+  '--color-accent-blue': '#0284c7',
+  '--color-accent-green': '#16a34a',
+  '--color-accent-amber': '#d97706',
+  '--color-accent-pink': '#db2777',
+};
+
+export const FONT_OPTIONS = [
+  { id: 'system', label: 'System UI', value: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  { id: 'serif', label: 'Serif', value: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif' },
+  { id: 'mono', label: 'Mono', value: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace' },
+  { id: 'rounded', label: 'Rounded', value: 'ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif' },
+] as const;
 
 export const COLOR_SCHEMES: ColorScheme[] = [
   {
@@ -154,20 +246,33 @@ export const COLOR_SCHEMES: ColorScheme[] = [
   },
 ];
 
+function isAppearanceColor(value: unknown): value is string {
+  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value.trim());
+}
+
 /** Apply a color scheme's CSS variables to the document root. */
-export function applyColorScheme(schemeId: string, theme: 'dark' | 'light'): void {
-  const scheme = COLOR_SCHEMES.find((s) => s.id === schemeId);
+export function applyColorScheme(
+  schemeId: string,
+  theme: 'dark' | 'light',
+  customThemes: CustomAppearanceTheme[] = [],
+  fontFamily?: string,
+  fontScale?: number,
+): void {
+  const scheme = COLOR_SCHEMES.find((s) => s.id === schemeId) || customThemes.find((s) => s.id === schemeId);
   const root = document.documentElement;
 
-  // Clear any previously applied scheme variables
-  for (const s of COLOR_SCHEMES) {
-    for (const key of Object.keys(s.dark)) root.style.removeProperty(key);
-    for (const key of Object.keys(s.light)) root.style.removeProperty(key);
+  // Clear every managed appearance variable, including values from deleted/imported themes.
+  for (const { key } of APPEARANCE_COLOR_VARIABLES) {
+    root.style.removeProperty(key);
   }
+
+  root.style.setProperty('--tc-font-family', fontFamily || FONT_OPTIONS[0].value);
+  root.style.setProperty('--tc-font-scale', String((fontScale ?? 100) / 100));
 
   if (!scheme) return; // default indigo — no overrides
   const vars = theme === 'dark' ? scheme.dark : scheme.light;
-  for (const [key, value] of Object.entries(vars)) {
-    root.style.setProperty(key, value);
+  for (const { key } of APPEARANCE_COLOR_VARIABLES) {
+    const value = vars[key];
+    if (isAppearanceColor(value)) root.style.setProperty(key, value.trim());
   }
 }

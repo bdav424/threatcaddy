@@ -1,5 +1,5 @@
 import pako from 'pako';
-import type { Note, Task, TimelineEvent, Timeline, Whiteboard, StandaloneIOC, Folder, Tag, ChatThread } from '../types';
+import type { Note, Task, TimelineEvent, Timeline, Whiteboard, StandaloneIOC, EvidenceItem, Folder, Tag, ChatThread } from '../types';
 
 // --- Payload types ---
 
@@ -11,6 +11,7 @@ export interface InvestigationBundle {
   timelines: Timeline[];
   whiteboards: Whiteboard[];
   iocs: StandaloneIOC[];
+  evidenceItems?: EvidenceItem[];
   chatThreads: ChatThread[];
   tags: Tag[];
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Pencil, Trash2, FileText, ListChecks, Clock, PenTool, Search, Network, Activity, MessageSquare } from 'lucide-react';
+import { Plus, Pencil, Trash2, FileText, ListChecks, Clock, PenTool, Search, Network, Activity, MessageSquare, FileOutput } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import type { QuickLink, ViewMode, Folder, Note, Task, TimelineEvent, Whiteboard, StandaloneIOC, KPIMetricId } from '../../types';
 import { QuickLinkForm } from './QuickLinkForm';
@@ -10,6 +10,7 @@ import { KPIWidgets } from './KPIWidgets';
 const INTERNAL_TOOLS: { view: ViewMode; labelKey: string; descKey: string; icon: typeof FileText; color: string }[] = [
   { view: 'notes', labelKey: 'view.notes', descKey: 'view.notesDesc', icon: FileText, color: '#38bdf8' },
   { view: 'tasks', labelKey: 'view.tasks', descKey: 'view.tasksDesc', icon: ListChecks, color: '#fbbf24' },
+  { view: 'products', labelKey: 'view.products', descKey: 'view.productsDesc', icon: FileOutput, color: '#22c55e' },
   { view: 'timeline', labelKey: 'view.timeline', descKey: 'view.timelineDesc', icon: Clock, color: '#4ade80' },
   { view: 'whiteboard', labelKey: 'view.whiteboards', descKey: 'view.whiteboardsDesc', icon: PenTool, color: '#a855f7' },
   { view: 'ioc-stats', labelKey: 'view.iocs', descKey: 'view.iocsDesc', icon: Search, color: '#10b981' },

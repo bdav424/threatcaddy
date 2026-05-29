@@ -324,7 +324,7 @@
   "intel.disableAll": "Desabilitar tudo",
   "intel.bulkJsonImport": "Importação JSON em massa",
   "intel.exportConfig": "Exportar configuração",
-  "intel.bulkImportHelp": "Aceita { cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, oci_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }",
+  "intel.bulkImportHelp": "Aceita { cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, cloud_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }",
   "intel.defaultClsLevel": "Nível de classificação padrão",
   "intel.usingTlpDefaults": "Usando padrões TLP",
   "intel.defaultReportSource": "Fonte de relatório padrão",

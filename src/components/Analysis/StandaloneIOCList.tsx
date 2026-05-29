@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, forwardRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Pencil, Trash2, Archive, RotateCcw, Search, ChevronUp, ChevronDown, X, ListPlus, Clipboard, Tag as TagIcon, GitMerge, Zap } from 'lucide-react';
+import { Plus, Pencil, Trash2, Archive, RotateCcw, Search, ChevronUp, ChevronDown, X, ListPlus, Clipboard, Tag as TagIcon, GitMerge, Zap, Columns } from 'lucide-react';
 import type { StandaloneIOC, Folder, Tag, IOCType, ConfidenceLevel } from '../../types';
 import { IOC_TYPE_LABELS, CONFIDENCE_LEVELS, IOC_STATUS_VALUES, IOC_STATUS_LABELS, IOC_STATUS_COLORS } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -26,6 +26,29 @@ const CLS_COLORS: Record<string, string> = {
   'TLP:RED': '#ef4444',
 };
 
+function displayMetaValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '--';
+  if (Array.isArray(value)) return value.slice(0, 8).map(String).join(', ');
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .slice(0, 6)
+      .map(([key, val]) => `${key}: ${String(val)}`)
+      .join('; ');
+  }
+  return String(value);
+}
+
+function enrichmentDetails(ioc: StandaloneIOC): Array<{ provider: string; key: string; value: unknown }> {
+  return Object.entries(ioc.enrichment || {}).flatMap(([provider, snapshots]) => {
+    const latest = snapshots?.[0];
+    if (!latest) return [];
+    return Object.entries(latest)
+      .filter(([key, value]) => key !== 'ts' && displayMetaValue(value) !== '--')
+      .slice(0, 16)
+      .map(([key, value]) => ({ provider, key, value }));
+  });
+}
+
 // Sort field types
 type SortField = 'value' | 'type' | 'confidence' | 'iocStatus' | 'attribution' | 'updatedAt';
 type SortDir = 'asc' | 'desc';
@@ -37,6 +60,28 @@ const CONFIDENCE_ORDER: Record<string, number> = { low: 0, medium: 1, high: 2, c
 const STATUS_OPTIONS = IOC_STATUS_VALUES;
 const CONFIDENCE_OPTIONS: ConfidenceLevel[] = ['low', 'medium', 'high', 'confirmed'];
 const ALL_IOC_TYPES = Object.keys(IOC_TYPE_LABELS) as IOCType[];
+const DEFAULT_STANDALONE_COLUMN_WIDTHS: Record<string, number> = {
+  value: 280,
+  type: 90,
+  confidence: 100,
+  iocStatus: 95,
+  attribution: 130,
+  clsLevel: 80,
+  labels: 170,
+  updatedAt: 110,
+  actions: 150,
+};
+const STANDALONE_COLUMN_LABELS: Record<string, string> = {
+  value: 'Value',
+  type: 'Type',
+  confidence: 'Confidence',
+  iocStatus: 'Status',
+  attribution: 'Attribution',
+  clsLevel: 'CLS',
+  labels: 'Labels',
+  updatedAt: 'Updated',
+  actions: 'Actions',
+};
 
 interface StandaloneIOCListProps {
   iocs: StandaloneIOC[];
@@ -89,6 +134,9 @@ export function StandaloneIOCList({
   const [bulkTagText, setBulkTagText] = useState('');
   const [showDeduplicator, setShowDeduplicator] = useState(false);
   const [showBulkEnrich, setShowBulkEnrich] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [showColumnSizer, setShowColumnSizer] = useState(false);
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(DEFAULT_STANDALONE_COLUMN_WIDTHS);
 
   // Sort state
   const [sortField, setSortField] = useState<SortField>('updatedAt');
@@ -168,6 +216,14 @@ export function StandaloneIOCList({
 
   const hasActiveFilters = searchText.trim() !== '' || statusFilter !== null || confidenceFilter !== null || typeFilter.length > 0;
   const hasAnyEnrichment = useMemo(() => iocs.some(i => i.enrichment && Object.keys(i.enrichment).length > 0), [iocs]);
+  const toggleExpanded = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const handleSubmit = async (data: Partial<StandaloneIOC>) => {
     if (editingIOC) {
@@ -240,9 +296,10 @@ export function StandaloneIOCList({
 
   const SortHeader = ({ field, label, className }: { field: SortField; label: string; className: string }) => (
     <th
-      className={`${className} cursor-pointer select-none hover:text-gray-300 transition-colors`}
+      className={`${className} border-b border-r border-gray-700/80 cursor-pointer select-none hover:text-gray-300 transition-colors`}
       onClick={() => handleSort(field)}
       aria-sort={sortField === field ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+      style={{ width: columnWidths[field] ?? DEFAULT_STANDALONE_COLUMN_WIDTHS[field], maxWidth: columnWidths[field] ?? DEFAULT_STANDALONE_COLUMN_WIDTHS[field] }}
     >
       <span className="inline-flex items-center gap-0.5">
         {label}
@@ -260,6 +317,7 @@ export function StandaloneIOCList({
       prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
     );
   };
+  const colStyle = (key: string) => ({ width: columnWidths[key] ?? DEFAULT_STANDALONE_COLUMN_WIDTHS[key], maxWidth: columnWidths[key] ?? DEFAULT_STANDALONE_COLUMN_WIDTHS[key] });
 
   return (
     <div className="flex flex-col">
@@ -271,6 +329,37 @@ export function StandaloneIOCList({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          <div className="relative">
+            <button
+              onClick={() => setShowColumnSizer((v) => !v)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 text-sm font-medium transition-colors"
+              title="Resize columns"
+            >
+              <Columns size={16} />
+              Columns
+            </button>
+            {showColumnSizer && (
+              <div className="absolute right-0 top-full mt-1 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl p-3 w-72 space-y-2">
+                {Object.entries(STANDALONE_COLUMN_LABELS).map(([key, label]) => (
+                  <label key={key} className="grid grid-cols-[70px_1fr_38px] items-center gap-2 text-xs">
+                    <span className="text-gray-400">{label}</span>
+                    <input
+                      type="range"
+                      min={36}
+                      max={360}
+                      value={columnWidths[key] ?? DEFAULT_STANDALONE_COLUMN_WIDTHS[key]}
+                      onChange={(e) => setColumnWidths((prev) => ({ ...prev, [key]: Number(e.target.value) }))}
+                      className="w-full accent-accent"
+                    />
+                    <span className="text-[10px] text-gray-500 text-end tabular-nums">{columnWidths[key] ?? DEFAULT_STANDALONE_COLUMN_WIDTHS[key]}</span>
+                  </label>
+                ))}
+                <button onClick={() => setColumnWidths(DEFAULT_STANDALONE_COLUMN_WIDTHS)} className="text-[10px] text-gray-500 hover:text-gray-300">
+                  Reset widths
+                </button>
+              </div>
+            )}
+          </div>
           {iocs.length > 1 && (
             <button
               onClick={() => setShowDeduplicator(true)}
@@ -521,14 +610,14 @@ export function StandaloneIOCList({
             <TableVirtuoso
               data={filteredSortedIOCs}
               components={{
-                Table: (props) => <table {...props} className="w-full min-w-[640px] text-xs" aria-label="IOC list" />,
+                Table: (props) => <table {...props} className="w-full min-w-[640px] text-xs table-fixed border-separate border-spacing-0" aria-label="IOC list" />,
                 TableHead: forwardRef((props, ref) => <thead ref={ref} {...props} />),
-                TableRow: (props) => <tr {...props} className="border-b border-gray-800/50 group" />,
+                TableRow: (props) => <tr {...props} className="group hover:bg-gray-800/20 focus-within:bg-gray-800/25" />,
                 TableBody: forwardRef((props, ref) => <tbody ref={ref} {...props} />),
               }}
               fixedHeaderContent={() => (
                 <tr className="border-b border-gray-800 bg-gray-900">
-                  <th className="text-start text-gray-500 font-medium py-2 pe-1 w-8">
+                  <th className="text-start text-gray-500 font-medium py-2 pe-1 w-8 border-b border-r border-gray-700/80">
                     <input type="checkbox" checked={filteredSortedIOCs.length > 0 && selectedIds.size === filteredSortedIOCs.length} onChange={toggleSelectAll} className="rounded border-gray-600 bg-gray-800 text-accent focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer" aria-label={t('iocList.selectAllAria')} />
                   </th>
                   <SortHeader field="value" label={t('iocList.valueHeader')} className="text-start text-gray-500 font-medium py-2 pe-2" />
@@ -536,10 +625,10 @@ export function StandaloneIOCList({
                   <SortHeader field="confidence" label={t('iocList.confidenceHeader')} className="text-start text-gray-500 font-medium py-2 px-2" />
                   <SortHeader field="iocStatus" label={t('iocList.statusHeader')} className="text-start text-gray-500 font-medium py-2 px-2" />
                   <SortHeader field="attribution" label={t('iocList.attributionHeader')} className="text-start text-gray-500 font-medium py-2 px-2" />
-                  <th className="text-start text-gray-500 font-medium py-2 px-2" title={t('iocForm.classificationLabel')}>{t('iocList.clsHeader')}</th>
-                  {hasAnyEnrichment && <th className="text-start text-gray-500 font-medium py-2 px-2">{t('iocList.labelsHeader')}</th>}
+                  <th className="text-start text-gray-500 font-medium py-2 px-2 border-b border-r border-gray-700/80" style={colStyle('clsLevel')} title={t('iocForm.classificationLabel')}>{t('iocList.clsHeader')}</th>
+                  {hasAnyEnrichment && <th className="text-start text-gray-500 font-medium py-2 px-2 border-b border-r border-gray-700/80" style={colStyle('labels')}>{t('iocList.labelsHeader')}</th>}
                   <SortHeader field="updatedAt" label={t('iocList.updatedHeader')} className="text-start text-gray-500 font-medium py-2 px-2" />
-                  <th className="text-end text-gray-500 font-medium py-2 ps-2">{t('iocList.actionsHeader')}</th>
+                  <th className="text-end text-gray-500 font-medium py-2 ps-2 border-b border-gray-700/80" style={colStyle('actions')}>{t('iocList.actionsHeader')}</th>
                 </tr>
               )}
               itemContent={(_index, ioc) => {
@@ -547,13 +636,43 @@ export function StandaloneIOCList({
                 const confInfo = CONFIDENCE_LEVELS[ioc.confidence as ConfidenceLevel] || { label: ioc.confidence, color: '#6b7280' };
                 const statusColor = ioc.iocStatus ? STATUS_COLORS[ioc.iocStatus] || '#6b7280' : undefined;
                 const clsColor = ioc.clsLevel ? CLS_COLORS[ioc.clsLevel] || '#6b7280' : undefined;
+                const details = enrichmentDetails(ioc);
+                const isExpanded = expandedIds.has(ioc.id);
                 return (
                   <>
-                    <td className="py-2 pe-1 w-8">
+                    <td className="py-2 pe-1 w-8 border-b border-r border-gray-700/70">
                       <input type="checkbox" checked={selectedIds.has(ioc.id)} onChange={() => toggleSelect(ioc.id)} className="rounded border-gray-600 bg-gray-800 text-accent focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer" aria-label={`Select IOC ${ioc.value}`} />
                     </td>
-                    <td className="py-2 pe-2 text-gray-200 font-mono max-w-[240px] truncate">{ioc.value}</td>
-                    <td className="py-2 px-2">
+                    <td className="py-2 pe-2 text-gray-200 font-mono border-b border-r border-gray-700/70" style={colStyle('value')}>
+                      <div className="flex items-center gap-1 min-w-0">
+                        <button
+                          onClick={() => toggleExpanded(ioc.id)}
+                          className={`inline-flex items-center gap-1 rounded px-1 py-0.5 ${details.length > 0 ? 'text-accent hover:bg-accent/10' : 'text-gray-500 hover:bg-gray-800'}`}
+                          title={details.length > 0 ? 'Show IOC metadata' : 'Show IOC details'}
+                        >
+                          {isExpanded ? <ChevronDown size={13} /> : <ChevronUp size={13} className="-rotate-90" />}
+                          <span className="text-[10px]">Details</span>
+                        </button>
+                        <span className="block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap" title={ioc.value}>{ioc.value}</span>
+                      </div>
+                      {isExpanded && (
+                        <div className="mt-2 rounded border border-gray-700 bg-gray-950/60 p-2 font-sans text-[11px] text-gray-400 min-w-[440px]">
+                          {details.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1">
+                              {details.map((detail) => (
+                                <div key={`${detail.provider}-${detail.key}`} className="grid grid-cols-[96px_1fr] gap-2">
+                                  <span className="text-gray-600">{detail.key}</span>
+                                  <span className="text-gray-300 break-words">{displayMetaValue(detail.value)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-gray-500">No enrichment metadata has been stored for this IOC yet.</span>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-2 px-2 border-b border-r border-gray-700/70" style={colStyle('type')}>
                       <span
                         className="text-[10px] px-1.5 py-0.5 rounded"
                         style={{ backgroundColor: typeInfo.color + '22', color: typeInfo.color }}
@@ -561,7 +680,7 @@ export function StandaloneIOCList({
                         {typeInfo.label}
                       </span>
                     </td>
-                    <td className="py-2 px-2">
+                    <td className="py-2 px-2 border-b border-r border-gray-700/70" style={colStyle('confidence')}>
                       <span
                         className="text-[10px] px-1.5 py-0.5 rounded"
                         style={{ backgroundColor: confInfo.color + '22', color: confInfo.color }}
@@ -569,7 +688,7 @@ export function StandaloneIOCList({
                         {confInfo.label}
                       </span>
                     </td>
-                    <td className="py-2 px-2">
+                    <td className="py-2 px-2 border-b border-r border-gray-700/70" style={colStyle('iocStatus')}>
                       {ioc.iocStatus ? (
                         <span
                           className="text-[10px] px-1.5 py-0.5 rounded"
@@ -581,8 +700,10 @@ export function StandaloneIOCList({
                         <span className="text-gray-600">—</span>
                       )}
                     </td>
-                    <td className="py-2 px-2 text-gray-400">{ioc.attribution || '—'}</td>
-                    <td className="py-2 px-2">
+                    <td className="py-2 px-2 text-gray-400 border-b border-r border-gray-700/70" style={colStyle('attribution')}>
+                      <span className="block overflow-hidden text-ellipsis whitespace-nowrap">{ioc.attribution || '—'}</span>
+                    </td>
+                    <td className="py-2 px-2 border-b border-r border-gray-700/70" style={colStyle('clsLevel')}>
                       {ioc.clsLevel ? (
                         <span
                           className="text-[10px] px-1.5 py-0.5 rounded font-medium"
@@ -595,12 +716,12 @@ export function StandaloneIOCList({
                       )}
                     </td>
                     {hasAnyEnrichment && (
-                      <td className="py-2 px-2">
+                      <td className="py-2 px-2 border-b border-r border-gray-700/70" style={colStyle('labels')}>
                         <EnrichmentLabels enrichment={ioc.enrichment} maxVisible={4} compact />
                       </td>
                     )}
-                    <td className="py-2 px-2 text-gray-500">{formatDate(ioc.updatedAt)}</td>
-                    <td className="py-2 ps-2">
+                    <td className="py-2 px-2 text-gray-500 border-b border-r border-gray-700/70" style={colStyle('updatedAt')}>{formatDate(ioc.updatedAt)}</td>
+                    <td className="py-2 ps-2 border-b border-gray-700/70" style={colStyle('actions')}>
                       <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                         {ioc.trashed ? (
                           <>

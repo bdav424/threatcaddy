@@ -8,7 +8,8 @@ export interface EnrichmentLabel {
   category: 'risk' | 'provider' | 'context';
 }
 
-type Enrichment = Record<string, Array<Record<string, unknown>>> | undefined;
+type EnrichmentSnapshot = Record<string, unknown>;
+type Enrichment = Record<string, EnrichmentSnapshot[] | EnrichmentSnapshot> | undefined;
 
 function num(v: unknown): number | undefined {
   if (v === null || v === undefined) return undefined;
@@ -30,7 +31,8 @@ function toArray(v: unknown): string[] {
 
 function latest(enrichment: Enrichment, provider: string): Record<string, unknown> | undefined {
   const snaps = enrichment?.[provider];
-  return snaps && snaps.length > 0 ? snaps[0] : undefined;
+  if (Array.isArray(snaps)) return snaps.length > 0 ? snaps[0] : undefined;
+  return snaps;
 }
 
 export function computeEnrichmentLabels(enrichment: Enrichment): EnrichmentLabel[] {
@@ -47,6 +49,14 @@ export function computeEnrichmentLabels(enrichment: Enrichment): EnrichmentLabel
   if (vt) {
     vtMalicious = num(vt.malicious);
     vtTotal = num(vt.total);
+    if (vtTotal === undefined) {
+      const suspicious = num(vt.suspicious) ?? 0;
+      const harmless = num(vt.harmless) ?? 0;
+      const undetected = num(vt.undetected) ?? 0;
+      if (vtMalicious !== undefined) {
+        vtTotal = vtMalicious + suspicious + harmless + undetected;
+      }
+    }
     if (vtMalicious !== undefined && vtTotal !== undefined) {
       const color = vtMalicious > 5 ? '#ef4444' : vtMalicious > 0 ? '#f59e0b' : '#22c55e';
       labels.push({
@@ -190,8 +200,8 @@ export function computeEnrichmentLabels(enrichment: Enrichment): EnrichmentLabel
   // --- Country codes (deduplicated across all providers) ---
   const countries = new Set<string>();
   for (const snaps of Object.values(enrichment)) {
-    if (snaps && snaps.length > 0) {
-      const snap = snaps[0];
+    const snap = Array.isArray(snaps) ? snaps[0] : snaps;
+    if (snap) {
       const cc = str(snap.country) || str(snap.countryCode) || str(snap.country_code);
       if (cc && cc.length === 2) {
         countries.add(cc.toUpperCase());

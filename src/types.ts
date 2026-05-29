@@ -175,6 +175,8 @@ export interface Folder {
   updatedBy?: string;
   localOnly?: boolean;
   playbookExecution?: PlaybookExecution;
+  /** Note templates pinned to this investigation for fast note creation. */
+  noteTemplateIds?: string[];
   /** CaddyAgent: is the agent enabled for this investigation? */
   agentEnabled?: boolean;
   /** CaddyAgent: per-investigation policy overrides */
@@ -195,7 +197,7 @@ export interface Tag {
   updatedBy?: string;
 }
 
-export type CloudProvider = 'oci' | 'aws-s3' | 'azure-blob' | 'gcs';
+export type CloudProvider = 'cloudstore' | 'aws-s3' | 'azure-blob' | 'gcs';
 
 export interface BackupDestination {
   id: string;
@@ -205,8 +207,22 @@ export interface BackupDestination {
   enabled: boolean;
 }
 
+export interface CustomAppearanceTheme {
+  id: string;
+  name: string;
+  swatch: string;
+  fontFamily?: string;
+  fontTargets?: Partial<Record<AppearanceTypographyTarget, string>>;
+  dark: Record<string, string>;
+  light: Record<string, string>;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type AppearanceTypographyTarget = 'interface' | 'headings' | 'body' | 'controls' | 'navigation' | 'code';
+
 /** Top-level view/page the user can navigate to. */
-export type ViewMode = 'dashboard' | 'notes' | 'tasks' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat' | 'caddyshack' | 'agent' | 'investigations';
+export type ViewMode = 'dashboard' | 'notes' | 'tasks' | 'evidence' | 'products' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat' | 'caddyshack' | 'agent' | 'investigations';
 export type EditorMode = 'edit' | 'preview' | 'split';
 export type TaskViewMode = 'list' | 'kanban';
 
@@ -242,8 +258,8 @@ export interface Settings {
   displayName?: string;
   taskViewMode: TaskViewMode;
   tourCompleted?: boolean;
-  ociWritePAR?: string;
-  ociLabel?: string;
+  cloudWriteUrl?: string;
+  cloudLabel?: string;
   attributionActors?: string[];
   tiDefaultClsLevel?: string;
   tiDefaultReportSource?: string;
@@ -274,6 +290,8 @@ export interface Settings {
   agentSupervisorIntervalMinutes?: number;
   tiAutoExtractEnabled?: boolean;        // default true
   tiAutoExtractDebounceMs?: number;      // default 2000
+  tiAutoEnrichImportedIOCs?: boolean;    // default true when VT integration is installed
+  tiAutoEnrichImportedIOCMax?: number;   // default 50 per import/create burst
   tiEnabledIOCTypes?: string[];          // IOC type strings; undefined = all enabled
   tiDefaultConfidence?: string;          // 'low' | 'medium' | 'high' | 'confirmed'; default 'medium'
   serverUrl?: string;
@@ -289,17 +307,27 @@ export interface Settings {
   iocTableColumns?: string[];
   noteListCollapsed?: boolean;
   colorScheme?: string;          // color scheme id; default 'indigo'
+  windowGlassEnabled?: boolean;  // legacy toggle; glass is now derived from slider values
+  windowGlassTransparency?: number; // 0–100; higher = clearer / less opaque
+  windowGlassBlur?: number;      // blur radius in px
+  customAppearanceThemes?: CustomAppearanceTheme[];
+  appearanceFontFamily?: string;
+  appearanceFontTargets?: Partial<Record<AppearanceTypographyTarget, string>>;
+  appearanceFontScale?: number;
   bgImageEnabled?: boolean;      // whether background image is active
   bgImageOpacity?: number;       // overlay opacity 0–100; default 85
   bgImagePosX?: number;          // horizontal position 0–100; default 50
   bgImagePosY?: number;          // vertical position 0–100; default 50
   bgImageZoom?: number;          // zoom scale 50–200; default 100
+  bgImageBlur?: number;          // background image blur radius in px
   /** Configured external agent hosts for skill execution */
   agentHosts?: AgentHost[];
   /** Skills discovered from the local LLM endpoint (GET /skills) */
   llmLocalSkills?: AgentHostSkill[];
   /** Timestamp of last local skill discovery */
   llmLocalSkillsFetchedAt?: number;
+  /** User-approved CTI source display template overrides. */
+  ctiSourceFormatTemplates?: Partial<Record<CtiSourceId, CtiSourceTemplate>>;
   /** UI language code (e.g. 'en', 'de', 'zh-CN'). Defaults to 'en'. */
   language?: string;
 }
@@ -337,6 +365,11 @@ export const DEFAULT_SETTINGS: Settings = {
   editorMode: 'split',
   sidebarCollapsed: false,
   taskViewMode: 'list',
+  windowGlassEnabled: false,
+  windowGlassTransparency: 0,
+  windowGlassBlur: 0,
+  bgImageBlur: 0,
+  llmRoutingMode: 'auto',
 };
 
 export const AVAILABLE_KPI_METRICS = [
@@ -366,7 +399,7 @@ export const DEFAULT_DASHBOARD_KPIS: KPIMetricId[] = [
 ];
 
 export const DEFAULT_IOC_TABLE_COLUMNS = [
-  'value', 'type', 'confidence', 'source', 'iocStatus', 'attribution', 'clsLevel', 'updatedAt',
+  'value', 'type', 'confidence', 'source', 'iocStatus', 'attribution', 'clsLevel', 'lastSeen', 'updatedAt',
 ];
 
 const IOC_TABLE_COLUMN_DEFS: { key: string; alwaysVisible?: boolean; hiddenByDefault?: boolean; teamOnly?: boolean }[] = [
@@ -381,6 +414,7 @@ const IOC_TABLE_COLUMN_DEFS: { key: string; alwaysVisible?: boolean; hiddenByDef
   { key: 'analystNotes', hiddenByDefault: true },
   { key: 'tags', hiddenByDefault: true },
   { key: 'firstSeen', hiddenByDefault: true },
+  { key: 'lastSeen' },
   { key: 'labels', hiddenByDefault: true },
   { key: 'assignee', hiddenByDefault: true, teamOnly: true },
 ];
@@ -602,10 +636,63 @@ export interface StandaloneIOC {
   linkedNoteIds?: string[];
   linkedTaskIds?: string[];
   linkedTimelineEventIds?: string[];
+  linkedEvidenceIds?: string[];
   comments?: EntityComment[];
   enrichment?: Record<string, Array<Record<string, unknown>>>;
+  firstSeen?: number;
+  lastSeen?: number;
   assigneeId?: string;
   assigneeName?: string;
+  trashed: boolean;
+  trashedAt?: number;
+  archived: boolean;
+  createdBy?: string;
+  updatedBy?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type EvidenceKind =
+  | 'pdf'
+  | 'docx'
+  | 'doc'
+  | 'rtf'
+  | 'xlsx'
+  | 'xls'
+  | 'image'
+  | 'text'
+  | 'spreadsheet'
+  | 'unknown';
+
+export type EvidenceExtractionStatus = 'extracted' | 'partial' | 'metadata-only';
+
+/** Imported source material kept separate from analyst notes. */
+export interface EvidenceItem {
+  id: string;
+  title: string;
+  folderId?: string;
+  fileName: string;
+  fileType: EvidenceKind;
+  mimeType?: string;
+  size: number;
+  lastModified?: number;
+  imageWidth?: number;
+  imageHeight?: number;
+  imageAspectRatio?: string;
+  imagePixelCount?: number;
+  imageData?: string;
+  imageDataMimeType?: string;
+  imageAnalysis?: string;
+  imageOcrText?: string;
+  content: string;
+  extractionStatus: EvidenceExtractionStatus;
+  extractionWarning?: string;
+  importedAt: number;
+  chunkIndex: number;
+  chunkCount: number;
+  tags: string[];
+  linkedIOCIds?: string[];
+  clsLevel?: string;
   trashed: boolean;
   trashedAt?: number;
   archived: boolean;
@@ -637,7 +724,16 @@ export interface ToolResultBlock {
   is_error?: boolean;
 }
 
-export type ContentBlock = TextBlock | ToolUseBlock | ToolResultBlock;
+export interface ImageBlock {
+  type: 'image';
+  source: {
+    type: 'base64';
+    media_type: string;
+    data: string;
+  };
+}
+
+export type ContentBlock = TextBlock | ToolUseBlock | ToolResultBlock | ImageBlock;
 
 export interface ToolCallRecord {
   id: string;
@@ -723,6 +819,104 @@ export interface CheckpointEntity {
   data: Record<string, unknown> | null;
 }
 
+// CTI source formatting types
+export type CtiSourceId = 'virustotal' | 'censys' | 'flashpoint';
+export type CtiSlashSource = CtiSourceId | 'all';
+export type CtiEvidenceStatus = 'ok' | 'partial' | 'error' | 'skipped';
+
+export type CtiEvidenceValue = string | number | boolean | null | string[];
+
+export interface CtiEvidence {
+  source: CtiSourceId;
+  sourceLabel: string;
+  sourceKey: CtiSourceId;
+  sourceName: string;
+  observable?: string;
+  status: CtiEvidenceStatus;
+  verdict?: string;
+  highlights: string[];
+  sections: Record<string, CtiEvidenceValue | undefined>;
+  fields: Record<string, CtiEvidenceValue | undefined>;
+  caveats: string[];
+  recommendedPivots: string[];
+  toolName?: string;
+  input?: Record<string, unknown>;
+  warnings: string[];
+  raw?: unknown;
+  error?: string;
+}
+
+export interface CtiTemplateField {
+  key: string;
+  label: string;
+  required?: boolean;
+  format?: 'text' | 'code' | 'list' | 'multiline';
+  fallback?: string;
+}
+
+export interface CtiTemplateSection {
+  title: string;
+  fields: CtiTemplateField[];
+}
+
+export interface CtiSourceTemplate {
+  id: string;
+  version?: number;
+  source: CtiSourceId;
+  label: string;
+  active: boolean;
+  description: string;
+  hostTool?: string;
+  sections: CtiTemplateSection[];
+  hiddenSections?: string[];
+  showRawJson?: boolean;
+  caveatMode?: 'default' | 'compact' | 'hidden';
+  pivotMode?: 'default' | 'compact' | 'hidden';
+  suggestedBy?: 'default' | 'user' | 'llm';
+  approvedAt?: number;
+  approvedBy?: string;
+  caveats: string[];
+}
+
+export interface CtiSlashCommand {
+  source: CtiSlashSource;
+  target: string;
+  command: string;
+}
+
+export interface CtiSourcePlanItem {
+  source: CtiSourceId;
+  sourceLabel: string;
+  tool: string;
+  input: Record<string, unknown>;
+  templateId: string;
+}
+
+export interface CtiSkippedSource {
+  source: CtiSlashSource;
+  sourceLabel: string;
+  reason: string;
+  inactive?: boolean;
+}
+
+export interface CtiHostParsedResult {
+  status: Exclude<CtiEvidenceStatus, 'skipped'>;
+  ok: boolean;
+  data?: unknown;
+  error?: string;
+  warnings: string[];
+  rawText?: string;
+}
+
+export interface CtiSourceRunResult {
+  source: CtiSourceId;
+  sourceLabel: string;
+  tool: string;
+  input: Record<string, unknown>;
+  parsed: CtiHostParsedResult;
+  evidence: CtiEvidence;
+}
+
 /** A user-defined slash command template for CaddyAI chat. */
 export interface CustomSlashCommand {
   id: string;
@@ -774,7 +968,7 @@ export const PRIORITY_COLORS: Record<Priority, string> = {
 export const DEFAULT_CLS_LEVELS = ['TLP:CLEAR', 'TLP:GREEN', 'TLP:AMBER', 'TLP:AMBER+STRICT', 'TLP:RED'];
 export const DEFAULT_PAP_LEVELS = ['PAP:WHITE', 'PAP:GREEN', 'PAP:AMBER', 'PAP:RED'];
 
-// OCI Sync types
+// Cloud Sync types
 export interface SharedItemEnvelope {
   version: 1;
   type: 'note' | 'clip' | 'ioc-report' | 'full-backup';
@@ -787,6 +981,51 @@ export interface SharedItemEnvelope {
 
 export type TemplateSource = 'builtin' | 'user' | 'team';
 
+export type ProductBaselineKind = 'markdown' | 'docx-template';
+
+export interface ProductBaselineSourceDocument {
+  name: string;
+  type?: 'docx' | 'pdf' | 'markdown' | 'json' | 'other';
+  path?: string;
+  sha256?: string;
+  role?: string;
+  notes?: string;
+}
+
+export interface ProductBaselineTestFixture {
+  name: string;
+  type?: 'docx' | 'pdf' | 'markdown' | 'json' | 'other';
+  path?: string;
+  sha256?: string;
+  role?: string;
+  notes?: string;
+}
+
+export interface ProductBaselineAsset {
+  name: string;
+  role?: 'docx-template' | 'preview' | 'image' | 'context' | 'other';
+  mimeType?: string;
+  data?: string;
+  path?: string;
+  notes?: string;
+}
+
+export interface ProductBaselineMetadata {
+  schemaVersion: 1;
+  kind: ProductBaselineKind;
+  productType: 'custom-report' | 'custom-intel-note' | 'executive-brief' | 'custom';
+  importedAt?: number;
+  importedFrom?: string;
+  renderer?: 'markdown' | 'docx-template';
+  visualFidelity?: 'placeholder' | 'structural' | 'word-template';
+  sourceDocuments?: ProductBaselineSourceDocument[];
+  testFixtures?: ProductBaselineTestFixture[];
+  assets?: ProductBaselineAsset[];
+  layoutNotes?: string[];
+  sourceNoteRules?: string[];
+  requiredFields?: string[];
+}
+
 /** A reusable template for creating pre-structured notes (e.g., triage forms, IR reports). */
 export interface NoteTemplate {
   id: string;
@@ -798,6 +1037,7 @@ export interface NoteTemplate {
   tags?: string[];
   clsLevel?: string;
   source: TemplateSource;
+  productBaseline?: ProductBaselineMetadata;
   createdBy?: string;
   updatedBy?: string;
   createdAt: number;
@@ -849,6 +1089,7 @@ export interface ExportData {
   timelines?: Timeline[];
   whiteboards?: Whiteboard[];
   standaloneIOCs?: StandaloneIOC[];
+  evidenceItems?: EvidenceItem[];
   chatThreads?: ChatThread[];
   agentActions?: AgentAction[];
   agentProfiles?: AgentProfile[];
@@ -868,7 +1109,7 @@ export const TAG_COLORS = [
 // Activity Log types
 export type ActivityCategory =
   | 'note' | 'task' | 'timeline' | 'whiteboard'
-  | 'folder' | 'tag' | 'ioc' | 'sync' | 'data' | 'chat'
+  | 'folder' | 'tag' | 'ioc' | 'evidence' | 'sync' | 'data' | 'chat'
   | 'agent-bridge';
 
 export type ActivityAction =
@@ -877,7 +1118,7 @@ export type ActivityAction =
   | 'complete' | 'reopen'
   | 'star' | 'unstar'
   | 'analyze' | 'dismiss' | 'push-iocs'
-  | 'export' | 'import' | 'share' | 'backup' | 'share-ioc-report'
+  | 'export' | 'import' | 'deduplicate' | 'share' | 'backup' | 'share-ioc-report'
   | 'rename'
   | 'tool.exec' | 'tool.error';
 
@@ -894,7 +1135,7 @@ export interface ActivityLogEntry {
 
 const ACTIVITY_CATEGORY_COLORS: Record<ActivityCategory, string> = {
   note: '#3b82f6', task: '#22c55e', timeline: '#f97316', whiteboard: '#a855f7',
-  folder: '#eab308', tag: '#ec4899', ioc: '#ef4444', sync: '#06b6d4',
+  folder: '#eab308', tag: '#ec4899', ioc: '#ef4444', evidence: '#38bdf8', sync: '#06b6d4',
   data: '#6366f1', chat: '#8b5cf6', 'agent-bridge': '#14b8a6',
 };
 export const ACTIVITY_CATEGORY_LABELS: Record<ActivityCategory, { label: string; color: string }> = createLabelColorProxy(

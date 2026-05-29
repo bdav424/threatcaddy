@@ -56,10 +56,12 @@ describe('sync-sanitize', () => {
         order: 0,
         createdAt: 1000,
         closedAt: '2025-06-15T00:00:00.000Z',
+        noteTemplateIds: ['tpl-1', 'tpl-2', 42],
       });
       expect(result).toBeDefined();
       expect(typeof result!.closedAt).toBe('number');
       expect(result!.closedAt).toBe(new Date('2025-06-15T00:00:00.000Z').getTime());
+      expect(result!.noteTemplateIds).toEqual(['tpl-1', 'tpl-2']);
     });
 
     it('sanitizes timeline events with timestamp ISO strings', () => {

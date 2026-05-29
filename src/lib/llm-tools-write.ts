@@ -3,8 +3,17 @@ import DOMPurify from 'dompurify';
 import { db } from '../db';
 import type {
   IOCType, ConfidenceLevel, TimelineEventType, Priority, TaskStatus,
-  Note, Task, StandaloneIOC, TimelineEvent,
+  Note, Task, StandaloneIOC, TimelineEvent, ProductBaselineMetadata,
 } from '../types';
+import {
+  buildProductRenderContext,
+  getProductBaseline,
+  PRODUCT_BASELINE_CATEGORY,
+  PRODUCT_BASELINE_TAG,
+  PRODUCT_DRAFT_TAG,
+  PRODUCT_NOTE_TAG,
+  renderJinjaTemplate,
+} from './product-baselines';
 
 const MAX_SNIPPET = 200;
 /** Max stored length for LLM-supplied free-text fields (prevents memory abuse from runaway agents) */
@@ -35,7 +44,7 @@ export async function executeCreateNote(input: Record<string, unknown>, folderId
     updatedAt: now,
   };
   await db.notes.add(note);
-  return JSON.stringify({ success: true, id: note.id, title: note.title });
+  return JSON.stringify({ success: true, id: note.id, title: note.title, folderId: note.folderId });
 }
 
 export async function executeUpdateNote(input: Record<string, unknown>): Promise<string> {
@@ -384,6 +393,110 @@ export async function executeGenerateReport(input: Record<string, unknown>, fold
   await db.notes.add(note);
 
   return JSON.stringify({ success: true, id: note.id, title: note.title, contentLength: report.length });
+}
+
+export async function executeCreateProductBaseline(input: Record<string, unknown>): Promise<string> {
+  const name = String(input.name || '').trim();
+  const content = String(input.content || '').trim();
+  if (!name || !content) return JSON.stringify({ error: 'name and content are required' });
+
+  const now = Date.now();
+  const tags = Array.from(new Set([
+    PRODUCT_BASELINE_TAG,
+    'jinja',
+    String(input.productType || 'custom'),
+    ...(Array.isArray(input.tags) ? input.tags.map(String) : []),
+  ]));
+  const productType = String(input.productType || 'custom');
+  const productBaseline: ProductBaselineMetadata = {
+    schemaVersion: 1,
+    kind: input.renderer === 'docx-template' ? 'docx-template' : 'markdown',
+    productType: productType === 'custom-report' ||
+      productType === 'custom-intel-note' ||
+      productType === 'executive-brief' ||
+      productType === 'custom'
+      ? productType
+      : 'custom',
+    importedAt: now,
+    importedFrom: 'CaddyAI',
+    renderer: input.renderer === 'docx-template' ? 'docx-template' : 'markdown',
+    visualFidelity: input.visualFidelity === 'word-template' || input.visualFidelity === 'structural' ? input.visualFidelity : 'placeholder',
+    layoutNotes: Array.isArray(input.layoutNotes) ? input.layoutNotes.map(String) : [],
+    sourceNoteRules: Array.isArray(input.sourceNoteRules) ? input.sourceNoteRules.map(String) : [],
+    requiredFields: Array.isArray(input.requiredFields) ? input.requiredFields.map(String) : [],
+  };
+  const baseline = {
+    id: nanoid(),
+    name: sanitizeText(name),
+    content: sanitizeText(content),
+    category: PRODUCT_BASELINE_CATEGORY,
+    source: 'user' as const,
+    icon: 'TPL',
+    description: input.description ? sanitizeText(String(input.description)) : undefined,
+    tags,
+    productBaseline,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.noteTemplates.add(baseline);
+  return JSON.stringify({ success: true, id: baseline.id, name: baseline.name, tags: baseline.tags });
+}
+
+export async function executeRenderProductBaseline(input: Record<string, unknown>, folderId?: string): Promise<string> {
+  if (!folderId) return JSON.stringify({ error: 'No investigation selected.' });
+
+  const folder = await db.folders.get(folderId);
+  if (!folder) return JSON.stringify({ error: 'Investigation not found' });
+
+  const baseline = await getProductBaseline({
+    id: input.baselineId ? String(input.baselineId) : undefined,
+    name: input.baselineName ? String(input.baselineName) : undefined,
+  });
+  if (!baseline) return JSON.stringify({ error: 'Product baseline not found. Use list_product_baselines first.' });
+
+  const suppliedContext = (input.context && typeof input.context === 'object' && !Array.isArray(input.context))
+    ? input.context as Record<string, unknown>
+    : {};
+  const title = String(input.title || suppliedContext.title || `${folder.name} Product`);
+  const context = await buildProductRenderContext(folder, baseline, {
+    ...suppliedContext,
+    title,
+  });
+  const rendered = sanitizeText(renderJinjaTemplate(baseline.content, context));
+  if (input.previewOnly === true) {
+    return JSON.stringify({ success: true, baselineId: baseline.id, baselineName: baseline.name, title, content: rendered });
+  }
+
+  const now = Date.now();
+  const tags = Array.from(new Set([
+    PRODUCT_NOTE_TAG,
+    PRODUCT_DRAFT_TAG,
+    `baseline:${baseline.id}`,
+    ...(Array.isArray(input.tags) ? input.tags.map(String) : []),
+  ]));
+  const note = {
+    id: nanoid(),
+    title: sanitizeText(title),
+    content: rendered,
+    folderId,
+    tags,
+    pinned: false,
+    archived: false,
+    trashed: false,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.notes.add(note);
+
+  return JSON.stringify({
+    success: true,
+    id: note.id,
+    title: note.title,
+    baselineId: baseline.id,
+    baselineName: baseline.name,
+    contentLength: rendered.length,
+    message: 'Draft product created. Review it in Products before release.',
+  });
 }
 
 export async function executeCreateInInvestigation(input: Record<string, unknown>): Promise<string> {

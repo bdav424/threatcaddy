@@ -11,6 +11,10 @@ const TOOL_ACTION_CLASS: Record<string, AgentActionClass> = {
   search_notes: 'read',
   search_all: 'read',
   read_note: 'read',
+  list_evidence: 'read',
+  search_evidence: 'read',
+  read_evidence: 'read',
+  list_product_baselines: 'read',
   read_task: 'read',
   read_ioc: 'read',
   read_timeline_event: 'read',
@@ -37,6 +41,8 @@ const TOOL_ACTION_CLASS: Record<string, AgentActionClass> = {
   bulk_create_iocs: 'create',
   create_timeline_event: 'create',
   generate_report: 'create',
+  create_product_baseline: 'create',
+  render_product_baseline: 'create',
   create_in_investigation: 'create',
   link_entities: 'create',
 
@@ -100,17 +106,26 @@ const TOOL_ACTION_CLASS: Record<string, AgentActionClass> = {
 /** Get the action class for a tool name. Defaults to 'modify' for unknown tools. */
 export function getToolActionClass(toolName: string): AgentActionClass {
   if (TOOL_ACTION_CLASS[toolName]) return TOOL_ACTION_CLASS[toolName];
+  const canonicalToolName = (() => {
+    if (toolName.startsWith('local__')) return `local:${toolName.slice(7)}`;
+    if (toolName.startsWith('host__')) {
+      const rest = toolName.slice(6);
+      const delimiter = rest.indexOf('__');
+      if (delimiter > 0) return `host:${rest.slice(0, delimiter)}:${rest.slice(delimiter + 2)}`;
+    }
+    return toolName;
+  })();
 
   // Dynamic skill tools — resolve from cached skill metadata in Settings
-  if (toolName.startsWith('host:') || toolName.startsWith('local:')) {
+  if (canonicalToolName.startsWith('host:') || canonicalToolName.startsWith('local:')) {
     try {
       const settings = JSON.parse(localStorage.getItem('threatcaddy-settings') || '{}');
-      if (toolName.startsWith('local:')) {
-        const skillName = toolName.slice(6);
+      if (canonicalToolName.startsWith('local:')) {
+        const skillName = canonicalToolName.slice(6);
         const skill = (settings.llmLocalSkills || []).find((s: { name: string }) => s.name === skillName);
         return (skill?.actionClass as AgentActionClass) || 'modify';
       }
-      const parts = toolName.split(':');
+      const parts = canonicalToolName.split(':');
       if (parts.length >= 3) {
         const hostName = parts[1];
         const skillName = parts.slice(2).join(':');

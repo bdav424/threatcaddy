@@ -259,7 +259,7 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({ role, content
   }, [content, isUser]);
 
   const hasReadTools = toolCalls?.some(tc =>
-    !tc.isError && ['search_notes', 'search_all', 'read_note', 'list_tasks', 'list_iocs', 'list_timeline_events', 'analyze_graph'].includes(tc.name)
+    !tc.isError && ['search_notes', 'search_all', 'read_note', 'list_evidence', 'search_evidence', 'read_evidence', 'list_tasks', 'list_iocs', 'list_timeline_events', 'analyze_graph'].includes(tc.name)
   );
 
   // Parse meeting speaker from **icon Name:** prefix
@@ -274,10 +274,10 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({ role, content
     <div className={cn('group/msg flex w-full mb-3', isUser ? 'justify-end' : 'justify-start')}>
       <div
         className={cn(
-          'relative max-w-[85%] rounded-xl px-4 py-2.5 text-sm leading-relaxed',
+          'relative min-w-0 rounded-xl px-4 py-2.5 text-sm leading-relaxed',
           isUser
-            ? 'bg-purple/20 text-text-primary rounded-br-sm'
-            : 'bg-bg-raised text-text-primary rounded-bl-sm border border-border-subtle'
+            ? 'max-w-[85%] bg-purple/20 text-text-primary rounded-br-sm'
+            : 'w-full max-w-[85%] bg-bg-raised text-text-primary rounded-bl-sm border border-border-subtle'
         )}
       >
         {/* Message actions (branch, rewind) */}
@@ -355,7 +355,7 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({ role, content
             )}
             {displayContent && (
               <div
-                className="markdown-preview text-sm"
+                className="markdown-preview min-w-0 w-full text-sm [overflow-wrap:anywhere]"
                 dangerouslySetInnerHTML={{ __html: sanitizeHtml(processEntityLinks(renderMarkdown(meetingSpeaker ? meetingSpeaker.contentWithout : displayContent), onEntityClick)) }}
                 onClick={(e) => {
                   const target = (e.target as HTMLElement).closest('.tc-entity-link') as HTMLElement;

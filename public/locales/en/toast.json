@@ -34,6 +34,7 @@
     "restored": "Backup restored",
     "restoreFailed": "Failed to restore backup",
     "mergeComplete": "Merge complete: {{added}} added, {{updated}} updated, {{skipped}} skipped",
+    "mergeCompleteDetailed": "Merge complete: {{notes}} notes across {{investigations}} investigations ({{added}} added, {{updated}} updated, {{skipped}} skipped)",
     "mergeFailed": "Failed to merge backup",
     "serverCreated": "Backup created",
     "serverCreateFailed": "Backup creation failed",

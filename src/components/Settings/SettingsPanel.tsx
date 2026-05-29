@@ -4,11 +4,17 @@ import { Github, Download, FlaskConical, Trash2, Bot, X, Shield, RefreshCw, Rota
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES } from '../../i18n';
 import { useToast } from '../../contexts/ToastContext';
-import type { Settings, Note, NoteTemplate, PlaybookTemplate, PlaybookStep, CustomSlashCommand } from '../../types';
+import type { CtiEvidence, CtiSourceId, Settings, Note, NoteTemplate, PlaybookTemplate, PlaybookStep, CustomSlashCommand } from '../../types';
 import { useCustomSlashCommands } from '../../hooks/useCustomSlashCommands';
 import { TemplateManager } from './TemplateManager';
 import { PlaybookManager } from './PlaybookManager';
 import { DEFAULT_SYSTEM_PROMPT } from '../../lib/llm-tools';
+import {
+  DEFAULT_CTI_SOURCE_TEMPLATES,
+  getCtiTemplate,
+  parseCtiTemplateJson,
+  renderCtiEvidenceMarkdown,
+} from '../../lib/cti-source-formatting';
 import { MODELS, MODEL_PROVIDER_MAP } from '../../lib/models';
 import { ExportImport } from './ExportImport';
 import { useAgentProfiles } from '../../hooks/useAgentProfiles';
@@ -21,6 +27,8 @@ import { EncryptionSettings } from '../Encryption/EncryptionSettings';
 import { ServerConnection } from './ServerConnection';
 import { IntegrationPanel } from '../Integrations/IntegrationPanel';
 import { AppearanceSettings } from './AppearanceSettings';
+import { AgentHostsConfig } from './AgentHostsConfig';
+import { getLocalLLMAuthHeaders, resolveLocalLLMApiKey } from '../../lib/local-llm-auth';
 
 function SystemPromptEditor({ value, onChange }: { value?: string; onChange: (v: string | undefined) => void }) {
   const { t } = useTranslation('settings');
@@ -212,6 +220,233 @@ function CustomSlashCommandsEditor() {
               {editing ? tc('save') : tc('create')}
             </button>
             <button onClick={resetForm} className="px-3 py-1.5 rounded bg-gray-700 text-gray-300 text-xs hover:bg-gray-600">{tc('cancel')}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function sampleTemplateEvidence(source: CtiSourceId): CtiEvidence {
+  if (source === 'virustotal') {
+    return {
+      source,
+      sourceLabel: 'VirusTotal',
+      sourceKey: source,
+      sourceName: 'VirusTotal',
+      observable: '8.8.8.8',
+      status: 'ok',
+      verdict: 'usable',
+      highlights: ['analysisStats: 0 malicious, 0 suspicious, 56 harmless, 36 undetected', 'ownerContext: Google LLC'],
+      sections: {
+        objectId: '8.8.8.8',
+        objectType: 'ip_address',
+        analysisStats: '0 malicious, 0 suspicious, 56 harmless, 36 undetected',
+        reputation: 539,
+        ownerContext: 'Google LLC',
+        tags: ['dns', 'resolver'],
+      },
+      fields: {
+        objectId: '8.8.8.8',
+        objectType: 'ip_address',
+        analysisStats: '0 malicious, 0 suspicious, 56 harmless, 36 undetected',
+        reputation: 539,
+        ownerContext: 'Google LLC',
+        tags: ['dns', 'resolver'],
+      },
+      caveats: ['Preview only; live evidence is rendered from Agent Host results.'],
+      recommendedPivots: ['Review related resolutions and passive DNS.'],
+      warnings: [],
+      raw: { preview: true },
+    };
+  }
+  if (source === 'censys') {
+    return {
+      source,
+      sourceLabel: 'Censys',
+      sourceKey: source,
+      sourceName: 'Censys',
+      observable: '8.8.8.8',
+      status: 'ok',
+      verdict: 'usable',
+      highlights: ['servicesCount: 4', 'asContext: GOOGLE - Google LLC'],
+      sections: {
+        host: '8.8.8.8',
+        apiMode: 'legacy',
+        servicesCount: 4,
+        asContext: 'GOOGLE - Google LLC',
+        reverseDns: ['dns.google'],
+        serviceSample: ['443/TCP HTTPS - 302 Moved', '53/UDP DNS'],
+      },
+      fields: {
+        host: '8.8.8.8',
+        apiMode: 'legacy',
+        servicesCount: 4,
+        asContext: 'GOOGLE - Google LLC',
+        reverseDns: ['dns.google'],
+        serviceSample: ['443/TCP HTTPS - 302 Moved', '53/UDP DNS'],
+      },
+      caveats: ['Preview only; live evidence is rendered from Agent Host results.'],
+      recommendedPivots: ['Validate current exposure and certificate reuse.'],
+      warnings: [],
+      raw: { preview: true },
+    };
+  }
+  return {
+    source,
+    sourceLabel: 'Flashpoint',
+    sourceKey: source,
+    sourceName: 'Flashpoint',
+    observable: 'Handala Hack',
+    status: 'ok',
+    verdict: 'usable',
+    highlights: ['returned: 11', 'sourceContext: Telegram | Handala Hack (3686754935)', 'latestPost: 2026-05-19T06:19:25Z'],
+    sections: {
+      queryWindow: 'author=Handala Hack; site=Telegram; now-48h to now',
+      returned: '11 returned (=11 total)',
+      sourceContext: 'Telegram | Handala Hack (3686754935) | https://t.me/CYBER_HANDALA',
+      substantivePosts: [
+        '2026-05-19T06:19:25Z - Handala Hack (3686754935)\nid=I708tzdkWIerCV-0yXD76g\nhttps://t.me/CYBER_HANDALA\nPFAP alleged leak with 639,000 documents.',
+      ],
+      emptyRows: 2,
+      notableTerms: ['PFAP', '639,000', 'documents', 'leak'],
+      latestPost: '2026-05-19T06:19:25Z - Handala Hack (3686754935)\nid=I708tzdkWIerCV-0yXD76g\nhttps://t.me/CYBER_HANDALA\nPFAP alleged leak with 639,000 documents.',
+    },
+    fields: {
+      queryWindow: 'author=Handala Hack; site=Telegram; now-48h to now',
+      returned: '11 returned (=11 total)',
+      sourceContext: 'Telegram | Handala Hack (3686754935) | https://t.me/CYBER_HANDALA',
+      substantivePosts: [
+        '2026-05-19T06:19:25Z - Handala Hack (3686754935)\nid=I708tzdkWIerCV-0yXD76g\nhttps://t.me/CYBER_HANDALA\nPFAP alleged leak with 639,000 documents.',
+      ],
+      emptyRows: 2,
+      notableTerms: ['PFAP', '639,000', 'documents', 'leak'],
+      latestPost: '2026-05-19T06:19:25Z - Handala Hack (3686754935)\nid=I708tzdkWIerCV-0yXD76g\nhttps://t.me/CYBER_HANDALA\nPFAP alleged leak with 639,000 documents.',
+    },
+    caveats: ['Preview only.'],
+    recommendedPivots: ['Corroborate actor and victim claims before creating final assessment language.'],
+    warnings: [],
+    raw: { preview: true },
+  };
+}
+
+function CtiSourceTemplatesEditor({ settings, onUpdateSettings }: { settings: Settings; onUpdateSettings: (updates: Partial<Settings>) => void }) {
+  const { addToast } = useToast();
+  const sources: CtiSourceId[] = ['virustotal', 'censys', 'flashpoint'];
+  const [editingSource, setEditingSource] = useState<CtiSourceId | null>(null);
+  const [templateJson, setTemplateJson] = useState('');
+  const [issues, setIssues] = useState<string[]>([]);
+
+  const startEdit = (source: CtiSourceId) => {
+    setEditingSource(source);
+    setTemplateJson(JSON.stringify(getCtiTemplate(source, settings.ctiSourceFormatTemplates), null, 2));
+    setIssues([]);
+  };
+
+  const saveTemplate = () => {
+    if (!editingSource) return;
+    const parsed = parseCtiTemplateJson(templateJson);
+    if (!parsed.template || parsed.issues.length > 0) {
+      setIssues(parsed.issues);
+      return;
+    }
+    const template = {
+      ...parsed.template,
+      source: editingSource,
+      active: parsed.template.active,
+      suggestedBy: 'user' as const,
+      approvedAt: Date.now(),
+      approvedBy: settings.displayName || 'Analyst',
+    };
+    const reparsed = parseCtiTemplateJson(JSON.stringify(template));
+    if (!reparsed.template || reparsed.issues.length > 0) {
+      setIssues(reparsed.issues);
+      return;
+    }
+    onUpdateSettings({
+      ctiSourceFormatTemplates: {
+        ...(settings.ctiSourceFormatTemplates || {}),
+        [editingSource]: reparsed.template,
+      },
+    });
+    setEditingSource(null);
+    setIssues([]);
+    addToast('success', `Saved ${DEFAULT_CTI_SOURCE_TEMPLATES[editingSource].label} CTI format.`);
+  };
+
+  const resetTemplate = (source: CtiSourceId) => {
+    const next = { ...(settings.ctiSourceFormatTemplates || {}) };
+    delete next[source];
+    onUpdateSettings({ ctiSourceFormatTemplates: next });
+    if (editingSource === source) setEditingSource(null);
+    addToast('success', `Reset ${DEFAULT_CTI_SOURCE_TEMPLATES[source].label} CTI format.`);
+  };
+
+  const preview = editingSource
+    ? renderCtiEvidenceMarkdown(sampleTemplateEvidence(editingSource), parseCtiTemplateJson(templateJson).template || getCtiTemplate(editingSource, settings.ctiSourceFormatTemplates))
+    : '';
+
+  return (
+    <div className="border border-gray-700 rounded-lg p-4 space-y-3">
+      <div>
+        <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+          <Shield size={16} />
+          CTI Source Formats
+        </h3>
+        <p className="text-xs text-gray-500 mt-1">
+          Edit how normalized Agent Host evidence is displayed. Templates affect presentation only, not source facts.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        {sources.map(source => {
+          const isCustom = !!settings.ctiSourceFormatTemplates?.[source];
+          const template = getCtiTemplate(source, settings.ctiSourceFormatTemplates);
+          return (
+            <div key={source} className="rounded-lg border border-gray-700 bg-gray-800/40 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm text-gray-200 font-medium">{DEFAULT_CTI_SOURCE_TEMPLATES[source].label}</div>
+                  <div className="text-[10px] text-gray-500">{isCustom ? 'Custom template' : 'Default template'} · {template.active ? 'Active' : 'Inactive'}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => startEdit(source)} className="text-xs px-2 py-1 rounded bg-gray-700 text-gray-200 hover:bg-gray-600">
+                    Edit
+                  </button>
+                  <button onClick={() => resetTemplate(source)} disabled={!isCustom} className="text-xs px-2 py-1 rounded bg-gray-700 text-gray-200 hover:bg-gray-600 disabled:opacity-40">
+                    Reset
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {editingSource && (
+        <div className="space-y-2 rounded-lg border border-accent-blue/30 bg-gray-900/60 p-3">
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-medium text-gray-300">Editing {DEFAULT_CTI_SOURCE_TEMPLATES[editingSource].label}</div>
+            <button onClick={() => setEditingSource(null)} className="text-gray-500 hover:text-gray-300"><X size={14} /></button>
+          </div>
+          <textarea
+            value={templateJson}
+            onChange={(e) => { setTemplateJson(e.target.value); setIssues([]); }}
+            rows={12}
+            className="w-full bg-gray-950 border border-gray-700 rounded px-2.5 py-2 text-xs text-gray-200 focus:outline-none focus:border-accent font-mono resize-y"
+          />
+          {issues.length > 0 && (
+            <div className="rounded border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-300">
+              {issues.map(issue => <div key={issue}>- {issue}</div>)}
+            </div>
+          )}
+          <div className="rounded border border-gray-700 bg-gray-950 p-2">
+            <div className="text-[10px] uppercase tracking-wide text-gray-500 mb-1">Preview</div>
+            <pre className="whitespace-pre-wrap text-xs text-gray-300 font-mono">{preview}</pre>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={saveTemplate} className="px-3 py-1.5 rounded bg-accent text-white text-xs font-medium hover:brightness-110">Save</button>
+            <button onClick={() => setEditingSource(null)} className="px-3 py-1.5 rounded bg-gray-700 text-gray-300 text-xs hover:bg-gray-600">Cancel</button>
           </div>
         </div>
       )}
@@ -717,6 +952,11 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
               </div>
             )}
           </div>
+
+          <CtiSourceTemplatesEditor settings={settings} onUpdateSettings={onUpdateSettings} />
+
+          {/* External Agent Hosts */}
+          <AgentHostsConfig settings={settings} onUpdateSettings={onUpdateSettings} />
         </div>
       )}
 
@@ -784,16 +1024,24 @@ function LocalLLMConfig({ settings, onUpdateSettings }: LocalLLMConfigProps) {
   const inputClass = 'w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent';
 
   const getBaseUrl = useCallback(() => {
-    return (settings.llmLocalEndpoint || 'http://localhost:11434/v1').replace(/\/+$/, '');
+    return (settings.llmLocalEndpoint || '').replace(/\/+$/, '');
   }, [settings.llmLocalEndpoint]);
+
+  const getBridgeHealthUrl = useCallback(() => {
+    const base = getBaseUrl().replace(/\/v1\/?$/, '').replace(/\/+$/, '');
+    return `${base}/health`;
+  }, [getBaseUrl]);
 
   const fetchModels = useCallback(async () => {
     setFetchingModels(true);
     setAvailableModels([]);
     try {
       const base = getBaseUrl();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (settings.llmLocalApiKey) headers['Authorization'] = `Bearer ${settings.llmLocalApiKey}`;
+      if (!base) throw new Error('No Local LLM endpoint configured');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...getLocalLLMAuthHeaders(settings.llmLocalApiKey, base),
+      };
 
       // Try OpenAI-compatible /v1/models endpoint
       const modelsCtrl = new AbortController();
@@ -824,7 +1072,8 @@ function LocalLLMConfig({ settings, onUpdateSettings }: LocalLLMConfigProps) {
     } catch (err) {
       // Try Ollama's native API as fallback
       try {
-        const ollamaBase = (settings.llmLocalEndpoint || 'http://localhost:11434').replace(/\/v1\/?$/, '').replace(/\/+$/, '');
+        if (!settings.llmLocalEndpoint?.trim()) throw err;
+        const ollamaBase = settings.llmLocalEndpoint.replace(/\/v1\/?$/, '').replace(/\/+$/, '');
         const tagsCtrl = new AbortController();
         const tagsTimer = setTimeout(() => tagsCtrl.abort(), 10_000);
         const resp = await fetch(`${ollamaBase}/api/tags`, { signal: tagsCtrl.signal }).finally(() => clearTimeout(tagsTimer));
@@ -855,8 +1104,31 @@ function LocalLLMConfig({ settings, onUpdateSettings }: LocalLLMConfigProps) {
     setTestError('');
     try {
       const base = getBaseUrl();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (settings.llmLocalApiKey) headers['Authorization'] = `Bearer ${settings.llmLocalApiKey}`;
+      if (!base) throw new Error('No Local LLM endpoint configured');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...getLocalLLMAuthHeaders(settings.llmLocalApiKey, base),
+      };
+
+      // Some local services expose /health, including non-LLM agent hosts. Use
+      // it only for optional metadata; a local LLM test must still complete a
+      // chat/completions request to avoid false positives.
+      try {
+        const healthCtrl = new AbortController();
+        const healthTimer = setTimeout(() => healthCtrl.abort(), 5_000);
+        const healthResp = await fetch(getBridgeHealthUrl(), {
+          headers,
+          signal: healthCtrl.signal,
+        }).finally(() => clearTimeout(healthTimer));
+        if (healthResp.ok) {
+          const health = await healthResp.json().catch(() => null) as { ok?: boolean; served_model_name?: string } | null;
+          if (health?.served_model_name && settings.llmLocalModelName !== health.served_model_name) {
+            onUpdateSettings({ llmLocalModelName: health.served_model_name });
+          }
+        }
+      } catch {
+        // Not every local LLM exposes /health; continue with chat/completions.
+      }
 
       const model = settings.llmLocalModelName || 'test';
       const testCtrl = new AbortController();
@@ -875,6 +1147,12 @@ function LocalLLMConfig({ settings, onUpdateSettings }: LocalLLMConfigProps) {
 
       if (!resp.ok) {
         const text = await resp.text().catch(() => '');
+        if (resp.status === 401) {
+          throw new Error('HTTP 401: Unauthorized. Check that the Local LLM API Key matches the token required by the local bridge.');
+        }
+        if (resp.status === 404) {
+          throw new Error(`HTTP 404: ${text.substring(0, 200)}. This endpoint does not look like an OpenAI-compatible Local LLM /v1 endpoint. If this is the CTI Agent Host, put it under Agent Hosts instead.`);
+        }
         throw new Error(`HTTP ${resp.status}: ${text.substring(0, 200)}`);
       }
 
@@ -886,9 +1164,14 @@ function LocalLLMConfig({ settings, onUpdateSettings }: LocalLLMConfigProps) {
       }
     } catch (err) {
       setTestStatus('error');
-      setTestError((err as Error).message || 'Connection failed');
+      const message = (err as Error).message || 'Connection failed';
+      setTestError(
+        message.includes('NetworkError') || message.includes('Failed to fetch')
+          ? `${message}. Confirm ThreatCaddy is opened from http://127.0.0.1:5173 or http://localhost:5173 and the local Codex bridge is reachable at ${getBridgeHealthUrl()}.`
+          : message
+      );
     }
-  }, [getBaseUrl, settings.llmLocalApiKey, settings.llmLocalModelName]);
+  }, [getBaseUrl, getBridgeHealthUrl, settings.llmLocalApiKey, settings.llmLocalModelName, onUpdateSettings]);
 
   return (
     <div className="border border-gray-700 rounded-lg p-3 space-y-3">
@@ -932,6 +1215,7 @@ function LocalLLMConfig({ settings, onUpdateSettings }: LocalLLMConfigProps) {
           placeholder={t('ai.localApiKeyPlaceholder')}
           className={inputClass}
         />
+        <p className="text-[10px] text-gray-600 mt-0.5">{t('ai.localApiKeyHelp')}</p>
       </div>
       <div>
         <div className="flex items-center justify-between">
@@ -980,10 +1264,13 @@ function LocalLLMConfig({ settings, onUpdateSettings }: LocalLLMConfigProps) {
               setSkillsError('');
               try {
                 const { fetchHostSkills } = await import('../../lib/agent-hosts');
-                const baseUrl = (settings.llmLocalEndpoint || 'http://localhost:11434/v1').replace(/\/+$/, '').replace(/\/v1\/?$/, '');
+                const baseUrl = settings.llmLocalEndpoint!.replace(/\/+$/, '').replace(/\/v1\/?$/, '');
                 const skills = await fetchHostSkills({
                   id: 'local', name: 'local', displayName: 'Local Agent',
-                  url: baseUrl, apiKey: settings.llmLocalApiKey, enabled: true, skills: [],
+                  url: baseUrl,
+                  apiKey: resolveLocalLLMApiKey(settings.llmLocalApiKey, baseUrl),
+                  enabled: true,
+                  skills: [],
                 });
                 onUpdateSettings({ llmLocalSkills: skills, llmLocalSkillsFetchedAt: Date.now() });
                 setShowSkills(true);

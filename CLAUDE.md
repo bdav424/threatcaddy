@@ -1,5 +1,7 @@
 # ThreatCaddy — Claude Code Guidelines
 
+Shared AI-maintainer guidance now lives in `AGENTS.md`. Read it first, especially for origin-scoped browser storage, standalone build/update rules, Dexie/export requirements, and the maintenance log that should be appended when material build/storage/sync/agent behavior changes.
+
 ## What This Is
 
 ThreatCaddy is a client-side threat intelligence and incident response platform. Chrome extension + React SPA + optional team server. All investigation data lives in IndexedDB via Dexie. The extension proxies LLM API calls and handles CORS-bypassing fetches.
@@ -7,7 +9,7 @@ ThreatCaddy is a client-side threat intelligence and incident response platform.
 ## Architecture
 
 - **SPA**: React + TypeScript + Vite + Tailwind. Entry: `src/App.tsx`
-- **Database**: Dexie (IndexedDB). Schema: `src/db.ts`. Currently version 28.
+- **Database**: Dexie (IndexedDB). Schema: `src/db.ts`. Currently version 32.
 - **Extension**: `extension/src/` — `background.js` (LLM streaming, fetch proxy, notifications), `bridge.js` (page↔extension message relay), `content.js` (capture UI)
 - **Team Server**: `server/` — Hono + Drizzle + PostgreSQL. Syncs investigations, runs server-side agents, manages bots.
 - **CaddyAI Chat**: `src/components/Chat/ChatView.tsx` + `src/hooks/useLLM.ts`. Human-driven conversational AI. Stays mounted in background when switching tabs.

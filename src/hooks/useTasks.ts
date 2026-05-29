@@ -13,12 +13,17 @@ export function useTasks(folderId?: string) {
   const [loading, setLoading] = useState(true);
 
   const loadTasks = useCallback(async () => {
-    const allTasks = folderId
-      ? await db.tasks.where('[folderId+updatedAt]').between([folderId, Dexie.minKey], [folderId, Dexie.maxKey]).toArray()
-      : await db.tasks.toArray();
-    const remaining = await purgeOldTrash(allTasks, db.tasks);
-    setTasks(remaining);
-    setLoading(false);
+    try {
+      const allTasks = folderId
+        ? await db.tasks.where('[folderId+updatedAt]').between([folderId, Dexie.minKey], [folderId, Dexie.maxKey]).toArray()
+        : await db.tasks.toArray();
+      const remaining = await purgeOldTrash(allTasks, db.tasks);
+      setTasks(remaining);
+    } catch (err) {
+      console.error('Failed to load tasks:', err);
+    } finally {
+      setLoading(false);
+    }
   }, [folderId]);
 
   useEffect(() => {

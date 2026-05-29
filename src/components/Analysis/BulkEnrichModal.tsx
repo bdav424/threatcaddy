@@ -3,12 +3,13 @@ import { Zap, Loader2, X, CheckCircle2, AlertTriangle, XCircle, Pause, Play } fr
 import { useTranslation } from 'react-i18next';
 import { nanoid } from 'nanoid';
 import { useAuth } from '../../contexts/AuthContext';
-import { IntegrationExecutor } from '../../lib/integration-executor';
+import { buildIntegrationConfigError, IntegrationExecutor, validateIntegrationConfig } from '../../lib/integration-executor';
 import type { ExecutionOptions } from '../../lib/integration-executor';
 import { db } from '../../db';
 import type { IntegrationRun, InstalledIntegration, IntegrationTemplate } from '../../types/integration-types';
 import type { StandaloneIOC } from '../../types';
 import { currentLocale } from '../../lib/utils';
+import { persistIOCIntegrationUpdate } from '../../lib/ioc-enrichment-persistence';
 
 interface BulkEnrichModalProps {
   open: boolean;
@@ -205,6 +206,16 @@ export function BulkEnrichModal({
 
         for (const { installation, template } of integrations) {
           if (controller.signal.aborted) break;
+          const missingConfig = validateIntegrationConfig(template, installation);
+          if (missingConfig.length > 0) {
+            iocResult.integrationResults.push({
+              templateName: template.name,
+              status: 'error',
+              error: buildIntegrationConfigError(template, missingConfig),
+            });
+            anyError = true;
+            continue;
+          }
 
           // Pause (Phase 3a)
           await sleepUntilUnpaused(controller.signal, pauseRef);
@@ -288,23 +299,10 @@ export function BulkEnrichModal({
                   // Phase 1b: try/catch for DB failures
                   try {
                     if (type === 'ioc') {
-                      // Phase 1c: transactional read-modify-write
-                      await db.transaction('rw', db.standaloneIOCs, async () => {
-                        const existing = await db.standaloneIOCs.get(id);
-                        if (!existing) return;
-                        const updates: Partial<StandaloneIOC> = { updatedAt: Date.now() };
-                        if (fields.iocStatus !== undefined) updates.iocStatus = fields.iocStatus as string;
-                        if (fields.confidence !== undefined) updates.confidence = fields.confidence as StandaloneIOC['confidence'];
-                        if (fields.enrichment) {
-                          const existingEnrichment = existing.enrichment || {};
-                          const newEnrichment = fields.enrichment as Record<string, Record<string, unknown>>;
-                          const merged: Record<string, Array<Record<string, unknown>>> = { ...existingEnrichment };
-                          for (const [provider, data] of Object.entries(newEnrichment)) {
-                            merged[provider] = [{ ...data, ts: Date.now() }, ...(merged[provider] || [])].slice(0, 20);
-                          }
-                          updates.enrichment = merged;
-                        }
-                        await db.standaloneIOCs.update(id, updates);
+                      await persistIOCIntegrationUpdate({
+                        ioc: { id, value: ioc.value, type: ioc.type, confidence: ioc.confidence },
+                        fields,
+                        folderId: ioc.folderId || investigation?.id,
                       });
                     }
                   } catch (dbErr) {
@@ -365,9 +363,14 @@ export function BulkEnrichModal({
         else if (r.status === 'error') finalStats.error++;
         else if (r.status === 'skipped') finalStats.skipped++;
       }
+      if (finalStats.success > 0) {
+        window.dispatchEvent(new CustomEvent('integration-entity-created', {
+          detail: { iocId: iocs[0]?.id || 'bulk-enrich' },
+        }));
+      }
       onCompleted?.(finalStats);
     }
-  }, [effectivePlan, addRun, investigation, createNotes, onCompleted, connected, serverUrl, getAccessToken]);
+  }, [effectivePlan, addRun, investigation, createNotes, onCompleted, connected, serverUrl, getAccessToken, iocs]);
 
   const handleCancel = useCallback(() => {
     cancelledRef.current = true;

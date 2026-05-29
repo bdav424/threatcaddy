@@ -49,7 +49,7 @@ import { useCloudSync } from '../hooks/useCloudSync';
 function makeDest(overrides: Partial<BackupDestination> = {}): BackupDestination {
   return {
     id: 'dest-1',
-    provider: 'oci',
+    provider: 'cloudstore',
     label: 'Test Bucket',
     url: 'https://bucket.example.com/',
     enabled: true,

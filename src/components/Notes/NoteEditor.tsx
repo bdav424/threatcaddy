@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Upload, Briefcase, MessageSquare, Search, Lock, LockOpen, Share2, FileText, Download, AlertTriangle } from 'lucide-react';
+import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Upload, Briefcase, MessageSquare, Search, Lock, LockOpen, Share2, FileText, Download, AlertTriangle, Highlighter } from 'lucide-react';
 import type { Note, Task, TimelineEvent, Tag, Folder, EditorMode, Settings, NoteAnnotation } from '../../types';
 import { NOTE_COLORS } from '../../types';
 import { nanoid } from 'nanoid';
@@ -8,7 +8,7 @@ import { extractIOCs, mergeIOCAnalysis } from '../../lib/ioc-extractor';
 import { mergeText, adjustCursor } from '../../lib/text-merge';
 import { markPending, clearPending } from '../../lib/pending-changes';
 import { ClsSelect } from '../Common/ClsSelect';
-import { MarkdownPreview } from './MarkdownPreview';
+import { MarkdownPreview, type MarkdownSelectionMirror } from './MarkdownPreview';
 import { TagInput } from '../Common/TagInput';
 import { IOCPanel } from '../Analysis/IOCPanel';
 import { ResizeHandle } from '../Common/ResizeHandle';
@@ -88,6 +88,8 @@ export function NoteEditor({
   const [showAnnotations, setShowAnnotations] = useState(false);
   const [annotationText, setAnnotationText] = useState('');
   const [scrollLocked, setScrollLocked] = useState(true);
+  const [mirrorSelectionEnabled, setMirrorSelectionEnabled] = useState(false);
+  const [editorSelection, setEditorSelection] = useState({ start: 0, end: 0 });
   const [showBacklinks, setShowBacklinks] = useState(false);
   const cloud = useCloudSync(externalSettings?.backupDestinations);
   const logActivity = useLogActivity();
@@ -121,6 +123,15 @@ export function NoteEditor({
     if (!ta) return;
     const before = ta.value.substring(0, ta.selectionStart);
     setCurrentLine((before.match(/\n/g) || []).length + 1);
+  }, []);
+
+  const updateEditorSelection = useCallback((textarea: HTMLTextAreaElement | null = textareaRef.current) => {
+    if (!textarea) return;
+    const start = Math.min(textarea.selectionStart, textarea.selectionEnd);
+    const end = Math.max(textarea.selectionStart, textarea.selectionEnd);
+    setEditorSelection((previous) => (
+      previous.start === start && previous.end === end ? previous : { start, end }
+    ));
   }, []);
 
   // Measure wrapped line heights: render all lines in a mirror div, read heights in one pass
@@ -252,6 +263,7 @@ export function NoteEditor({
       lastSavedTitleRef.current = note.title;
       setTitle(note.title);
       setContent(note.content);
+      setEditorSelection({ start: 0, end: 0 });
       setInlineConflict(null);
       stashedLocalRef.current = null;
       return;
@@ -449,7 +461,10 @@ export function NoteEditor({
       const end = textarea.selectionEnd;
       const newContent = content.slice(0, start) + '  ' + content.slice(end);
       handleContentChange(newContent);
-      setTimeout(() => { textarea.selectionStart = textarea.selectionEnd = start + 2; }, 0);
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + 2;
+        updateEditorSelection(textarea);
+      }, 0);
     }
   };
 
@@ -464,6 +479,7 @@ export function NoteEditor({
       textarea.selectionStart = start + before.length;
       textarea.selectionEnd = start + before.length + selected.length;
       textarea.focus();
+      updateEditorSelection(textarea);
     }, 0);
   };
 
@@ -542,8 +558,9 @@ export function NoteEditor({
     setTimeout(() => {
       textarea.selectionStart = textarea.selectionEnd = newCursorPos;
       textarea.focus();
+      updateEditorSelection(textarea);
     }, 0);
-  }, [content, slashTriggerPos, handleContentChange]);
+  }, [content, slashTriggerPos, handleContentChange, updateEditorSelection]);
 
   // Slash commands: click-outside to close
   useEffect(() => {
@@ -649,8 +666,9 @@ export function NoteEditor({
     setTimeout(() => {
       textarea.selectionStart = textarea.selectionEnd = newCursorPos;
       textarea.focus();
+      updateEditorSelection(textarea);
     }, 0);
-  }, [content, linkTriggerPos, handleContentChange]);
+  }, [content, linkTriggerPos, handleContentChange, updateEditorSelection]);
 
   // Link autocomplete: click-outside to close
   useEffect(() => {
@@ -709,6 +727,14 @@ export function NoteEditor({
   const stats = wordCount(content);
   const showEditor = editorMode === 'edit' || editorMode === 'split';
   const showPreview = editorMode === 'preview' || editorMode === 'split';
+  const previewSelectionMirror = useMemo<MarkdownSelectionMirror | undefined>(() => {
+    if (editorMode !== 'split') return undefined;
+    return {
+      enabled: mirrorSelectionEnabled,
+      start: editorSelection.start,
+      end: editorSelection.end,
+    };
+  }, [editorMode, mirrorSelectionEnabled, editorSelection.start, editorSelection.end]);
 
   return (
     <div className="flex flex-col h-full w-full">
@@ -748,6 +774,20 @@ export function NoteEditor({
         >
           <Eye size={16} />
         </button>
+        {editorMode === 'split' && (
+          <button
+            onClick={() => setMirrorSelectionEnabled((enabled) => !enabled)}
+            className={cn(
+              'p-1.5 rounded hidden sm:block',
+              mirrorSelectionEnabled ? 'bg-amber-500/20 text-amber-300' : 'text-gray-500 hover:text-gray-300'
+            )}
+            title={t('editor.mirrorSelection')}
+            aria-label={t('editor.mirrorSelectionAria')}
+            aria-pressed={mirrorSelectionEnabled}
+          >
+            <Highlighter size={16} />
+          </button>
+        )}
 
         <div className="w-px h-5 bg-gray-700 mx-1" />
 
@@ -1063,17 +1103,23 @@ export function NoteEditor({
                 ref={textareaRef}
                 value={content}
                 onChange={(e) => {
+                  updateEditorSelection(e.currentTarget);
                   handleContentChange(e.target.value);
                   const val = e.target.value;
                   setTimeout(() => {
                     if (textareaRef.current) {
                       const pos = textareaRef.current.selectionStart;
+                      updateEditorSelection(textareaRef.current);
                       detectSlashTrigger(val, pos);
                       detectLinkTrigger(val, pos);
                     }
                   }, 0);
                 }}
                 onKeyDown={handleEditorKeyDown}
+                onKeyUp={(e) => updateEditorSelection(e.currentTarget)}
+                onMouseUp={(e) => updateEditorSelection(e.currentTarget)}
+                onSelect={(e) => updateEditorSelection(e.currentTarget)}
+                onFocus={(e) => updateEditorSelection(e.currentTarget)}
                 className="note-editor flex-1 w-full p-2 sm:p-4 ps-1 bg-transparent text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-0 border-none text-sm leading-relaxed"
                 placeholder={t('editor.contentPlaceholder')}
                 readOnly={note.trashed}
@@ -1123,7 +1169,7 @@ export function NoteEditor({
               style={editorMode === 'split' ? { width: `${(1 - editorPreview.ratio) * 100}%` } : { flex: 1 }}
             >
               {content ? (
-                <MarkdownPreview content={content} defanged={defangPreview} allNotes={allNotes} onNavigateToNote={onNavigateToNote} iocs={note.iocAnalysis?.iocs} />
+                <MarkdownPreview content={content} defanged={defangPreview} allNotes={allNotes} onNavigateToNote={onNavigateToNote} iocs={note.iocAnalysis?.iocs} selectionMirror={previewSelectionMirror} />
               ) : (
                 <p className="text-gray-600 text-sm italic">{t('editor.nothingToPreview')}</p>
               )}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { IntegrationExecutor } from '../lib/integration-executor';
+import { IntegrationExecutor, validateIntegrationConfig } from '../lib/integration-executor';
 import type { ExecutionInput, ExecutionCallbacks } from '../lib/integration-executor';
 import type {
   IntegrationTemplate,
@@ -60,6 +60,76 @@ function makeInstallation(config: Record<string, unknown> = {}): InstalledIntegr
     updatedAt: Date.now(),
   };
 }
+
+describe('integration config validation', () => {
+  it('reports missing required config before network execution', async () => {
+    const executor = new IntegrationExecutor();
+    const template = makeTemplate([
+      {
+        id: 'fetch',
+        type: 'http',
+        label: 'Needs key',
+        method: 'GET',
+        url: 'https://api.example.com/lookup',
+      },
+    ]);
+    template.configSchema = [
+      { key: 'apiKey', label: 'API key', type: 'password', required: true, secret: true },
+    ];
+    template.requiredDomains = ['api.example.com'];
+
+    const result = await executor.run(
+      template,
+      makeInstallation({ apiKey: '' }),
+      makeInput(),
+      makeCallbacks(),
+    );
+
+    expect(validateIntegrationConfig(template, makeInstallation({ apiKey: '' }))).toEqual(['API key']);
+    expect(result.status).toBe('error');
+    expect(result.error).toContain('Missing required field: API key');
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('passes template requiredDomains to the team server proxy', async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockJsonResponse({
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        data: { ok: true },
+      }),
+    );
+
+    const executor = new IntegrationExecutor();
+    const template = makeTemplate([
+      {
+        id: 'fetch',
+        type: 'http',
+        label: 'Server proxied lookup',
+        method: 'GET',
+        url: 'https://api.example.com/lookup',
+      },
+    ]);
+    template.requiredDomains = ['api.example.com'];
+
+    const result = await executor.run(
+      template,
+      makeInstallation(),
+      makeInput(),
+      makeCallbacks(),
+      undefined,
+      { useServerProxy: { serverUrl: 'https://team.example', getAccessToken: async () => 'token' } },
+    );
+
+    expect(result.status).toBe('success');
+    const [, init] = mockFetch.mock.calls[0];
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      url: 'https://api.example.com/lookup',
+      requiredDomains: ['api.example.com'],
+    });
+  });
+});
 
 function makeInput(overrides: Partial<ExecutionInput> = {}): ExecutionInput {
   return {
@@ -297,7 +367,7 @@ describe('IntegrationExecutor', () => {
 
       expect(result.status).toBe('success');
       expect(result.displayResults).toEqual({
-        malicious: '10',
+        malicious: 10,
         country: 'US',
       });
     });
@@ -357,7 +427,7 @@ describe('IntegrationExecutor', () => {
       expect(result.status).toBe('success');
       expect(result.displayResults).toEqual({
         status: 'no_results',
-        tags: '["phishing"]',
+        tags: ['phishing'],
       });
     });
   });

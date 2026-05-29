@@ -5,6 +5,58 @@ import type { IntegrationTemplate, InstalledIntegration, IntegrationRun } from '
 import { BUILTIN_INTEGRATIONS } from '../lib/builtin-integrations';
 import { syncProxyAllowedDomains } from '../lib/integration-executor';
 
+function isBlankConfigValue(value: unknown): boolean {
+  if (typeof value === 'string') return value.trim().length === 0;
+  return value === null || value === undefined || value === false;
+}
+
+function integrationSourceKey(template?: IntegrationTemplate): string | null {
+  if (!template) return null;
+  const domains = (template.requiredDomains || []).map((d) => d.toLowerCase()).sort();
+  if (domains.length > 0) return `domains:${domains.join(',')}`;
+  const providerTag = template.tags.find((tag) =>
+    ['virustotal', 'flashpoint', 'censys', 'abuseipdb', 'shodan', 'greynoise', 'urlhaus', 'threatfox', 'malwarebazaar']
+      .includes(tag.toLowerCase()),
+  );
+  return providerTag ? `tag:${providerTag.toLowerCase()}` : null;
+}
+
+function sharedConfigForTemplate(
+  template: IntegrationTemplate | undefined,
+  installations: InstalledIntegration[],
+  templates: IntegrationTemplate[],
+): Record<string, unknown> {
+  const key = integrationSourceKey(template);
+  if (!template || !key) return {};
+
+  const config: Record<string, unknown> = {};
+  for (const field of template.configSchema) {
+    for (const installation of installations) {
+      const otherTemplate = templates.find((t) => t.id === installation.templateId);
+      if (integrationSourceKey(otherTemplate) !== key) continue;
+      const value = installation.config?.[field.key];
+      if (!isBlankConfigValue(value)) {
+        config[field.key] = value;
+        break;
+      }
+    }
+  }
+  return config;
+}
+
+function mergeSharedConfig(
+  installation: InstalledIntegration,
+  template: IntegrationTemplate | undefined,
+  installations: InstalledIntegration[],
+  templates: IntegrationTemplate[],
+): InstalledIntegration {
+  const shared = sharedConfigForTemplate(template, installations, templates);
+  const own = Object.fromEntries(
+    Object.entries(installation.config || {}).filter(([, value]) => !isBlankConfigValue(value)),
+  );
+  return { ...installation, config: { ...shared, ...own } };
+}
+
 export function useIntegrations() {
   const [templates, setTemplates] = useState<IntegrationTemplate[]>([]);
   const [installations, setInstallations] = useState<InstalledIntegration[]>([]);
@@ -28,7 +80,26 @@ export function useIntegrations() {
     // Sync allowed proxy domains to extension for defense-in-depth
     syncProxyAllowedDomains(allTemplates);
 
-    setInstallations(dbInstallations);
+    const hydratedInstallations = dbInstallations.map((installation) => {
+      const template = allTemplates.find((t) => t.id === installation.templateId);
+      return mergeSharedConfig(installation, template, dbInstallations, allTemplates);
+    });
+    const hydrationUpdates = hydratedInstallations.filter((installation) => {
+      const original = dbInstallations.find((i) => i.id === installation.id);
+      return JSON.stringify(original?.config || {}) !== JSON.stringify(installation.config || {});
+    });
+    if (hydrationUpdates.length > 0) {
+      await db.transaction('rw', db.installedIntegrations, async () => {
+        for (const installation of hydrationUpdates) {
+          await db.installedIntegrations.update(installation.id, {
+            config: installation.config,
+            updatedAt: Date.now(),
+          });
+        }
+      });
+    }
+
+    setInstallations(hydratedInstallations);
     setRuns(dbRuns);
     setLoading(false);
   }, []);
@@ -119,13 +190,14 @@ export function useIntegrations() {
     config: Record<string, unknown>,
   ): Promise<InstalledIntegration> => {
     const template = templates.find((t) => t.id === templateId);
+    const sharedConfig = sharedConfigForTemplate(template, installations, templates);
     const now = Date.now();
     const installation: InstalledIntegration = {
       id: nanoid(),
       templateId,
       name: template?.name ?? 'Integration',
       enabled: true,
-      config,
+      config: { ...sharedConfig, ...config },
       scopeType: 'all',
       scopeFolderIds: [],
       runCount: 0,
@@ -137,13 +209,62 @@ export function useIntegrations() {
     await db.installedIntegrations.put(installation);
     setInstallations((prev) => [...prev, installation]);
     return installation;
-  }, [templates]);
+  }, [installations, templates]);
 
   const updateInstallation = useCallback(async (id: string, updates: Partial<InstalledIntegration>) => {
     const patched = { ...updates, updatedAt: Date.now() };
-    await db.installedIntegrations.update(id, patched);
-    setInstallations((prev) => prev.map((i) => (i.id === id ? { ...i, ...patched } : i)));
-  }, []);
+    const current = installations.find((i) => i.id === id);
+    const currentTemplate = templates.find((t) => t.id === current?.templateId);
+    const currentSourceKey = integrationSourceKey(currentTemplate);
+
+    await db.transaction('rw', db.installedIntegrations, async () => {
+      await db.installedIntegrations.update(id, patched);
+      if (!updates.config || !currentSourceKey) return;
+
+      const nonBlankUpdates = Object.fromEntries(
+        Object.entries(updates.config).filter(([, value]) => !isBlankConfigValue(value)),
+      );
+      if (Object.keys(nonBlankUpdates).length === 0) return;
+
+      const related = installations.filter((installation) => {
+        if (installation.id === id) return false;
+        const template = templates.find((t) => t.id === installation.templateId);
+        return integrationSourceKey(template) === currentSourceKey;
+      });
+      for (const installation of related) {
+        const nextConfig = { ...(installation.config || {}) };
+        let changed = false;
+        for (const [key, value] of Object.entries(nonBlankUpdates)) {
+          if (isBlankConfigValue(nextConfig[key])) {
+            nextConfig[key] = value;
+            changed = true;
+          }
+        }
+        if (changed) {
+          await db.installedIntegrations.update(installation.id, {
+            config: nextConfig,
+            updatedAt: patched.updatedAt,
+          });
+        }
+      }
+    });
+
+    setInstallations((prev) => prev.map((i) => {
+      if (i.id === id) return { ...i, ...patched };
+      if (!updates.config || !currentSourceKey) return i;
+      const template = templates.find((t) => t.id === i.templateId);
+      if (integrationSourceKey(template) !== currentSourceKey) return i;
+      const nextConfig = { ...(i.config || {}) };
+      let changed = false;
+      for (const [key, value] of Object.entries(updates.config)) {
+        if (!isBlankConfigValue(value) && isBlankConfigValue(nextConfig[key])) {
+          nextConfig[key] = value;
+          changed = true;
+        }
+      }
+      return changed ? { ...i, config: nextConfig, updatedAt: patched.updatedAt! } : i;
+    }));
+  }, [installations, templates]);
 
   const deleteInstallation = useCallback(async (id: string) => {
     await db.transaction('rw', [db.installedIntegrations, db.integrationRuns], async () => {
@@ -228,7 +349,10 @@ export function useIntegrations() {
         );
 
         if (hasMatchingTrigger) {
-          results.push({ installation, template });
+          results.push({
+            installation: mergeSharedConfig(installation, template, installations, templates),
+            template,
+          });
         }
       }
 

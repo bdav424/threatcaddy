@@ -38,21 +38,21 @@ function requireHttps(url: string): { parsed: URL } | { error: string } {
   return { parsed };
 }
 
-// ---- OCI ----
+// ---- Cloud ----
 
-const ociConfig: CloudProviderConfig = {
-  name: 'Oracle Cloud (OCI)',
-  placeholder: 'https://objectstorage.us-ashburn-1.oraclecloud.com/p/.../o/',
-  hostnameHint: 'objectstorage.*.oraclecloud.com',
+const cloudstoreConfig: CloudProviderConfig = {
+  name: 'Cloud Object Storage',
+  placeholder: 'https://storage.us-ashburn-1.examplecloud.com/p/.../o/',
+  hostnameHint: 'storage.*.examplecloud.com',
   validateUrl(url) {
     if (!url || typeof url !== 'string') return { valid: false, error: 'URL is required' };
     const result = requireHttps(url);
     if ('error' in result) return { valid: false, error: result.error };
-    if (!/^objectstorage\..*\.oraclecloud\.com$/i.test(result.parsed.hostname)) {
-      return { valid: false, error: 'OCI URL must be an objectstorage.*.oraclecloud.com endpoint' };
+    if (!/^storage\..*\.examplecloud\.com$/i.test(result.parsed.hostname)) {
+      return { valid: false, error: 'Cloud URL must be an storage.*.examplecloud.com endpoint' };
     }
     if (!url.includes('/p/') || !url.includes('/o/')) {
-      return { valid: false, error: 'OCI PAR URL must contain /p/ and /o/ path segments' };
+      return { valid: false, error: 'Cloud PAR URL must contain /p/ and /o/ path segments' };
     }
     return { valid: true };
   },
@@ -148,7 +148,7 @@ const gcsConfig: CloudProviderConfig = {
 // ---- Registry ----
 
 export const CLOUD_PROVIDERS: Record<CloudProvider, CloudProviderConfig> = {
-  'oci': ociConfig,
+  'cloudstore': cloudstoreConfig,
   'aws-s3': awsS3Config,
   'azure-blob': azureBlobConfig,
   'gcs': gcsConfig,
@@ -164,7 +164,7 @@ export function detectProvider(url: string): CloudProvider | null {
   } catch {
     return null;
   }
-  if (/^objectstorage\..*\.oraclecloud\.com$/i.test(hostname)) return 'oci';
+  if (/^storage\..*\.examplecloud\.com$/i.test(hostname)) return 'cloudstore';
   if (/(?:^|\.)s3[.-].*\.amazonaws\.com$/i.test(hostname)) return 'aws-s3';
   if (/\.blob\.core\.windows\.net$/i.test(hostname)) return 'azure-blob';
   if (hostname === 'storage.googleapis.com' || hostname === 'storage.cloud.google.com') return 'gcs';

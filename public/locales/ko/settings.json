@@ -324,7 +324,7 @@
   "intel.disableAll": "모두 비활성화",
   "intel.bulkJsonImport": "일괄 JSON 가져오기",
   "intel.exportConfig": "설정 내보내기",
-  "intel.bulkImportHelp": "{ cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, oci_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }을 허용합니다",
+  "intel.bulkImportHelp": "{ cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors, default_cls_level, default_report_source, cloud_label, auto_extract_enabled, auto_extract_debounce_ms, enabled_ioc_types, default_confidence }을 허용합니다",
   "intel.defaultClsLevel": "기본 분류 레벨",
   "intel.usingTlpDefaults": "TLP 기본값 사용",
   "intel.defaultReportSource": "기본 보고서 출처",

@@ -313,6 +313,83 @@ describe('useLLM', () => {
     );
   });
 
+  it('normalizes serialized content-block JSON before completing a tool loop', async () => {
+    const { result } = renderHook(() => useLLM());
+    await act(async () => { await flush(); });
+
+    const toolExecutor = vi.fn(async () => ({
+      result: JSON.stringify({ success: true, id: 'note-1', title: 'AI Note' }),
+      isError: false,
+    }));
+    const onComplete = vi.fn();
+
+    let rid: string;
+    act(() => {
+      rid = result.current.sendAgentRequest(
+        {
+          provider: 'anthropic',
+          model: 'claude-sonnet-4-6',
+          messages: [{ role: 'user', content: 'Create a note' }],
+          apiKey: 'key',
+          tools: [{ name: 'create_note', description: 'Create note', input_schema: {} }],
+        },
+        toolExecutor,
+        onComplete,
+      );
+    });
+
+    const rawBlocks = JSON.stringify([
+      { type: 'text', text: 'Assessment text' },
+      { type: 'tool_use', id: 'tool-1', name: 'create_note', input: { title: 'AI Note' } },
+    ]);
+
+    await act(async () => {
+      postToWindow({ type: 'TC_LLM_CHUNK', requestId: rid!, content: rawBlocks });
+      await flush();
+      await new Promise((r) => setTimeout(r, 50));
+    });
+
+    await act(async () => {
+      postToWindow({
+        type: 'TC_LLM_DONE',
+        requestId: rid!,
+        stopReason: 'tool_use',
+        contentBlocks: [
+          { type: 'text', text: 'Assessment text' },
+          { type: 'tool_use', id: 'tool-1', name: 'create_note', input: { title: 'AI Note' } },
+        ],
+      });
+      await flush();
+      await new Promise((r) => setTimeout(r, 100));
+    });
+
+    expect(result.current.streamingContent).toBe('Assessment text');
+    expect(result.current.streamingContent).not.toContain('tool_use');
+    expect(toolExecutor).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      postToWindow({ type: 'TC_LLM_CHUNK', content: 'Done.' });
+      await flush();
+      await new Promise((r) => setTimeout(r, 50));
+    });
+
+    await act(async () => {
+      postToWindow({
+        type: 'TC_LLM_DONE',
+        stopReason: 'end_turn',
+        contentBlocks: [{ type: 'text', text: 'Done.' }],
+      });
+      await flush();
+      await new Promise((r) => setTimeout(r, 50));
+    });
+
+    expect(onComplete).toHaveBeenCalledWith({
+      content: 'Assessment text\n\nDone.',
+      toolCalls: [expect.objectContaining({ id: 'tool-1', name: 'create_note' })],
+      usage: undefined,
+    });
+  });
+
   it('clears error on new request', async () => {
     const { result } = renderHook(() => useLLM());
     await act(async () => { await flush(); });

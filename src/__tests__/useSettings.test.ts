@@ -73,40 +73,40 @@ describe('useSettings', () => {
     expect(result.current.settings.editorMode).toBe('edit');
   });
 
-  it('stores OCI PAR settings', () => {
+  it('stores Cloud PAR settings', () => {
     const { result } = renderHook(() => useSettings());
 
     act(() => {
       result.current.updateSettings({
-        ociWritePAR: 'https://example.com/p/write/o/',
-        ociLabel: 'my-device',
+        cloudWriteUrl: 'https://example.com/p/write/o/',
+        cloudLabel: 'my-device',
       });
     });
 
-    expect(result.current.settings.ociWritePAR).toBe('https://example.com/p/write/o/');
-    expect(result.current.settings.ociLabel).toBe('my-device');
+    expect(result.current.settings.cloudWriteUrl).toBe('https://example.com/p/write/o/');
+    expect(result.current.settings.cloudLabel).toBe('my-device');
   });
 
-  it('migrates legacy ociWritePAR to backupDestinations', () => {
+  it('migrates legacy cloudWriteUrl to backupDestinations', () => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-      ociWritePAR: 'https://objectstorage.us-ashburn-1.oraclecloud.com/p/token/n/ns/b/bucket/o/',
-      ociLabel: 'My OCI',
+      cloudWriteUrl: 'https://storage.us-ashburn-1.examplecloud.com/p/token/n/ns/b/bucket/o/',
+      cloudLabel: 'My Cloud',
     }));
     const { result } = renderHook(() => useSettings());
     const dests = result.current.settings.backupDestinations;
     expect(dests).toBeDefined();
     expect(dests).toHaveLength(1);
-    expect(dests![0].provider).toBe('oci');
-    expect(dests![0].label).toBe('My OCI');
-    expect(dests![0].url).toBe('https://objectstorage.us-ashburn-1.oraclecloud.com/p/token/n/ns/b/bucket/o/');
+    expect(dests![0].provider).toBe('cloudstore');
+    expect(dests![0].label).toBe('My Cloud');
+    expect(dests![0].url).toBe('https://storage.us-ashburn-1.examplecloud.com/p/token/n/ns/b/bucket/o/');
     expect(dests![0].enabled).toBe(true);
-    expect(dests![0].id).toBe('migrated-oci');
+    expect(dests![0].id).toBe('migrated-cloud');
   });
 
   it('does not re-migrate if backupDestinations already exists', () => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-      ociWritePAR: 'https://objectstorage.us-ashburn-1.oraclecloud.com/p/token/n/ns/b/bucket/o/',
-      ociLabel: 'Old',
+      cloudWriteUrl: 'https://storage.us-ashburn-1.examplecloud.com/p/token/n/ns/b/bucket/o/',
+      cloudLabel: 'Old',
       backupDestinations: [{ id: 'custom', provider: 'aws-s3', label: 'S3', url: 'https://mybucket.s3.us-east-1.amazonaws.com/', enabled: true }],
     }));
     const { result } = renderHook(() => useSettings());
@@ -116,13 +116,13 @@ describe('useSettings', () => {
     expect(dests![0].provider).toBe('aws-s3');
   });
 
-  it('uses default label when ociLabel is not set', () => {
+  it('uses default label when cloudLabel is not set', () => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-      ociWritePAR: 'https://objectstorage.us-ashburn-1.oraclecloud.com/p/token/n/ns/b/bucket/o/',
+      cloudWriteUrl: 'https://storage.us-ashburn-1.examplecloud.com/p/token/n/ns/b/bucket/o/',
     }));
     const { result } = renderHook(() => useSettings());
     const dests = result.current.settings.backupDestinations;
     expect(dests).toBeDefined();
-    expect(dests![0].label).toBe('OCI Backup');
+    expect(dests![0].label).toBe('Cloud Backup');
   });
 });

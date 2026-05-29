@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useLoggedActions } from '../hooks/useLoggedActions';
-import type { Note, Task, TimelineEvent, StandaloneIOC, ChatThread, Folder, Tag, Timeline, Whiteboard } from '../types';
+import type { Note, Task, TimelineEvent, StandaloneIOC, EvidenceItem, ChatThread, Folder, Tag, Timeline, Whiteboard } from '../types';
 import type { ActivityCategory, ActivityAction } from '../types';
 
 type LogFn = (category: ActivityCategory, action: ActivityAction, detail: string, itemId?: string, itemTitle?: string) => void;
@@ -39,6 +39,12 @@ function buildMocks() {
   const sampleIOC: StandaloneIOC = {
     id: 'ioc1', type: 'ipv4', value: '10.0.0.1', confidence: 'high',
     tags: [], trashed: false, archived: false,
+    createdAt: Date.now(), updatedAt: Date.now(),
+  };
+  const sampleEvidenceItem: EvidenceItem = {
+    id: 'evd1', title: 'Test Evidence', fileName: 'test.txt', fileType: 'text',
+    size: 4, content: 'test', extractionStatus: 'extracted', importedAt: Date.now(),
+    chunkIndex: 1, chunkCount: 1, tags: [], trashed: false, archived: false,
     createdAt: Date.now(), updatedAt: Date.now(),
   };
   const sampleThread: ChatThread = {
@@ -118,6 +124,12 @@ function buildMocks() {
     reload: vi.fn(),
   };
 
+  const evidenceItems = {
+    evidenceItems: [sampleEvidenceItem],
+    emptyTrashEvidenceItems: vi.fn().mockResolvedValue(undefined),
+    reload: vi.fn(),
+  };
+
   const chats = {
     createThread: vi.fn().mockResolvedValue(sampleThread),
     reload: vi.fn(),
@@ -141,9 +153,9 @@ function buildMocks() {
 
   return {
     log, notes, tasks, timeline, timelinesOps, whiteboardOps,
-    standaloneIOCs, chats, foldersOps, tagsOps,
+    standaloneIOCs, evidenceItems, chats, foldersOps, tagsOps,
     sampleNote, sampleTask, sampleEvent, sampleTimeline,
-    sampleWhiteboard, sampleIOC, sampleThread, sampleFolder, sampleTag,
+    sampleWhiteboard, sampleIOC, sampleEvidenceItem, sampleThread, sampleFolder, sampleTag,
   };
 }
 
@@ -164,6 +176,7 @@ describe('useLoggedActions', () => {
         mocks.timelinesOps,
         mocks.whiteboardOps,
         mocks.standaloneIOCs,
+        mocks.evidenceItems,
         mocks.chats,
         mocks.foldersOps,
         mocks.tagsOps,

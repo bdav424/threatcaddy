@@ -50,22 +50,27 @@ export function useNotes(folderId?: string) {
   useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
   const loadNotes = useCallback(async () => {
-    const allNotes = folderId
-      ? await db.notes.where('[folderId+updatedAt]').between([folderId, Dexie.minKey], [folderId, Dexie.maxKey]).toArray()
-      : await db.notes.toArray();
-    const remaining = await purgeOldTrash(allNotes, db.notes);
-    const cache = contentCacheRef.current;
-    for (const note of remaining) {
-      cache.set(note.id, note.content);
+    try {
+      const allNotes = folderId
+        ? await db.notes.where('[folderId+updatedAt]').between([folderId, Dexie.minKey], [folderId, Dexie.maxKey]).toArray()
+        : await db.notes.toArray();
+      const remaining = await purgeOldTrash(allNotes, db.notes);
+      const cache = contentCacheRef.current;
+      for (const note of remaining) {
+        cache.set(note.id, note.content);
+      }
+      // Clean up cache entries for deleted/purged notes
+      const activeIds = new Set(remaining.map(n => n.id));
+      for (const id of cache.keys()) {
+        if (!activeIds.has(id)) cache.delete(id);
+      }
+      if (!mountedRef.current) return;
+      setNotes(remaining);
+    } catch (err) {
+      console.error('Failed to load notes:', err);
+    } finally {
+      if (mountedRef.current) setLoading(false);
     }
-    // Clean up cache entries for deleted/purged notes
-    const activeIds = new Set(remaining.map(n => n.id));
-    for (const id of cache.keys()) {
-      if (!activeIds.has(id)) cache.delete(id);
-    }
-    if (!mountedRef.current) return;
-    setNotes(remaining);
-    setLoading(false);
   }, [folderId]);
 
   useEffect(() => {
