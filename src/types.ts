@@ -167,6 +167,7 @@ export interface Folder {
   papLevel?: string;
   updatedAt?: number;
   tags?: string[];
+  noteTemplateIds?: string[];
   timelineId?: string;
   closureResolution?: ClosureResolution;
   closedReason?: string;
@@ -602,10 +603,63 @@ export interface StandaloneIOC {
   linkedNoteIds?: string[];
   linkedTaskIds?: string[];
   linkedTimelineEventIds?: string[];
+  linkedEvidenceIds?: string[];
   comments?: EntityComment[];
   enrichment?: Record<string, Array<Record<string, unknown>>>;
+  firstSeen?: number;
+  lastSeen?: number;
   assigneeId?: string;
   assigneeName?: string;
+  trashed: boolean;
+  trashedAt?: number;
+  archived: boolean;
+  createdBy?: string;
+  updatedBy?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type EvidenceKind =
+  | 'pdf'
+  | 'docx'
+  | 'doc'
+  | 'rtf'
+  | 'xlsx'
+  | 'xls'
+  | 'image'
+  | 'text'
+  | 'spreadsheet'
+  | 'unknown';
+
+export type EvidenceExtractionStatus = 'extracted' | 'partial' | 'metadata-only';
+
+/** Imported source material kept separate from analyst notes. */
+export interface EvidenceItem {
+  id: string;
+  title: string;
+  folderId?: string;
+  fileName: string;
+  fileType: EvidenceKind;
+  mimeType?: string;
+  size: number;
+  lastModified?: number;
+  imageWidth?: number;
+  imageHeight?: number;
+  imageAspectRatio?: string;
+  imagePixelCount?: number;
+  imageData?: string;
+  imageDataMimeType?: string;
+  imageAnalysis?: string;
+  imageOcrText?: string;
+  content: string;
+  extractionStatus: EvidenceExtractionStatus;
+  extractionWarning?: string;
+  importedAt: number;
+  chunkIndex: number;
+  chunkCount: number;
+  tags: string[];
+  linkedIOCIds?: string[];
+  clsLevel?: string;
   trashed: boolean;
   trashedAt?: number;
   archived: boolean;
@@ -849,6 +903,7 @@ export interface ExportData {
   timelines?: Timeline[];
   whiteboards?: Whiteboard[];
   standaloneIOCs?: StandaloneIOC[];
+  evidenceItems?: EvidenceItem[];
   chatThreads?: ChatThread[];
   agentActions?: AgentAction[];
   agentProfiles?: AgentProfile[];

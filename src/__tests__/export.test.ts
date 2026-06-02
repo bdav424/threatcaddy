@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-explicit-any */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { exportJSON, importJSON, exportNotesMarkdown, sanitizeNote, parseTimelineImport, exportEventsJSON, downloadFile } from '../lib/export';
+import { exportJSON, importJSON, mergeImportJSON, importInvestigationJSON, exportNotesMarkdown, sanitizeNote, sanitizeStandaloneIOC, sanitizeEvidenceItem, parseTimelineImport, exportEventsJSON, downloadFile } from '../lib/export';
 import { db } from '../db';
 import type { Note, TimelineEvent } from '../types';
 
@@ -12,6 +12,9 @@ beforeEach(async () => {
   await db.timelines.clear();
   await db.timelineEvents.clear();
   await db.whiteboards.clear();
+  await db.evidenceItems.clear();
+  await db.standaloneIOCs.clear();
+  await db.chatThreads.clear();
 });
 
 // ---------------------------------------------------------------------------
@@ -227,6 +230,110 @@ describe('sanitizeNote', () => {
 });
 
 // ---------------------------------------------------------------------------
+// sanitizeStandaloneIOC
+// ---------------------------------------------------------------------------
+describe('sanitizeStandaloneIOC', () => {
+  it('preserves enrichment and integration link fields', () => {
+    const result = sanitizeStandaloneIOC({
+      id: 'ioc-1',
+      type: 'domain',
+      value: 'evil.example',
+      confidence: 'high',
+      tags: ['source:integration'],
+      linkedNoteIds: ['note-1'],
+      linkedEvidenceIds: ['evidence-1'],
+      enrichment: {
+        virusTotal: { malicious: 2, harmless: 60 },
+      },
+      firstSeen: 1000,
+      lastSeen: 2000,
+      trashed: false,
+      archived: false,
+      createdAt: 1000,
+      updatedAt: 2000,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.linkedNoteIds).toEqual(['note-1']);
+    expect(result!.linkedEvidenceIds).toEqual(['evidence-1']);
+    expect(result!.firstSeen).toBe(1000);
+    expect(result!.lastSeen).toBe(2000);
+    expect(result!.enrichment?.virusTotal).toHaveLength(1);
+    expect(result!.enrichment?.virusTotal?.[0]).toMatchObject({
+      malicious: 2,
+      harmless: 60,
+      ts: 2000,
+      source: 'import',
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sanitizeEvidenceItem
+// ---------------------------------------------------------------------------
+describe('sanitizeEvidenceItem', () => {
+  it('preserves image evidence metadata and bounded payloads', () => {
+    const result = sanitizeEvidenceItem({
+      id: 'ev1',
+      title: 'Screenshot',
+      fileName: 'weaponized-clipboard.png',
+      fileType: 'image',
+      mimeType: 'image/png',
+      size: 1024,
+      imageWidth: 1200,
+      imageHeight: 800,
+      imageAspectRatio: '3:2',
+      imagePixelCount: 960000,
+      imageData: 'aGVsbG8=',
+      imageDataMimeType: 'image/png',
+      content: '# Evidence: weaponized-clipboard.png',
+      extractionStatus: 'metadata-only',
+      importedAt: 1000,
+      chunkIndex: 1,
+      chunkCount: 1,
+      tags: ['evidence', 'file:png'],
+      trashed: false,
+      archived: false,
+      createdAt: 1000,
+      updatedAt: 1000,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.fileType).toBe('image');
+    expect(result!.imageWidth).toBe(1200);
+    expect(result!.imageHeight).toBe(800);
+    expect(result!.imageData).toBe('aGVsbG8=');
+    expect(result!.imageDataMimeType).toBe('image/png');
+  });
+
+  it('drops image payloads with unsafe or unsupported MIME types', () => {
+    const result = sanitizeEvidenceItem({
+      id: 'ev1',
+      title: 'Unsafe SVG',
+      fileName: 'unsafe.svg',
+      fileType: 'image',
+      imageData: 'aGVsbG8=',
+      imageDataMimeType: 'image/svg+xml',
+      size: 10,
+      content: '# Evidence: unsafe.svg',
+      extractionStatus: 'metadata-only',
+      importedAt: 1000,
+      chunkIndex: 1,
+      chunkCount: 1,
+      tags: [],
+      trashed: false,
+      archived: false,
+      createdAt: 1000,
+      updatedAt: 1000,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.imageData).toBeUndefined();
+    expect(result!.imageDataMimeType).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // exportJSON / importJSON roundtrip
 // ---------------------------------------------------------------------------
 describe('exportJSON / importJSON roundtrip', () => {
@@ -259,7 +366,7 @@ describe('exportJSON / importJSON roundtrip', () => {
     await db.tags.clear();
 
     const counts = await importJSON(json);
-    expect(counts).toEqual({ notes: 1, tasks: 1, folders: 1, tags: 1, timelineEvents: 0, timelines: 0, whiteboards: 0, standaloneIOCs: 0, chatThreads: 0, noteTemplates: 0, playbookTemplates: 0, agentActions: 0, agentProfiles: 0, agentDeployments: 0, agentMeetings: 0 });
+    expect(counts).toEqual({ notes: 1, tasks: 1, folders: 1, tags: 1, timelineEvents: 0, timelines: 0, whiteboards: 0, standaloneIOCs: 0, evidenceItems: 0, chatThreads: 0, noteTemplates: 0, playbookTemplates: 0, agentActions: 0, agentProfiles: 0, agentDeployments: 0, agentMeetings: 0 });
 
     // Verify data integrity
     const notes = await db.notes.toArray();
@@ -331,7 +438,7 @@ describe('exportJSON / importJSON roundtrip', () => {
 
     // Re-import through sanitizers
     const counts = await importJSON(json);
-    expect(counts).toEqual({ notes: 1, tasks: 1, folders: 1, tags: 1, timelineEvents: 1, timelines: 1, whiteboards: 0, standaloneIOCs: 0, chatThreads: 0, noteTemplates: 0, playbookTemplates: 0, agentActions: 0, agentProfiles: 0, agentDeployments: 0, agentMeetings: 0 });
+    expect(counts).toEqual({ notes: 1, tasks: 1, folders: 1, tags: 1, timelineEvents: 1, timelines: 1, whiteboards: 0, standaloneIOCs: 0, evidenceItems: 0, chatThreads: 0, noteTemplates: 0, playbookTemplates: 0, agentActions: 0, agentProfiles: 0, agentDeployments: 0, agentMeetings: 0 });
 
     // Verify Note fields
     const notes = await db.notes.toArray();
@@ -493,6 +600,221 @@ describe('importJSON edge cases', () => {
     expect(counts.timelines).toBe(1);
     const timelines = await db.timelines.toArray();
     expect(timelines[0].name).toBe('Existing TL');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// mergeImportJSON
+// ---------------------------------------------------------------------------
+describe('mergeImportJSON', () => {
+  it('preserves current investigations while merging backup notes into their original investigations', async () => {
+    await db.folders.add({
+      id: 'teampcp',
+      name: 'TeamPCP',
+      order: 0,
+      createdAt: 1000,
+      updatedAt: 5000,
+    });
+    await db.notes.add({
+      id: 'team-note',
+      title: 'TeamPCP - Clean Summary and Working Timeline',
+      content: 'current CaddyAI work',
+      folderId: 'teampcp',
+      tags: [],
+      pinned: false,
+      archived: false,
+      trashed: false,
+      createdAt: 1000,
+      updatedAt: 5000,
+    });
+
+    const backup = {
+      version: 1,
+      exportedAt: 1000,
+      folders: [
+        { id: 'old-case', name: 'FAIR-TRADE DUMPSTER-FIRE', order: 1, createdAt: 1000, updatedAt: 1000 },
+      ],
+      notes: [
+        {
+          id: 'old-note-1',
+          title: 'Imported finding',
+          content: 'older investigation note',
+          folderId: 'old-case',
+          tags: [],
+          pinned: false,
+          archived: false,
+          trashed: false,
+          createdAt: 1000,
+          updatedAt: 1000,
+        },
+        {
+          id: 'old-note-2',
+          title: 'Imported timeline',
+          content: 'older timeline note',
+          folderId: 'old-case',
+          tags: [],
+          pinned: false,
+          archived: false,
+          trashed: false,
+          createdAt: 1000,
+          updatedAt: 1000,
+        },
+      ],
+      tasks: [],
+      tags: [],
+    };
+
+    const result = await mergeImportJSON(JSON.stringify(backup));
+
+    expect(result.tables.notes).toMatchObject({ incoming: 2, added: 2, updated: 0, skipped: 0 });
+    expect(result.tables.folders).toMatchObject({ incoming: 1, added: 1, updated: 0, skipped: 0 });
+    expect(result.noteInvestigations).toEqual([
+      { folderId: 'old-case', folderName: 'FAIR-TRADE DUMPSTER-FIRE', notes: 2, activeNotes: 2 },
+    ]);
+
+    await expect(db.notes.get('team-note')).resolves.toMatchObject({
+      title: 'TeamPCP - Clean Summary and Working Timeline',
+      content: 'current CaddyAI work',
+      folderId: 'teampcp',
+    });
+    const oldNotes = await db.notes.where('folderId').equals('old-case').toArray();
+    expect(oldNotes.map((note) => note.title).sort()).toEqual(['Imported finding', 'Imported timeline']);
+  });
+
+  it('reports skipped backup notes when local copies are already newer', async () => {
+    await db.folders.add({ id: 'case-1', name: 'Existing Case', order: 0, createdAt: 1000, updatedAt: 5000 });
+    await db.notes.add({
+      id: 'n1',
+      title: 'Local newer note',
+      content: 'newer local content',
+      folderId: 'case-1',
+      tags: [],
+      pinned: false,
+      archived: false,
+      trashed: false,
+      createdAt: 1000,
+      updatedAt: 5000,
+    });
+
+    const backup = {
+      version: 1,
+      exportedAt: 1000,
+      folders: [{ id: 'case-1', name: 'Existing Case', order: 0, createdAt: 1000, updatedAt: 1000 }],
+      notes: [{
+        id: 'n1',
+        title: 'Backup older note',
+        content: 'older backup content',
+        folderId: 'case-1',
+        tags: [],
+        pinned: false,
+        archived: false,
+        trashed: false,
+        createdAt: 1000,
+        updatedAt: 1000,
+      }],
+      tasks: [],
+      tags: [],
+    };
+
+    const result = await mergeImportJSON(JSON.stringify(backup));
+
+    expect(result.tables.notes).toMatchObject({ incoming: 1, added: 0, updated: 0, skipped: 1 });
+    await expect(db.notes.get('n1')).resolves.toMatchObject({
+      title: 'Local newer note',
+      content: 'newer local content',
+    });
+  });
+
+  it('treats omitted optional folders as empty during merge import', async () => {
+    const result = await mergeImportJSON(JSON.stringify({
+      version: 1,
+      exportedAt: 1000,
+      notes: [],
+      tasks: [],
+      tags: [],
+    }));
+
+    expect(result.tables.folders).toMatchObject({ incoming: 0, added: 0, updated: 0, skipped: 0 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// importInvestigationJSON
+// ---------------------------------------------------------------------------
+describe('importInvestigationJSON', () => {
+  it('collapses mixed first-class and legacy evidence and remaps linked IOCs once', async () => {
+    const content = [
+      '# Evidence: weaponized-clipboard.txt',
+      '',
+      '**Imported:** 2026-05-21T00:00:00.000Z',
+      '**File type:** TEXT',
+      '**Extraction:** extracted',
+      '',
+      '## Extracted Text',
+      '',
+      'evil.example was observed in the source material.',
+    ].join('\n');
+
+    const result = await importInvestigationJSON(JSON.stringify({
+      version: 1,
+      exportedAt: 1000,
+      folders: [{ id: 'old-case', name: 'Old Case', order: 0, createdAt: 1000, updatedAt: 1000 }],
+      notes: [{
+        id: 'legacy-note',
+        title: 'Evidence - weaponized-clipboard.txt',
+        content,
+        folderId: 'old-case',
+        tags: ['evidence', 'source:file', 'file:txt', 'extraction:extracted'],
+        pinned: false,
+        archived: false,
+        trashed: false,
+        createdAt: 1000,
+        updatedAt: 1000,
+      }],
+      tasks: [],
+      tags: [],
+      standaloneIOCs: [{
+        id: 'ioc-old',
+        type: 'domain',
+        value: 'evil.example',
+        confidence: 'high',
+        folderId: 'old-case',
+        tags: [],
+        trashed: false,
+        archived: false,
+        createdAt: 1000,
+        updatedAt: 1000,
+      }],
+      evidenceItems: [{
+        id: 'evidence-old',
+        title: 'weaponized-clipboard.txt',
+        folderId: 'old-case',
+        fileName: 'weaponized-clipboard.txt',
+        fileType: 'text',
+        size: 123,
+        content,
+        extractionStatus: 'extracted',
+        importedAt: 1000,
+        chunkIndex: 1,
+        chunkCount: 1,
+        tags: ['evidence', 'source:file', 'file:txt', 'extraction:extracted'],
+        linkedIOCIds: ['ioc-old'],
+        trashed: false,
+        archived: false,
+        createdAt: 1000,
+        updatedAt: 1000,
+      }],
+    }));
+
+    expect(result.evidenceItems).toBe(1);
+    expect(result.notes).toBe(0);
+    const evidenceItems = await db.evidenceItems.toArray();
+    const iocs = await db.standaloneIOCs.toArray();
+    expect(evidenceItems).toHaveLength(1);
+    expect(iocs).toHaveLength(1);
+    expect(evidenceItems[0].folderId).toBe(result.folderId);
+    expect(evidenceItems[0].linkedIOCIds).toEqual([iocs[0].id]);
+    expect(evidenceItems[0].linkedIOCIds).not.toContain('ioc-old');
   });
 });
 
