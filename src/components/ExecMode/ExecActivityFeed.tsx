@@ -26,6 +26,7 @@ const CATEGORY_ICONS: Record<ActivityCategory, typeof FileText> = {
   folder: FolderOpen,
   tag: Tag,
   ioc: Shield,
+  evidence: FileText,
   sync: Cloud,
   data: Database,
   'agent-bridge': Bot,

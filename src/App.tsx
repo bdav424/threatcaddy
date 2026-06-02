@@ -19,6 +19,7 @@ import { useTimeline } from './hooks/useTimeline';
 import { useTimelines } from './hooks/useTimelines';
 import { useWhiteboards } from './hooks/useWhiteboards';
 import { useStandaloneIOCs } from './hooks/useStandaloneIOCs';
+import { useEvidenceItems } from './hooks/useEvidenceItems';
 import { useChats } from './hooks/useChats';
 import { useFolders } from './hooks/useFolders';
 import { useTags } from './hooks/useTags';
@@ -26,6 +27,7 @@ import { useSettings } from './hooks/useSettings';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useNoteTemplates } from './hooks/useNoteTemplates';
 import { usePlaybooks } from './hooks/usePlaybooks';
+import { useIntegrations } from './hooks/useIntegrations';
 const PlaybookPicker = lazy(() => import('./components/Playbooks/PlaybookPicker').then(m => ({ default: m.PlaybookPicker })));
 const OperationNameGenerator = lazy(() => import('./components/Common/OperationNameGenerator').then(m => ({ default: m.OperationNameGenerator })));
 import { useActivityLog } from './hooks/useActivityLog';
@@ -36,7 +38,7 @@ import { clipBuffer } from './lib/clipBuffer';
 import { formatBytes, openFilePicker, getDroppedFiles, dispatchFile, type FileOpenDetail } from './lib/file-handler';
 import { hasPendingChanges } from './lib/pending-changes';
 import { useInvestigationData } from './hooks/useInvestigationData';
-import type { Note, Task, TimelineEvent, ChatThread } from './types';
+import type { ConfidenceLevel, Note, StandaloneIOC, Task, TimelineEvent, ChatThread } from './types';
 import { DEFAULT_QUICK_LINKS } from './types';
 const DashboardView = lazy(() => import('./components/Dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
 import { FileText, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
@@ -45,6 +47,8 @@ import { exportJSON, importJSON, mergeImportJSON, downloadFile, exportInvestigat
 import { ConfirmDialog } from './components/Common/ConfirmDialog';
 const SearchOverlay = lazy(() => import('./components/Search/SearchOverlay').then(m => ({ default: m.SearchOverlay })));
 import { extractIOCs, mergeIOCAnalysis } from './lib/ioc-extractor';
+import { autoEnrichImportedIOCs } from './lib/ioc-auto-enrichment';
+import { upsertIOCObservations } from './lib/ioc-observations';
 import { generateSampleInvestigation, isSampleEntity } from './lib/sample-investigation';
 import { db } from './db';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
@@ -117,11 +121,13 @@ function AppDataLayer() {
   const { timelines, createTimeline, updateTimeline, deleteTimeline, reload: reloadTimelines } = useTimelines();
   const { whiteboards, createWhiteboard, updateWhiteboard, deleteWhiteboard, trashWhiteboard, restoreWhiteboard, toggleArchiveWhiteboard, emptyTrashWhiteboards, getFilteredWhiteboards, whiteboardCounts, reload: reloadWhiteboards } = useWhiteboards();
   const standaloneIOCsHook = useStandaloneIOCs();
+  const evidenceItemsHook = useEvidenceItems();
   const chatsHook = useChats();
   const { folders, loading: foldersLoading, createFolder, findOrCreateFolder, updateFolder, deleteFolder, deleteFolderWithContents, trashFolderContents, archiveFolder, unarchiveFolder, reload: reloadFolders } = useFolders();
   const { tags, createTag, updateTag, deleteTag, reload: reloadTags } = useTags();
   const noteTemplatesHook = useNoteTemplates();
   const playbooksHook = usePlaybooks();
+  const integrationsHook = useIntegrations();
 
   const activityLog = useActivityLog();
 
@@ -155,12 +161,13 @@ function AppDataLayer() {
     reloadTimelines();
     reloadWhiteboards();
     standaloneIOCsHook.reload();
+    evidenceItemsHook.reload();
     chatsHook.reload();
     reloadTags();
     noteTemplatesHook.reload();
     playbooksHook.reload();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reloadFolders, notes.reload, tasks.reload, timeline.reload, reloadTimelines, reloadWhiteboards, standaloneIOCsHook.reload, chatsHook.reload, reloadTags, noteTemplatesHook.reload, playbooksHook.reload]);
+  }, [reloadFolders, notes.reload, tasks.reload, timeline.reload, reloadTimelines, reloadWhiteboards, standaloneIOCsHook.reload, evidenceItemsHook.reload, chatsHook.reload, reloadTags, noteTemplatesHook.reload, playbooksHook.reload]);
 
   // Reload folders when agent tools modify folder state (e.g. deploy_agent enables agentEnabled)
   useEffect(() => {
@@ -171,11 +178,11 @@ function AppDataLayer() {
 
   // Reload UI when external agents write data via the agent bridge
   useEffect(() => {
-    const handler = () => { notes.reload(); tasks.reload(); timeline.reload(); standaloneIOCsHook.reload(); chatsHook.reload(); reloadTags(); };
+    const handler = () => { notes.reload(); tasks.reload(); timeline.reload(); standaloneIOCsHook.reload(); evidenceItemsHook.reload(); chatsHook.reload(); reloadTags(); };
     window.addEventListener('threatcaddy:entities-changed', handler);
     return () => window.removeEventListener('threatcaddy:entities-changed', handler);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notes.reload, tasks.reload, timeline.reload, standaloneIOCsHook.reload]);
+  }, [notes.reload, tasks.reload, timeline.reload, standaloneIOCsHook.reload, evidenceItemsHook.reload]);
 
   const syncedFolderIds = useMemo(() => {
     const localIds = new Set(folders.map(f => f.id));
@@ -234,6 +241,7 @@ function AppDataLayer() {
             whiteboardCounts={whiteboardCounts}
             reloadWhiteboards={reloadWhiteboards}
             standaloneIOCsHook={standaloneIOCsHook}
+            evidenceItemsHook={evidenceItemsHook}
             chatsHook={chatsHook}
             folders={folders}
             foldersLoading={foldersLoading}
@@ -253,6 +261,7 @@ function AppDataLayer() {
             reloadTags={reloadTags}
             noteTemplatesHook={noteTemplatesHook}
             playbooksHook={playbooksHook}
+            integrationsHook={integrationsHook}
             activityLog={activityLog}
             auth={auth}
             remoteInvestigations={remoteInvestigations}
@@ -334,6 +343,7 @@ type AppInnerProps = {
   whiteboardCounts: ReturnType<typeof useWhiteboards>['whiteboardCounts'];
   reloadWhiteboards: ReturnType<typeof useWhiteboards>['reload'];
   standaloneIOCsHook: ReturnType<typeof useStandaloneIOCs>;
+  evidenceItemsHook: ReturnType<typeof useEvidenceItems>;
   chatsHook: ReturnType<typeof useChats>;
   folders: ReturnType<typeof useFolders>['folders'];
   foldersLoading: boolean;
@@ -353,6 +363,7 @@ type AppInnerProps = {
   reloadTags: ReturnType<typeof useTags>['reload'];
   noteTemplatesHook: ReturnType<typeof useNoteTemplates>;
   playbooksHook: ReturnType<typeof usePlaybooks>;
+  integrationsHook: ReturnType<typeof useIntegrations>;
   activityLog: ReturnType<typeof useActivityLog>;
   auth: ReturnType<typeof useAuth>;
   remoteInvestigations: ReturnType<typeof useRemoteInvestigations>['remoteInvestigations'];
@@ -381,11 +392,11 @@ const AppInner = memo(function AppInner({
   whiteboards, createWhiteboard, updateWhiteboard, deleteWhiteboard,
   trashWhiteboard, restoreWhiteboard, toggleArchiveWhiteboard,
   emptyTrashWhiteboards, getFilteredWhiteboards, whiteboardCounts, reloadWhiteboards,
-  standaloneIOCsHook, chatsHook,
+  standaloneIOCsHook, evidenceItemsHook, chatsHook,
   folders, foldersLoading, createFolder, findOrCreateFolder, updateFolder, deleteFolder,
   deleteFolderWithContents, trashFolderContents, archiveFolder, unarchiveFolder, reloadFolders,
   tags, createTag, updateTag, deleteTag, reloadTags,
-  noteTemplatesHook, playbooksHook,
+  noteTemplatesHook, playbooksHook, integrationsHook,
   activityLog, auth,
   remoteInvestigations, remoteLoading,
   presenceUsers, syncConflicts, setSyncConflicts, handleResolveConflict, handleResolveAllConflicts,
@@ -484,10 +495,65 @@ const AppInner = memo(function AppInner({
     { timelines, createTimeline, deleteTimeline },
     { whiteboards, createWhiteboard, deleteWhiteboard, trashWhiteboard, restoreWhiteboard, toggleArchiveWhiteboard, emptyTrashWhiteboards, reload: reloadWhiteboards },
     standaloneIOCsHook,
+    evidenceItemsHook,
     { createThread: chatsHook.createThread, reload: chatsHook.reload },
     { folders, createFolder, deleteFolder, deleteFolderWithContents, trashFolderContents, archiveFolder, unarchiveFolder },
     { tags, createTag, deleteTag },
   );
+
+  const autoEnrichCreatedIOCs = useCallback((createdIOCs: StandaloneIOC[]) => {
+    if (settings.tiAutoEnrichImportedIOCs !== true || createdIOCs.length === 0) return;
+    const executionOptions = auth.connected && auth.serverUrl
+      ? { useServerProxy: { serverUrl: auth.serverUrl, getAccessToken: auth.getAccessToken } }
+      : undefined;
+
+    void autoEnrichImportedIOCs(createdIOCs, {
+      maxIOCs: settings.tiAutoEnrichImportedIOCMax ?? 50,
+      investigation: selectedFolder ? { id: selectedFolder.id, name: selectedFolder.name } : undefined,
+      getInstallationsForIOCType: integrationsHook.getInstallationsForIOCType,
+      addRun: integrationsHook.addRun,
+      executionOptions,
+      onComplete: (stats) => {
+        standaloneIOCsHook.reload();
+        if (stats.queued === 0) return;
+        if (stats.missingIntegration > 0 && stats.enriched === 0 && stats.errors === 0) {
+          addToast(
+            'warning',
+            `Imported IOCs were extracted, but VirusTotal auto-check could not run because no enabled VirusTotal integration matched ${stats.missingIntegration} IOC${stats.missingIntegration === 1 ? '' : 's'}.`,
+            7000,
+          );
+        } else {
+          addToast(
+            stats.errors > 0 ? 'warning' : 'success',
+            `VirusTotal auto-check finished for imported IOCs: ${stats.enriched} enriched, ${stats.errors} error${stats.errors === 1 ? '' : 's'}${stats.missingIntegration > 0 ? `, ${stats.missingIntegration} skipped without a matching VirusTotal integration` : ''}.`,
+            5000,
+          );
+        }
+      },
+    });
+  }, [addToast, auth.connected, auth.getAccessToken, auth.serverUrl, integrationsHook.addRun, integrationsHook.getInstallationsForIOCType, selectedFolder, settings.tiAutoEnrichImportedIOCMax, settings.tiAutoEnrichImportedIOCs, standaloneIOCsHook]);
+
+  const loggedCreateIOCWithAuto = useCallback(async (partial?: Partial<StandaloneIOC>) => {
+    const ioc = await loggedCreateIOC(partial);
+    autoEnrichCreatedIOCs([ioc]);
+    return ioc;
+  }, [autoEnrichCreatedIOCs, loggedCreateIOC]);
+
+  const handleUpdateNoteWithIOCObservation = useCallback(async (id: string, updates: Partial<Note>) => {
+    await notes.updateNote(id, updates);
+    if (!updates.iocAnalysis?.iocs?.length) return;
+
+    const note = notes.notes.find((candidate) => candidate.id === id);
+    const result = await upsertIOCObservations(updates.iocAnalysis.iocs, {
+      folderId: updates.folderId ?? note?.folderId,
+      clsLevel: updates.clsLevel ?? note?.clsLevel,
+      source: { kind: 'note', id, title: updates.title ?? note?.title },
+      defaultConfidence: settings.tiDefaultConfidence as ConfidenceLevel | undefined,
+    });
+    if (result.touched.length === 0) return;
+    standaloneIOCsHook.reload();
+    autoEnrichCreatedIOCs(result.touched);
+  }, [autoEnrichCreatedIOCs, notes, settings.tiDefaultConfidence, standaloneIOCsHook]);
 
   const demoProcessedRef = useRef(false);
 
@@ -1622,7 +1688,7 @@ const AppInner = memo(function AppInner({
             allTags={tags}
             allStandaloneIOCs={screensafeStandaloneIOCs}
             filteredStandaloneIOCs={ssFilteredStandaloneIOCs}
-            onCreateIOC={loggedCreateIOC}
+            onCreateIOC={loggedCreateIOCWithAuto}
             onUpdateIOC={standaloneIOCsHook.updateIOC}
             onDeleteIOC={loggedDeleteIOC}
             onTrashIOC={loggedTrashIOC}
@@ -1883,7 +1949,7 @@ const AppInner = memo(function AppInner({
               {selectedNote ? (
                 <NoteEditor
                   note={selectedNote}
-                  onUpdate={notes.updateNote}
+                  onUpdate={handleUpdateNoteWithIOCObservation}
                   onTrash={loggedTrashNote}
                   onRestore={loggedRestoreNote}
                   onTogglePin={loggedTogglePin}
@@ -2029,7 +2095,7 @@ const AppInner = memo(function AppInner({
           open={showIOCForm}
           onClose={() => setShowIOCForm(false)}
           onSubmit={async (data) => {
-            await loggedCreateIOC(data);
+            await loggedCreateIOCWithAuto(data);
             navigateTo('ioc-stats');
           }}
           folders={folders}

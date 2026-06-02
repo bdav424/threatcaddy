@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { Note, Task, TimelineEvent, StandaloneIOC, ChatThread, Folder, Tag, Timeline, Whiteboard } from '../types';
+import type { Note, Task, TimelineEvent, StandaloneIOC, EvidenceItem, ChatThread, Folder, Tag, Timeline, Whiteboard } from '../types';
 
 import type { ActivityCategory, ActivityAction } from '../types';
 
@@ -66,6 +66,15 @@ export function useLoggedActions(
     toggleArchiveIOC(id: string): Promise<void>;
     deleteIOC(id: string): Promise<void>;
     emptyTrashIOCs(): Promise<void>;
+    reload(): void;
+  },
+  evidenceItems: {
+    evidenceItems: EvidenceItem[];
+    trashEvidenceItem?(id: string): Promise<void>;
+    restoreEvidenceItem?(id: string): Promise<void>;
+    toggleArchiveEvidenceItem?(id: string): Promise<void>;
+    deleteEvidenceItem?(id: string): Promise<void>;
+    emptyTrashEvidenceItems(): Promise<void>;
     reload(): void;
   },
   chats: {
@@ -311,6 +320,43 @@ export function useLoggedActions(
     log('ioc', 'empty-trash', `Emptied IOC trash (${count} IOCs)`);
   }, [standaloneIOCs, log]);
 
+  // ─── Evidence Items ───────────────────────────────────────────
+
+  const loggedTrashEvidenceItem = useCallback(async (id: string) => {
+    const item = evidenceItems.evidenceItems.find((e) => e.id === id);
+    if (!evidenceItems.trashEvidenceItem) return;
+    await evidenceItems.trashEvidenceItem(id);
+    log('evidence', 'trash', `Trashed evidence "${item?.title || item?.fileName || 'Untitled'}"`, id, item?.title || item?.fileName);
+  }, [evidenceItems, log]);
+
+  const loggedRestoreEvidenceItem = useCallback(async (id: string) => {
+    const item = evidenceItems.evidenceItems.find((e) => e.id === id);
+    if (!evidenceItems.restoreEvidenceItem) return;
+    await evidenceItems.restoreEvidenceItem(id);
+    log('evidence', 'restore', `Restored evidence "${item?.title || item?.fileName || 'Untitled'}"`, id, item?.title || item?.fileName);
+  }, [evidenceItems, log]);
+
+  const loggedToggleArchiveEvidenceItem = useCallback(async (id: string) => {
+    const item = evidenceItems.evidenceItems.find((e) => e.id === id);
+    if (!evidenceItems.toggleArchiveEvidenceItem) return;
+    await evidenceItems.toggleArchiveEvidenceItem(id);
+    const action = item?.archived ? 'unarchive' : 'archive';
+    log('evidence', action, `${action === 'archive' ? 'Archived' : 'Unarchived'} evidence "${item?.title || item?.fileName || 'Untitled'}"`, id, item?.title || item?.fileName);
+  }, [evidenceItems, log]);
+
+  const loggedDeleteEvidenceItem = useCallback(async (id: string) => {
+    const item = evidenceItems.evidenceItems.find((e) => e.id === id);
+    if (!evidenceItems.deleteEvidenceItem) return;
+    await evidenceItems.deleteEvidenceItem(id);
+    log('evidence', 'delete', `Deleted evidence "${item?.title || item?.fileName || 'Untitled'}"`, id, item?.title || item?.fileName);
+  }, [evidenceItems, log]);
+
+  const loggedEmptyTrashEvidenceItems = useCallback(async () => {
+    const count = evidenceItems.evidenceItems.filter((e) => e.trashed).length;
+    await evidenceItems.emptyTrashEvidenceItems();
+    log('evidence', 'empty-trash', `Emptied evidence trash (${count} items)`);
+  }, [evidenceItems, log]);
+
   // ─── Folders ──────────────────────────────────────────────────
 
   const loggedCreateFolder = useCallback(async (name: string) => {
@@ -328,9 +374,10 @@ export function useLoggedActions(
     timeline.reload();
     whiteboardOps.reload();
     standaloneIOCs.reload();
+    evidenceItems.reload();
     chats.reload();
     log('folder', 'delete', `Deleted investigation "${folder?.name || 'Untitled'}"`, id, folder?.name);
-  }, [foldersOps, notes, tasks, timeline, whiteboardOps, standaloneIOCs, chats, log]);
+  }, [foldersOps, notes, tasks, timeline, whiteboardOps, standaloneIOCs, evidenceItems, chats, log]);
 
   const loggedTrashFolderContents = useCallback(async (id: string) => {
     const folder = foldersOps.folders.find((f) => f.id === id);
@@ -341,8 +388,9 @@ export function useLoggedActions(
     timeline.reload();
     whiteboardOps.reload();
     standaloneIOCs.reload();
+    evidenceItems.reload();
     chats.reload();
-  }, [foldersOps, log, notes, tasks, timeline, whiteboardOps, standaloneIOCs, chats]);
+  }, [foldersOps, log, notes, tasks, timeline, whiteboardOps, standaloneIOCs, evidenceItems, chats]);
 
   const loggedArchiveFolder = useCallback(async (id: string) => {
     const folder = foldersOps.folders.find((f) => f.id === id);
@@ -353,8 +401,9 @@ export function useLoggedActions(
     timeline.reload();
     whiteboardOps.reload();
     standaloneIOCs.reload();
+    evidenceItems.reload();
     chats.reload();
-  }, [foldersOps, log, notes, tasks, timeline, whiteboardOps, standaloneIOCs, chats]);
+  }, [foldersOps, log, notes, tasks, timeline, whiteboardOps, standaloneIOCs, evidenceItems, chats]);
 
   const loggedUnarchiveFolder = useCallback(async (id: string) => {
     const folder = foldersOps.folders.find((f) => f.id === id);
@@ -365,8 +414,9 @@ export function useLoggedActions(
     timeline.reload();
     whiteboardOps.reload();
     standaloneIOCs.reload();
+    evidenceItems.reload();
     chats.reload();
-  }, [foldersOps, log, notes, tasks, timeline, whiteboardOps, standaloneIOCs, chats]);
+  }, [foldersOps, log, notes, tasks, timeline, whiteboardOps, standaloneIOCs, evidenceItems, chats]);
 
   // ─── Tags ─────────────────────────────────────────────────────
 
@@ -398,7 +448,8 @@ export function useLoggedActions(
     await loggedEmptyTrashEvents();
     await loggedEmptyTrashWhiteboards();
     await loggedEmptyTrashIOCs();
-  }, [loggedEmptyTrash, loggedEmptyTrashTasks, loggedEmptyTrashEvents, loggedEmptyTrashWhiteboards, loggedEmptyTrashIOCs]);
+    await loggedEmptyTrashEvidenceItems();
+  }, [loggedEmptyTrash, loggedEmptyTrashTasks, loggedEmptyTrashEvents, loggedEmptyTrashWhiteboards, loggedEmptyTrashIOCs, loggedEmptyTrashEvidenceItems]);
 
   return {
     // Notes
@@ -418,6 +469,9 @@ export function useLoggedActions(
     // IOCs
     loggedCreateIOC, loggedTrashIOC, loggedRestoreIOC,
     loggedToggleArchiveIOC, loggedDeleteIOC, loggedEmptyTrashIOCs,
+    // Evidence
+    loggedTrashEvidenceItem, loggedRestoreEvidenceItem,
+    loggedToggleArchiveEvidenceItem, loggedDeleteEvidenceItem, loggedEmptyTrashEvidenceItems,
     // Folders
     loggedCreateFolder, loggedDeleteFolder,
     loggedTrashFolderContents, loggedArchiveFolder, loggedUnarchiveFolder,

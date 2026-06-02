@@ -260,6 +260,42 @@ export function ThreatIntelConfig() {
           </button>
         </div>
 
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <label className="text-sm text-gray-300">Auto-check imported IOCs</label>
+            <p className="text-[10px] text-gray-600">Runs enabled VirusTotal integrations after IOC creation.</p>
+          </div>
+          <button
+            onClick={() => updateSettings({ tiAutoEnrichImportedIOCs: settings.tiAutoEnrichImportedIOCs !== true })}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${settings.tiAutoEnrichImportedIOCs === true ? 'bg-accent' : 'bg-gray-600'}`}
+            role="switch"
+            aria-checked={settings.tiAutoEnrichImportedIOCs === true}
+          >
+            <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${settings.tiAutoEnrichImportedIOCs === true ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
+          </button>
+        </div>
+
+        {settings.tiAutoEnrichImportedIOCs === true && (
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm text-gray-400">Auto-check limit</label>
+              <p className="text-[10px] text-gray-600">Maximum imported IOCs to check per batch.</p>
+            </div>
+            <select
+              value={settings.tiAutoEnrichImportedIOCMax ?? 50}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                updateSettings({ tiAutoEnrichImportedIOCMax: val === 50 ? undefined : val });
+              }}
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent"
+            >
+              {[10, 25, 50, 100].map((value) => (
+                <option key={value} value={value}>{value}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Default Confidence Level */}
         <div className="flex items-center justify-between">
           <div>

@@ -277,6 +277,8 @@ export interface Settings {
   tiAutoExtractDebounceMs?: number;      // default 2000
   tiEnabledIOCTypes?: string[];          // IOC type strings; undefined = all enabled
   tiDefaultConfidence?: string;          // 'low' | 'medium' | 'high' | 'confirmed'; default 'medium'
+  tiAutoEnrichImportedIOCs?: boolean;    // default false; requires explicit user consent
+  tiAutoEnrichImportedIOCMax?: number;   // default 50
   serverUrl?: string;
   serverDisplayName?: string;
   notificationPrefs?: {
@@ -923,7 +925,7 @@ export const TAG_COLORS = [
 // Activity Log types
 export type ActivityCategory =
   | 'note' | 'task' | 'timeline' | 'whiteboard'
-  | 'folder' | 'tag' | 'ioc' | 'sync' | 'data' | 'chat'
+  | 'folder' | 'tag' | 'ioc' | 'evidence' | 'sync' | 'data' | 'chat'
   | 'agent-bridge';
 
 export type ActivityAction =
@@ -950,7 +952,7 @@ export interface ActivityLogEntry {
 const ACTIVITY_CATEGORY_COLORS: Record<ActivityCategory, string> = {
   note: '#3b82f6', task: '#22c55e', timeline: '#f97316', whiteboard: '#a855f7',
   folder: '#eab308', tag: '#ec4899', ioc: '#ef4444', sync: '#06b6d4',
-  data: '#6366f1', chat: '#8b5cf6', 'agent-bridge': '#14b8a6',
+  evidence: '#0ea5e9', data: '#6366f1', chat: '#8b5cf6', 'agent-bridge': '#14b8a6',
 };
 export const ACTIVITY_CATEGORY_LABELS: Record<ActivityCategory, { label: string; color: string }> = createLabelColorProxy(
   'activityCategory', ACTIVITY_CATEGORY_COLORS,
