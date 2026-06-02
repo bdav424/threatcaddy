@@ -1,5 +1,5 @@
 import { db } from '../db';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, StandaloneIOC, EvidenceItem, ChatThread, ChatMessage, NoteTemplate, PlaybookTemplate, PlaybookStep, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel, IOCAnalysis, IOCEntry, IOCRelationship, TaskComment, NoteAnnotation, QuickLink, LLMProvider, IOCType, TemplateSource, PlaybookStepEntity, AgentAction, EvidenceExtractionStatus, EvidenceKind } from '../types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, StandaloneIOC, EvidenceItem, ChatThread, ChatMessage, NoteTemplate, PlaybookTemplate, PlaybookStep, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel, IOCAnalysis, IOCEntry, IOCRelationship, TaskComment, NoteAnnotation, QuickLink, LLMProvider, IOCType, TemplateSource, PlaybookStepEntity, AgentAction, EvidenceExtractionStatus, EvidenceKind, ProductBaselineAsset, ProductBaselineMetadata, ProductBaselineSourceDocument, ProductBaselineTestFixture } from '../types';
 import { TIMELINE_EVENT_TYPE_LABELS, CONFIDENCE_LEVELS, IOC_TYPE_LABELS } from '../types';
 import { nanoid } from 'nanoid';
 
@@ -937,6 +937,7 @@ function sanitizeNoteTemplate(raw: unknown): NoteTemplate | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   const source = str(r.source, 'user');
+  const productBaseline = sanitizeProductBaselineMetadata(r.productBaseline);
   return {
     id: str(r.id),
     name: str(r.name),
@@ -947,9 +948,82 @@ function sanitizeNoteTemplate(raw: unknown): NoteTemplate | null {
     tags: Array.isArray(r.tags) ? strArr(r.tags) : undefined,
     clsLevel: r.clsLevel != null ? str(r.clsLevel) : undefined,
     source: (VALID_TEMPLATE_SOURCES.includes(source) ? source : 'user') as TemplateSource,
+    productBaseline,
     createdAt: num(r.createdAt, Date.now()),
     updatedAt: num(r.updatedAt, Date.now()),
   };
+}
+
+function sanitizeProductBaselineMetadata(raw: unknown): ProductBaselineMetadata | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  const kind = str(r.kind);
+  const productType = str(r.productType);
+  const renderer = str(r.renderer);
+  const visualFidelity = str(r.visualFidelity);
+  return {
+    schemaVersion: 1,
+    kind: kind === 'docx-template' ? 'docx-template' : 'markdown',
+    productType: ['analysis-report', 'intel-note', 'executive-brief', 'custom'].includes(productType)
+      ? productType as ProductBaselineMetadata['productType']
+      : 'custom',
+    importedAt: num(r.importedAt, Date.now()),
+    importedFrom: r.importedFrom != null ? str(r.importedFrom) : undefined,
+    renderer: renderer === 'docx-template' ? 'docx-template' : 'markdown',
+    visualFidelity: ['placeholder', 'structural', 'word-template'].includes(visualFidelity)
+      ? visualFidelity as ProductBaselineMetadata['visualFidelity']
+      : 'placeholder',
+    sourceDocuments: sanitizeProductBaselineDocs(r.sourceDocuments),
+    testFixtures: sanitizeProductBaselineFixtures(r.testFixtures),
+    assets: sanitizeProductBaselineAssets(r.assets),
+    layoutNotes: Array.isArray(r.layoutNotes) ? strArr(r.layoutNotes) : undefined,
+    sourceNoteRules: Array.isArray(r.sourceNoteRules) ? strArr(r.sourceNoteRules) : undefined,
+    requiredFields: Array.isArray(r.requiredFields) ? strArr(r.requiredFields) : undefined,
+  };
+}
+
+function sanitizeProductBaselineDocs(raw: unknown): ProductBaselineSourceDocument[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const docs = raw.flatMap((item): ProductBaselineSourceDocument[] => {
+    if (!item || typeof item !== 'object') return [];
+    const r = item as Record<string, unknown>;
+    const name = str(r.name).trim();
+    if (!name) return [];
+    const type = str(r.type);
+    return [{
+      name,
+      type: ['docx', 'pdf', 'markdown', 'json', 'other'].includes(type) ? type as ProductBaselineSourceDocument['type'] : undefined,
+      path: r.path != null ? str(r.path) : undefined,
+      sha256: r.sha256 != null ? str(r.sha256) : undefined,
+      role: r.role != null ? str(r.role) : undefined,
+      notes: r.notes != null ? str(r.notes).slice(0, 2000) : undefined,
+    }];
+  });
+  return docs.length > 0 ? docs : undefined;
+}
+
+function sanitizeProductBaselineFixtures(raw: unknown): ProductBaselineTestFixture[] | undefined {
+  return sanitizeProductBaselineDocs(raw) as ProductBaselineTestFixture[] | undefined;
+}
+
+function sanitizeProductBaselineAssets(raw: unknown): ProductBaselineAsset[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const assets = raw.flatMap((item): ProductBaselineAsset[] => {
+    if (!item || typeof item !== 'object') return [];
+    const r = item as Record<string, unknown>;
+    const name = str(r.name).trim();
+    if (!name) return [];
+    const role = str(r.role);
+    return [{
+      name,
+      role: ['docx-template', 'preview', 'image', 'context', 'other'].includes(role) ? role as ProductBaselineAsset['role'] : undefined,
+      mimeType: r.mimeType != null ? str(r.mimeType) : undefined,
+      data: typeof r.data === 'string' ? r.data.slice(0, 20_000_000) : undefined,
+      path: r.path != null ? str(r.path) : undefined,
+      notes: r.notes != null ? str(r.notes).slice(0, 2000) : undefined,
+    }];
+  });
+  return assets.length > 0 ? assets : undefined;
 }
 
 function sanitizePlaybookStep(raw: unknown): PlaybookStep | null {

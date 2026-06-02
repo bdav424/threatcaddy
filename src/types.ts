@@ -830,7 +830,7 @@ export const PRIORITY_COLORS: Record<Priority, string> = {
 export const DEFAULT_CLS_LEVELS = ['TLP:CLEAR', 'TLP:GREEN', 'TLP:AMBER', 'TLP:AMBER+STRICT', 'TLP:RED'];
 export const DEFAULT_PAP_LEVELS = ['PAP:WHITE', 'PAP:GREEN', 'PAP:AMBER', 'PAP:RED'];
 
-// OCI Sync types
+// Shared sync types
 export interface SharedItemEnvelope {
   version: 1;
   type: 'note' | 'clip' | 'ioc-report' | 'full-backup';
@@ -843,6 +843,52 @@ export interface SharedItemEnvelope {
 
 export type TemplateSource = 'builtin' | 'user' | 'team';
 
+export type ProductBaselineDocumentType = 'docx' | 'pdf' | 'markdown' | 'json' | 'other';
+export type ProductBaselineAssetRole = 'docx-template' | 'preview' | 'image' | 'context' | 'other';
+
+export interface ProductBaselineSourceDocument {
+  name: string;
+  type?: ProductBaselineDocumentType;
+  path?: string;
+  sha256?: string;
+  role?: string;
+  notes?: string;
+}
+
+export interface ProductBaselineTestFixture {
+  name: string;
+  type?: ProductBaselineDocumentType;
+  path?: string;
+  sha256?: string;
+  role?: string;
+  notes?: string;
+}
+
+export interface ProductBaselineAsset {
+  name: string;
+  role?: ProductBaselineAssetRole;
+  mimeType?: string;
+  data?: string;
+  path?: string;
+  notes?: string;
+}
+
+export interface ProductBaselineMetadata {
+  schemaVersion: 1;
+  kind: 'markdown' | 'docx-template';
+  productType: 'analysis-report' | 'intel-note' | 'executive-brief' | 'custom';
+  importedAt: number;
+  importedFrom?: string;
+  renderer: 'markdown' | 'docx-template';
+  visualFidelity: 'placeholder' | 'structural' | 'word-template';
+  sourceDocuments?: ProductBaselineSourceDocument[];
+  testFixtures?: ProductBaselineTestFixture[];
+  assets?: ProductBaselineAsset[];
+  layoutNotes?: string[];
+  sourceNoteRules?: string[];
+  requiredFields?: string[];
+}
+
 /** A reusable template for creating pre-structured notes (e.g., triage forms, IR reports). */
 export interface NoteTemplate {
   id: string;
@@ -854,6 +900,7 @@ export interface NoteTemplate {
   tags?: string[];
   clsLevel?: string;
   source: TemplateSource;
+  productBaseline?: ProductBaselineMetadata;
   createdBy?: string;
   updatedBy?: string;
   createdAt: number;
@@ -861,6 +908,105 @@ export interface NoteTemplate {
 }
 
 // ─── Investigation Playbooks ────────────────────────────────────
+
+export type CtiSourceId = 'virustotal' | 'censys' | 'flashpoint';
+export type CtiSlashSource = CtiSourceId | 'all';
+export type CtiEvidenceStatus = 'ok' | 'partial' | 'error' | 'skipped';
+export type CtiEvidenceValue = string | number | boolean | string[] | number[] | Record<string, unknown> | null;
+
+export interface CtiTemplateField {
+  key: string;
+  label: string;
+  format?: 'text' | 'code' | 'list' | 'multiline';
+  required?: boolean;
+  fallback?: string;
+}
+
+export interface CtiSourceTemplateSection {
+  title: string;
+  fields: CtiTemplateField[];
+}
+
+export interface CtiSourceTemplate {
+  id: string;
+  source: CtiSourceId;
+  label: string;
+  active: boolean;
+  description?: string;
+  hostTool?: string;
+  sections: CtiSourceTemplateSection[];
+  hiddenSections?: string[];
+  showRawJson?: boolean;
+  caveatMode?: 'append' | 'replace' | 'hide' | 'hidden';
+  pivotMode?: 'append' | 'replace' | 'hide' | 'hidden' | 'compact';
+  caveats: string[];
+}
+
+export interface CtiSlashCommand {
+  command: string;
+  source: CtiSlashSource;
+  target: string;
+}
+
+export interface CtiSourcePlanItem {
+  source: CtiSourceId;
+  sourceLabel: string;
+  tool: string;
+  input: Record<string, unknown>;
+  target?: string;
+  templateId: string;
+}
+
+export interface CtiSkippedSource {
+  source: CtiSourceId;
+  sourceLabel: string;
+  reason: string;
+  inactive?: boolean;
+}
+
+export interface CtiHostParsedResult {
+  status: CtiEvidenceStatus;
+  ok: boolean;
+  data?: unknown;
+  raw?: unknown;
+  rawText?: string;
+  warnings: string[];
+  error?: string;
+}
+
+export interface CtiEvidence {
+  source: CtiSourceId;
+  sourceLabel: string;
+  sourceKey: CtiSourceId;
+  sourceName: string;
+  observable?: string;
+  status: CtiEvidenceStatus;
+  verdict?: string;
+  toolName?: string;
+  input?: Record<string, unknown>;
+  sections: Record<string, CtiEvidenceValue | undefined>;
+  fields: Record<string, CtiEvidenceValue | undefined>;
+  highlights?: string[];
+  caveats: string[];
+  warnings: string[];
+  error?: string;
+  recommendedPivots: string[];
+  raw?: unknown;
+}
+
+export interface CtiSourceRunResult {
+  source: CtiSourceId;
+  sourceLabel: string;
+  tool: string;
+  input: Record<string, unknown>;
+  target?: string;
+  templateId?: string;
+  status?: CtiEvidenceStatus;
+  parsed?: CtiHostParsedResult;
+  evidence: CtiEvidence;
+  skipped?: boolean;
+  error?: string;
+}
 
 export type PlaybookStepEntity = 'task' | 'note';
 
