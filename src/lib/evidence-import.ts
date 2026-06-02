@@ -1025,7 +1025,7 @@ function extractRtfText(rtf: string): string {
         if (IGNORABLE_RTF_DESTINATIONS.has(word)) {
           skipGroupDepth = stack.length;
         } else if (!isSkippingRtfGroup(stack, skipGroupDepth)) {
-          if (word === 'signed URL' || word === 'line') text += '\n';
+          if (word === 'par' || word === 'line') text += '\n';
           else if (word === 'tab') text += '\t';
           else if (word === 'emdash' || word === 'endash') text += '-';
           else if (word === 'bullet') text += '- ';
