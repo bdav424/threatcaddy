@@ -35,7 +35,6 @@ import { useTimeline } from './hooks/useTimeline';
 import { useTimelines } from './hooks/useTimelines';
 import { useWhiteboards } from './hooks/useWhiteboards';
 import { useStandaloneIOCs } from './hooks/useStandaloneIOCs';
-import { useIntegrations } from './hooks/useIntegrations';
 import { useEvidenceItems } from './hooks/useEvidenceItems';
 import { useChats } from './hooks/useChats';
 import { useFolders } from './hooks/useFolders';
@@ -44,6 +43,7 @@ import { useSettings } from './hooks/useSettings';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useNoteTemplates } from './hooks/useNoteTemplates';
 import { usePlaybooks } from './hooks/usePlaybooks';
+import { useIntegrations } from './hooks/useIntegrations';
 const PlaybookPicker = lazy(() => import('./components/Playbooks/PlaybookPicker').then(m => ({ default: m.PlaybookPicker })));
 const OperationNameGenerator = lazy(() => import('./components/Common/OperationNameGenerator').then(m => ({ default: m.OperationNameGenerator })));
 import { useActivityLog } from './hooks/useActivityLog';
@@ -237,13 +237,13 @@ function AppDataLayer() {
   const { timelines, createTimeline, updateTimeline, deleteTimeline, reload: reloadTimelines } = useTimelines();
   const { whiteboards, createWhiteboard, updateWhiteboard, deleteWhiteboard, trashWhiteboard, restoreWhiteboard, toggleArchiveWhiteboard, emptyTrashWhiteboards, getFilteredWhiteboards, whiteboardCounts, reload: reloadWhiteboards } = useWhiteboards();
   const standaloneIOCsHook = useStandaloneIOCs();
-  const integrations = useIntegrations();
   const evidenceItemsHook = useEvidenceItems();
   const chatsHook = useChats();
   const { folders, loading: foldersLoading, createFolder, findOrCreateFolder, updateFolder, deleteFolder, deleteFolderWithContents, trashFolderContents, archiveFolder, unarchiveFolder, reload: reloadFolders } = useFolders();
   const { tags, createTag, updateTag, deleteTag, reload: reloadTags } = useTags();
   const noteTemplatesHook = useNoteTemplates();
   const playbooksHook = usePlaybooks();
+  const integrationsHook = useIntegrations();
 
   const activityLog = useActivityLog();
 
@@ -358,7 +358,6 @@ function AppDataLayer() {
             whiteboardCounts={whiteboardCounts}
             reloadWhiteboards={reloadWhiteboards}
             standaloneIOCsHook={standaloneIOCsHook}
-            integrations={integrations}
             evidenceItemsHook={evidenceItemsHook}
             chatsHook={chatsHook}
             folders={folders}
@@ -379,6 +378,7 @@ function AppDataLayer() {
             reloadTags={reloadTags}
             noteTemplatesHook={noteTemplatesHook}
             playbooksHook={playbooksHook}
+            integrationsHook={integrationsHook}
             activityLog={activityLog}
             auth={auth}
             remoteInvestigations={remoteInvestigations}
@@ -460,7 +460,6 @@ type AppInnerProps = {
   whiteboardCounts: ReturnType<typeof useWhiteboards>['whiteboardCounts'];
   reloadWhiteboards: ReturnType<typeof useWhiteboards>['reload'];
   standaloneIOCsHook: ReturnType<typeof useStandaloneIOCs>;
-  integrations: ReturnType<typeof useIntegrations>;
   evidenceItemsHook: ReturnType<typeof useEvidenceItems>;
   chatsHook: ReturnType<typeof useChats>;
   folders: ReturnType<typeof useFolders>['folders'];
@@ -481,6 +480,7 @@ type AppInnerProps = {
   reloadTags: ReturnType<typeof useTags>['reload'];
   noteTemplatesHook: ReturnType<typeof useNoteTemplates>;
   playbooksHook: ReturnType<typeof usePlaybooks>;
+  integrationsHook: ReturnType<typeof useIntegrations>;
   activityLog: ReturnType<typeof useActivityLog>;
   auth: ReturnType<typeof useAuth>;
   remoteInvestigations: ReturnType<typeof useRemoteInvestigations>['remoteInvestigations'];
@@ -509,11 +509,11 @@ const AppInner = memo(function AppInner({
   whiteboards, createWhiteboard, updateWhiteboard, deleteWhiteboard,
   trashWhiteboard, restoreWhiteboard, toggleArchiveWhiteboard,
   emptyTrashWhiteboards, getFilteredWhiteboards, whiteboardCounts, reloadWhiteboards,
-  standaloneIOCsHook, integrations, evidenceItemsHook, chatsHook,
+  standaloneIOCsHook, evidenceItemsHook, chatsHook,
   folders, foldersLoading, createFolder, findOrCreateFolder, updateFolder, deleteFolder,
   deleteFolderWithContents, trashFolderContents, archiveFolder, unarchiveFolder, reloadFolders,
   tags, createTag, updateTag, deleteTag, reloadTags,
-  noteTemplatesHook, playbooksHook,
+  noteTemplatesHook, playbooksHook, integrationsHook,
   activityLog, auth,
   remoteInvestigations, remoteLoading,
   presenceUsers, syncConflicts, setSyncConflicts, handleResolveConflict, handleResolveAllConflicts,
@@ -693,8 +693,8 @@ const AppInner = memo(function AppInner({
     void autoEnrichImportedIOCs(createdIOCs, {
       maxIOCs: settings.tiAutoEnrichImportedIOCMax ?? 50,
       investigation: selectedFolder ? { id: selectedFolder.id, name: selectedFolder.name } : undefined,
-      getInstallationsForIOCType: integrations.getInstallationsForIOCType,
-      addRun: integrations.addRun,
+      getInstallationsForIOCType: integrationsHook.getInstallationsForIOCType,
+      addRun: integrationsHook.addRun,
       executionOptions,
       onComplete: (stats) => {
         standaloneIOCsHook.reload();
@@ -713,7 +713,7 @@ const AppInner = memo(function AppInner({
         }
       },
     });
-  }, [addToast, auth.connected, auth.getAccessToken, auth.serverUrl, integrations.addRun, integrations.getInstallationsForIOCType, selectedFolder, settings.tiAutoEnrichImportedIOCMax, settings.tiAutoEnrichImportedIOCs, standaloneIOCsHook]);
+  }, [addToast, auth.connected, auth.getAccessToken, auth.serverUrl, integrationsHook.addRun, integrationsHook.getInstallationsForIOCType, selectedFolder, settings.tiAutoEnrichImportedIOCMax, settings.tiAutoEnrichImportedIOCs, standaloneIOCsHook]);
 
   const loggedCreateIOCWithAuto = useCallback(async (partial?: Partial<StandaloneIOC>) => {
     const ioc = await loggedCreateIOC(partial);
