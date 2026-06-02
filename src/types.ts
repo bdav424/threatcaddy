@@ -1308,8 +1308,6 @@ export interface NoteTemplate {
   updatedAt: number;
 }
 
-// ─── Investigation Playbooks ────────────────────────────────────
-
 export type PlaybookStepEntity = 'task' | 'note';
 
 export interface PlaybookStep {

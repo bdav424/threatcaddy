@@ -17,6 +17,7 @@ function makeToolUse(name: string, input: Record<string, unknown> = {}): ToolUse
   return { type: 'tool_use', id: `tool-${name}`, name, input };
 }
 
+
 describe('product baselines', () => {
   beforeEach(async () => {
     await db.notes.clear();
