@@ -1,6 +1,27 @@
 import { createLabelProxy, createLabelColorProxy, noteColorLabel, iocTableColumnLabel } from './lib/i18n-labels';
 import type { EmailAccountConfig } from './lib/email-onboarding';
 
+export type EventSource =
+  | 'ThreatCaddy Work' | 'Research' | 'Family' | 'Zoom' | 'PTO'
+  | 'Google Calendar' | 'Microsoft 365' | 'CalDAV';
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  source: EventSource;
+  detail: string;
+  location: string;
+  conferenceApp?: string;
+  remoteId?: string;
+  syncAccountId?: string;
+  etag?: string;
+  updatedAt?: number;
+  syncState?: 'local' | 'dirty' | 'synced';
+}
+
 /** An investigation note with markdown content, tags, and optional IOC analysis. */
 export interface Note {
   id: string;

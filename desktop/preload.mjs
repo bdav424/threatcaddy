@@ -15,6 +15,16 @@ contextBridge.exposeInMainWorld('threatcaddyMail', {
     ipcRenderer.invoke('threatcaddy-mail:execute', { action, credentialReferenceId, params }),
 });
 
+// Calendar sync bridge — pull/push via main-process IPC (tokens stay in main)
+contextBridge.exposeInMainWorld('threatcaddy', {
+  calendar: {
+    pull:   (accountId, range)    => ipcRenderer.invoke('calendar:pull',   accountId, range),
+    create: (accountId, event)    => ipcRenderer.invoke('calendar:create', accountId, event),
+    update: (accountId, event)    => ipcRenderer.invoke('calendar:update', accountId, event),
+    remove: (accountId, remoteId) => ipcRenderer.invoke('calendar:remove', accountId, remoteId),
+  },
+});
+
 contextBridge.exposeInMainWorld('threatcaddyDesktop', {
   isDesktop: true,
   platform: process.platform,

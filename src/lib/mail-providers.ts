@@ -77,7 +77,7 @@ export const MAIL_PROVIDERS: Record<MailProviderId, MailProviderPreset> = {
     oauth: {
       authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
       tokenUrl: 'https://oauth2.googleapis.com/token',
-      scopes: ['https://mail.google.com/'],
+      scopes: ['https://mail.google.com/', 'https://www.googleapis.com/auth/calendar'],
       sendVia: 'smtp', // Gmail SMTP accepts XOAUTH2
       clientKind: 'desktop-loopback-pkce',
     },
@@ -96,6 +96,7 @@ export const MAIL_PROVIDERS: Record<MailProviderId, MailProviderPreset> = {
       scopes: [
         'https://outlook.office365.com/IMAP.AccessAsUser.All',
         'https://outlook.office365.com/SMTP.Send',
+        'https://graph.microsoft.com/Calendars.ReadWrite',
         'offline_access',
       ],
       // Many consumer Outlook.com mailboxes have SMTP AUTH disabled server-side; if XOAUTH2

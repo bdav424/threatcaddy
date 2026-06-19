@@ -40,25 +40,14 @@ import { useWorkspacePanel } from '../WorkspacePanels/useWorkspacePanels';
 import { cn } from '../../lib/utils';
 import { calendarCaddyPanelRegistrations } from './workspacePanelRegistrations';
 import { sortEvents } from './calendar-utils';
+import { useCalendarSync, type PendingDeletion, type CalendarSyncAccount } from '../../hooks/useCalendarSync';
+import type { CalendarEvent, EventSource } from '../../types';
 
 type CalendarViewMode = 'week' | 'month' | 'year';
 type CalendarDensity = 'condensed' | 'medium' | 'spacious';
 type RepeatMode = 'none' | 'daily' | 'weekly';
-type EventSource = 'ThreatCaddy Work' | 'Research' | 'Family' | 'Zoom' | 'PTO';
 type WeekSnapMinutes = 15 | 30;
 type CalendarStampId = 'birthday' | 'holiday' | 'vacation' | 'school' | 'travel' | 'focus' | 'family' | 'medical' | 'deadline' | 'pto' | 'parental';
-
-interface CalendarEvent {
-  id: string;
-  title: string;
-  start: string;
-  end: string;
-  allDay: boolean;
-  source: EventSource;
-  detail: string;
-  location: string;
-  conferenceApp?: string;
-}
 
 interface EventDraft {
   id: string | null;
@@ -130,6 +119,8 @@ const DEFAULT_EVENT_DURATION_MINUTES = 30;
 const MAX_STAMPS_PER_DAY = 3;
 const DAY_STAMP_STORAGE_KEY = 'tc-calendarcaddy-day-stamps-v2';
 const EVENT_STAMP_STORAGE_KEY = 'tc-calendarcaddy-event-stamps-v1';
+const EVENT_STORAGE_KEY = 'tc-calendarcaddy-events-v1';
+const EVENT_DELETION_KEY = 'tc-calendarcaddy-pending-deletions-v1';
 const COMPACT_TITLEBAR_STAMP_PRIORITY: CalendarStampId[] = ['focus', 'medical', 'deadline', 'pto', 'school', 'travel'];
 const COMPACT_VIEW_LABELS: Record<CalendarViewMode, string> = { week: 'W', month: 'M', year: 'Y' };
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -1009,7 +1000,16 @@ export function CalendarCaddyWorkspaceContent({
   const [today] = useState(() => getCalendarToday());
   const [displayDate, setDisplayDate] = useState(() => startOfMonth(today));
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(today));
-  const [events, setEvents] = useState<CalendarEvent[]>(() => sortEvents(initialEvents));
+  const [events, setEvents] = useState<CalendarEvent[]>(() => {
+    try {
+      const raw = localStorage.getItem(EVENT_STORAGE_KEY);
+      if (raw) return sortEvents(JSON.parse(raw) as CalendarEvent[]);
+    } catch { /* fall through to seed */ }
+    return sortEvents(initialEvents);
+  });
+  const [pendingDeletions, setPendingDeletions] = useState<PendingDeletion[]>(() => {
+    try { return JSON.parse(localStorage.getItem(EVENT_DELETION_KEY) ?? '[]'); } catch { return []; }
+  });
   const [assistantInput, setAssistantInput] = useState('');
   const [assistantPreview, setAssistantPreview] = useState<AssistantPreview | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -1044,6 +1044,12 @@ export function CalendarCaddyWorkspaceContent({
     }
     selectedAgendaPanel.setMode(mode);
   }, [onWorkspaceOwnPanel, selectedAgendaPanel]);
+
+  // Calendar sync — no accounts wired yet; button renders and will error gracefully
+  const calendarAccounts: CalendarSyncAccount[] = [];
+  const { syncing, lastSyncedAt, error: syncError, sync } = useCalendarSync(
+    events, setEvents, pendingDeletions, setPendingDeletions, calendarAccounts, null,
+  );
 
   const density = densityClasses[densityMode];
   const activeStamp = activeStampId ? STAMP_BY_ID[activeStampId] : null;
@@ -1085,6 +1091,14 @@ export function CalendarCaddyWorkspaceContent({
       // Calendar stamping remains usable even if local persistence is unavailable.
     }
   }, [eventStamps]);
+
+  useEffect(() => {
+    try { localStorage.setItem(EVENT_STORAGE_KEY, JSON.stringify(events)); } catch { /* ok */ }
+  }, [events]);
+
+  useEffect(() => {
+    try { localStorage.setItem(EVENT_DELETION_KEY, JSON.stringify(pendingDeletions)); } catch { /* ok */ }
+  }, [pendingDeletions]);
 
   useEffect(() => {
     if (!selectedEventId) {
@@ -1549,6 +1563,8 @@ export function CalendarCaddyWorkspaceContent({
             detail: draft.detail.trim(),
             location: draft.location.trim(),
             conferenceApp: draft.conferenceApp.trim(),
+            syncState: event.remoteId ? 'dirty' : 'local',
+            updatedAt: Date.now(),
           }
           : event
       ))));
@@ -1572,6 +1588,8 @@ export function CalendarCaddyWorkspaceContent({
         detail: draft.detail.trim(),
         location: draft.location.trim(),
         conferenceApp: draft.conferenceApp.trim(),
+        syncState: 'local',
+        updatedAt: Date.now(),
       } satisfies CalendarEvent;
     });
 
@@ -1600,6 +1618,8 @@ export function CalendarCaddyWorkspaceContent({
       detail: '',
       location: '',
       conferenceApp: '',
+      syncState: 'local',
+      updatedAt: Date.now(),
     };
 
     setEvents((current) => sortEvents([...current, event]));
@@ -1622,6 +1642,8 @@ export function CalendarCaddyWorkspaceContent({
       detail: '',
       location: '',
       conferenceApp: '',
+      syncState: 'local',
+      updatedAt: Date.now(),
     };
 
     setEvents((current) => sortEvents([...current, event]));
@@ -1638,6 +1660,11 @@ export function CalendarCaddyWorkspaceContent({
       return;
     }
 
+    const removedDraft = events.find((e) => e.id === draft.id);
+    if (removedDraft?.remoteId && removedDraft.syncAccountId) {
+      const { remoteId, syncAccountId } = removedDraft;
+      setPendingDeletions((cur) => [...cur, { remoteId, syncAccountId }]);
+    }
     setEvents((current) => current.filter((event) => event.id !== draft.id));
     setEventStamps((current) => {
       const next = { ...current };
@@ -1651,6 +1678,10 @@ export function CalendarCaddyWorkspaceContent({
 
   const deleteEvent = (eventId: string) => {
     const event = events.find((item) => item.id === eventId);
+    if (event?.remoteId && event.syncAccountId) {
+      const { remoteId, syncAccountId } = event;
+      setPendingDeletions((cur) => [...cur, { remoteId, syncAccountId }]);
+    }
     setEvents((current) => current.filter((item) => item.id !== eventId));
     setEventStamps((current) => {
       const next = { ...current };
@@ -1759,6 +1790,8 @@ export function CalendarCaddyWorkspaceContent({
         start: nextStart.toISOString(),
         end: nextEnd.toISOString(),
         allDay: false,
+        syncState: event.remoteId ? 'dirty' : 'local',
+        updatedAt: Date.now(),
       };
     })));
     setSelectedEventId(eventId);
@@ -1808,12 +1841,12 @@ export function CalendarCaddyWorkspaceContent({
         if (resize.edge === 'start') {
           const latestStart = addMinutes(resize.originalEnd, -weekSnapMinutes);
           const nextStart = point.getTime() < latestStart.getTime() ? point : latestStart;
-          return { ...calendarEvent, start: nextStart.toISOString(), allDay: false };
+          return { ...calendarEvent, start: nextStart.toISOString(), allDay: false, syncState: calendarEvent.remoteId ? 'dirty' : 'local', updatedAt: Date.now() };
         }
 
         const earliestEnd = addMinutes(resize.originalStart, weekSnapMinutes);
         const nextEnd = point.getTime() > earliestEnd.getTime() ? point : earliestEnd;
-        return { ...calendarEvent, end: nextEnd.toISOString(), allDay: false };
+        return { ...calendarEvent, end: nextEnd.toISOString(), allDay: false, syncState: calendarEvent.remoteId ? 'dirty' : 'local', updatedAt: Date.now() };
       })));
       setStatusMessage('Resizing selected event.');
       return;
@@ -2788,8 +2821,19 @@ export function CalendarCaddyWorkspaceContent({
                 <button type="button" className={cn('flex items-center justify-center border border-border-subtle bg-bg-raised/70 text-text-primary transition-colors hover:border-border-medium hover:bg-bg-hover', density.toolbarIconButton)} aria-label="Calendar settings">
                   <Settings size={density.toolbarIconSize} />
                 </button>
-                <button type="button" className={cn('flex items-center justify-center border border-border-subtle bg-bg-raised/70 text-text-primary transition-colors hover:border-border-medium hover:bg-bg-hover', density.toolbarIconButton)} aria-label="Refresh calendar">
-                  <RefreshCw size={density.toolbarIconSize} />
+                <button
+                  type="button"
+                  onClick={() => { void sync(); }}
+                  disabled={syncing}
+                  aria-label="Sync calendar with connected accounts"
+                  title={syncError ?? (lastSyncedAt ? `Last synced ${new Date(lastSyncedAt).toLocaleTimeString()}` : 'Sync with connected accounts')}
+                  className={cn(
+                    'inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border-subtle px-3 py-1.5 text-[13px] font-medium transition-colors',
+                    syncing ? 'opacity-60' : syncError ? 'text-red-400 hover:bg-bg-hover' : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary',
+                  )}
+                >
+                  <RefreshCw size={14} className={syncing ? 'animate-spin' : undefined} />
+                  {syncing ? 'Syncing…' : 'Sync'}
                 </button>
               </div>
             )}

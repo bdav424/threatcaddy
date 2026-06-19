@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { registerMailBridge } from './mail-bridge.mjs';
+import * as cal from './mail-calendar-sync.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -62,6 +63,64 @@ function createWindow() {
 
   applyWindowGlass(win, {});
 }
+
+// In-memory account registry (populated by the renderer via a future settings IPC).
+// For v1, accounts are stored in Settings (renderer) — this map caches them for IPC handlers.
+const accountRegistry = new Map();
+
+function getAccount(accountId) {
+  const a = accountRegistry.get(accountId);
+  if (!a) throw new Error(`No account registered for id: ${accountId}`);
+  return a;
+}
+
+ipcMain.handle('calendar:register-account', (_e, account) => {
+  accountRegistry.set(account.id, account);
+  return { ok: true };
+});
+
+async function tokenFor(account) {
+  if (account.provider === 'google') {
+    return { google: account.tokens.accessToken };
+  }
+  if (account.provider === 'microsoft') {
+    const graphToken = await cal.getGraphToken(account.tokens.refreshToken, account.clientId);
+    return { graph: graphToken };
+  }
+  throw new Error('Calendar sync supports Google and Microsoft today.');
+}
+
+ipcMain.handle('calendar:pull', async (_e, accountId, range) => {
+  const a = getAccount(accountId);
+  const t = await tokenFor(a);
+  return a.provider === 'google'
+    ? cal.fetchGoogleCalendar(t.google, range)
+    : cal.fetchMicrosoftCalendar(t.graph, range);
+});
+
+ipcMain.handle('calendar:create', async (_e, accountId, event) => {
+  const a = getAccount(accountId);
+  const t = await tokenFor(a);
+  return a.provider === 'google'
+    ? cal.createGoogleEvent(t.google, event)
+    : cal.createMicrosoftEvent(t.graph, event);
+});
+
+ipcMain.handle('calendar:update', async (_e, accountId, event) => {
+  const a = getAccount(accountId);
+  const t = await tokenFor(a);
+  return a.provider === 'google'
+    ? cal.updateGoogleEvent(t.google, event)
+    : cal.updateMicrosoftEvent(t.graph, event);
+});
+
+ipcMain.handle('calendar:remove', async (_e, accountId, remoteId) => {
+  const a = getAccount(accountId);
+  const t = await tokenFor(a);
+  return a.provider === 'google'
+    ? cal.deleteGoogleEvent(t.google, remoteId)
+    : cal.deleteMicrosoftEvent(t.graph, remoteId);
+});
 
 app.whenReady().then(() => {
   createWindow();
