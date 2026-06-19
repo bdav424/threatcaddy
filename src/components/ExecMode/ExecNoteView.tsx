@@ -1,0 +1,79 @@
+import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Share2 } from 'lucide-react';
+import type { Note } from '../../types';
+import { renderMarkdown } from '../../lib/markdown';
+import { formatFullDate, isSafeUrl } from '../../lib/utils';
+import { ExecDetailNav } from './ExecDetailNav';
+
+interface ExecNoteViewProps {
+  note: Note;
+  allNotes: Note[];
+  onBack: () => void;
+  onShare?: () => void;
+  currentIndex?: number;
+  totalCount?: number;
+  onNavigate?: (direction: 'prev' | 'next') => void;
+}
+
+export function ExecNoteView({ note, allNotes, onShare, currentIndex, totalCount, onNavigate }: ExecNoteViewProps) {
+  const { t } = useTranslation('exec');
+  const wikiLinkTargets = useMemo(
+    () => allNotes.map((n) => ({ id: n.id, title: n.title })),
+    [allNotes],
+  );
+
+  const html = useMemo(
+    () => renderMarkdown(note.content, wikiLinkTargets),
+    [note.content, wikiLinkTargets],
+  );
+
+  return (
+    <div className="flex flex-col gap-3">
+      {onShare && (
+        <div className="flex justify-end">
+          <button onClick={onShare} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-accent bg-accent/10 active:bg-accent/20 text-xs font-medium">
+            <Share2 size={14} />
+            {t('detail.share')}
+          </button>
+        </div>
+      )}
+
+      <h2 className="text-lg font-bold text-text-primary">{note.title || t('notes.untitled')}</h2>
+
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-text-muted">
+        <span>{t('notes.created', { date: formatFullDate(note.createdAt) })}</span>
+        <span>{t('notes.updated', { date: formatFullDate(note.updatedAt) })}</span>
+        {note.clsLevel && <span className="font-semibold text-accent-amber">{note.clsLevel}</span>}
+      </div>
+
+      {note.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {note.tags.map((tag) => (
+            <span key={tag} className="text-[10px] bg-accent/10 text-accent px-2 py-0.5 rounded-full">#{tag}</span>
+          ))}
+        </div>
+      )}
+
+      {isSafeUrl(note.sourceUrl) && (
+        <a href={note.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-accent underline truncate">
+          {note.sourceUrl}
+        </a>
+      )}
+
+      {note.iocAnalysis && note.iocAnalysis.iocs.filter((i) => !i.dismissed).length > 0 && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+          <p className="text-[10px] font-semibold text-red-400 mb-1">
+            {note.iocAnalysis.iocs.filter((i) => !i.dismissed).length !== 1 ? t('notes.iocsDetected', { count: note.iocAnalysis.iocs.filter((i) => !i.dismissed).length }) : t('notes.iocDetected', { count: 1 })}
+          </p>
+        </div>
+      )}
+
+      <div className="bg-bg-raised rounded-xl p-4 markdown-preview" dangerouslySetInnerHTML={{ __html: html }} />
+
+      {onNavigate && totalCount != null && currentIndex != null && (
+        <ExecDetailNav currentIndex={currentIndex} totalCount={totalCount} onPrev={() => onNavigate('prev')} onNext={() => onNavigate('next')} />
+      )}
+    </div>
+  );
+}

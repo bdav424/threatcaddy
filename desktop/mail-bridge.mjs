@@ -24,6 +24,8 @@ import { simpleParser } from 'mailparser';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import crypto from 'node:crypto';
+import { runOAuthPopout } from './mail-oauth.mjs';
 
 // --- credential store: encrypted-at-rest, keyed by a reference id the renderer holds ---
 // The renderer only ever passes a credentialReferenceId. Raw host/user/password/token
@@ -199,5 +201,53 @@ export function registerMailBridge() {
       default:
         return { status: 'blocked', reason: 'unknown_action', adapterCalled: false, willSend: false };
     }
+  });
+
+  ipcMain.handle('threatcaddy-mail:start-oauth', async (_e, { providerId }) => {
+    // Map EmailProviderId to MailProviderId ('google-gmail' → 'google', etc.)
+    const providerMap = { 'google-gmail': 'google', 'microsoft-outlook': 'microsoft' };
+    const mailProviderId = providerMap[providerId] ?? providerId;
+
+    const tokens = await runOAuthPopout(mailProviderId);
+
+    // Fetch user email from the provider (best-effort — not blocking)
+    let email = null;
+    try {
+      if (mailProviderId === 'google') {
+        const resp = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${tokens.accessToken}` },
+        });
+        const data = await resp.json();
+        email = data.email ?? null;
+      } else if (mailProviderId === 'microsoft') {
+        const resp = await fetch('https://graph.microsoft.com/v1.0/me', {
+          headers: { Authorization: `Bearer ${tokens.accessToken}` },
+        });
+        const data = await resp.json();
+        email = data.mail ?? data.userPrincipalName ?? null;
+      }
+    } catch (_err) { /* email display name is optional */ }
+
+    const credRefId = crypto.randomUUID().replace(/-/g, '');
+
+    const OAUTH_ENDPOINTS = {
+      google:    { imap: { host: 'imap.gmail.com',         port: 993, secure: true  }, smtp: { host: 'smtp.gmail.com',       port: 465, secure: true  } },
+      microsoft: { imap: { host: 'outlook.office365.com',  port: 993, secure: true  }, smtp: { host: 'smtp.office365.com',   port: 587, secure: false } },
+    };
+    const ep = OAUTH_ENDPOINTS[mailProviderId] ?? OAUTH_ENDPOINTS.google;
+
+    saveCredential(credRefId, {
+      kind: 'imap-smtp',
+      imap: ep.imap,
+      smtp: ep.smtp,
+      authMethod: 'oauth',
+      auth: {
+        user: email ?? '',
+        oauth: { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, expiresAt: tokens.expiresAt },
+      },
+      from: email ?? '',
+    });
+
+    return { credRefId, email };
   });
 }

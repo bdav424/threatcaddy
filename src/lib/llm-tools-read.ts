@@ -1,0 +1,650 @@
+import { db } from '../db';
+import type { IOCType, TimelineEventType, TaskStatus } from '../types';
+import { listProductBaselines } from './product-baselines';
+
+const MAX_SNIPPET = 200;
+const MAX_CONTENT = 12000;
+
+function snippet(text: string, maxLen = MAX_SNIPPET): string {
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen) + '…';
+}
+
+function snippetAround(text: string, query: string, maxLen = MAX_SNIPPET): { snippet: string; matchStart: number } {
+  if (!query) return { snippet: snippet(text, maxLen), matchStart: -1 };
+  const index = text.toLowerCase().indexOf(query.toLowerCase());
+  if (index < 0) return { snippet: snippet(text, maxLen), matchStart: -1 };
+  const context = Math.max(0, Math.floor((maxLen - query.length) / 2));
+  const start = Math.max(0, index - context);
+  const end = Math.min(text.length, start + maxLen);
+  const prefix = start > 0 ? '…' : '';
+  const suffix = end < text.length ? '…' : '';
+  return { snippet: `${prefix}${text.slice(start, end)}${suffix}`, matchStart: index };
+}
+
+export async function executeSearchNotes(input: Record<string, unknown>, folderId?: string): Promise<string> {
+  const query = String(input.query || '').toLowerCase().substring(0, 500);
+  const limit = Math.min(Number(input.limit) || 10, 30);
+  if (!query) return JSON.stringify({ error: 'query is required' });
+
+  let notes = await db.notes.where('folderId').equals(folderId || '').and(n => !n.trashed).toArray();
+  if (!folderId) {
+    notes = await db.notes.filter(n => !n.trashed).toArray();
+  }
+
+  const matches = notes
+    .filter(n => n.title.toLowerCase().includes(query) || n.content.toLowerCase().includes(query))
+    .slice(0, limit)
+    .map(n => ({ id: n.id, title: n.title, snippet: snippet(n.content), tags: n.tags }));
+
+  return JSON.stringify({ count: matches.length, notes: matches });
+}
+
+export async function executeListEvidence(input: Record<string, unknown>, folderId?: string): Promise<string> {
+  const limit = Math.min(Number(input.limit) || 20, 50);
+  let evidenceItems = folderId
+    ? await db.evidenceItems.where('folderId').equals(folderId).and(item => !item.trashed).toArray()
+    : await db.evidenceItems.filter(item => !item.trashed).toArray();
+
+  evidenceItems = evidenceItems
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, limit);
+
+  return JSON.stringify({
+    count: evidenceItems.length,
+    evidence: evidenceItems.map((item) => ({
+      id: item.id,
+      title: item.title,
+      fileName: item.fileName,
+      fileType: item.fileType,
+      extractionStatus: item.extractionStatus,
+      snippet: snippet(item.content),
+      linkedIOCIds: item.linkedIOCIds || [],
+      updatedAt: item.updatedAt,
+    })),
+  });
+}
+
+export async function executeSearchEvidence(input: Record<string, unknown>, folderId?: string): Promise<string> {
+  const query = String(input.query || '').toLowerCase().substring(0, 500);
+  const limit = Math.min(Number(input.limit) || 10, 30);
+  if (!query) return JSON.stringify({ error: 'query is required' });
+
+  const evidenceItems = folderId
+    ? await db.evidenceItems.where('folderId').equals(folderId).and(item => !item.trashed).toArray()
+    : await db.evidenceItems.filter(item => !item.trashed).toArray();
+
+  const matches = evidenceItems
+    .flatMap((item) => {
+      const titleMatch = item.title.toLowerCase().includes(query);
+      const fileNameMatch = item.fileName.toLowerCase().includes(query);
+      const contentMatch = item.content.toLowerCase().includes(query);
+      if (!titleMatch && !fileNameMatch && !contentMatch) return [];
+      const excerpt = snippetAround(item.content, query);
+      return [{
+        id: item.id,
+        title: item.title,
+        fileName: item.fileName,
+        fileType: item.fileType,
+        extractionStatus: item.extractionStatus,
+        snippet: excerpt.snippet,
+        matchStart: excerpt.matchStart,
+        linkedIOCIds: item.linkedIOCIds || [],
+      }];
+    })
+    .slice(0, limit);
+
+  return JSON.stringify({ count: matches.length, evidence: matches });
+}
+
+export async function executeReadEvidence(input: Record<string, unknown>, folderId?: string): Promise<string> {
+  const id = String(input.id || '');
+  const title = String(input.title || '');
+  const fileName = String(input.fileName || '');
+  const offset = Math.max(0, Number(input.offset) || 0);
+  const requestedLength = Math.max(1, Number(input.length) || MAX_CONTENT);
+  const length = Math.min(requestedLength, MAX_CONTENT);
+
+  let item;
+  if (id) {
+    item = await db.evidenceItems.get(id);
+    if (item && (item.trashed || (folderId && item.folderId !== folderId))) {
+      item = undefined;
+    }
+  } else if (title || fileName) {
+    const lower = (title || fileName).toLowerCase();
+    const all = folderId
+      ? await db.evidenceItems.where('folderId').equals(folderId).and(evidence => !evidence.trashed).toArray()
+      : await db.evidenceItems.filter(evidence => !evidence.trashed).toArray();
+    item = all.find(evidence => evidence.title.toLowerCase() === lower || evidence.fileName.toLowerCase() === lower)
+      || all.find(evidence => evidence.title.toLowerCase().includes(lower) || evidence.fileName.toLowerCase().includes(lower));
+  }
+
+  if (!item) return JSON.stringify({ error: 'Evidence not found' });
+
+  const contentStart = Math.min(offset, item.content.length);
+  const contentEnd = Math.min(item.content.length, contentStart + length);
+  const truncated = contentEnd < item.content.length;
+  const content = item.content.slice(contentStart, contentEnd);
+
+  return JSON.stringify({
+    id: item.id,
+    title: item.title,
+    fileName: item.fileName,
+    fileType: item.fileType,
+    extractionStatus: item.extractionStatus,
+    extractionWarning: item.extractionWarning,
+    content,
+    contentStart,
+    contentEnd,
+    totalLength: item.content.length,
+    truncated,
+    nextOffset: truncated ? contentEnd : undefined,
+    linkedIOCIds: item.linkedIOCIds || [],
+    importedAt: item.importedAt,
+    updatedAt: item.updatedAt,
+  });
+}
+
+export async function executeListProductBaselines(input: Record<string, unknown>): Promise<string> {
+  const query = input.query ? String(input.query) : undefined;
+  const baselines = await listProductBaselines(query);
+  return JSON.stringify({
+    count: baselines.length,
+    baselines: baselines.map((baseline) => ({
+      id: baseline.id,
+      name: baseline.name,
+      description: baseline.description || '',
+      category: baseline.category,
+      source: baseline.source,
+      tags: baseline.tags || [],
+      productBaseline: baseline.productBaseline ? {
+        kind: baseline.productBaseline.kind,
+        productType: baseline.productBaseline.productType,
+        renderer: baseline.productBaseline.renderer,
+        visualFidelity: baseline.productBaseline.visualFidelity,
+        sourceDocuments: baseline.productBaseline.sourceDocuments?.map((doc) => doc.name) || [],
+        testFixtures: baseline.productBaseline.testFixtures?.map((fixture) => fixture.name) || [],
+      } : undefined,
+      variables: Array.from(new Set(Array.from(baseline.content.matchAll(/{{\s*([A-Za-z_][\w.]*)\s*}}/g)).map((match) => match[1]))).sort(),
+    })),
+  });
+}
+
+export async function executeSearchAll(input: Record<string, unknown>, folderId?: string): Promise<string> {
+  const query = String(input.query || '').toLowerCase().substring(0, 500);
+  const limit = Math.min(Number(input.limit) || 10, 30);
+  if (!query) return JSON.stringify({ error: 'query is required' });
+
+  const [notes, tasks, iocs, events, evidenceItems] = await Promise.all([
+    folderId
+      ? db.notes.where('folderId').equals(folderId).and(n => !n.trashed).toArray()
+      : db.notes.filter(n => !n.trashed).toArray(),
+    folderId
+      ? db.tasks.where('folderId').equals(folderId).and(t => !t.trashed).toArray()
+      : db.tasks.filter(t => !t.trashed).toArray(),
+    folderId
+      ? db.standaloneIOCs.where('folderId').equals(folderId).and(i => !i.trashed).toArray()
+      : db.standaloneIOCs.filter(i => !i.trashed).toArray(),
+    folderId
+      ? db.timelineEvents.where('folderId').equals(folderId).and(e => !e.trashed).toArray()
+      : db.timelineEvents.filter(e => !e.trashed).toArray(),
+    folderId
+      ? db.evidenceItems.where('folderId').equals(folderId).and(evidence => !evidence.trashed).toArray()
+      : db.evidenceItems.filter(evidence => !evidence.trashed).toArray(),
+  ]);
+
+  const matchedNotes = notes
+    .filter(n => n.title.toLowerCase().includes(query) || n.content.toLowerCase().includes(query))
+    .slice(0, limit)
+    .map(n => ({ id: n.id, title: n.title, snippet: snippet(n.content) }));
+
+  const matchedTasks = tasks
+    .filter(t => t.title.toLowerCase().includes(query) || (t.description || '').toLowerCase().includes(query))
+    .slice(0, limit)
+    .map(t => ({ id: t.id, title: t.title, status: t.status, priority: t.priority }));
+
+  const matchedIOCs = iocs
+    .filter(i => i.value.toLowerCase().includes(query) || (i.analystNotes || '').toLowerCase().includes(query))
+    .slice(0, limit)
+    .map(i => ({ id: i.id, type: i.type, value: i.value, confidence: i.confidence }));
+
+  const matchedEvents = events
+    .filter(e => e.title.toLowerCase().includes(query) || (e.description || '').toLowerCase().includes(query))
+    .slice(0, limit)
+    .map(e => ({ id: e.id, title: e.title, eventType: e.eventType, timestamp: new Date(e.timestamp).toISOString() }));
+
+  const matchedEvidence = evidenceItems
+    .filter(evidence => evidence.title.toLowerCase().includes(query) || evidence.fileName.toLowerCase().includes(query) || evidence.content.toLowerCase().includes(query))
+    .slice(0, limit)
+    .map(evidence => ({ id: evidence.id, title: evidence.title, fileName: evidence.fileName, snippet: snippet(evidence.content) }));
+
+  return JSON.stringify({
+    notes: { count: matchedNotes.length, results: matchedNotes },
+    tasks: { count: matchedTasks.length, results: matchedTasks },
+    iocs: { count: matchedIOCs.length, results: matchedIOCs },
+    events: { count: matchedEvents.length, results: matchedEvents },
+    evidence: { count: matchedEvidence.length, results: matchedEvidence },
+    totalMatches: matchedNotes.length + matchedTasks.length + matchedIOCs.length + matchedEvents.length + matchedEvidence.length,
+  });
+}
+
+export async function executeReadNote(input: Record<string, unknown>, folderId?: string): Promise<string> {
+  const id = String(input.id || '');
+  const title = String(input.title || '');
+
+  let note;
+  if (id) {
+    note = await db.notes.get(id);
+  } else if (title) {
+    const lower = title.toLowerCase();
+    const all = folderId
+      ? await db.notes.where('folderId').equals(folderId).and(n => !n.trashed).toArray()
+      : await db.notes.filter(n => !n.trashed).toArray();
+    note = all.find(n => n.title.toLowerCase() === lower)
+      || all.find(n => n.title.toLowerCase().includes(lower));
+  }
+
+  if (!note) return JSON.stringify({ error: 'Note not found' });
+
+  const content = note.content.length > MAX_CONTENT
+    ? note.content.slice(0, MAX_CONTENT) + '\n…(truncated)'
+    : note.content;
+
+  return JSON.stringify({ id: note.id, title: note.title, content, tags: note.tags, createdAt: note.createdAt, updatedAt: note.updatedAt });
+}
+
+export async function executeReadTask(input: Record<string, unknown>, folderId?: string): Promise<string> {
+  const id = String(input.id || '');
+  const title = String(input.title || '');
+
+  let task;
+  if (id) {
+    task = await db.tasks.get(id);
+  } else if (title) {
+    const lower = title.toLowerCase();
+    const all = folderId
+      ? await db.tasks.where('folderId').equals(folderId).and(t => !t.trashed).toArray()
+      : await db.tasks.filter(t => !t.trashed).toArray();
+    task = all.find(t => t.title.toLowerCase() === lower)
+      || all.find(t => t.title.toLowerCase().includes(lower));
+  }
+
+  if (!task) return JSON.stringify({ error: 'Task not found' });
+
+  return JSON.stringify({
+    id: task.id, title: task.title, description: task.description || '',
+    status: task.status, priority: task.priority, completed: task.completed,
+    assigneeId: task.assigneeId, tags: task.tags,
+    comments: task.comments || [],
+    dueDate: task.dueDate ? new Date(task.dueDate).toISOString() : undefined,
+    createdAt: task.createdAt, updatedAt: task.updatedAt,
+  });
+}
+
+export async function executeReadIOC(input: Record<string, unknown>, folderId?: string): Promise<string> {
+  const id = String(input.id || '');
+  const value = String(input.value || '');
+
+  let ioc;
+  if (id) {
+    ioc = await db.standaloneIOCs.get(id);
+  } else if (value) {
+    const lower = value.toLowerCase();
+    const all = folderId
+      ? await db.standaloneIOCs.where('folderId').equals(folderId).and(i => !i.trashed).toArray()
+      : await db.standaloneIOCs.filter(i => !i.trashed).toArray();
+    ioc = all.find(i => i.value.toLowerCase() === lower)
+      || all.find(i => i.value.toLowerCase().includes(lower));
+  }
+
+  if (!ioc) return JSON.stringify({ error: 'IOC not found' });
+
+  return JSON.stringify({
+    id: ioc.id, type: ioc.type, value: ioc.value, confidence: ioc.confidence,
+    analystNotes: ioc.analystNotes || '', attribution: ioc.attribution,
+    iocSubtype: ioc.iocSubtype, iocStatus: ioc.iocStatus,
+    relationships: ioc.relationships || [], tags: ioc.tags,
+    clsLevel: ioc.clsLevel,
+    createdAt: ioc.createdAt, updatedAt: ioc.updatedAt,
+  });
+}
+
+export async function executeReadTimelineEvent(input: Record<string, unknown>, folderId?: string): Promise<string> {
+  const id = String(input.id || '');
+  const title = String(input.title || '');
+
+  let event;
+  if (id) {
+    event = await db.timelineEvents.get(id);
+  } else if (title) {
+    const lower = title.toLowerCase();
+    const all = folderId
+      ? await db.timelineEvents.where('folderId').equals(folderId).and(e => !e.trashed).toArray()
+      : await db.timelineEvents.filter(e => !e.trashed).toArray();
+    event = all.find(e => e.title.toLowerCase() === lower)
+      || all.find(e => e.title.toLowerCase().includes(lower));
+  }
+
+  if (!event) return JSON.stringify({ error: 'Timeline event not found' });
+
+  return JSON.stringify({
+    id: event.id, title: event.title, description: event.description || '',
+    timestamp: new Date(event.timestamp).toISOString(),
+    timestampEnd: event.timestampEnd ? new Date(event.timestampEnd).toISOString() : undefined,
+    eventType: event.eventType, source: event.source, confidence: event.confidence,
+    actor: event.actor, assets: event.assets,
+    mitreAttackIds: event.mitreAttackIds, linkedIOCIds: event.linkedIOCIds,
+    linkedNoteIds: event.linkedNoteIds, linkedTaskIds: event.linkedTaskIds,
+    latitude: event.latitude, longitude: event.longitude,
+    tags: event.tags, clsLevel: event.clsLevel,
+    comments: event.comments || [],
+    createdAt: event.createdAt, updatedAt: event.updatedAt,
+  });
+}
+
+export async function executeListTasks(input: Record<string, unknown>, folderId?: string): Promise<string> {
+  const statusFilter = input.status as TaskStatus | undefined;
+  const limit = Math.min(Number(input.limit) || 20, 50);
+
+  let tasks = folderId
+    ? await db.tasks.where('folderId').equals(folderId).and(t => !t.trashed).toArray()
+    : await db.tasks.filter(t => !t.trashed).toArray();
+
+  if (statusFilter) tasks = tasks.filter(t => t.status === statusFilter);
+  tasks = tasks.slice(0, limit);
+
+  const result = tasks.map(t => ({
+    id: t.id, title: t.title, status: t.status, priority: t.priority,
+    description: snippet(t.description || ''), completed: t.completed,
+  }));
+
+  return JSON.stringify({ count: result.length, tasks: result });
+}
+
+export async function executeListIOCs(input: Record<string, unknown>, folderId?: string): Promise<string> {
+  const typeFilter = input.type as IOCType | undefined;
+  const limit = Math.min(Number(input.limit) || 30, 100);
+
+  let iocs = folderId
+    ? await db.standaloneIOCs.where('folderId').equals(folderId).and(i => !i.trashed).toArray()
+    : await db.standaloneIOCs.filter(i => !i.trashed).toArray();
+
+  if (typeFilter) iocs = iocs.filter(i => i.type === typeFilter);
+  iocs = iocs.slice(0, limit);
+
+  const result = iocs.map(i => ({
+    id: i.id, type: i.type, value: i.value, confidence: i.confidence,
+    analystNotes: snippet(i.analystNotes || ''),
+  }));
+
+  return JSON.stringify({ count: result.length, iocs: result });
+}
+
+export async function executeListTimelineEvents(input: Record<string, unknown>, folderId?: string): Promise<string> {
+  const eventTypeFilter = input.eventType as TimelineEventType | undefined;
+  const limit = Math.min(Number(input.limit) || 20, 50);
+
+  let events = folderId
+    ? await db.timelineEvents.where('folderId').equals(folderId).and(e => !e.trashed).toArray()
+    : await db.timelineEvents.filter(e => !e.trashed).toArray();
+
+  if (eventTypeFilter) events = events.filter(e => e.eventType === eventTypeFilter);
+  events.sort((a, b) => a.timestamp - b.timestamp);
+  events = events.slice(0, limit);
+
+  const result = events.map(e => ({
+    id: e.id, title: e.title, timestamp: new Date(e.timestamp).toISOString(),
+    eventType: e.eventType, description: snippet(e.description || ''),
+    source: e.source,
+  }));
+
+  return JSON.stringify({ count: result.length, events: result });
+}
+
+export async function executeGetInvestigationSummary(_input: Record<string, unknown>, folderId?: string): Promise<string> {
+  if (!folderId) {
+    return JSON.stringify({ error: 'No investigation selected. Select an investigation folder first.' });
+  }
+
+  const folder = await db.folders.get(folderId);
+  if (!folder) return JSON.stringify({ error: 'Investigation not found' });
+
+  const [noteCount, taskCount, iocCount, eventCount, evidenceCount] = await Promise.all([
+    db.notes.where('folderId').equals(folderId).and(n => !n.trashed).count(),
+    db.tasks.where('folderId').equals(folderId).and(t => !t.trashed).count(),
+    db.standaloneIOCs.where('folderId').equals(folderId).and(i => !i.trashed).count(),
+    db.timelineEvents.where('folderId').equals(folderId).and(e => !e.trashed).count(),
+    db.evidenceItems.where('folderId').equals(folderId).and(evidence => !evidence.trashed).count(),
+  ]);
+
+  const tasks = await db.tasks.where('folderId').equals(folderId).and(t => !t.trashed).toArray();
+  const tasksByStatus = { todo: 0, 'in-progress': 0, done: 0 };
+  tasks.forEach(t => { tasksByStatus[t.status] = (tasksByStatus[t.status] || 0) + 1; });
+
+  return JSON.stringify({
+    name: folder.name,
+    description: folder.description || '',
+    status: folder.status || 'active',
+    counts: { notes: noteCount, evidence: evidenceCount, tasks: taskCount, iocs: iocCount, timelineEvents: eventCount },
+    tasksByStatus,
+    createdAt: new Date(folder.createdAt).toISOString(),
+  });
+}
+
+export async function executeListInvestigations(input: Record<string, unknown>): Promise<string> {
+  const statusFilter = input.status as string | undefined;
+  const limit = Math.min(Number(input.limit) || 20, 50);
+
+  let folders = await db.folders.toArray();
+  if (statusFilter) folders = folders.filter(f => (f.status || 'active') === statusFilter);
+  folders.sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
+  folders = folders.slice(0, limit);
+
+  const results = await Promise.all(folders.map(async (f) => {
+    const [noteCount, taskCount, iocCount, eventCount, evidenceCount] = await Promise.all([
+      db.notes.where('folderId').equals(f.id).and(n => !n.trashed).count(),
+      db.tasks.where('folderId').equals(f.id).and(t => !t.trashed).count(),
+      db.standaloneIOCs.where('folderId').equals(f.id).and(i => !i.trashed).count(),
+      db.timelineEvents.where('folderId').equals(f.id).and(e => !e.trashed).count(),
+      db.evidenceItems.where('folderId').equals(f.id).and(evidence => !evidence.trashed).count(),
+    ]);
+    return {
+      id: f.id,
+      name: f.name,
+      status: f.status || 'active',
+      description: f.description ? snippet(f.description) : '',
+      counts: { notes: noteCount, evidence: evidenceCount, tasks: taskCount, iocs: iocCount, events: eventCount },
+      clsLevel: f.clsLevel,
+      createdAt: new Date(f.createdAt).toISOString(),
+      updatedAt: new Date(f.updatedAt || f.createdAt).toISOString(),
+    };
+  }));
+
+  return JSON.stringify({ count: results.length, investigations: results });
+}
+
+export async function executeGetInvestigationDetails(input: Record<string, unknown>): Promise<string> {
+  const id = String(input.id || '');
+  const name = String(input.name || '');
+
+  let folder;
+  if (id) {
+    folder = await db.folders.get(id);
+  } else if (name) {
+    const lower = name.toLowerCase();
+    const all = await db.folders.toArray();
+    folder = all.find(f => f.name.toLowerCase() === lower)
+      || all.find(f => f.name.toLowerCase().includes(lower));
+  }
+
+  if (!folder) return JSON.stringify({ error: 'Investigation not found' });
+
+  const [notes, tasks, iocs, events, evidenceItems] = await Promise.all([
+    db.notes.where('folderId').equals(folder.id).and(n => !n.trashed).toArray(),
+    db.tasks.where('folderId').equals(folder.id).and(t => !t.trashed).toArray(),
+    db.standaloneIOCs.where('folderId').equals(folder.id).and(i => !i.trashed).toArray(),
+    db.timelineEvents.where('folderId').equals(folder.id).and(e => !e.trashed).toArray(),
+    db.evidenceItems.where('folderId').equals(folder.id).and(evidence => !evidence.trashed).toArray(),
+  ]);
+
+  const tasksByStatus = { todo: 0, 'in-progress': 0, done: 0 };
+  tasks.forEach(t => { tasksByStatus[t.status] = (tasksByStatus[t.status] || 0) + 1; });
+
+  const topIOCs = iocs.slice(0, 10).map(i => ({ type: i.type, value: i.value, confidence: i.confidence }));
+
+  const recentNotes = notes
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, 5)
+    .map(n => ({ id: n.id, title: n.title }));
+
+  return JSON.stringify({
+    id: folder.id,
+    name: folder.name,
+    description: folder.description || '',
+    status: folder.status || 'active',
+    clsLevel: folder.clsLevel,
+    papLevel: folder.papLevel,
+    counts: { notes: notes.length, evidence: evidenceItems.length, tasks: tasks.length, iocs: iocs.length, events: events.length },
+    tasksByStatus,
+    topIOCs,
+    recentNotes,
+    createdAt: new Date(folder.createdAt).toISOString(),
+    updatedAt: new Date(folder.updatedAt || folder.createdAt).toISOString(),
+  });
+}
+
+export async function executeSearchAcrossInvestigations(input: Record<string, unknown>): Promise<string> {
+  const query = String(input.query || '').toLowerCase();
+  if (!query) return JSON.stringify({ error: 'query is required' });
+  const limit = Math.min(Number(input.limit) || 5, 20);
+  const entityTypes = (input.entityTypes as string[] | undefined) || ['notes', 'tasks', 'iocs', 'events', 'evidence'];
+
+  const folders = await db.folders.toArray();
+  const results: Record<string, unknown>[] = [];
+
+  for (const folder of folders) {
+    const match: Record<string, unknown> = { investigationId: folder.id, investigationName: folder.name };
+    let totalHits = 0;
+
+    if (entityTypes.includes('notes')) {
+      const notes = await db.notes.where('folderId').equals(folder.id).and(n => !n.trashed).toArray();
+      const hits = notes
+        .filter(n => n.title.toLowerCase().includes(query) || n.content.toLowerCase().includes(query))
+        .slice(0, limit)
+        .map(n => ({ id: n.id, title: n.title, snippet: snippet(n.content) }));
+      if (hits.length > 0) { match.notes = hits; totalHits += hits.length; }
+    }
+
+    if (entityTypes.includes('tasks')) {
+      const tasks = await db.tasks.where('folderId').equals(folder.id).and(t => !t.trashed).toArray();
+      const hits = tasks
+        .filter(t => t.title.toLowerCase().includes(query) || (t.description || '').toLowerCase().includes(query))
+        .slice(0, limit)
+        .map(t => ({ id: t.id, title: t.title, status: t.status }));
+      if (hits.length > 0) { match.tasks = hits; totalHits += hits.length; }
+    }
+
+    if (entityTypes.includes('iocs')) {
+      const iocs = await db.standaloneIOCs.where('folderId').equals(folder.id).and(i => !i.trashed).toArray();
+      const hits = iocs
+        .filter(i => i.value.toLowerCase().includes(query) || (i.analystNotes || '').toLowerCase().includes(query))
+        .slice(0, limit)
+        .map(i => ({ id: i.id, type: i.type, value: i.value, confidence: i.confidence }));
+      if (hits.length > 0) { match.iocs = hits; totalHits += hits.length; }
+    }
+
+    if (entityTypes.includes('events')) {
+      const events = await db.timelineEvents.where('folderId').equals(folder.id).and(e => !e.trashed).toArray();
+      const hits = events
+        .filter(e => e.title.toLowerCase().includes(query) || (e.description || '').toLowerCase().includes(query))
+        .slice(0, limit)
+        .map(e => ({ id: e.id, title: e.title, eventType: e.eventType }));
+      if (hits.length > 0) { match.events = hits; totalHits += hits.length; }
+    }
+
+    if (entityTypes.includes('evidence')) {
+      const evidenceItems = await db.evidenceItems.where('folderId').equals(folder.id).and(evidence => !evidence.trashed).toArray();
+      const hits = evidenceItems
+        .filter(evidence => evidence.title.toLowerCase().includes(query) || evidence.fileName.toLowerCase().includes(query) || evidence.content.toLowerCase().includes(query))
+        .slice(0, limit)
+        .map(evidence => ({ id: evidence.id, title: evidence.title, fileName: evidence.fileName, snippet: snippet(evidence.content) }));
+      if (hits.length > 0) { match.evidence = hits; totalHits += hits.length; }
+    }
+
+    if (totalHits > 0) results.push(match);
+  }
+
+  return JSON.stringify({ query, investigationsSearched: folders.length, investigationsWithHits: results.length, results });
+}
+
+export async function executeCompareInvestigations(input: Record<string, unknown>): Promise<string> {
+  const ids = input.investigationIds as string[];
+  if (!ids || ids.length < 2) return JSON.stringify({ error: 'At least 2 investigation IDs required' });
+
+  const comparisons = await Promise.all(ids.map(async (id) => {
+    const folder = await db.folders.get(id);
+    if (!folder) return { id, error: 'Not found' };
+
+    const [notes, tasks, iocs, events, evidence] = await Promise.all([
+      db.notes.where('folderId').equals(id).and(n => !n.trashed).count(),
+      db.tasks.where('folderId').equals(id).and(t => !t.trashed).count(),
+      db.standaloneIOCs.where('folderId').equals(id).and(i => !i.trashed).toArray(),
+      db.timelineEvents.where('folderId').equals(id).and(e => !e.trashed).toArray(),
+      db.evidenceItems.where('folderId').equals(id).and(item => !item.trashed).count(),
+    ]);
+
+    const eventTypes = new Set(events.map(e => e.eventType));
+
+    return {
+      id,
+      name: folder.name,
+      status: folder.status || 'active',
+      counts: { notes, evidence, tasks, iocs: iocs.length, events: events.length },
+      iocValues: iocs.map(i => i.value),
+      iocTypes: [...new Set(iocs.map(i => i.type))],
+      eventTypes: [...eventTypes],
+      timeRange: events.length > 0 ? {
+        earliest: new Date(Math.min(...events.map(e => e.timestamp))).toISOString(),
+        latest: new Date(Math.max(...events.map(e => e.timestamp))).toISOString(),
+      } : null,
+    };
+  }));
+
+  // Find shared IOCs
+  const validComparisons = comparisons.filter(c => !('error' in c && c.error));
+  const iocSets = validComparisons.map(c => new Set((c as { iocValues: string[] }).iocValues));
+  const sharedIOCs: string[] = [];
+  if (iocSets.length >= 2) {
+    for (const val of iocSets[0]) {
+      if (iocSets.slice(1).every(s => s.has(val))) sharedIOCs.push(val);
+    }
+  }
+
+  // Find shared event types (TTPs)
+  const ttpSets = validComparisons.map(c => new Set((c as { eventTypes: string[] }).eventTypes));
+  const sharedTTPs: string[] = [];
+  if (ttpSets.length >= 2) {
+    for (const val of ttpSets[0]) {
+      if (ttpSets.slice(1).every(s => s.has(val))) sharedTTPs.push(val);
+    }
+  }
+
+  // Clean up before returning — remove raw arrays
+  const summaries = comparisons.map(c => {
+    if ('error' in c && c.error) return c;
+    const { iocValues, ...rest } = c as Record<string, unknown>;
+    void iocValues;
+    return rest;
+  });
+
+  return JSON.stringify({
+    investigations: summaries,
+    sharedIOCs,
+    sharedTTPs,
+    overlap: {
+      sharedIOCCount: sharedIOCs.length,
+      sharedTTPCount: sharedTTPs.length,
+    },
+  });
+}

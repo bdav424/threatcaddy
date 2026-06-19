@@ -13,6 +13,11 @@ contextBridge.exposeInMainWorld('threatcaddyMail', {
   // the staged-send review in the UI). Everything else is read/draft only — never transmits.
   execute: (action, credentialReferenceId, params = {}) =>
     ipcRenderer.invoke('threatcaddy-mail:execute', { action, credentialReferenceId, params }),
+
+  // Opens the OAuth consent popout for Google ('google-gmail') or Microsoft ('microsoft-outlook').
+  // Returns { credRefId, email } — credentials are stored in the OS keychain, never returned here.
+  startOAuth: (providerId) =>
+    ipcRenderer.invoke('threatcaddy-mail:start-oauth', { providerId }),
 });
 
 // Calendar sync bridge — pull/push via main-process IPC (tokens stay in main)

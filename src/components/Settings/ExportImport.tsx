@@ -1,0 +1,196 @@
+import { useState, useRef } from 'react';
+import { Download, Upload, FileText, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { exportJSON, importJSON, mergeImportJSON, exportNotesMarkdown, downloadFile } from '../../lib/export';
+import { ConfirmDialog } from '../Common/ConfirmDialog';
+import { MarkdownImportModal } from './MarkdownImportModal';
+import { useLogActivity } from '../../hooks/ActivityLogContext';
+import { useToast } from '../../contexts/ToastContext';
+import { db } from '../../db';
+import { nanoid } from 'nanoid';
+import type { Note } from '../../types';
+
+interface ExportImportProps {
+  notes: Note[];
+  onImportComplete: () => void;
+}
+
+export function ExportImport({ notes, onImportComplete }: ExportImportProps) {
+  const { t } = useTranslation('settings');
+  const { t: tt } = useTranslation('toast');
+  const logActivity = useLogActivity();
+  const { addToast } = useToast();
+  const [importing, setImporting] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [showMdImport, setShowMdImport] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const msgTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const showMessage = (msg: string) => {
+    setMessage(msg);
+    clearTimeout(msgTimeoutRef.current);
+    msgTimeoutRef.current = setTimeout(() => setMessage(''), 3000);
+  };
+
+  const handleExportJSON = async () => {
+    try {
+      const json = await exportJSON();
+      downloadFile(json, `threatcaddy-backup-${new Date().toISOString().split('T')[0]}.json`, 'application/json');
+      showMessage(t('data.exportSuccess'));
+      addToast('success', tt('backup.exported'));
+      logActivity('data', 'export', 'Exported JSON backup');
+    } catch {
+      addToast('error', tt('backup.exportFailed'));
+    }
+  };
+
+  const handleExportMarkdown = () => {
+    const activeNotes = notes.filter((n) => !n.trashed && !n.archived);
+    const md = exportNotesMarkdown(activeNotes);
+    downloadFile(md, `threatcaddy-${new Date().toISOString().split('T')[0]}.md`, 'text/markdown');
+    showMessage(t('data.exportedNotes', { count: activeNotes.length }));
+    logActivity('data', 'export', `Exported ${activeNotes.length} notes as Markdown`);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) setPendingFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleConfirmImport = async () => {
+    if (!pendingFile) return;
+    setImporting(true);
+    setError('');
+    try {
+      const text = await pendingFile.text();
+      const counts = await importJSON(text);
+      showMessage(t('data.importedCounts', { notes: counts.notes, tasks: counts.tasks, folders: counts.folders, tags: counts.tags }));
+      addToast('success', tt('import.jsonImported', { notes: counts.notes, tasks: counts.tasks }));
+      logActivity('data', 'import', `Imported ${counts.notes} notes, ${counts.tasks} tasks, ${counts.folders} investigations, ${counts.tags} tags`);
+      onImportComplete();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to import';
+      setError(msg);
+      addToast('error', tt('import.importFailed'));
+    } finally {
+      setImporting(false);
+      setPendingFile(null);
+    }
+  };
+
+  const handleMergeImport = async () => {
+    if (!pendingFile) return;
+    setImporting(true);
+    setError('');
+    try {
+      const text = await pendingFile.text();
+      const result = await mergeImportJSON(text);
+      const notesMerged = (result.tables.notes?.added ?? 0) + (result.tables.notes?.updated ?? 0);
+      const investigationsWithNotes = result.noteInvestigations.filter((item) => item.notes > 0).length;
+      showMessage(t('data.mergeImportedCounts', {
+        notes: notesMerged,
+        investigations: investigationsWithNotes,
+        added: result.added,
+        updated: result.updated,
+        skipped: result.skipped,
+      }));
+      addToast('success', tt('backup.mergeCompleteDetailed', {
+        notes: notesMerged,
+        investigations: investigationsWithNotes,
+        added: result.added,
+        updated: result.updated,
+        skipped: result.skipped,
+      }));
+      logActivity('data', 'import', `Merged backup: ${notesMerged} notes across ${investigationsWithNotes} investigations (${result.added} added, ${result.updated} updated, ${result.skipped} skipped)`);
+      onImportComplete();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to merge';
+      setError(msg);
+      addToast('error', tt('backup.mergeFailed'));
+    } finally {
+      setImporting(false);
+      setPendingFile(null);
+    }
+  };
+
+  const handleMarkdownImport = async (importedNotes: Array<{ title: string; content: string; tags: string[] }>): Promise<number> => {
+    const now = Date.now();
+    const notesToAdd: Note[] = importedNotes.map((n) => ({
+      id: nanoid(),
+      title: n.title,
+      content: n.content,
+      tags: n.tags,
+      pinned: false,
+      archived: false,
+      trashed: false,
+      createdAt: now,
+      updatedAt: now,
+    }));
+
+    await db.notes.bulkAdd(notesToAdd);
+    showMessage(t('data.importedMarkdown', { count: notesToAdd.length }));
+    addToast('success', tt('import.markdownImported', { count: notesToAdd.length }));
+    logActivity('data', 'import', `Imported ${notesToAdd.length} notes from Markdown`);
+    onImportComplete();
+    return notesToAdd.length;
+  };
+
+  const btnClass = 'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors';
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-sm font-semibold text-gray-300">{t('data.exportImportTitle')}</h3>
+
+      <div className="flex flex-wrap gap-3">
+        <button onClick={handleExportJSON} className={`${btnClass} bg-gray-700 hover:bg-gray-600 text-gray-200`}>
+          <Download size={16} />
+          {t('data.exportJSON')}
+        </button>
+        <button onClick={handleExportMarkdown} className={`${btnClass} bg-gray-700 hover:bg-gray-600 text-gray-200`}>
+          <FileText size={16} />
+          {t('data.exportMarkdown')}
+        </button>
+        <button onClick={() => setShowMdImport(true)} className={`${btnClass} bg-gray-700 hover:bg-gray-600 text-gray-200`}>
+          <Upload size={16} />
+          {t('data.importMarkdown')}
+        </button>
+        <label className={`${btnClass} bg-accent hover:bg-accent-hover text-white cursor-pointer ${importing ? 'opacity-50 pointer-events-none' : ''}`}>
+          <Upload size={16} />
+          {importing ? t('data.importing') : t('data.importJSON')}
+          <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileSelect} className="hidden" disabled={importing} />
+        </label>
+      </div>
+
+      {message && (
+        <p className="text-sm text-green-400">{message}</p>
+      )}
+      {error && (
+        <p className="text-sm text-red-400 flex items-center gap-1">
+          <AlertCircle size={14} />
+          {error}
+        </p>
+      )}
+
+      <ConfirmDialog
+        open={pendingFile !== null}
+        onClose={() => setPendingFile(null)}
+        onConfirm={handleConfirmImport}
+        title={t('data.importBackupTitle')}
+        message={t('data.importBackupMessage')}
+        confirmLabel={t('data.importReplace')}
+        danger
+        secondaryAction={handleMergeImport}
+        secondaryLabel={t('data.importMerge')}
+      />
+
+      <MarkdownImportModal
+        open={showMdImport}
+        onClose={() => setShowMdImport(false)}
+        onImport={handleMarkdownImport}
+      />
+    </div>
+  );
+}

@@ -1,0 +1,1153 @@
+import { nanoid } from 'nanoid';
+import { resolveVariables, evaluateCondition, resolveDeep } from './integration-expression';
+import { postMessageOrigin } from './utils';
+import type {
+  IntegrationTemplate,
+  InstalledIntegration,
+  IntegrationStep,
+  IntegrationRun,
+  IntegrationRunLogEntry,
+  IntegrationRunStatus,
+  HttpStep,
+  TransformStep,
+  ConditionStep,
+  LoopStep,
+  CreateEntityStep,
+  UpdateEntityStep,
+  SetVariableStep,
+} from '../types/integration-types';
+
+export interface ExecutionInput {
+  ioc?: { id: string; value: string; type: string; confidence: string };
+  investigation?: { id: string; name: string };
+}
+
+export interface ExecutionCallbacks {
+  onCreateEntity?: (type: string, fields: Record<string, unknown>) => Promise<string>;
+  onUpdateEntity?: (type: string, id: string, fields: Record<string, unknown>) => Promise<void>;
+  onNotify?: (message: string) => void;
+  onLog?: (entry: IntegrationRunLogEntry) => void;
+}
+
+export interface ExecutionOptions {
+  /**
+   * When set, HTTP requests are routed through `POST <serverUrl>/api/proxy-fetch`
+   * instead of going directly from the browser. This lets the server enforce
+   * DNS-level SSRF checks that the client cannot perform.
+   */
+  useServerProxy?: {
+    serverUrl: string;
+    getAccessToken: () => Promise<string | null>;
+  };
+}
+
+/**
+ * Proxy fetch via the team server (`POST /api/proxy-fetch`).
+ * The server can perform DNS resolution to block private IPs.
+ */
+async function serverProxyFetch(
+  serverUrl: string,
+  getAccessToken: () => Promise<string | null>,
+  url: string,
+  method: string,
+  headers: Record<string, string>,
+  body: string | null,
+  requiredDomains: string[],
+): Promise<{ ok: boolean; status: number; statusText: string; data: unknown; headers: Record<string, string> }> {
+  const token = await getAccessToken();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60_000);
+  const resp = await fetch(`${serverUrl}/api/proxy-fetch`, {
+    method: 'POST',
+    signal: controller.signal,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ url, method, headers, body, requiredDomains }),
+  });
+  clearTimeout(timer);
+  const result = await resp.json();
+  if (!resp.ok) {
+    throw new Error(result.error || `Server proxy error: ${resp.status}`);
+  }
+  return {
+    ok: result.status >= 200 && result.status < 300,
+    status: result.status,
+    statusText: result.statusText || '',
+    data: result.data,
+    headers: result.headers || {},
+  };
+}
+
+async function localIntegrationProxyFetch(
+  url: string,
+  method: string,
+  headers: Record<string, string>,
+  body: string | null,
+  requiredDomains: string[],
+): Promise<{ ok: boolean; status: number; statusText: string; data: unknown; headers: Record<string, string> }> {
+  const resp = await fetch('http://127.0.0.1:8767/api/proxy-fetch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, method, headers, body, requiredDomains }),
+  });
+  const result = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    throw new Error(
+      typeof result?.error === 'string'
+        ? result.error
+        : `Local integration proxy error: ${resp.status}`,
+    );
+  }
+  return {
+    ok: result.status >= 200 && result.status < 300,
+    status: result.status,
+    statusText: result.statusText || '',
+    data: result.data,
+    headers: result.headers || {},
+  };
+}
+
+interface ExecutionContext {
+  [key: string]: unknown;
+  ioc?: ExecutionInput['ioc'];
+  investigation?: ExecutionInput['investigation'];
+  config: Record<string, unknown>;
+  now: string;
+  steps: Record<string, unknown>;
+  vars: Record<string, unknown>;
+  loop?: { item: unknown; index: number };
+}
+
+const MAX_EXECUTION_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Collect secret values from the installation config based on the template's
+ * configSchema.  Used to redact secrets from log entries.
+ */
+function collectSecretValues(
+  template: IntegrationTemplate,
+  config: Record<string, unknown>,
+): string[] {
+  const secrets: string[] = [];
+  for (const field of template.configSchema) {
+    if ((field.secret || field.type === 'password') && config[field.key]) {
+      const val = String(config[field.key]);
+      if (val.length > 0) secrets.push(val);
+    }
+  }
+  return secrets;
+}
+
+/** Replace known secret values in a string with [REDACTED]. */
+function redactSecrets(text: string, secrets: string[]): string {
+  let result = text;
+  for (const secret of secrets) {
+    // Only redact secrets that are at least 4 chars to avoid false positives
+    if (secret.length >= 4) {
+      result = result.replaceAll(secret, '[REDACTED]');
+    }
+  }
+  return result;
+}
+
+/**
+ * Enforce that a resolved URL's hostname matches the template's requiredDomains.
+ * Prevents a tampered template from exfiltrating secrets to arbitrary domains.
+ */
+function enforceRequiredDomains(url: URL, requiredDomains: string[]): void {
+  if (!requiredDomains || requiredDomains.length === 0) return;
+  const host = url.hostname;
+  const allowed = requiredDomains.some(
+    (domain) => host === domain || host.endsWith(`.${domain}`),
+  );
+  if (!allowed) {
+    throw new Error(
+      `Blocked request to ${host} — not in allowed domains: ${requiredDomains.join(', ')}`,
+    );
+  }
+}
+
+/**
+ * Validate that a URL is safe to fetch (SSRF mitigation).
+ *
+ * Limitation: this is a client-side check on the literal hostname string.
+ * It cannot perform DNS resolution, so a public hostname that resolves to
+ * a private IP (DNS rebinding) will bypass this filter. When a team server
+ * is available, callers should route requests through `POST /api/proxy-fetch`
+ * which can enforce server-side DNS checks.
+ */
+function validateHttpUrl(urlStr: string): URL {
+  const url = new URL(urlStr);
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    throw new Error(`Blocked URL scheme: ${url.protocol} — only HTTP/HTTPS allowed`);
+  }
+  const host = url.hostname;
+  if (
+    ['169.254.169.254', 'localhost', '127.0.0.1', '::1', '0.0.0.0'].includes(host) ||
+    host === '::ffff:127.0.0.1' ||
+    /^10\./.test(host) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+    /^192\.168\./.test(host) ||
+    host.endsWith('.local') ||
+    host.endsWith('.internal')
+  ) {
+    throw new Error(`Blocked request to private/internal address: ${host}`);
+  }
+  return url;
+}
+
+/**
+ * Proxy fetch via the extension bridge (postMessage → bridge.js → background.js).
+ * Returns a Response-like object. Used to bypass CSP/CORS in extension context.
+ */
+function bridgeProxyFetch(
+  url: string,
+  method: string,
+  headers: Record<string, string>,
+  body: string | null,
+): Promise<{ ok: boolean; status: number; statusText: string; data: unknown; headers: Record<string, string> }> {
+  return new Promise((resolve, reject) => {
+    const requestId = nanoid();
+    const timeout = setTimeout(() => {
+      window.removeEventListener('message', handler);
+      reject(new Error('Bridge proxy fetch timed out (30s)'));
+    }, 30000);
+
+    function handler(event: MessageEvent) {
+      if (event.source !== window || !event.data) return;
+      if (event.data.type !== 'TC_PROXY_FETCH_RESULT') return;
+      if (event.data.requestId !== requestId) return;
+      window.removeEventListener('message', handler);
+      clearTimeout(timeout);
+
+      if (!event.data.success && event.data.error) {
+        reject(new Error(event.data.error));
+      } else {
+        resolve({
+          ok: event.data.status >= 200 && event.data.status < 300,
+          status: event.data.status,
+          statusText: event.data.statusText || '',
+          data: event.data.data,
+          headers: event.data.headers || {},
+        });
+      }
+    }
+
+    window.addEventListener('message', handler);
+    window.postMessage({
+      type: 'TC_PROXY_FETCH',
+      requestId,
+      url,
+      method,
+      headers,
+      body,
+    }, postMessageOrigin());
+  });
+}
+
+/** Sync allowed proxy domains to the extension so the background script can enforce an allowlist. */
+export function syncProxyAllowedDomains(templates: IntegrationTemplate[]): void {
+  const domains = new Set<string>();
+  for (const t of templates) {
+    for (const d of t.requiredDomains ?? []) {
+      domains.add(d);
+    }
+  }
+  try {
+    window.postMessage({ type: 'TC_SET_PROXY_DOMAINS', domains: [...domains] }, postMessageOrigin());
+  } catch { /* extension not present */ }
+}
+
+export function validateIntegrationConfig(
+  template: IntegrationTemplate,
+  installation: InstalledIntegration,
+): string[] {
+  return template.configSchema
+    .filter((field) => field.required)
+    .filter((field) => {
+      const value = installation.config?.[field.key];
+      if (typeof value === 'string') return value.trim().length === 0;
+      return value === null || value === undefined || value === false;
+    })
+    .map((field) => field.label || field.key);
+}
+
+export function buildIntegrationConfigError(template: IntegrationTemplate, missingFields: string[]): string {
+  const missing = missingFields.join(', ');
+  return `${template.name} needs configuration before it can run. Missing required field${missingFields.length === 1 ? '' : 's'}: ${missing}. Open Integrations, edit this installation, and add the required API key or setting.`;
+}
+
+/** Check if the extension bridge supports proxy_fetch */
+function hasBridgeProxyFetch(): boolean {
+  try {
+    const caps = document.documentElement.dataset.tcBridgeCaps || '';
+    return caps.split(',').includes('proxy_fetch');
+  } catch {
+    return false;
+  }
+}
+
+export class IntegrationExecutor {
+  async run(
+    template: IntegrationTemplate,
+    installation: InstalledIntegration,
+    input: ExecutionInput,
+    callbacks: ExecutionCallbacks,
+    signal?: AbortSignal,
+    options?: ExecutionOptions,
+  ): Promise<IntegrationRun> {
+    const runId = nanoid();
+    const startTime = Date.now();
+    const log: IntegrationRunLogEntry[] = [];
+    let status: IntegrationRunStatus = 'running';
+    let error: string | undefined;
+    let apiCallsMade = 0;
+    let entitiesCreated = 0;
+    let entitiesUpdated = 0;
+    let displayResults: unknown;
+
+    const context: ExecutionContext = {
+      ioc: input.ioc,
+      investigation: input.investigation,
+      config: installation.config,
+      now: new Date().toISOString(),
+      steps: {},
+      vars: {},
+    };
+
+    const secrets = collectSecretValues(template, installation.config);
+    const missingConfig = validateIntegrationConfig(template, installation);
+
+    const addLog = (entry: IntegrationRunLogEntry) => {
+      // Redact any secret values that leaked into log detail strings
+      const redacted = entry.detail
+        ? { ...entry, detail: redactSecrets(entry.detail, secrets) }
+        : entry;
+      log.push(redacted);
+      callbacks.onLog?.(redacted);
+    };
+
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), MAX_EXECUTION_MS);
+
+    try {
+      if (missingConfig.length > 0) {
+        throw new Error(buildIntegrationConfigError(template, missingConfig));
+      }
+
+      for (const step of template.steps) {
+        const stepResult = await this.executeStep(
+          step,
+          template,
+          context,
+          callbacks,
+          addLog,
+          signal,
+          timeoutController.signal,
+          options,
+        );
+
+        if (stepResult.skipped) continue;
+
+        apiCallsMade += stepResult.apiCalls;
+        entitiesCreated += stepResult.entitiesCreated;
+        entitiesUpdated += stepResult.entitiesUpdated;
+
+        if (stepResult.error) {
+          if (!step.continueOnError) {
+            error = stepResult.error;
+            status = 'error';
+            break;
+          }
+        }
+
+        if (signal?.aborted) {
+          status = 'cancelled';
+          break;
+        }
+        if (timeoutController.signal.aborted) {
+          status = 'timeout';
+          error = 'Execution exceeded 5 minute timeout';
+          break;
+        }
+      }
+
+      if (status === 'running') {
+        // Process outputs
+        const outputResult = await this.processOutputs(template, context, callbacks, addLog);
+        entitiesCreated += outputResult.entitiesCreated;
+        entitiesUpdated += outputResult.entitiesUpdated;
+        displayResults = outputResult.displayResults;
+        status = 'success';
+      }
+    } catch (err) {
+      if (signal?.aborted) {
+        status = 'cancelled';
+      } else if (timeoutController.signal.aborted) {
+        status = 'timeout';
+        error = 'Execution exceeded 5 minute timeout';
+      } else {
+        status = 'error';
+        error = redactSecrets(err instanceof Error ? err.message : String(err), secrets);
+      }
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    const durationMs = Date.now() - startTime;
+
+    return {
+      id: runId,
+      integrationId: installation.id,
+      templateId: template.id,
+      status,
+      trigger: 'manual',
+      inputSummary: this.buildInputSummary(input),
+      outputSummary: this.buildOutputSummary(status, entitiesCreated, entitiesUpdated, apiCallsMade),
+      durationMs,
+      error,
+      entitiesCreated,
+      entitiesUpdated,
+      apiCallsMade,
+      log,
+      displayResults,
+      createdAt: startTime,
+    };
+  }
+
+  private async executeStep(
+    step: IntegrationStep,
+    template: IntegrationTemplate,
+    context: ExecutionContext,
+    callbacks: ExecutionCallbacks,
+    addLog: (entry: IntegrationRunLogEntry) => void,
+    signal?: AbortSignal,
+    timeoutSignal?: AbortSignal,
+    options?: ExecutionOptions,
+  ): Promise<{
+    skipped: boolean;
+    error?: string;
+    apiCalls: number;
+    entitiesCreated: number;
+    entitiesUpdated: number;
+  }> {
+    // Check condition
+    if (step.condition) {
+      const shouldRun = evaluateCondition(step.condition, context);
+      if (!shouldRun) {
+        return { skipped: true, apiCalls: 0, entitiesCreated: 0, entitiesUpdated: 0 };
+      }
+    }
+
+    // Check abort
+    if (signal?.aborted || timeoutSignal?.aborted) {
+      return { skipped: true, apiCalls: 0, entitiesCreated: 0, entitiesUpdated: 0 };
+    }
+
+    const stepStart = Date.now();
+    addLog({
+      ts: stepStart,
+      stepId: step.id,
+      stepLabel: step.label,
+      type: 'step-start',
+    });
+
+    let apiCalls = 0;
+    let entitiesCreated = 0;
+    let entitiesUpdated = 0;
+
+    try {
+      switch (step.type) {
+        case 'http': {
+          const result = await this.executeHttpStep(step, template, context, addLog, signal, timeoutSignal, options);
+          context.steps[step.id] = result;
+          apiCalls += (result._apiCalls as number) ?? 1;
+          break;
+        }
+        case 'transform': {
+          const result = this.executeTransformStep(step, context);
+          context.steps[step.id] = result;
+          break;
+        }
+        case 'condition': {
+          const result = await this.executeConditionStep(
+            step,
+            template,
+            context,
+            callbacks,
+            addLog,
+            signal,
+            timeoutSignal,
+            options,
+          );
+          context.steps[step.id] = { branch: result.branch };
+          apiCalls += result.apiCalls;
+          entitiesCreated += result.entitiesCreated;
+          entitiesUpdated += result.entitiesUpdated;
+          break;
+        }
+        case 'loop': {
+          const result = await this.executeLoopStep(
+            step,
+            template,
+            context,
+            callbacks,
+            addLog,
+            signal,
+            timeoutSignal,
+            options,
+          );
+          context.steps[step.id] = { iterations: result.iterations };
+          apiCalls += result.apiCalls;
+          entitiesCreated += result.entitiesCreated;
+          entitiesUpdated += result.entitiesUpdated;
+          break;
+        }
+        case 'create-entity': {
+          const id = await this.executeCreateEntityStep(step, context, callbacks, addLog);
+          context.steps[step.id] = { id };
+          entitiesCreated += 1;
+          break;
+        }
+        case 'update-entity': {
+          await this.executeUpdateEntityStep(step, context, callbacks, addLog);
+          context.steps[step.id] = { updated: true };
+          entitiesUpdated += 1;
+          break;
+        }
+        case 'set-variable': {
+          this.executeSetVariableStep(step, context, addLog);
+          context.steps[step.id] = { set: true };
+          break;
+        }
+        case 'delay': {
+          await new Promise((r) => setTimeout(r, step.ms));
+          context.steps[step.id] = { delayed: step.ms };
+          break;
+        }
+      }
+
+      addLog({
+        ts: Date.now(),
+        stepId: step.id,
+        stepLabel: step.label,
+        type: 'step-complete',
+        durationMs: Date.now() - stepStart,
+      });
+
+      return { skipped: false, apiCalls, entitiesCreated, entitiesUpdated };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      addLog({
+        ts: Date.now(),
+        stepId: step.id,
+        stepLabel: step.label,
+        type: 'step-error',
+        detail: errorMessage,
+        durationMs: Date.now() - stepStart,
+      });
+
+      return { skipped: false, error: errorMessage, apiCalls, entitiesCreated, entitiesUpdated };
+    }
+  }
+
+  private async executeHttpStep(
+    step: HttpStep,
+    template: IntegrationTemplate,
+    context: ExecutionContext,
+    addLog: (entry: IntegrationRunLogEntry) => void,
+    signal?: AbortSignal,
+    timeoutSignal?: AbortSignal,
+    options?: ExecutionOptions,
+  ): Promise<Record<string, unknown>> {
+    const resolvedUrl = resolveVariables(step.url, context);
+    const resolvedHeaders = step.headers
+      ? (resolveDeep(step.headers, context) as Record<string, string>)
+      : {};
+    const resolvedBasicAuth = step.basicAuth
+      ? (resolveDeep(step.basicAuth, context) as { username?: string; password?: string })
+      : undefined;
+    const resolvedParams = step.queryParams
+      ? (resolveDeep(step.queryParams, context) as Record<string, string>)
+      : {};
+    const resolvedBody = step.body != null ? resolveDeep(step.body, context) : undefined;
+
+    // Validate URL before fetching (SSRF protection)
+    const url = validateHttpUrl(resolvedUrl);
+    for (const [key, value] of Object.entries(resolvedParams)) {
+      url.searchParams.set(key, String(value));
+    }
+
+    // Enforce required domains — prevents templates from exfiltrating secrets
+    enforceRequiredDomains(url, template.requiredDomains);
+
+    const maxRetries = step.retry?.maxRetries ?? 0;
+    const retryOn = step.retry?.retryOn ?? [];
+    const backoffMs = step.retry?.backoffMs ?? 1000;
+    let apiCalls = 0;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      // Build fetch options
+      const fetchOptions: RequestInit = {
+        method: step.method,
+        headers: resolvedHeaders,
+      };
+
+      if (resolvedBasicAuth?.username && resolvedBasicAuth?.password) {
+        (fetchOptions.headers as Record<string, string>).Authorization = `Basic ${btoa(`${resolvedBasicAuth.username}:${resolvedBasicAuth.password}`)}`;
+      }
+
+      if (resolvedBody != null && step.method !== 'GET') {
+        if (step.contentType === 'form') {
+          fetchOptions.body = new URLSearchParams(resolvedBody as Record<string, string>);
+        } else if (step.contentType === 'text') {
+          fetchOptions.body = String(resolvedBody);
+        } else {
+          fetchOptions.body = JSON.stringify(resolvedBody);
+          if (!resolvedHeaders['Content-Type'] && !resolvedHeaders['content-type']) {
+            (fetchOptions.headers as Record<string, string>)['Content-Type'] = 'application/json';
+          }
+        }
+      }
+
+      // Combine abort signals
+      const timeoutMs = step.timeout ?? 30000;
+      const stepTimeout = AbortSignal.timeout(timeoutMs);
+      const combinedSignals = [stepTimeout];
+      if (signal) combinedSignals.push(signal);
+      if (timeoutSignal) combinedSignals.push(timeoutSignal);
+      fetchOptions.signal = AbortSignal.any(combinedSignals);
+
+      addLog({
+        ts: Date.now(),
+        stepId: step.id,
+        stepLabel: step.label,
+        type: 'http-request',
+        detail: `${step.method} ${url.toString()}${attempt > 0 ? ` (retry ${attempt})` : ''}`,
+      });
+
+      apiCalls++;
+
+      let responseStatus: number;
+      let responseStatusText: string;
+      let responseData: unknown;
+      let responseHeaders: Record<string, string> = {};
+
+      // Serialize body for proxy transports
+      const serializeBody = () =>
+        fetchOptions.body instanceof URLSearchParams
+          ? fetchOptions.body.toString()
+          : typeof fetchOptions.body === 'string'
+            ? fetchOptions.body
+            : fetchOptions.body != null ? String(fetchOptions.body) : null;
+
+      if (options?.useServerProxy) {
+        // Route through team server — server can enforce DNS-level SSRF checks
+        const proxyHeaders = { ...(fetchOptions.headers as Record<string, string>) };
+        if (fetchOptions.body instanceof URLSearchParams && !proxyHeaders['Content-Type'] && !proxyHeaders['content-type']) {
+          proxyHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+        }
+        const proxyResult = await serverProxyFetch(
+          options.useServerProxy.serverUrl,
+          options.useServerProxy.getAccessToken,
+          url.toString(), step.method, proxyHeaders, serializeBody(), template.requiredDomains,
+        );
+        responseStatus = proxyResult.status;
+        responseStatusText = proxyResult.statusText;
+        responseData = step.responseType === 'text' ? String(proxyResult.data) : proxyResult.data;
+        responseHeaders = proxyResult.headers;
+      } else if (hasBridgeProxyFetch()) {
+        // Route through extension background script to bypass CSP/CORS
+        const proxyHeaders = { ...(fetchOptions.headers as Record<string, string>) };
+        if (fetchOptions.body instanceof URLSearchParams && !proxyHeaders['Content-Type'] && !proxyHeaders['content-type']) {
+          proxyHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+        }
+        const proxyResult = await bridgeProxyFetch(url.toString(), step.method, proxyHeaders, serializeBody());
+        responseStatus = proxyResult.status;
+        responseStatusText = proxyResult.statusText;
+        responseData = step.responseType === 'text' ? String(proxyResult.data) : proxyResult.data;
+        responseHeaders = proxyResult.headers;
+      } else {
+        // Direct fetch first for normal web/dev contexts. If the browser blocks
+        // the provider with CORS/CSP, fall back to the bundled local proxy.
+        let response: Response;
+        try {
+          response = await fetch(url.toString(), fetchOptions);
+          responseStatus = response.status;
+          responseStatusText = response.statusText;
+          responseData = step.responseType === 'text'
+            ? await response.text()
+            : await response.json().catch(() => null);
+          response.headers.forEach((value, key) => {
+            responseHeaders[key] = value;
+          });
+        } catch (directErr) {
+          const proxyHeaders = { ...(fetchOptions.headers as Record<string, string>) };
+          if (fetchOptions.body instanceof URLSearchParams && !proxyHeaders['Content-Type'] && !proxyHeaders['content-type']) {
+            proxyHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+          }
+          try {
+            const proxyResult = await localIntegrationProxyFetch(url.toString(), step.method, proxyHeaders, serializeBody(), template.requiredDomains);
+            responseStatus = proxyResult.status;
+            responseStatusText = proxyResult.statusText;
+            responseData = step.responseType === 'text' ? String(proxyResult.data) : proxyResult.data;
+            responseHeaders = proxyResult.headers;
+          } catch (proxyErr) {
+            const message = directErr instanceof Error ? directErr.message : String(directErr);
+            const proxyMessage = proxyErr instanceof Error ? proxyErr.message : String(proxyErr);
+            const proxyHint = [
+              `Direct browser request failed for ${url.hostname}: ${message}.`,
+              `The bundled local integration proxy at http://127.0.0.1:8767 also was not available: ${proxyMessage}.`,
+              'Start the ThreatCaddy integration proxy with `pnpm integration-proxy`, open the extension-enabled app, or connect to a team server, then rerun the integration.',
+            ].join(' ');
+            throw new Error(proxyHint);
+          }
+        }
+        if (responseStatus === undefined) {
+          const proxyHint = [
+            `Integration transport failed for ${url.hostname}.`,
+            'Start the ThreatCaddy integration proxy with `pnpm integration-proxy`, open the extension-enabled app, or connect to a team server, then rerun the integration.',
+          ].join(' ');
+          throw new Error(proxyHint);
+        }
+      }
+
+      addLog({
+        ts: Date.now(),
+        stepId: step.id,
+        stepLabel: step.label,
+        type: 'http-response',
+        detail: `${responseStatus} ${responseStatusText}`,
+      });
+
+      // Check if we should retry
+      if (responseStatus >= 400 && attempt < maxRetries && retryOn.includes(responseStatus)) {
+        await new Promise((r) => setTimeout(r, backoffMs * (attempt + 1)));
+        continue;
+      }
+
+      if (responseStatus >= 400) {
+        throw new Error(`HTTP ${responseStatus}: ${responseStatusText}`);
+      }
+
+      return {
+        response: {
+          status: responseStatus,
+          data: responseData,
+          headers: responseHeaders,
+        },
+        _apiCalls: apiCalls,
+      };
+    }
+
+    // Should not reach here, but safety net
+    throw new Error('HTTP request failed after all retries');
+  }
+
+  private executeTransformStep(
+    step: TransformStep,
+    context: ExecutionContext,
+  ): Record<string, unknown> {
+    // Resolve the input — if it's a single {{path}} expression, preserve the
+    // raw object so extract/map/filter can traverse its properties. When the
+    // template contains surrounding text or multiple expressions we fall back
+    // to the stringified value.
+    let sourceData: unknown;
+    const singleExprMatch = /^\{\{([^}]+)\}\}$/.exec(step.input);
+    if (singleExprMatch) {
+      const path = singleExprMatch[1].trim();
+      const segments = path.split('.');
+      let current: unknown = context;
+      for (const seg of segments) {
+        if (current == null || typeof current !== 'object') { current = undefined; break; }
+        current = (current as Record<string, unknown>)[seg];
+      }
+      sourceData = current;
+    } else {
+      sourceData = resolveVariables(step.input, context);
+    }
+    const result: Record<string, unknown> = {};
+
+    // Make sourceData available as a working value
+    let working: unknown = sourceData;
+
+    for (const op of step.operations) {
+      switch (op.op) {
+        case 'extract': {
+          // Extract always reads from the original sourceData so multiple
+          // independent extracts don't interfere with each other.
+          const value = getNestedValue(sourceData, op.path);
+          result[op.as] = value;
+          break;
+        }
+        case 'map': {
+          const arr = getNestedValue(working, op.path);
+          if (!Array.isArray(arr)) {
+            result[op.as] = [];
+            break;
+          }
+          result[op.as] = arr.map((item) => {
+            const itemContext = { ...context, item };
+            return resolveDeep(op.template, itemContext);
+          });
+          break;
+        }
+        case 'filter': {
+          const arr = getNestedValue(working, op.path);
+          if (!Array.isArray(arr)) {
+            result[op.as] = [];
+            break;
+          }
+          result[op.as] = arr.filter((item) => {
+            const itemContext = { ...context, item };
+            return evaluateCondition(op.condition, itemContext);
+          });
+          break;
+        }
+        case 'flatten': {
+          const arr = getNestedValue(working, op.path);
+          result[op.as] = Array.isArray(arr) ? arr.flat() : arr;
+          break;
+        }
+        case 'join': {
+          const arr = getNestedValue(working, op.path);
+          result[op.as] = Array.isArray(arr) ? arr.join(op.separator) : String(arr ?? '');
+          break;
+        }
+        case 'template': {
+          result[op.as] = resolveVariables(op.template, context);
+          break;
+        }
+        case 'lookup': {
+          const value = String(getNestedValue(working, op.path) ?? '');
+          result[op.as] = op.map[value] ?? op.default ?? value;
+          break;
+        }
+      }
+
+      // Each operation's result feeds into working for chaining
+      if ('as' in op) {
+        working = result[op.as];
+      }
+    }
+
+    return result;
+  }
+
+  private async executeConditionStep(
+    step: ConditionStep,
+    template: IntegrationTemplate,
+    context: ExecutionContext,
+    callbacks: ExecutionCallbacks,
+    addLog: (entry: IntegrationRunLogEntry) => void,
+    signal?: AbortSignal,
+    timeoutSignal?: AbortSignal,
+    options?: ExecutionOptions,
+  ): Promise<{
+    branch: 'then' | 'else';
+    apiCalls: number;
+    entitiesCreated: number;
+    entitiesUpdated: number;
+  }> {
+    const conditionResult = evaluateCondition(step.expression, context);
+    const stepIds = conditionResult ? step.thenSteps : (step.elseSteps ?? []);
+    let apiCalls = 0;
+    let entitiesCreated = 0;
+    let entitiesUpdated = 0;
+
+    for (const stepId of stepIds) {
+      const subStep = template.steps.find((s) => s.id === stepId);
+      if (!subStep) continue;
+
+      const result = await this.executeStep(
+        subStep,
+        template,
+        context,
+        callbacks,
+        addLog,
+        signal,
+        timeoutSignal,
+        options,
+      );
+      apiCalls += result.apiCalls;
+      entitiesCreated += result.entitiesCreated;
+      entitiesUpdated += result.entitiesUpdated;
+
+      if (result.error && !subStep.continueOnError) {
+        throw new Error(result.error);
+      }
+    }
+
+    return {
+      branch: conditionResult ? 'then' : 'else',
+      apiCalls,
+      entitiesCreated,
+      entitiesUpdated,
+    };
+  }
+
+  private async executeLoopStep(
+    step: LoopStep,
+    template: IntegrationTemplate,
+    context: ExecutionContext,
+    callbacks: ExecutionCallbacks,
+    addLog: (entry: IntegrationRunLogEntry) => void,
+    signal?: AbortSignal,
+    timeoutSignal?: AbortSignal,
+    options?: ExecutionOptions,
+  ): Promise<{ iterations: number; apiCalls: number; entitiesCreated: number; entitiesUpdated: number }> {
+    const items = resolveVariables(step.items, context);
+    if (!Array.isArray(items)) {
+      throw new Error(`Loop items expression did not resolve to an array`);
+    }
+
+    const maxIterations = step.maxIterations ?? 100;
+    let apiCalls = 0;
+    let entitiesCreated = 0;
+    let entitiesUpdated = 0;
+    let iterations = 0;
+
+    for (let i = 0; i < Math.min(items.length, maxIterations); i++) {
+      if (signal?.aborted || timeoutSignal?.aborted) break;
+
+      const item = items[i];
+      context.loop = { item, index: i };
+      context.vars[step.itemVariable] = item;
+      if (step.indexVariable) {
+        context.vars[step.indexVariable] = i;
+      }
+
+      for (const stepId of step.bodySteps) {
+        const subStep = template.steps.find((s) => s.id === stepId);
+        if (!subStep) continue;
+
+        const result = await this.executeStep(
+          subStep,
+          template,
+          context,
+          callbacks,
+          addLog,
+          signal,
+          timeoutSignal,
+          options,
+        );
+        apiCalls += result.apiCalls;
+        entitiesCreated += result.entitiesCreated;
+        entitiesUpdated += result.entitiesUpdated;
+
+        if (result.error && !subStep.continueOnError) {
+          throw new Error(result.error);
+        }
+      }
+
+      iterations++;
+
+      if (step.delayMs && i < items.length - 1) {
+        await new Promise((r) => setTimeout(r, step.delayMs));
+      }
+    }
+
+    // Clean up loop context
+    delete context.loop;
+
+    return { iterations, apiCalls, entitiesCreated, entitiesUpdated };
+  }
+
+  private async executeCreateEntityStep(
+    step: CreateEntityStep,
+    context: ExecutionContext,
+    callbacks: ExecutionCallbacks,
+    addLog: (entry: IntegrationRunLogEntry) => void,
+  ): Promise<string> {
+    const resolvedFields = resolveDeep(step.fields, context) as Record<string, unknown>;
+
+    if (!callbacks.onCreateEntity) {
+      throw new Error('No onCreateEntity callback provided');
+    }
+
+    const id = await callbacks.onCreateEntity(step.entityType, resolvedFields);
+
+    addLog({
+      ts: Date.now(),
+      stepId: step.id,
+      stepLabel: step.label,
+      type: 'entity-created',
+      detail: `Created ${step.entityType}: ${id}`,
+    });
+
+    return id;
+  }
+
+  private async executeUpdateEntityStep(
+    step: UpdateEntityStep,
+    context: ExecutionContext,
+    callbacks: ExecutionCallbacks,
+    addLog: (entry: IntegrationRunLogEntry) => void,
+  ): Promise<void> {
+    const resolvedFields = resolveDeep(step.fields, context) as Record<string, unknown>;
+    const resolvedId = resolveVariables(step.entityId, context) as string;
+
+    if (!callbacks.onUpdateEntity) {
+      throw new Error('No onUpdateEntity callback provided');
+    }
+
+    await callbacks.onUpdateEntity(step.entityType, resolvedId, resolvedFields);
+
+    addLog({
+      ts: Date.now(),
+      stepId: step.id,
+      stepLabel: step.label,
+      type: 'entity-created',
+      detail: `Updated ${step.entityType}: ${resolvedId}`,
+    });
+  }
+
+  private executeSetVariableStep(
+    step: SetVariableStep,
+    context: ExecutionContext,
+    addLog: (entry: IntegrationRunLogEntry) => void,
+  ): void {
+    for (const [key, expr] of Object.entries(step.variables)) {
+      const value = resolveVariables(expr, context);
+      context.vars[key] = value;
+
+      addLog({
+        ts: Date.now(),
+        stepId: step.id,
+        stepLabel: step.label,
+        type: 'variable-set',
+        detail: `${key} = ${typeof value === 'string' ? value : JSON.stringify(value)}`,
+      });
+    }
+  }
+
+  private async processOutputs(
+    template: IntegrationTemplate,
+    context: ExecutionContext,
+    callbacks: ExecutionCallbacks,
+    addLog: (entry: IntegrationRunLogEntry) => void,
+  ): Promise<{ displayResults: unknown; entitiesCreated: number; entitiesUpdated: number }> {
+    let entitiesCreated = 0;
+    let entitiesUpdated = 0;
+    let displayResults: unknown;
+
+    for (const output of template.outputs) {
+      if (output.condition) {
+        const shouldProcess = evaluateCondition(output.condition, context);
+        if (!shouldProcess) continue;
+      }
+
+      const resolved = resolveDeep(output.template, context) as Record<string, unknown>;
+
+      switch (output.type) {
+        case 'display':
+          displayResults = resolved;
+          break;
+
+        case 'create-ioc':
+        case 'create-note':
+        case 'create-task':
+        case 'create-timeline-event': {
+          if (callbacks.onCreateEntity) {
+            const entityType = output.type.replace('create-', '') as string;
+            // For notes, attach raw API responses and transform results for rich formatting
+            if (output.type === 'create-note') {
+              const httpResponses: Record<string, unknown> = {};
+              const transformResults: Record<string, unknown> = {};
+              for (const [stepId, stepData] of Object.entries(context.steps)) {
+                const data = stepData as Record<string, unknown>;
+                if (data?.response) {
+                  httpResponses[stepId] = (data.response as Record<string, unknown>).data;
+                } else if (!data?._apiCalls && !data?.branch) {
+                  // Transform step results (no _apiCalls or branch property)
+                  transformResults[stepId] = data;
+                }
+              }
+              resolved._rawResponses = httpResponses;
+              resolved._transformResults = transformResults;
+            }
+            await callbacks.onCreateEntity(entityType, resolved);
+            entitiesCreated++;
+            addLog({
+              ts: Date.now(),
+              stepId: 'output',
+              stepLabel: `Output: ${output.type}`,
+              type: 'entity-created',
+              detail: `Created ${entityType} from output`,
+            });
+          }
+          break;
+        }
+
+        case 'update-ioc': {
+          if (callbacks.onUpdateEntity) {
+            const id = resolved.id as string;
+            const fields = { ...resolved };
+            delete fields.id;
+            await callbacks.onUpdateEntity('ioc', id, fields);
+            entitiesUpdated++;
+          }
+          break;
+        }
+
+        case 'notify': {
+          const message =
+            typeof resolved.message === 'string' ? resolved.message : JSON.stringify(resolved);
+          callbacks.onNotify?.(message);
+          break;
+        }
+
+        case 'post-to-feed':
+          // post-to-feed is handled at a higher level
+          break;
+      }
+    }
+
+    return { displayResults, entitiesCreated, entitiesUpdated };
+  }
+
+  private buildInputSummary(input: ExecutionInput): string {
+    const parts: string[] = [];
+    if (input.ioc) {
+      parts.push(`IOC: ${input.ioc.value} (${input.ioc.type})`);
+    }
+    if (input.investigation) {
+      parts.push(`Investigation: ${input.investigation.name}`);
+    }
+    return parts.join(', ') || 'No input';
+  }
+
+  private buildOutputSummary(
+    status: IntegrationRunStatus,
+    entitiesCreated: number,
+    entitiesUpdated: number,
+    apiCallsMade: number,
+  ): string {
+    if (status === 'error') return 'Failed';
+    if (status === 'cancelled') return 'Cancelled';
+    if (status === 'timeout') return 'Timed out';
+
+    const parts: string[] = [];
+    if (apiCallsMade > 0) parts.push(`${apiCallsMade} API call${apiCallsMade !== 1 ? 's' : ''}`);
+    if (entitiesCreated > 0) parts.push(`${entitiesCreated} created`);
+    if (entitiesUpdated > 0) parts.push(`${entitiesUpdated} updated`);
+    return parts.join(', ') || 'Completed';
+  }
+}
+
+function getNestedValue(obj: unknown, path: string): unknown {
+  if (!path) return obj;
+  const parts = path.split('.');
+  let current: unknown = obj;
+  for (const part of parts) {
+    if (current == null) return undefined;
+    if (typeof current === 'object') {
+      current = (current as Record<string, unknown>)[part];
+    } else {
+      return undefined;
+    }
+  }
+  return current;
+}

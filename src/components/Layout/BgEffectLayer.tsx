@@ -1,0 +1,471 @@
+import { useEffect, useRef } from 'react';
+import type { BackgroundEffectPattern } from '../../types';
+
+interface BgEffectLayerProps {
+  pattern: BackgroundEffectPattern;
+  color?: string;
+  intensity?: number;
+  size?: number;
+  theme: 'dark' | 'light';
+}
+
+type MovingPoint = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  twinkle: number;
+};
+
+type SwirlSeed = {
+  anchorX: number;
+  anchorY: number;
+  orbitX: number;
+  orbitY: number;
+  speed: number;
+  phase: number;
+  width: number;
+};
+
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+function normalizeHex(value?: string) {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (/^#[0-9a-f]{6}$/i.test(trimmed)) return trimmed;
+  return null;
+}
+
+function hexToRgb(hex: string) {
+  const clean = hex.replace('#', '');
+  return {
+    r: parseInt(clean.slice(0, 2), 16),
+    g: parseInt(clean.slice(2, 4), 16),
+    b: parseInt(clean.slice(4, 6), 16),
+  };
+}
+
+function rgba(hex: string, alpha: number) {
+  const { r, g, b } = hexToRgb(hex);
+  return `rgba(${r}, ${g}, ${b}, ${clamp(alpha, 0, 1)})`;
+}
+
+function getPaletteFallbackColor(theme: 'dark' | 'light') {
+  const styles = getComputedStyle(document.documentElement);
+  const tokens = [
+    '--color-text-primary',
+    '--color-accent',
+    '--color-accent-blue',
+  ];
+  for (const token of tokens) {
+    const value = normalizeHex(styles.getPropertyValue(token));
+    if (value) return value;
+  }
+  return theme === 'dark' ? '#8ec5ff' : '#5b8cff';
+}
+
+function createSwirls(width: number, height: number, scale: number) {
+  const count = Math.max(4, Math.round(Math.min(width, height) / 280));
+  return Array.from({ length: count }, (_, index) => ({
+    anchorX: width * (0.15 + ((index * 0.19) % 0.72)),
+    anchorY: height * (0.18 + ((index * 0.13) % 0.66)),
+    orbitX: (150 + Math.random() * 180) * scale,
+    orbitY: (90 + Math.random() * 150) * scale,
+    speed: 0.55 + Math.random() * 0.75,
+    phase: Math.random() * Math.PI * 2,
+    width: 0.7 + Math.random() * 0.8,
+  } satisfies SwirlSeed));
+}
+
+function createPoints(width: number, height: number, scale: number, density: number) {
+  const count = Math.max(18, Math.round(((width * height) / 65000) * density));
+  return Array.from({ length: count }, () => ({
+    x: Math.random() * width,
+    y: Math.random() * height,
+    vx: (Math.random() - 0.5) * 0.18 * scale,
+    vy: (Math.random() - 0.5) * 0.18 * scale,
+    radius: (1.2 + Math.random() * 2.6) * scale,
+    twinkle: Math.random() * Math.PI * 2,
+  } satisfies MovingPoint));
+}
+
+export function BgEffectLayer({
+  pattern,
+  color,
+  intensity = 60,
+  size = 100,
+  theme,
+}: BgEffectLayerProps) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || pattern === 'none') {
+      return;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      return;
+    }
+
+    const effectColor = normalizeHex(color) || getPaletteFallbackColor(theme);
+    const glowColor = theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.34)';
+    const reducedMotion = typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const shouldAnimate = !reducedMotion && pattern !== 'dots';
+    const alphaBase = clamp(intensity / 100, 0.08, 1);
+    const scale = clamp(size / 100, 0.45, 2);
+    const starDensity = 0.75 + alphaBase * 0.45;
+    let frame = 0;
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
+    let swirls: SwirlSeed[] = [];
+    let points: MovingPoint[] = [];
+
+    const resize = () => {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      swirls = createSwirls(width, height, scale);
+      points = createPoints(width, height, scale, starDensity);
+    };
+
+    const stepPoints = (delta: number) => {
+      const speedScale = reducedMotion ? 0.08 : delta * 0.05;
+      for (const point of points) {
+        point.x += point.vx * speedScale;
+        point.y += point.vy * speedScale;
+        point.twinkle += delta * 0.0015;
+        if (point.x < -20) point.x = width + 20;
+        if (point.x > width + 20) point.x = -20;
+        if (point.y < -20) point.y = height + 20;
+        if (point.y > height + 20) point.y = -20;
+      }
+    };
+
+    const drawSparkles = (time: number) => {
+      stepPoints(reducedMotion ? 0.8 : 1.6);
+      for (const point of points) {
+        const twinkle = 0.35 + ((Math.sin(time * 0.0015 + point.twinkle) + 1) / 2) * 0.65;
+        context.strokeStyle = rgba(effectColor, alphaBase * 0.22 * twinkle);
+        context.lineWidth = 1;
+        context.beginPath();
+        context.moveTo(point.x - point.radius * 3, point.y);
+        context.lineTo(point.x + point.radius * 3, point.y);
+        context.moveTo(point.x, point.y - point.radius * 3);
+        context.lineTo(point.x, point.y + point.radius * 3);
+        context.stroke();
+
+        context.fillStyle = rgba(effectColor, alphaBase * 0.6 * twinkle);
+        context.beginPath();
+        context.arc(point.x, point.y, point.radius, 0, Math.PI * 2);
+        context.fill();
+      }
+    };
+
+    const drawDots = () => {
+      const spacing = 20 * scale;
+      context.fillStyle = rgba(effectColor, alphaBase * 0.22);
+      for (let y = spacing; y < height; y += spacing) {
+        for (let x = spacing; x < width; x += spacing) {
+          context.beginPath();
+          context.arc(x, y, 0.8 * scale, 0, Math.PI * 2);
+          context.fill();
+        }
+      }
+    };
+
+    const drawSynapse = (time: number) => {
+      const spacing = 24 * scale;
+      context.strokeStyle = rgba(effectColor, alphaBase * 0.08);
+      context.lineWidth = 1;
+      for (let x = 0; x < width; x += spacing) {
+        context.beginPath();
+        context.moveTo(x, 0);
+        context.lineTo(x, height);
+        context.stroke();
+      }
+      for (let y = 0; y < height; y += spacing) {
+        context.beginPath();
+        context.moveTo(0, y);
+        context.lineTo(width, y);
+        context.stroke();
+      }
+
+      const pulseCount = reducedMotion ? 5 : Math.max(10, Math.round(16 * alphaBase));
+      for (let index = 0; index < pulseCount; index += 1) {
+        const horizontal = index % 2 === 0;
+        const line = (index * 7) % Math.max(1, Math.ceil((horizontal ? height : width) / spacing));
+        const position = ((time * (0.09 + index * 0.006)) + index * 97) % ((horizontal ? width : height) + 140) - 70;
+        const x = horizontal ? position : line * spacing;
+        const y = horizontal ? line * spacing : position;
+        const gradient = horizontal
+          ? context.createLinearGradient(x - 28 * scale, y, x + 8 * scale, y)
+          : context.createLinearGradient(x, y - 28 * scale, x, y + 8 * scale);
+        gradient.addColorStop(0, 'rgba(0,0,0,0)');
+        gradient.addColorStop(1, rgba(effectColor, alphaBase * 0.5));
+        context.strokeStyle = gradient;
+        context.lineWidth = 1.2 * scale;
+        context.beginPath();
+        if (horizontal) {
+          context.moveTo(x - 30 * scale, y);
+          context.lineTo(x + 8 * scale, y);
+        } else {
+          context.moveTo(x, y - 30 * scale);
+          context.lineTo(x, y + 8 * scale);
+        }
+        context.stroke();
+        context.fillStyle = rgba(effectColor, alphaBase * 0.55);
+        context.beginPath();
+        context.arc(x, y, 1.6 * scale, 0, Math.PI * 2);
+        context.fill();
+      }
+    };
+
+    const drawRain = () => {
+      for (const point of points) {
+        point.y += reducedMotion ? 0.12 : (1.4 + point.radius) * (0.35 + alphaBase);
+        if (point.y > height + 80) {
+          point.y = -40;
+          point.x = Math.random() * width;
+        }
+        const length = (26 + point.radius * 11) * scale;
+        const gradient = context.createLinearGradient(point.x, point.y - length, point.x, point.y);
+        gradient.addColorStop(0, 'rgba(0,0,0,0)');
+        gradient.addColorStop(1, rgba(effectColor, alphaBase * 0.44));
+        context.strokeStyle = gradient;
+        context.lineWidth = 1.2 * scale;
+        context.beginPath();
+        context.moveTo(point.x, point.y - length);
+        context.lineTo(point.x, point.y);
+        context.stroke();
+      }
+    };
+
+    const drawPerlinFlow = (time: number) => {
+      for (const point of points) {
+        const angle = Math.sin(point.x * 0.006 + time * 0.0007) * Math.PI
+          + Math.cos(point.y * 0.005 + time * 0.00045);
+        point.x += Math.cos(angle) * (reducedMotion ? 0.08 : 0.9 * scale);
+        point.y += Math.sin(angle) * (reducedMotion ? 0.08 : 0.9 * scale);
+        point.twinkle -= 0.003;
+        if (point.x < -20 || point.x > width + 20 || point.y < -20 || point.y > height + 20 || point.twinkle < -1) {
+          point.x = Math.random() * width;
+          point.y = Math.random() * height;
+          point.twinkle = Math.random() * Math.PI * 2;
+        }
+        context.fillStyle = rgba(effectColor, alphaBase * 0.18);
+        context.beginPath();
+        context.arc(point.x, point.y, Math.max(0.8, point.radius * 0.7), 0, Math.PI * 2);
+        context.fill();
+      }
+    };
+
+    const drawPetals = (time: number) => {
+      for (const point of points.slice(0, Math.max(18, Math.round(points.length * 0.55)))) {
+        point.y += reducedMotion ? 0.06 : (0.28 + point.radius * 0.12) * scale;
+        point.x += Math.sin(time * 0.001 + point.twinkle) * 0.35 * scale;
+        point.twinkle += 0.012;
+        if (point.y > height + 20) {
+          point.y = -20;
+          point.x = Math.random() * width;
+        }
+        context.save();
+        context.translate(point.x, point.y);
+        context.rotate(point.twinkle);
+        context.fillStyle = rgba(effectColor, alphaBase * 0.24);
+        context.beginPath();
+        context.ellipse(0, 0, point.radius * 2.2, point.radius * 0.85, 0.35, 0, Math.PI * 2);
+        context.fill();
+        context.restore();
+      }
+    };
+
+    const drawEmbers = () => {
+      for (const point of points) {
+        point.y -= reducedMotion ? 0.04 : (0.25 + point.radius * 0.08) * scale;
+        point.x += Math.sin(point.twinkle) * 0.22 * scale;
+        point.twinkle += 0.018;
+        if (point.y < -20) {
+          point.y = height + 20;
+          point.x = Math.random() * width;
+        }
+        const glow = 0.25 + ((Math.sin(point.twinkle) + 1) / 2) * 0.75;
+        context.fillStyle = rgba(effectColor, alphaBase * 0.38 * glow);
+        context.beginPath();
+        context.arc(point.x, point.y, point.radius * 0.78, 0, Math.PI * 2);
+        context.fill();
+      }
+    };
+
+    const drawConstellations = (time: number) => {
+      stepPoints(reducedMotion ? 0.7 : 1.25);
+
+      for (let index = 0; index < points.length; index += 1) {
+        const point = points[index];
+        context.fillStyle = rgba(effectColor, alphaBase * 0.52);
+        context.beginPath();
+        context.arc(point.x, point.y, point.radius, 0, Math.PI * 2);
+        context.fill();
+
+        for (let compareIndex = index + 1; compareIndex < points.length; compareIndex += 1) {
+          const compare = points[compareIndex];
+          const dx = point.x - compare.x;
+          const dy = point.y - compare.y;
+          const distance = Math.hypot(dx, dy);
+          const limit = 180 * scale;
+          if (distance > limit) continue;
+
+          const distanceAlpha = (1 - distance / limit) * alphaBase * 0.16;
+          context.strokeStyle = rgba(effectColor, distanceAlpha);
+          context.lineWidth = 1;
+          context.beginPath();
+          context.moveTo(point.x, point.y);
+          context.lineTo(compare.x, compare.y);
+          context.stroke();
+        }
+      }
+
+      const haloX = width * (0.5 + Math.sin(time * 0.00018) * 0.12);
+      const haloY = height * (0.42 + Math.cos(time * 0.00014) * 0.1);
+      const haloRadius = Math.min(width, height) * (0.18 + scale * 0.08);
+      const gradient = context.createRadialGradient(haloX, haloY, 0, haloX, haloY, haloRadius);
+      gradient.addColorStop(0, rgba(effectColor, alphaBase * 0.12));
+      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      context.fillStyle = gradient;
+      context.beginPath();
+      context.arc(haloX, haloY, haloRadius, 0, Math.PI * 2);
+      context.fill();
+    };
+
+    const drawSwirls = (time: number) => {
+      const rotation = reducedMotion ? 0.00006 : 0.00018;
+      const baseRadius = Math.min(width, height) * 0.06 * scale;
+
+      for (const swirl of swirls) {
+        const cx = swirl.anchorX + Math.cos(time * rotation * swirl.speed + swirl.phase) * swirl.orbitX * 0.32;
+        const cy = swirl.anchorY + Math.sin(time * rotation * swirl.speed * 0.78 + swirl.phase) * swirl.orbitY * 0.24;
+        context.beginPath();
+        for (let step = 0; step < 48; step += 1) {
+          const stepRatio = step / 47;
+          const angle = (time * rotation * (1.6 + swirl.speed)) + swirl.phase + stepRatio * Math.PI * 3.4;
+          const radius = baseRadius + stepRatio * (110 * scale);
+          const px = cx + Math.cos(angle) * radius;
+          const py = cy + Math.sin(angle) * radius * 0.55;
+          if (step === 0) context.moveTo(px, py);
+          else context.lineTo(px, py);
+        }
+        context.strokeStyle = rgba(effectColor, alphaBase * 0.18);
+        context.lineWidth = swirl.width;
+        context.stroke();
+
+        context.fillStyle = rgba(effectColor, alphaBase * 0.24);
+        context.beginPath();
+        context.arc(cx, cy, 4 * scale, 0, Math.PI * 2);
+        context.fill();
+      }
+
+      for (const point of points) {
+        point.twinkle += reducedMotion ? 0.005 : 0.015;
+        const orbit = 14 * scale;
+        const px = point.x + Math.cos(point.twinkle) * orbit;
+        const py = point.y + Math.sin(point.twinkle * 1.2) * orbit * 0.6;
+        context.fillStyle = rgba(effectColor, alphaBase * 0.22);
+        context.beginPath();
+        context.arc(px, py, point.radius, 0, Math.PI * 2);
+        context.fill();
+      }
+    };
+
+    const render = (time: number) => {
+      context.clearRect(0, 0, width, height);
+
+      const wash = context.createRadialGradient(width * 0.5, height * 0.35, 0, width * 0.5, height * 0.35, Math.max(width, height) * 0.78);
+      wash.addColorStop(0, rgba(effectColor, alphaBase * 0.08));
+      wash.addColorStop(1, 'rgba(0,0,0,0)');
+      context.fillStyle = wash;
+      context.fillRect(0, 0, width, height);
+
+      context.shadowBlur = 28 * scale;
+      context.shadowColor = rgba(effectColor, alphaBase * 0.22);
+      switch (pattern) {
+        case 'dots':
+          drawDots();
+          break;
+        case 'synapse':
+          drawSynapse(time);
+          break;
+        case 'rain':
+          drawRain();
+          break;
+        case 'constellations':
+          drawConstellations(time);
+          break;
+        case 'perlin-flow':
+          drawPerlinFlow(time);
+          break;
+        case 'petals':
+          drawPetals(time);
+          break;
+        case 'sparkles':
+          drawSparkles(time);
+          break;
+        case 'embers':
+          drawEmbers();
+          break;
+        case 'swirls':
+        default:
+          drawSwirls(time);
+          break;
+      }
+      context.shadowBlur = 0;
+
+      const vignette = context.createLinearGradient(0, 0, 0, height);
+      vignette.addColorStop(0, glowColor);
+      vignette.addColorStop(0.35, 'rgba(0,0,0,0)');
+      vignette.addColorStop(1, theme === 'dark' ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.12)');
+      context.fillStyle = vignette;
+      context.fillRect(0, 0, width, height);
+
+      if (shouldAnimate) {
+        frame = window.requestAnimationFrame(render);
+      }
+    };
+
+    const handleResize = () => {
+      resize();
+      if (!shouldAnimate) render(performance.now());
+    };
+
+    resize();
+    render(performance.now());
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener('resize', handleResize);
+      context.clearRect(0, 0, width, height);
+    };
+  }, [color, intensity, pattern, size, theme]);
+
+  if (pattern === 'none') {
+    return null;
+  }
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="app-window-bg-effect pointer-events-none absolute inset-0 z-0"
+      data-bg-effect-pattern={pattern}
+      aria-hidden
+    />
+  );
+}
