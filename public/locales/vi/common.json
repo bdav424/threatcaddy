@@ -1,4 +1,4 @@
-{
+﻿{
   "appName": "ThreatCaddy",
   "save": "Lưu",
   "cancel": "Hủy",
@@ -101,7 +101,8 @@
   "sidebar.timeline": "Timeline",
   "sidebar.whiteboards": "Bảng trắng",
   "sidebar.iocs": "IOC",
-  "sidebar.graph": "Đồ thị",
+  "sidebar.graph": "Đồ thị",,
+  "sidebar.reports": "Báo cáo",
   "sidebar.activity": "Hoạt động",
   "sidebar.caddyAI": "CaddyAI",
   "sidebar.caddyShack": "Bảng tin nhóm",

@@ -1,4 +1,4 @@
-{
+﻿{
   "appName": "ThreatCaddy",
   "save": "Зберегти",
   "cancel": "Скасувати",
@@ -101,7 +101,8 @@
   "sidebar.timeline": "Хронологія",
   "sidebar.whiteboards": "Дошки",
   "sidebar.iocs": "IOC",
-  "sidebar.graph": "Граф",
+  "sidebar.graph": "Граф",,
+  "sidebar.reports": "Звіти",
   "sidebar.activity": "Активність",
   "sidebar.caddyAI": "CaddyAI",
   "sidebar.caddyShack": "Стрічка команди",

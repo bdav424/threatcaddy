@@ -1,5 +1,5 @@
 import { db } from '../db';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, StandaloneIOC, EvidenceItem, ChatThread, ChatMessage, NoteTemplate, PlaybookTemplate, PlaybookStep, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel, IOCAnalysis, IOCEntry, IOCRelationship, TaskComment, NoteAnnotation, QuickLink, LLMProvider, IOCType, TemplateSource, PlaybookStepEntity, AgentAction, EvidenceExtractionStatus, EvidenceKind, ProductBaselineMetadata } from '../types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, StandaloneIOC, EvidenceItem, ChatThread, ChatMessage, NoteTemplate, PlaybookTemplate, PlaybookStep, ReportTemplate, ReportSection, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel, IOCAnalysis, IOCEntry, IOCRelationship, TaskComment, NoteAnnotation, QuickLink, LLMProvider, IOCType, TemplateSource, PlaybookStepEntity, AgentAction, EvidenceExtractionStatus, EvidenceKind, ProductBaselineMetadata } from '../types';
 import { TIMELINE_EVENT_TYPE_LABELS, CONFIDENCE_LEVELS, IOC_TYPE_LABELS } from '../types';
 import { nanoid } from 'nanoid';
 import { normalizeIOCEnrichment } from './ioc-enrichment-persistence';
@@ -21,6 +21,7 @@ export async function exportJSON(): Promise<string> {
   const chatThreads = await db.chatThreads.toArray();
   const noteTemplates = await db.noteTemplates.toArray();
   const playbookTemplates = await db.playbookTemplates.toArray();
+  const reportTemplates = await db.reportTemplates.toArray();
   const agentActions = await db.agentActions.toArray();
   const agentProfiles = await db.agentProfiles.toArray();
   const agentDeployments = await db.agentDeployments.toArray();
@@ -56,6 +57,7 @@ export async function exportJSON(): Promise<string> {
     quickLinks,
     noteTemplates: noteTemplates.length > 0 ? noteTemplates : undefined,
     playbookTemplates: playbookTemplates.length > 0 ? playbookTemplates : undefined,
+    reportTemplates: reportTemplates.length > 0 ? reportTemplates : undefined,
   };
 
   return JSON.stringify(data, null, 2);
@@ -998,6 +1000,40 @@ function sanitizePlaybookTemplate(raw: unknown): PlaybookTemplate | null {
   };
 }
 
+function sanitizeReportSection(raw: unknown): ReportSection | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const validHints = new Set(['iocs', 'timeline', 'notes', 'tasks', 'graph']);
+  return {
+    id: str(r.id) || nanoid(),
+    title: str(r.title),
+    order: num(r.order, 0),
+    placeholder: r.placeholder != null ? str(r.placeholder) : undefined,
+    entityHints: Array.isArray(r.entityHints)
+      ? (r.entityHints as unknown[]).map(h => String(h)).filter(h => validHints.has(h)) as ReportSection['entityHints']
+      : undefined,
+  };
+}
+
+function sanitizeReportTemplate(raw: unknown): ReportTemplate | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const source = str(r.source, 'user');
+  return {
+    id: str(r.id),
+    name: str(r.name),
+    description: r.description != null ? str(r.description) : undefined,
+    icon: r.icon != null ? str(r.icon) : undefined,
+    category: str(r.category, 'Custom'),
+    sections: Array.isArray(r.sections)
+      ? (r.sections as unknown[]).map(sanitizeReportSection).filter((s): s is ReportSection => s !== null)
+      : [],
+    source: (VALID_TEMPLATE_SOURCES.includes(source) ? source : 'user') as TemplateSource,
+    createdAt: num(r.createdAt, Date.now()),
+    updatedAt: num(r.updatedAt, Date.now()),
+  };
+}
+
 function sanitizeQuickLink(raw: unknown): QuickLink | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
@@ -1014,7 +1050,7 @@ function sanitizeQuickLink(raw: unknown): QuickLink | null {
   };
 }
 
-export async function importJSON(json: string): Promise<{ notes: number; tasks: number; folders: number; tags: number; timelineEvents: number; timelines: number; whiteboards: number; standaloneIOCs: number; evidenceItems: number; chatThreads: number; noteTemplates: number; playbookTemplates: number; agentActions: number; agentProfiles: number; agentDeployments: number; agentMeetings: number }> {
+export async function importJSON(json: string): Promise<{ notes: number; tasks: number; folders: number; tags: number; timelineEvents: number; timelines: number; whiteboards: number; standaloneIOCs: number; evidenceItems: number; chatThreads: number; noteTemplates: number; playbookTemplates: number; reportTemplates: number; agentActions: number; agentProfiles: number; agentDeployments: number; agentMeetings: number }> {
   if (json.length > MAX_IMPORT_SIZE) {
     throw new Error(`Backup file too large (max ${MAX_IMPORT_SIZE / 1024 / 1024} MB)`);
   }
@@ -1072,6 +1108,10 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     .map(sanitizePlaybookTemplate)
     .filter((p: PlaybookTemplate | null): p is PlaybookTemplate => p !== null && !!p.id);
 
+  const reportTemplatesRaw = (Array.isArray(data.reportTemplates) ? data.reportTemplates : [])
+    .map(sanitizeReportTemplate)
+    .filter((t: ReportTemplate | null): t is ReportTemplate => t !== null && !!t.id);
+
   // If we have timeline events but no timelines, create a Default and assign all events
   if (timelineEvents.length > 0 && timelines.length === 0) {
     const defaultId = nanoid();
@@ -1092,7 +1132,7 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
   const importedDeployments = (Array.isArray(data.agentDeployments) ? data.agentDeployments : []).map(sanitizeAgentDeployment).filter(Boolean);
   const importedMeetings = (Array.isArray(data.agentMeetings) ? data.agentMeetings : []).map(sanitizeAgentMeeting).filter(Boolean);
 
-  await db.transaction('rw', [db.notes, db.tasks, db.folders, db.tags, db.timelineEvents, db.timelines, db.whiteboards, db.standaloneIOCs, db.evidenceItems, db.chatThreads, db.noteTemplates, db.playbookTemplates, db.agentActions, db.agentProfiles, db.agentDeployments, db.agentMeetings], async () => {
+  await db.transaction('rw', [db.notes, db.tasks, db.folders, db.tags, db.timelineEvents, db.timelines, db.whiteboards, db.standaloneIOCs, db.evidenceItems, db.chatThreads, db.noteTemplates, db.playbookTemplates, db.reportTemplates, db.agentActions, db.agentProfiles, db.agentDeployments, db.agentMeetings], async () => {
     await db.notes.clear();
     await db.tasks.clear();
     await db.folders.clear();
@@ -1122,6 +1162,7 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     await db.chatThreads.bulkAdd(chatThreads);
     if (noteTemplatesRaw.length > 0) await db.noteTemplates.bulkAdd(noteTemplatesRaw);
     if (playbookTemplatesRaw.length > 0) await db.playbookTemplates.bulkAdd(playbookTemplatesRaw);
+    if (reportTemplatesRaw.length > 0) await db.reportTemplates.bulkAdd(reportTemplatesRaw);
     if (agentActions.length > 0) await db.agentActions.bulkAdd(agentActions);
     if (importedProfiles.length > 0) await db.agentProfiles.bulkAdd(importedProfiles);
     if (importedDeployments.length > 0) await db.agentDeployments.bulkAdd(importedDeployments);
@@ -1151,6 +1192,7 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     chatThreads: chatThreads.length,
     noteTemplates: noteTemplatesRaw.length,
     playbookTemplates: playbookTemplatesRaw.length,
+    reportTemplates: reportTemplatesRaw.length,
     agentActions: agentActions.length,
     agentProfiles: importedProfiles.length,
     agentDeployments: importedDeployments.length,

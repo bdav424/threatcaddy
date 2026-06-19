@@ -1,4 +1,4 @@
-{
+﻿{
   "appName": "ThreatCaddy",
   "save": "保存",
   "cancel": "取消",
@@ -101,7 +101,8 @@
   "sidebar.timeline": "时间线",
   "sidebar.whiteboards": "白板",
   "sidebar.iocs": "IOC",
-  "sidebar.graph": "图谱",
+  "sidebar.graph": "图谱",,
+  "sidebar.reports": "报告",
   "sidebar.activity": "活动",
   "sidebar.caddyAI": "CaddyAI",
   "sidebar.caddyShack": "团队动态",

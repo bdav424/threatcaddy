@@ -1,4 +1,4 @@
-{
+﻿{
   "app.loading": "กำลังโหลด...",
   "app.error": "เกิดข้อผิดพลาด",
   "app.retry": "ลองอีกครั้ง",
@@ -90,7 +90,8 @@
   "sidebar.timeline": "ไทม์ไลน์",
   "sidebar.whiteboards": "ไวท์บอร์ด",
   "sidebar.iocs": "IOC",
-  "sidebar.graph": "กราฟ",
+  "sidebar.graph": "กราฟ",,
+  "sidebar.reports": "รายงาน",
   "sidebar.activity": "กิจกรรม",
   "sidebar.caddyAI": "CaddyAI",
   "sidebar.caddyShack": "ฟีดทีม",

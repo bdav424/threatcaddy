@@ -76,6 +76,7 @@ export const iocsWorkspacePanelId = 'iocs-workspace';
 export const experimentalWorkbenchWorkspacePanelId = 'experimental-workbench-workspace';
 export const agentCaddyWorkspacePanelId = 'agentcaddy-workspace';
 export const chatWorkspacePanelId = 'chat-workspace';
+export const reportsWorkspacePanelId = 'reports-workspace';
 
 type WorkspacePanelLaunchRequest = {
   view: WorkspacePanelLaunchView;
@@ -288,6 +289,18 @@ const chatWorkspacePanelRegistration: WorkspacePanelRegistration = {
   },
 };
 
+const reportsWorkspacePanelRegistration: WorkspacePanelRegistration = {
+  id: reportsWorkspacePanelId,
+  title: 'Reports',
+  mode: 'docked',
+  geometry: {
+    x: 320,
+    y: 72,
+    width: 860,
+    height: 640,
+  },
+};
+
 const appWorkspacePanelRegistrations: WorkspacePanelRegistration[] = [
   ...assistantCaddyWorkspacePanelRegistrations,
   dashboardWorkspacePanelRegistration,
@@ -304,6 +317,7 @@ const appWorkspacePanelRegistrations: WorkspacePanelRegistration[] = [
   experimentalWorkbenchWorkspacePanelRegistration,
   agentCaddyWorkspacePanelRegistration,
   chatWorkspacePanelRegistration,
+  reportsWorkspacePanelRegistration,
 ];
 
 export function AppWorkspaceShell({
@@ -338,6 +352,8 @@ export function AppWorkspaceShell({
   agentCaddy = null,
   chatActive = false,
   chat = null,
+  reportsActive = false,
+  reports = null,
   workspacePanelLaunchRequest = null,
   onWorkspacePanelLaunchHandled,
   assistantWorkspacePanelLaunchRequest = null,
@@ -374,6 +390,8 @@ export function AppWorkspaceShell({
   agentCaddy?: ReactNode;
   chatActive?: boolean;
   chat?: ReactNode;
+  reportsActive?: boolean;
+  reports?: ReactNode;
   workspacePanelLaunchRequest?: WorkspacePanelLaunchRequest | null;
   onWorkspacePanelLaunchHandled?: (requestId: number) => void;
   assistantWorkspacePanelLaunchRequest?: AssistantWorkspacePanelLaunchRequest | null;
@@ -395,6 +413,7 @@ export function AppWorkspaceShell({
   const [experimentalMounted, setExperimentalMounted] = useState(experimentalActive);
   const [agentCaddyMounted, setAgentCaddyMounted] = useState(agentCaddyActive);
   const [chatMounted, setChatMounted] = useState(chatActive);
+  const [reportsMounted, setReportsMounted] = useState(reportsActive);
   const [workspaceOwnedPanelIds, setWorkspaceOwnedPanelIds] = useState<ReadonlySet<string>>(() => new Set());
 
   useEffect(() => {
@@ -486,6 +505,12 @@ export function AppWorkspaceShell({
       setChatMounted(true);
     }
   }, [chatActive]);
+
+  useEffect(() => {
+    if (reportsActive) {
+      setReportsMounted(true);
+    }
+  }, [reportsActive]);
 
   const handleRestorePanel = useCallback((panel: WorkspacePanelState) => {
     if (workspaceOwnedPanelIds.has(panel.id)) {
@@ -591,7 +616,8 @@ export function AppWorkspaceShell({
     || iocsActive
     || experimentalActive
     || agentCaddyActive
-    || chatActive;
+    || chatActive
+    || reportsActive;
 
   const mountWorkspaceLayoutPanel = useCallback((panelId: string) => {
     if (
@@ -796,6 +822,9 @@ export function AppWorkspaceShell({
       )}
       {(chatMounted || chatActive || workspaceOwnedPanelIds.has(chatWorkspacePanelId)) && (
         <ChatWorkspacePanel routeActive={routeSurfaceActive(chatActive)} workspacePanelActive={workspacePanelActive(chatWorkspacePanelId)}>{chat}</ChatWorkspacePanel>
+      )}
+      {(reportsMounted || reportsActive || workspaceOwnedPanelIds.has(reportsWorkspacePanelId)) && (
+        <ReportsWorkspacePanel routeActive={routeSurfaceActive(reportsActive)} workspacePanelActive={workspacePanelActive(reportsWorkspacePanelId)}>{reports}</ReportsWorkspacePanel>
       )}
       <WorkspacePanelDock onRestorePanel={handleRestorePanel} />
       </WorkspaceOwnershipContext.Provider>
@@ -2094,6 +2123,47 @@ function ChatWorkspacePanel({ routeActive, workspacePanelActive, children }: { r
       minimizeLabel="Minimize CaddyAI"
       closeLabel="Close CaddyAI workspace panel"
       restoreLabel="Restore CaddyAI panel"
+      dockedClassName="flex h-full min-h-0 flex-col"
+      floatingClassName="shadow-[10px_16px_36px_rgba(0,0,0,0.38)]"
+      placeholderClassName="m-3"
+      bodyClassName="flex min-h-0 flex-1 overflow-hidden p-0"
+    >
+      {children}
+    </WorkspacePanel>
+  );
+}
+
+function ReportsWorkspacePanel({ routeActive, workspacePanelActive, children }: { routeActive: boolean; workspacePanelActive: boolean; children: ReactNode }) {
+  const { panel, setMode, setGeometry, focus, restore, close } = useWorkspaceOwnedPanel(reportsWorkspacePanelId);
+
+  if (routeActive && panel.mode === 'docked') {
+    return <RoutePanelPopOutSurface title={panel.title} onPopOut={() => { setMode('floating'); focus(); }}>{children}</RoutePanelPopOutSurface>;
+  }
+
+  return (
+    <WorkspacePanel
+      id={panel.id}
+      title={panel.title}
+      mode={panel.mode}
+      geometry={panel.geometry}
+      zIndex={panel.zIndex}
+      onModeChange={setMode}
+      onGeometryChange={setGeometry}
+      onPanelFocus={focus}
+      onRestore={restore}
+      onClose={close}
+      active={workspacePanelActive || (routeActive && panel.mode !== 'docked')}
+      minWidth={380}
+      minHeight={300}
+      compactWidth={700}
+      compactHeight={480}
+      resizeLabelBase="Reports panel"
+      floatingAriaLabel="Reports panel"
+      popOutLabel="Pop out Reports"
+      dockLabel="Dock Reports back into main workspace"
+      minimizeLabel="Minimize Reports"
+      closeLabel="Close Reports workspace panel"
+      restoreLabel="Restore Reports panel"
       dockedClassName="flex h-full min-h-0 flex-col"
       floatingClassName="shadow-[10px_16px_36px_rgba(0,0,0,0.38)]"
       placeholderClassName="m-3"

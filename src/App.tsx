@@ -114,6 +114,7 @@ type AssistantWorkspacePanelLaunchRequest = {
 };
 const AgentPanel = lazy(() => import('./components/Agent/AgentPanel').then(m => ({ default: m.AgentPanel })));
 const AgentDashboard = lazy(() => import('./components/Agent/AgentDashboard').then(m => ({ default: m.AgentDashboard })));
+const ReportsPanel = lazy(() => import('./components/Reports/ReportsPanel').then(m => ({ default: m.ReportsPanel })));
 const ConflictDialog = lazy(() => import('./components/Common/ConflictDialog').then(m => ({ default: m.ConflictDialog })));
 const KeyboardShortcutsPanel = lazy(() => import('./components/Common/KeyboardShortcutsPanel').then(m => ({ default: m.KeyboardShortcutsPanel })));
 const ServerOnboardingModal = lazy(() => import('./components/Settings/ServerOnboardingModal').then(m => ({ default: m.ServerOnboardingModal })));
@@ -225,7 +226,7 @@ function AppDataLayer() {
   const isMobile = useIsMobile();
 
   // Compute safe default view from settings for NavigationProvider
-  const safeDefaultView = settings.defaultView === 'dashboard' || settings.defaultView === 'workspace' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'evidence' || settings.defaultView === 'products' || settings.defaultView === 'experimental' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' || settings.defaultView === 'chat' || settings.defaultView === 'caddyassistant' || settings.defaultView === 'cademail' || settings.defaultView === 'calendarcaddy' || settings.defaultView === 'caddyshack' || settings.defaultView === 'agent' || settings.defaultView === 'investigations' ? settings.defaultView : 'notes';
+  const safeDefaultView = settings.defaultView === 'dashboard' || settings.defaultView === 'workspace' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'evidence' || settings.defaultView === 'products' || settings.defaultView === 'experimental' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' || settings.defaultView === 'chat' || settings.defaultView === 'caddyassistant' || settings.defaultView === 'cademail' || settings.defaultView === 'calendarcaddy' || settings.defaultView === 'caddyshack' || settings.defaultView === 'agent' || settings.defaultView === 'investigations' || settings.defaultView === 'reports' ? settings.defaultView : 'notes';
 
   return (
     <InvestigationProvider
@@ -1950,8 +1951,9 @@ const AppInner = memo(function AppInner({
   const experimentalWorkspaceActive = activeView === 'experimental';
   const agentCaddyWorkspaceActive = activeView === 'agent';
   const chatWorkspaceActive = activeView === 'chat';
+  const reportsWorkspaceActive = activeView === 'reports';
   const workspaceRouteActive = activeView === 'workspace';
-  const appWorkspaceActive = workspaceRouteActive || assistantWorkspaceActive || dashboardWorkspaceActive || activityWorkspaceActive || productsWorkspaceActive || notesWorkspaceActive || tasksWorkspaceActive || evidenceWorkspaceActive || timelineWorkspaceActive || whiteboardsWorkspaceActive || graphWorkspaceActive || caddyShackWorkspaceActive || iocsWorkspaceActive || experimentalWorkspaceActive || agentCaddyWorkspaceActive || chatWorkspaceActive;
+  const appWorkspaceActive = workspaceRouteActive || assistantWorkspaceActive || dashboardWorkspaceActive || activityWorkspaceActive || productsWorkspaceActive || notesWorkspaceActive || tasksWorkspaceActive || evidenceWorkspaceActive || timelineWorkspaceActive || whiteboardsWorkspaceActive || graphWorkspaceActive || caddyShackWorkspaceActive || iocsWorkspaceActive || experimentalWorkspaceActive || agentCaddyWorkspaceActive || chatWorkspaceActive || reportsWorkspaceActive;
   const assistantWorkspaceVisible = assistantWorkspaceActive && !showSettings && !showTrash && !showArchive;
   const dashboardWorkspaceVisible = dashboardWorkspaceActive && !showSettings && !showTrash && !showArchive;
   const activityWorkspaceVisible = activityWorkspaceActive && !showSettings && !showTrash && !showArchive;
@@ -1967,6 +1969,7 @@ const AppInner = memo(function AppInner({
   const experimentalWorkspaceVisible = experimentalWorkspaceActive && !showSettings && !showTrash && !showArchive;
   const agentCaddyWorkspaceVisible = agentCaddyWorkspaceActive && !showSettings && !showTrash && !showArchive;
   const chatWorkspaceVisible = chatWorkspaceActive && !showSettings && !showTrash && !showArchive;
+  const reportsWorkspaceVisible = reportsWorkspaceActive && !showSettings && !showTrash && !showArchive;
   const workspaceRouteVisible = workspaceRouteActive && !showSettings && !showTrash && !showArchive;
   const appWorkspaceVisible = appWorkspaceActive && !showSettings && !showTrash && !showArchive;
   const assistantShellView = activeView === 'cademail'
@@ -2757,6 +2760,8 @@ const AppInner = memo(function AppInner({
               agentCaddy={agentCaddyWorkspace}
               chatActive={chatWorkspaceVisible}
               chat={chatWorkspace}
+              reportsActive={reportsWorkspaceVisible}
+              reports={<ReportsPanel />}
               workspacePanelLaunchRequest={workspacePanelLaunchRequest}
               onWorkspacePanelLaunchHandled={handleWorkspacePanelLaunchHandled}
               assistantWorkspacePanelLaunchRequest={assistantWorkspacePanelLaunchRequest}

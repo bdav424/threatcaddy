@@ -1,4 +1,4 @@
-{
+﻿{
   "appName": "ThreatCaddy",
   "save": "सहेजें",
   "cancel": "रद्द करें",
@@ -101,7 +101,8 @@
   "sidebar.timeline": "टाइमलाइन",
   "sidebar.whiteboards": "व्हाइटबोर्ड",
   "sidebar.iocs": "IOCs",
-  "sidebar.graph": "ग्राफ",
+  "sidebar.graph": "ग्राफ",,
+  "sidebar.reports": "रिपोर्ट",
   "sidebar.activity": "गतिविधि",
   "sidebar.caddyAI": "CaddyAI",
   "sidebar.caddyShack": "टीम फ़ीड",

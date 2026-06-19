@@ -1,4 +1,4 @@
-{
+﻿{
   "appName": "ThreatCaddy",
   "save": "Opslaan",
   "cancel": "Annuleren",
@@ -101,7 +101,8 @@
   "sidebar.timeline": "Tijdlijn",
   "sidebar.whiteboards": "Whiteboards",
   "sidebar.iocs": "IOC's",
-  "sidebar.graph": "Grafiek",
+  "sidebar.graph": "Grafiek",,
+  "sidebar.reports": "Rapporten",
   "sidebar.activity": "Activiteit",
   "sidebar.caddyAI": "CaddyAI",
   "sidebar.caddyShack": "Teamfeed",

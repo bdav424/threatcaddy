@@ -1,4 +1,4 @@
-{
+﻿{
   "appName": "ThreatCaddy",
   "save": "Сохранить",
   "cancel": "Отмена",
@@ -101,7 +101,8 @@
   "sidebar.timeline": "Хронология",
   "sidebar.whiteboards": "Доски",
   "sidebar.iocs": "IOC",
-  "sidebar.graph": "Граф",
+  "sidebar.graph": "Граф",,
+  "sidebar.reports": "Отчёты",
   "sidebar.activity": "Активность",
   "sidebar.caddyAI": "CaddyAI",
   "sidebar.caddyShack": "Лента команды",

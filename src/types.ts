@@ -252,7 +252,7 @@ export type SidebarAccentStyle = 'default' | 'color-chips';
 export type BackgroundEffectPattern = 'none' | 'dots' | 'synapse' | 'rain' | 'constellations' | 'perlin-flow' | 'petals' | 'sparkles' | 'embers' | 'swirls';
 
 /** Top-level view/page the user can navigate to. */
-export type ViewMode = 'dashboard' | 'workspace' | 'notes' | 'tasks' | 'evidence' | 'products' | 'experimental' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat' | 'caddyassistant' | 'cademail' | 'calendarcaddy' | 'caddyshack' | 'agent' | 'investigations';
+export type ViewMode = 'dashboard' | 'workspace' | 'notes' | 'tasks' | 'evidence' | 'products' | 'experimental' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat' | 'caddyassistant' | 'cademail' | 'calendarcaddy' | 'caddyshack' | 'agent' | 'investigations' | 'reports';
 export type EditorMode = 'edit' | 'preview' | 'split';
 export type TaskViewMode = 'list' | 'kanban';
 
@@ -1132,6 +1132,32 @@ export interface PlaybookTemplate {
   updatedAt: number;
 }
 
+// ─── Report Templates ────────────────────────────────────────────
+
+/** A single named section within a report template. */
+export interface ReportSection {
+  id: string;
+  title: string;
+  order: number;
+  placeholder?: string;
+  entityHints?: Array<'iocs' | 'timeline' | 'notes' | 'tasks' | 'graph'>;
+}
+
+/** A composable report template — builtin (read-only) or user-defined (full CRUD). */
+export interface ReportTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  icon?: string;
+  category: string;
+  sections: ReportSection[];
+  source: TemplateSource;
+  createdBy?: string;
+  updatedBy?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface ExportData {
   version: 1;
   exportedAt: number;
@@ -1152,6 +1178,7 @@ export interface ExportData {
   quickLinks?: QuickLink[];
   noteTemplates?: NoteTemplate[];
   playbookTemplates?: PlaybookTemplate[];
+  reportTemplates?: ReportTemplate[];
 }
 
 export const TAG_COLORS = [

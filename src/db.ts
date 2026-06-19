@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus } from './types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, ReportTemplate, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus } from './types';
 import type { IntegrationTemplate, InstalledIntegration, IntegrationRun } from './types/integration-types';
 import { installEncryptionMiddleware } from './lib/encryptionMiddleware';
 
@@ -26,6 +26,7 @@ const db = new Dexie('ThreatCaddyDB') as Dexie & {
   agentProfiles: EntityTable<AgentProfile, 'id'>;
   agentDeployments: EntityTable<AgentDeployment, 'id'>;
   agentMeetings: EntityTable<AgentMeeting, 'id'>;
+  reportTemplates: EntityTable<ReportTemplate, 'id'>;
 };
 
 db.version(1).stores({
@@ -292,6 +293,11 @@ db.version(32).stores({
   evidenceItems: 'id, title, folderId, fileName, importedAt, createdAt, updatedAt, trashed, archived, *tags, [folderId+updatedAt]',
 }).upgrade(async (tx) => {
   await restoreFalsePositiveEvidenceNotes(tx);
+});
+
+// Version 33 adds the report templates table (S5 — report/template builder).
+db.version(33).stores({
+  reportTemplates: 'id, name, category, source, createdAt, updatedAt',
 });
 
 function evidenceKindFromExtension(value: string): EvidenceKind {

@@ -1,4 +1,4 @@
-{
+﻿{
   "appName": "ThreatCaddy",
   "save": "Guardar",
   "cancel": "Cancelar",
@@ -101,7 +101,8 @@
   "sidebar.timeline": "Cronología",
   "sidebar.whiteboards": "Pizarras",
   "sidebar.iocs": "IOCs",
-  "sidebar.graph": "Grafo",
+  "sidebar.graph": "Grafo",,
+  "sidebar.reports": "Informes",
   "sidebar.activity": "Actividad",
   "sidebar.caddyAI": "CaddyAI",
   "sidebar.caddyShack": "Feed del equipo",

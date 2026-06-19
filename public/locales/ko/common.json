@@ -1,4 +1,4 @@
-{
+﻿{
   "app.loading": "로드 중...",
   "app.error": "오류가 발생했습니다",
   "app.retry": "다시 시도",
@@ -90,7 +90,8 @@
   "sidebar.timeline": "타임라인",
   "sidebar.whiteboards": "화이트보드",
   "sidebar.iocs": "IOC",
-  "sidebar.graph": "그래프",
+  "sidebar.graph": "그래프",,
+  "sidebar.reports": "보고서",
   "sidebar.activity": "활동",
   "sidebar.caddyAI": "CaddyAI",
   "sidebar.caddyShack": "팀 피드",

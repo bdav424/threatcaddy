@@ -1,4 +1,4 @@
-{
+﻿{
   "appName": "ThreatCaddy",
   "save": "Simpan",
   "cancel": "Batal",
@@ -101,7 +101,8 @@
   "sidebar.timeline": "Timeline",
   "sidebar.whiteboards": "Papan Tulis",
   "sidebar.iocs": "IOC",
-  "sidebar.graph": "Graf",
+  "sidebar.graph": "Graf",,
+  "sidebar.reports": "Laporan",
   "sidebar.activity": "Aktivitas",
   "sidebar.caddyAI": "CaddyAI",
   "sidebar.caddyShack": "Feed Tim",

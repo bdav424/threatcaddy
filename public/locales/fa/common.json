@@ -1,4 +1,4 @@
-{
+﻿{
   "appName": "ThreatCaddy",
   "save": "ذخیره",
   "cancel": "لغو",
@@ -101,7 +101,8 @@
   "sidebar.timeline": "جدول زمانی",
   "sidebar.whiteboards": "تخته‌های سفید",
   "sidebar.iocs": "IOCها",
-  "sidebar.graph": "گراف",
+  "sidebar.graph": "گراف",,
+  "sidebar.reports": "گزارش‌ها",
   "sidebar.activity": "فعالیت",
   "sidebar.caddyAI": "CaddyAI",
   "sidebar.caddyShack": "فید تیم",

@@ -1,4 +1,4 @@
-{
+﻿{
   "appName": "ThreatCaddy",
   "save": "Kaydet",
   "cancel": "İptal",
@@ -101,7 +101,8 @@
   "sidebar.timeline": "Zaman Çizelgesi",
   "sidebar.whiteboards": "Beyaz Tahtalar",
   "sidebar.iocs": "IOC'ler",
-  "sidebar.graph": "Graf",
+  "sidebar.graph": "Graf",,
+  "sidebar.reports": "Raporlar",
   "sidebar.activity": "Etkinlik",
   "sidebar.caddyAI": "CaddyAI",
   "sidebar.caddyShack": "Takım Akışı",
