@@ -215,5 +215,17 @@
   "demoModal.deleteDemo": "Supprimer la démo et repartir à zéro",
   "demoModal.removeHint": "Vous pourrez supprimer les données d'exemple plus tard dans les Paramètres.",
   "error.unexpectedDetail": "Une erreur inattendue s'est produite.",
-  "header.caddylabs": "CaddyLabs"
+  "header.caddylabs": "CaddyLabs",
+  "reports.panelTitle": "Rapports",
+  "reports.new": "Nouveau",
+  "reports.newReport": "Nouveau rapport",
+  "reports.pickTemplate": "Choisir un modèle de rapport",
+  "reports.blankReport": "Rapport vierge",
+  "reports.blankReportDesc": "Commencer de zéro",
+  "reports.reportTitle": "Titre du rapport…",
+  "reports.copyMarkdown": "Copier le Markdown",
+  "reports.exportMarkdown": "Exporter en Markdown",
+  "reports.emptyTitle": "Aucun rapport pour l'instant",
+  "reports.emptyDesc": "Créez un rapport à partir d'un modèle pour commencer.",
+  "reports.createReport": "Créer un rapport"
 }

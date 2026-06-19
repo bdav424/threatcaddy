@@ -227,5 +227,18 @@
   "demoModal.startExploring": "Start Exploring",
   "demoModal.guidedTour": "Take the Guided Tour",
   "demoModal.deleteDemo": "Delete Demo & Start Fresh",
-  "demoModal.removeHint": "You can remove the sample data later in Settings."
+  "demoModal.removeHint": "You can remove the sample data later in Settings.",
+
+  "reports.panelTitle": "Reports",
+  "reports.new": "New",
+  "reports.newReport": "New Report",
+  "reports.pickTemplate": "Choose a report template",
+  "reports.blankReport": "Blank Report",
+  "reports.blankReportDesc": "Start from scratch",
+  "reports.reportTitle": "Report title…",
+  "reports.copyMarkdown": "Copy Markdown",
+  "reports.exportMarkdown": "Export Markdown",
+  "reports.emptyTitle": "No reports yet",
+  "reports.emptyDesc": "Create a report from a template to get started.",
+  "reports.createReport": "Create Report"
 }

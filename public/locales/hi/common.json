@@ -215,5 +215,17 @@
   "demoModal.deleteDemo": "डेमो हटाएं और नए सिरे से शुरू करें",
   "demoModal.removeHint": "आप बाद में सेटिंग्स में नमूना डेटा हटा सकते हैं।",
   "error.unexpectedDetail": "एक अप्रत्याशित त्रुटि हुई।",
-  "header.caddylabs": "CaddyLabs"
+  "header.caddylabs": "CaddyLabs",
+  "reports.panelTitle": "रिपोर्ट",
+  "reports.new": "नया",
+  "reports.newReport": "नई रिपोर्ट",
+  "reports.pickTemplate": "रिपोर्ट टेम्पलेट चुनें",
+  "reports.blankReport": "खाली रिपोर्ट",
+  "reports.blankReportDesc": "शुरू से शुरू करें",
+  "reports.reportTitle": "रिपोर्ट शीर्षक…",
+  "reports.copyMarkdown": "Markdown कॉपी करें",
+  "reports.exportMarkdown": "Markdown निर्यात करें",
+  "reports.emptyTitle": "अभी तक कोई रिपोर्ट नहीं",
+  "reports.emptyDesc": "आरंभ करने के लिए किसी टेम्पलेट से रिपोर्ट बनाएं।",
+  "reports.createReport": "रिपोर्ट बनाएं"
 }

@@ -215,5 +215,17 @@
   "demoModal.deleteDemo": "Demoyu Sil ve Sıfırdan Başla",
   "demoModal.removeHint": "Örnek verileri daha sonra Ayarlar'dan kaldırabilirsiniz.",
   "error.unexpectedDetail": "Beklenmedik bir hata oluştu.",
-  "header.caddylabs": "CaddyLabs"
+  "header.caddylabs": "CaddyLabs",
+  "reports.panelTitle": "Raporlar",
+  "reports.new": "Yeni",
+  "reports.newReport": "Yeni rapor",
+  "reports.pickTemplate": "Rapor şablonu seçin",
+  "reports.blankReport": "Boş rapor",
+  "reports.blankReportDesc": "Sıfırdan başla",
+  "reports.reportTitle": "Rapor başlığı…",
+  "reports.copyMarkdown": "Markdown'ı kopyala",
+  "reports.exportMarkdown": "Markdown'ı dışa aktar",
+  "reports.emptyTitle": "Henüz rapor yok",
+  "reports.emptyDesc": "Başlamak için bir şablondan rapor oluşturun.",
+  "reports.createReport": "Rapor oluştur"
 }

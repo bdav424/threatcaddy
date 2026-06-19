@@ -320,5 +320,17 @@
   "demoModal.guidedTour": "เริ่มทัวร์นำชม",
   "demoModal.deleteDemo": "ลบเดโมและเริ่มใหม่",
   "demoModal.removeHint": "คุณสามารถลบข้อมูลตัวอย่างได้ภายหลังในการตั้งค่า",
-  "header.caddylabs": "CaddyLabs"
+  "header.caddylabs": "CaddyLabs",
+  "reports.panelTitle": "รายงาน",
+  "reports.new": "ใหม่",
+  "reports.newReport": "รายงานใหม่",
+  "reports.pickTemplate": "เลือกเทมเพลตรายงาน",
+  "reports.blankReport": "รายงานเปล่า",
+  "reports.blankReportDesc": "เริ่มต้นจากศูนย์",
+  "reports.reportTitle": "ชื่อรายงาน…",
+  "reports.copyMarkdown": "คัดลอก Markdown",
+  "reports.exportMarkdown": "ส่งออก Markdown",
+  "reports.emptyTitle": "ยังไม่มีรายงาน",
+  "reports.emptyDesc": "สร้างรายงานจากเทมเพลตเพื่อเริ่มต้น",
+  "reports.createReport": "สร้างรายงาน"
 }

@@ -215,5 +215,17 @@
   "demoModal.deleteDemo": "Hapus Demo & Mulai Baru",
   "demoModal.removeHint": "Anda dapat menghapus data sampel nanti di Pengaturan.",
   "error.unexpectedDetail": "Terjadi kesalahan yang tidak terduga.",
-  "header.caddylabs": "CaddyLabs"
+  "header.caddylabs": "CaddyLabs",
+  "reports.panelTitle": "Laporan",
+  "reports.new": "Baru",
+  "reports.newReport": "Laporan Baru",
+  "reports.pickTemplate": "Pilih template laporan",
+  "reports.blankReport": "Laporan Kosong",
+  "reports.blankReportDesc": "Mulai dari awal",
+  "reports.reportTitle": "Judul laporan…",
+  "reports.copyMarkdown": "Salin Markdown",
+  "reports.exportMarkdown": "Ekspor Markdown",
+  "reports.emptyTitle": "Belum ada laporan",
+  "reports.emptyDesc": "Buat laporan dari template untuk memulai.",
+  "reports.createReport": "Buat Laporan"
 }

@@ -215,5 +215,17 @@
   "demoModal.deleteDemo": "Demo verwijderen & opnieuw beginnen",
   "demoModal.removeHint": "U kunt de voorbeeldgegevens later verwijderen in Instellingen.",
   "error.unexpectedDetail": "Er is een onverwachte fout opgetreden.",
-  "header.caddylabs": "CaddyLabs"
+  "header.caddylabs": "CaddyLabs",
+  "reports.panelTitle": "Rapporten",
+  "reports.new": "Nieuw",
+  "reports.newReport": "Nieuw rapport",
+  "reports.pickTemplate": "Kies een rapportsjabloon",
+  "reports.blankReport": "Leeg rapport",
+  "reports.blankReportDesc": "Begin vanaf nul",
+  "reports.reportTitle": "Rapporttitel…",
+  "reports.copyMarkdown": "Markdown kopiëren",
+  "reports.exportMarkdown": "Markdown exporteren",
+  "reports.emptyTitle": "Nog geen rapporten",
+  "reports.emptyDesc": "Maak een rapport op basis van een sjabloon om te beginnen.",
+  "reports.createReport": "Rapport maken"
 }

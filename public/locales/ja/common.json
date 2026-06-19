@@ -215,5 +215,17 @@
   "demoModal.deleteDemo": "デモを削除して最初から始める",
   "demoModal.removeHint": "サンプルデータは後で設定から削除できます。",
   "error.unexpectedDetail": "予期しないエラーが発生しました。",
-  "header.caddylabs": "CaddyLabs"
+  "header.caddylabs": "CaddyLabs",
+  "reports.panelTitle": "レポート",
+  "reports.new": "新規",
+  "reports.newReport": "新しいレポート",
+  "reports.pickTemplate": "レポートテンプレートを選択",
+  "reports.blankReport": "空白のレポート",
+  "reports.blankReportDesc": "ゼロから始める",
+  "reports.reportTitle": "レポートタイトル…",
+  "reports.copyMarkdown": "Markdownをコピー",
+  "reports.exportMarkdown": "Markdownをエクスポート",
+  "reports.emptyTitle": "レポートはまだありません",
+  "reports.emptyDesc": "テンプレートからレポートを作成して始めましょう。",
+  "reports.createReport": "レポートを作成"
 }

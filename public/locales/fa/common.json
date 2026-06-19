@@ -215,5 +215,17 @@
   "demoModal.deleteDemo": "حذف دمو و شروع تازه",
   "demoModal.removeHint": "می‌توانید داده‌های نمونه را بعداً در تنظیمات حذف کنید.",
   "error.unexpectedDetail": "خطای غیرمنتظره‌ای رخ داد.",
-  "header.caddylabs": "CaddyLabs"
+  "header.caddylabs": "CaddyLabs",
+  "reports.panelTitle": "گزارش‌ها",
+  "reports.new": "جدید",
+  "reports.newReport": "گزارش جدید",
+  "reports.pickTemplate": "انتخاب قالب گزارش",
+  "reports.blankReport": "گزارش خالی",
+  "reports.blankReportDesc": "شروع از صفر",
+  "reports.reportTitle": "عنوان گزارش…",
+  "reports.copyMarkdown": "کپی Markdown",
+  "reports.exportMarkdown": "صادر کردن Markdown",
+  "reports.emptyTitle": "هنوز گزارشی وجود ندارد",
+  "reports.emptyDesc": "برای شروع یک گزارش از قالب ایجاد کنید.",
+  "reports.createReport": "ایجاد گزارش"
 }

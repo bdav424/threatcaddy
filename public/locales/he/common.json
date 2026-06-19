@@ -215,5 +215,17 @@
   "demoModal.deleteDemo": "מחיקת הדמו והתחלה מחדש",
   "demoModal.removeHint": "ניתן להסיר את נתוני הדוגמה מאוחר יותר בהגדרות.",
   "error.unexpectedDetail": "אירעה שגיאה לא צפויה.",
-  "header.caddylabs": "CaddyLabs"
+  "header.caddylabs": "CaddyLabs",
+  "reports.panelTitle": "דוחות",
+  "reports.new": "חדש",
+  "reports.newReport": "דוח חדש",
+  "reports.pickTemplate": "בחר תבנית דוח",
+  "reports.blankReport": "דוח ריק",
+  "reports.blankReportDesc": "התחל מאפס",
+  "reports.reportTitle": "כותרת הדוח…",
+  "reports.copyMarkdown": "העתק Markdown",
+  "reports.exportMarkdown": "ייצא Markdown",
+  "reports.emptyTitle": "אין דוחות עדיין",
+  "reports.emptyDesc": "צור דוח מתבנית כדי להתחיל.",
+  "reports.createReport": "צור דוח"
 }

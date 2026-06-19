@@ -51,9 +51,9 @@ const TONE_STYLES: Record<WorkspaceTone, string> = {
   default: 'border-border-subtle bg-bg-deep/40 text-text-primary',
   blue: 'border-accent-blue/20 bg-accent-blue/5 text-text-primary',
   green: 'border-accent-green/20 bg-accent-green/5 text-text-primary',
-  amber: 'border-amber-400/20 bg-amber-400/10 text-text-primary',
+  amber: 'border-accent-amber/20 bg-accent-amber/10 text-text-primary',
   purple: 'border-purple/20 bg-purple/10 text-text-primary',
-  rose: 'border-rose-400/20 bg-rose-400/10 text-text-primary',
+  rose: 'border-accent-pink/20 bg-accent-pink/10 text-text-primary',
 };
 
 function normalizePromptInput(value: string) {

@@ -215,5 +215,17 @@
   "demoModal.deleteDemo": "Видалити демо та почати заново",
   "demoModal.removeHint": "Ви можете видалити зразкові дані пізніше в Налаштуваннях.",
   "error.unexpectedDetail": "Сталася неочікувана помилка.",
-  "header.caddylabs": "CaddyLabs"
+  "header.caddylabs": "CaddyLabs",
+  "reports.panelTitle": "Звіти",
+  "reports.new": "Новий",
+  "reports.newReport": "Новий звіт",
+  "reports.pickTemplate": "Виберіть шаблон звіту",
+  "reports.blankReport": "Порожній звіт",
+  "reports.blankReportDesc": "Почати з нуля",
+  "reports.reportTitle": "Назва звіту…",
+  "reports.copyMarkdown": "Скопіювати Markdown",
+  "reports.exportMarkdown": "Експортувати Markdown",
+  "reports.emptyTitle": "Звітів ще немає",
+  "reports.emptyDesc": "Створіть звіт із шаблону, щоб почати.",
+  "reports.createReport": "Створити звіт"
 }

@@ -215,5 +215,17 @@
   "demoModal.guidedTour": "خذ الجولة الإرشادية",
   "demoModal.deleteDemo": "حذف العرض التوضيحي والبدء من جديد",
   "demoModal.removeHint": "يمكنك إزالة البيانات النموذجية لاحقًا في الإعدادات.",
-  "header.caddylabs": "CaddyLabs"
+  "header.caddylabs": "CaddyLabs",
+  "reports.panelTitle": "التقارير",
+  "reports.new": "جديد",
+  "reports.newReport": "تقرير جديد",
+  "reports.pickTemplate": "اختر قالب تقرير",
+  "reports.blankReport": "تقرير فارغ",
+  "reports.blankReportDesc": "ابدأ من الصفر",
+  "reports.reportTitle": "عنوان التقرير…",
+  "reports.copyMarkdown": "نسخ Markdown",
+  "reports.exportMarkdown": "تصدير Markdown",
+  "reports.emptyTitle": "لا توجد تقارير بعد",
+  "reports.emptyDesc": "أنشئ تقريرًا من قالب للبدء.",
+  "reports.createReport": "إنشاء تقرير"
 }

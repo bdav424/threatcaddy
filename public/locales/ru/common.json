@@ -215,5 +215,17 @@
   "demoModal.deleteDemo": "Удалить демо и начать заново",
   "demoModal.removeHint": "Вы можете удалить примеры данных позже в Настройках.",
   "error.unexpectedDetail": "Произошла непредвиденная ошибка.",
-  "header.caddylabs": "CaddyLabs"
+  "header.caddylabs": "CaddyLabs",
+  "reports.panelTitle": "Отчёты",
+  "reports.new": "Новый",
+  "reports.newReport": "Новый отчёт",
+  "reports.pickTemplate": "Выберите шаблон отчёта",
+  "reports.blankReport": "Пустой отчёт",
+  "reports.blankReportDesc": "Начать с нуля",
+  "reports.reportTitle": "Название отчёта…",
+  "reports.copyMarkdown": "Копировать Markdown",
+  "reports.exportMarkdown": "Экспортировать Markdown",
+  "reports.emptyTitle": "Отчётов пока нет",
+  "reports.emptyDesc": "Создайте отчёт по шаблону, чтобы начать.",
+  "reports.createReport": "Создать отчёт"
 }

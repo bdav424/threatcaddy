@@ -1,9 +1,10 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileText, Plus, Trash2, Download, Copy, ChevronRight, ArrowLeft, LayoutTemplate, X } from 'lucide-react';
 import { useReportTemplates } from '../../hooks/useReportTemplates';
 import { useInvestigation } from '../../contexts/InvestigationContext';
 import { useToast } from '../../contexts/ToastContext';
+import { useWorkspacePanelChromeState } from '../WorkspacePanels/WorkspacePanel';
 import { buildReportContext, renderSectionTemplate } from '../../lib/report-template-renderer';
 import { nanoid } from 'nanoid';
 import type { ReportTemplate, ReportSection } from '../../types';
@@ -172,6 +173,9 @@ function SectionEditor({
     ta.style.height = `${ta.scrollHeight}px`;
   }, []);
 
+  // Resize on mount so pre-filled bodyTemplate content isn't clipped
+  useLayoutEffect(() => { autoResize(); }, [autoResize]);
+
   return (
     <div className="mb-5">
       <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
@@ -221,7 +225,7 @@ function ReportEditor({
   const { t } = useTranslation();
   const { showToast } = useToast();
   const [activeSectionIdx, setActiveSectionIdx] = useState<number | null>(null);
-  const compact = false; // will be driven by panel width when needed
+  const compact = Boolean(useWorkspacePanelChromeState()?.compact);
 
   const ordered = [...template.sections].sort((a, b) => a.order - b.order);
 

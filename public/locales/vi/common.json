@@ -215,5 +215,17 @@
   "demoModal.deleteDemo": "Xóa bản demo & Bắt đầu mới",
   "demoModal.removeHint": "Bạn có thể xóa dữ liệu mẫu sau trong Cài đặt.",
   "error.unexpectedDetail": "Đã xảy ra lỗi không mong muốn.",
-  "header.caddylabs": "CaddyLabs"
+  "header.caddylabs": "CaddyLabs",
+  "reports.panelTitle": "Báo cáo",
+  "reports.new": "Mới",
+  "reports.newReport": "Báo cáo mới",
+  "reports.pickTemplate": "Chọn mẫu báo cáo",
+  "reports.blankReport": "Báo cáo trống",
+  "reports.blankReportDesc": "Bắt đầu từ đầu",
+  "reports.reportTitle": "Tiêu đề báo cáo…",
+  "reports.copyMarkdown": "Sao chép Markdown",
+  "reports.exportMarkdown": "Xuất Markdown",
+  "reports.emptyTitle": "Chưa có báo cáo",
+  "reports.emptyDesc": "Tạo báo cáo từ mẫu để bắt đầu.",
+  "reports.createReport": "Tạo báo cáo"
 }

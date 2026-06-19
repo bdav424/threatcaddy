@@ -320,5 +320,17 @@
   "demoModal.guidedTour": "가이드 투어 시작",
   "demoModal.deleteDemo": "데모 삭제 및 새로 시작",
   "demoModal.removeHint": "나중에 설정에서 샘플 데이터를 제거할 수 있습니다.",
-  "header.caddylabs": "CaddyLabs"
+  "header.caddylabs": "CaddyLabs",
+  "reports.panelTitle": "보고서",
+  "reports.new": "새로 만들기",
+  "reports.newReport": "새 보고서",
+  "reports.pickTemplate": "보고서 템플릿 선택",
+  "reports.blankReport": "빈 보고서",
+  "reports.blankReportDesc": "처음부터 시작",
+  "reports.reportTitle": "보고서 제목…",
+  "reports.copyMarkdown": "Markdown 복사",
+  "reports.exportMarkdown": "Markdown 내보내기",
+  "reports.emptyTitle": "아직 보고서가 없습니다",
+  "reports.emptyDesc": "템플릿에서 보고서를 만들어 시작하세요.",
+  "reports.createReport": "보고서 만들기"
 }

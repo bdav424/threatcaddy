@@ -409,9 +409,9 @@ const todayItems: TodayItem[] = [
 const toneStyles: Record<OverviewTone, string> = {
   blue: 'border-accent-blue/20 bg-accent-blue/10 text-accent-blue',
   green: 'border-accent-green/20 bg-accent-green/10 text-accent-green',
-  amber: 'border-amber-400/20 bg-amber-400/10 text-amber-300',
+  amber: 'border-accent-amber/20 bg-accent-amber/10 text-accent-amber',
   purple: 'border-purple/20 bg-purple/10 text-purple',
-  rose: 'border-rose-400/20 bg-rose-400/10 text-rose-300',
+  rose: 'border-accent-pink/20 bg-accent-pink/10 text-accent-pink',
 };
 
 function normalizePromptInput(value: string) {
@@ -806,7 +806,7 @@ export function CaddyAssistantOverviewPanel() {
                     className={cn(
                       'inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors',
                       setupPanelMode === mode
-                        ? 'border-amber-300/30 bg-amber-300/10 text-text-primary'
+                        ? 'border-accent-amber/30 bg-accent-amber/10 text-text-primary'
                         : 'border-border-subtle bg-bg-primary/60 text-text-secondary hover:border-border-medium hover:text-text-primary',
                     )}
                   >
@@ -882,11 +882,11 @@ export function CaddyAssistantOverviewPanel() {
         <div
           role="region"
           aria-label="AssistantCaddy setup routes"
-          className="mb-3 rounded-2xl border border-amber-300/20 bg-amber-300/8 px-3 py-2.5"
+          className="mb-3 rounded-2xl border border-accent-amber/20 bg-accent-amber/8 px-3 py-2.5"
         >
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-2.5">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-amber-300/25 bg-amber-300/10 text-amber-300">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-accent-amber/25 bg-accent-amber/10 text-accent-amber">
                 <AlertCircle size={15} />
               </div>
               <div className="min-w-0">
@@ -942,11 +942,11 @@ export function CaddyAssistantOverviewPanel() {
         <div
           role="region"
           aria-label="AssistantCaddy setup routes"
-          className="mb-3 rounded-2xl border border-amber-300/20 bg-amber-300/8 p-3"
+          className="mb-3 rounded-2xl border border-accent-amber/20 bg-accent-amber/8 p-3"
         >
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex min-w-0 items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-300/25 bg-amber-300/10 text-amber-300">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-accent-amber/25 bg-accent-amber/10 text-accent-amber">
                 <AlertCircle size={17} />
               </div>
               <div>
@@ -1246,7 +1246,7 @@ export function CaddyAssistantOverviewPanel() {
                 )}
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <span className={cn('h-3 w-3 shrink-0 rounded-full', item.tone === 'green' ? 'bg-accent-green' : item.tone === 'amber' ? 'bg-amber-300' : item.tone === 'blue' ? 'bg-accent-blue' : item.tone === 'rose' ? 'bg-rose-300' : 'bg-purple')} />
+                  <span className={cn('h-3 w-3 shrink-0 rounded-full', item.tone === 'green' ? 'bg-accent-green' : item.tone === 'amber' ? 'bg-accent-amber' : item.tone === 'blue' ? 'bg-accent-blue' : item.tone === 'rose' ? 'bg-accent-pink' : 'bg-purple')} />
                   <div className="min-w-0 md:w-28">
                     <div className="text-sm font-medium text-text-primary">{item.time}</div>
                   </div>

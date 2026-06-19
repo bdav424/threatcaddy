@@ -215,5 +215,17 @@
   "demoModal.deleteDemo": "删除演示并重新开始",
   "demoModal.removeHint": "您可以稍后在设置中删除示例数据。",
   "error.unexpectedDetail": "发生了意外错误。",
-  "header.caddylabs": "CaddyLabs"
+  "header.caddylabs": "CaddyLabs",
+  "reports.panelTitle": "报告",
+  "reports.new": "新建",
+  "reports.newReport": "新建报告",
+  "reports.pickTemplate": "选择报告模板",
+  "reports.blankReport": "空白报告",
+  "reports.blankReportDesc": "从头开始",
+  "reports.reportTitle": "报告标题…",
+  "reports.copyMarkdown": "复制 Markdown",
+  "reports.exportMarkdown": "导出 Markdown",
+  "reports.emptyTitle": "暂无报告",
+  "reports.emptyDesc": "从模板创建报告以开始使用。",
+  "reports.createReport": "创建报告"
 }

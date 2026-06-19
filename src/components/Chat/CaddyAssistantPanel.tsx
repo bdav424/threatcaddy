@@ -80,7 +80,7 @@ const ASSISTANT_SECTIONS: AssistantSection[] = [
     description: 'Build concise briefs, talking points, and question lists from scattered notes, threads, and prep material.',
     guidance: 'Good for stakeholder calls, status reviews, customer syncs, and internal handoffs.',
     icon: BriefcaseBusiness,
-    iconClassName: 'bg-amber-500/10 text-amber-300 border-amber-400/20',
+    iconClassName: 'bg-accent-amber/10 text-accent-amber border-accent-amber/20',
     prompts: [
       {
         id: 'meeting-prep-brief',
@@ -100,7 +100,7 @@ const ASSISTANT_SECTIONS: AssistantSection[] = [
     description: 'Tighten wording, strip sensitive details, and convert rough updates into cleaner draft outputs.',
     guidance: 'Use this for redaction passes, audience shifts, and draft-to-share cleanups.',
     icon: ShieldCheck,
-    iconClassName: 'bg-rose-500/10 text-rose-300 border-rose-400/20',
+    iconClassName: 'bg-accent-pink/10 text-accent-pink border-accent-pink/20',
     prompts: [
       {
         id: 'drafts-sanitization-external',

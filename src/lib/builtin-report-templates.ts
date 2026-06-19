@@ -410,22 +410,14 @@ export const BUILTIN_REPORT_TEMPLATES: readonly ReportTemplate[] = [
         placeholder: 'C2 domains and IPs, hosting providers, registrar patterns, and infrastructure reuse across campaigns.',
         bodyTemplate: `\
 {% if iocs | length > 0 %}
-{% set network_types = ["ip", "domain", "url", "cidr"] %}
-{% set network_iocs = [] %}
-{% for ioc in iocs %}
-{% if ioc.type in network_types %}
-{% set _ = network_iocs.append(ioc) %}
-{% endif %}
-{% endfor %}
-{% if network_iocs | length > 0 %}
 | Indicator | Type | First Seen | Last Seen | Notes |
 |-----------|------|------------|-----------|-------|
-{% for ioc in network_iocs %}
+{% for ioc in iocs %}
+{% if ioc.type in ["ip", "ipv4", "ipv6", "domain", "url", "cidr", "asn"] %}
 | \`{{ ioc.value }}\` | {{ ioc.type }} | {{ ioc.firstSeen or "—" }} | {{ ioc.lastSeen or "—" }} | {{ ioc.analystNotes or "—" }} |
-{% endfor %}
-{% else %}
-*No network-layer indicators recorded in this investigation.*
 {% endif %}
+{% endfor %}
+*Add rows for each C2 server, relay, or registration cluster. Include WHOIS, registrar, ASN, and observed hosting patterns.*
 {% else %}
 *No indicators of compromise recorded in this investigation.*
 {% endif %}`,
