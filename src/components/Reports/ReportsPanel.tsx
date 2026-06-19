@@ -4,6 +4,7 @@ import { FileText, Plus, Trash2, Download, Copy, ChevronRight, ArrowLeft, Layout
 import { useReportTemplates } from '../../hooks/useReportTemplates';
 import { useInvestigation } from '../../contexts/InvestigationContext';
 import { useToast } from '../../contexts/ToastContext';
+import { buildReportContext, renderSectionTemplate } from '../../lib/report-template-renderer';
 import { nanoid } from 'nanoid';
 import type { ReportTemplate, ReportSection } from '../../types';
 
@@ -359,15 +360,19 @@ export function ReportsPanel() {
     ? (allTemplates.find(t => t.id === activeReport.templateId) ?? null)
     : null;
 
-  const createReport = useCallback((template: ReportTemplate) => {
+  const createReport = useCallback(async (template: ReportTemplate) => {
     const now = Date.now();
+    const ctx = await buildReportContext(selectedFolder?.id, selectedFolder?.name);
     const report: ActiveReport = {
       id: nanoid(),
       title: selectedFolder
         ? `${selectedFolder.name} — ${template.name}`
         : template.name,
       templateId: template.id,
-      sections: template.sections.map(s => ({ sectionId: s.id, content: '' })),
+      sections: template.sections.map(s => ({
+        sectionId: s.id,
+        content: s.bodyTemplate ? renderSectionTemplate(s.bodyTemplate, ctx) : '',
+      })),
       createdAt: now,
     };
     setReports(prev => [report, ...prev]);
@@ -389,7 +394,7 @@ export function ReportsPanel() {
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
-    createReport(blankTemplate);
+    void createReport(blankTemplate);
   }, [t, createReport]);
 
   const updateSection = useCallback((reportId: string, sectionId: string, content: string) => {

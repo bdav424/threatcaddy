@@ -1140,6 +1140,8 @@ export interface ReportSection {
   title: string;
   order: number;
   placeholder?: string;
+  /** Nunjucks template string rendered against investigation context to seed initial section content. */
+  bodyTemplate?: string;
   entityHints?: Array<'iocs' | 'timeline' | 'notes' | 'tasks' | 'graph'>;
 }
 

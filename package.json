@@ -37,6 +37,7 @@
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.0",
+    "@types/nunjucks": "^3.2.6",
     "cytoscape": "^3.33.1",
     "cytoscape-cose-bilkent": "^4.1.0",
     "dexie": "^4.3.0",
@@ -50,6 +51,7 @@
     "marked": "^17.0.3",
     "minisearch": "^7.2.0",
     "nanoid": "^5.1.6",
+    "nunjucks": "^3.2.4",
     "pako": "^2.1.0",
     "papaparse": "^5.5.3",
     "react": "^19.2.0",

@@ -1009,6 +1009,7 @@ function sanitizeReportSection(raw: unknown): ReportSection | null {
     title: str(r.title),
     order: num(r.order, 0),
     placeholder: r.placeholder != null ? str(r.placeholder) : undefined,
+    bodyTemplate: r.bodyTemplate != null ? str(r.bodyTemplate) : undefined,
     entityHints: Array.isArray(r.entityHints)
       ? (r.entityHints as unknown[]).map(h => String(h)).filter(h => validHints.has(h)) as ReportSection['entityHints']
       : undefined,
