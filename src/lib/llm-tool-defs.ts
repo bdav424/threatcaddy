@@ -543,6 +543,20 @@ export const TOOL_DEFINITIONS = [
     },
   },
   {
+    name: 'run_integration',
+    description: 'Run a specific installed integration against an input value. Use list_integrations first to discover available integrations and their IDs. Returns enrichment results and a summary of entities created by the integration. Useful for targeted VT/Censys/OTX/urlscan pivots without needing a stored IOC.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        integrationId: { type: 'string', description: 'Installed integration ID from list_integrations' },
+        input: { type: 'string', description: 'Value to look up — IOC value, hash, IP, domain, CVE, or free-form text depending on what the integration accepts' },
+        iocType: { type: 'string', enum: ['ipv4', 'ipv6', 'domain', 'url', 'email', 'md5', 'sha1', 'sha256', 'cve', 'mitre-attack', 'yara-rule', 'sigma-rule', 'file-path'], description: 'IOC type hint for trigger matching (optional; omit for free-form or non-IOC input)' },
+        folderId: { type: 'string', description: 'Investigation folder ID to associate any entities created by the integration (optional)' },
+      },
+      required: ['integrationId', 'input'],
+    },
+  },
+  {
     name: 'forensicate_scan',
     description: 'Scan text for prompt injection patterns using Forensicate.ai detection rules (keyword, regex, heuristic, NLP). Returns confidence score, matched rules, and attack complexity.',
     input_schema: {
@@ -916,6 +930,7 @@ const WRITE_TOOLS = new Set([
   'notify_human',
   'declare_war_bridge',
   'enrich_ioc',
+  'run_integration',
   'run_remote_command',
   'create_ticket',
   'ingest_alert',

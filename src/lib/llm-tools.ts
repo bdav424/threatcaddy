@@ -323,6 +323,7 @@ export async function executeTool(
       case 'compare_investigations':        result = await executeCompareInvestigations(inp); break;
       case 'enrich_ioc':                    result = await executeEnrichIOC(inp, folderId, _settings); break;
       case 'list_integrations':             result = await executeListIntegrations(inp); break;
+      case 'run_integration':               result = await executeRunIntegration(inp, folderId); break;
       case 'review_completed_task':          result = await executeReviewCompletedTask(inp, folderId, agentContext?.profileId); break;
       case 'delegate_task':                 result = await executeDelegateTask(inp, folderId); break;
       case 'list_agent_activity':           result = await executeListAgentActivity(inp, folderId); break;
@@ -939,6 +940,89 @@ async function executeListIntegrations(inp: Record<string, unknown>): Promise<st
     enabled: filtered.filter(i => i.enabled).length,
     integrations: filtered,
   });
+}
+
+async function executeRunIntegration(inp: Record<string, unknown>, folderId?: string): Promise<string> {
+  const integrationId = String(inp.integrationId || '');
+  const input = String(inp.input || '');
+  if (!integrationId) return JSON.stringify({ error: 'integrationId is required' });
+  if (!input) return JSON.stringify({ error: 'input is required' });
+
+  const iocType = (inp.iocType ? String(inp.iocType) : 'unknown') as import('../types').IOCType;
+
+  const installation = await db.installedIntegrations.get(integrationId);
+  if (!installation) return JSON.stringify({ error: `Integration not found: ${integrationId}. Use list_integrations to see available integration IDs.` });
+  if (!installation.enabled) return JSON.stringify({ error: `Integration "${installation.name}" is disabled. Enable it in Settings > Integrations first.` });
+
+  const templates = await db.integrationTemplates.toArray();
+  const { BUILTIN_INTEGRATIONS } = await import('./builtin-integrations');
+  const allTemplates = [...templates, ...BUILTIN_INTEGRATIONS];
+  const template = allTemplates.find(t => t.id === installation.templateId);
+  if (!template) return JSON.stringify({ error: `Template not found for integration "${installation.name}"` });
+
+  const folder = folderId ? await db.folders.get(folderId) : undefined;
+
+  const { IntegrationExecutor } = await import('./integration-executor');
+  const executor = new IntegrationExecutor();
+
+  try {
+    const run = await executor.run(
+      template,
+      installation,
+      {
+        ioc: { id: nanoid(), value: input, type: iocType, confidence: 'medium' },
+        investigation: folder ? { id: folder.id, name: folder.name } : undefined,
+      },
+      {
+        onCreateEntity: async (type, fields) => {
+          const entityId = nanoid();
+          if (type === 'note') {
+            await db.notes.add({
+              id: entityId,
+              title: String(fields.title || `${template.name}: ${input}`),
+              content: String(fields.content || ''),
+              folderId,
+              tags: ['integration-result', ...(Array.isArray(fields.tags) ? fields.tags : [])],
+              pinned: false, archived: false, trashed: false,
+              createdBy: 'agent:integration',
+              createdAt: Date.now(), updatedAt: Date.now(),
+            });
+          } else if (type === 'ioc' || type === 'standaloneIOC') {
+            await db.standaloneIOCs.add({
+              id: entityId,
+              type: String(fields.type || 'unknown') as import('../types').IOCType,
+              value: String(fields.value || ''),
+              confidence: String(fields.confidence || 'medium') as import('../types').ConfidenceLevel,
+              folderId,
+              tags: ['integration-result'],
+              trashed: false, archived: false,
+              createdAt: Date.now(), updatedAt: Date.now(),
+            });
+          }
+          return entityId;
+        },
+        onUpdateEntity: async () => { /* run_integration results land in new entities */ },
+      },
+    );
+
+    await db.integrationRuns.add(run);
+
+    return JSON.stringify({
+      integration: template.name,
+      input,
+      status: run.status,
+      summary: run.outputSummary || `${run.entitiesCreated} created, ${run.entitiesUpdated} updated`,
+      entitiesCreated: run.entitiesCreated,
+      durationMs: run.durationMs,
+    });
+  } catch (err) {
+    return JSON.stringify({
+      integration: template.name,
+      input,
+      status: 'error',
+      error: String((err as Error).message || err),
+    });
+  }
 }
 
 // ── Autonomy Tools (call_meeting, notify_human, declare_war_bridge) ──

@@ -15,11 +15,20 @@
 // when you implement an email/calendar/messaging tool, give it one of these names (or add
 // the new name here) and it is automatically AssistantCaddy-only.
 
-export type ToolScope = 'investigation' | 'admin';
+export type ToolScope = 'investigation' | 'admin' | 'shared';
+
+/**
+ * Tools available in BOTH investigation and admin contexts. Shared tools pass
+ * scope checks for any caller so CaddyAI and AssistantCaddy can both invoke them.
+ */
+export const SHARED_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
+  'run_integration', // threat-intel lookups are useful from both investigation and admin context
+]);
 
 /**
  * Names that belong to AssistantCaddy's administrative surface. Anything NOT in this set
- * is treated as 'investigation' (CaddyAI). Forward-looking: these may not all exist yet.
+ * (and not in SHARED_TOOL_NAMES) is treated as 'investigation' (CaddyAI).
+ * Forward-looking: these may not all exist yet.
  */
 export const ADMIN_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
   // email (EmailCaddy)
@@ -47,18 +56,24 @@ export const ADMIN_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
 
 /** Resolve the scope of a tool by name. Unknown/existing tools default to investigation. */
 export function toolScope(name: string): ToolScope {
-  return ADMIN_TOOL_NAMES.has(name) ? 'admin' : 'investigation';
+  if (ADMIN_TOOL_NAMES.has(name)) return 'admin';
+  if (SHARED_TOOL_NAMES.has(name)) return 'shared';
+  return 'investigation';
 }
 
-/** True when a tool is allowed to run under the given scope (strict: exact match). */
+/** True when a tool is allowed to run under the given scope. Shared tools pass any scope. */
 export function isToolInScope(name: string, scope: ToolScope): boolean {
-  return toolScope(name) === scope;
+  const s = toolScope(name);
+  return s === 'shared' || s === scope;
 }
 
-/** Filter a tool-definition list down to a single scope. */
+/** Filter a tool-definition list down to a single scope (shared tools always included). */
 export function getToolDefinitionsForScope<T extends { name: string }>(
   scope: ToolScope,
   defs: readonly T[],
 ): T[] {
-  return defs.filter((d) => toolScope(d.name) === scope);
+  return defs.filter((d) => {
+    const s = toolScope(d.name);
+    return s === scope || s === 'shared';
+  });
 }

@@ -55,6 +55,7 @@ const TOOL_ACTION_CLASS: Record<string, AgentActionClass> = {
   // Integration / enrichment tools
   enrich_ioc: 'enrich',
   list_integrations: 'read',
+  run_integration: 'fetch',
 
   // Knowledge / memory
   update_knowledge: 'create',
