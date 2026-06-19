@@ -30,6 +30,16 @@ import { cn } from '../../lib/utils';
 import type { LLMProvider, Settings, ViewMode } from '../../types';
 import { loadStoredSettings, patchStoredSettings } from '../../hooks/useSettings';
 import { resolveAssistantLLMConfig } from '../../lib/assistant-llm-config';
+import {
+  ONBOARDING_STEPS,
+  computeStepStatuses,
+  isOnboardingComplete,
+  loadOnboardingState,
+  saveOnboardingState,
+  type OnboardingState,
+  type OnboardingStep,
+  type OnboardingStepStatus,
+} from '../../lib/assistant-onboarding';
 
 const WIDGET_STORAGE_KEY = 'threatcaddy-assistantcaddy-overview-widgets-v2';
 const OVERVIEW_MODULE_IDS = ['route-details', 'quick-actions', 'signals', 'today'] as const;
@@ -550,6 +560,28 @@ export function CaddyAssistantOverviewPanel() {
 
   const effectiveConfig = useMemo(() => resolveAssistantLLMConfig(llmSettings), [llmSettings]);
 
+  const [onboardingState, setOnboardingState] = useState<OnboardingState>(() => loadOnboardingState());
+
+  const stepStatuses = useMemo(
+    () => computeStepStatuses(llmSettings, onboardingState, 0),
+    [llmSettings, onboardingState],
+  );
+
+  const onboardingComplete = useMemo(() => isOnboardingComplete(stepStatuses), [stepStatuses]);
+  const showOnboarding = !onboardingComplete && !onboardingState.dismissed;
+
+  const dismissOnboarding = () => {
+    const next = { ...onboardingState, dismissed: true };
+    saveOnboardingState(next);
+    setOnboardingState(next);
+  };
+
+  const skipStep = (id: OnboardingStep['id']) => {
+    const next = { ...onboardingState, skippedSteps: [...onboardingState.skippedSteps, id] };
+    saveOnboardingState(next);
+    setOnboardingState(next);
+  };
+
   const selectAssistantProvider = (provider: LLMProvider | 'inherit') => {
     const updates: Partial<Settings> = provider === 'inherit'
       ? { assistantLlmSeparate: false }
@@ -828,6 +860,22 @@ export function CaddyAssistantOverviewPanel() {
             </button>
           </div>
         </div>
+      )}
+
+      {showOnboarding && (
+        <AssistantOnboardingCard
+          steps={ONBOARDING_STEPS}
+          stepStatuses={stepStatuses}
+          onAction={(step) => {
+            if (step.actionTarget.kind === 'settings') {
+              openSettings(step.actionTarget.tab);
+            } else {
+              navigateTo(step.actionTarget.target);
+            }
+          }}
+          onSkip={skipStep}
+          onDismiss={dismissOnboarding}
+        />
       )}
 
       {setupPanelVisible && setupPanelMode === 'compact' && (
@@ -1226,6 +1274,135 @@ export function CaddyAssistantOverviewPanel() {
         AssistantCaddy can make mistakes. Verify important information before acting on it.
       </p>
     </WorkspaceShell>
+  );
+}
+
+const STATUS_ICON: Record<OnboardingStepStatus, string> = {
+  complete: '✓',
+  active: '→',
+  pending: '·',
+  skipped: '–',
+};
+
+function AssistantOnboardingCard({
+  steps,
+  stepStatuses,
+  onAction,
+  onSkip,
+  onDismiss,
+}: {
+  steps: readonly OnboardingStep[];
+  stepStatuses: Record<OnboardingStep['id'], OnboardingStepStatus>;
+  onAction: (step: OnboardingStep) => void;
+  onSkip: (id: OnboardingStep['id']) => void;
+  onDismiss: () => void;
+}) {
+  const completedCount = steps.filter((s) => stepStatuses[s.id] === 'complete').length;
+
+  return (
+    <div
+      role="region"
+      aria-label="AssistantCaddy setup checklist"
+      className="mb-4 rounded-2xl border border-purple/20 bg-purple/5 p-4"
+    >
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-purple/25 bg-purple/10 text-purple">
+            <Sparkles size={14} />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary">
+              AssistantCaddy setup
+            </h3>
+            <p className="text-xs text-text-muted">
+              {completedCount} of {steps.filter((s) => !s.optional).length} required steps complete
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss AssistantCaddy setup checklist"
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-bg-deep/50 text-text-muted transition-colors hover:border-border-medium hover:text-text-primary"
+        >
+          <X size={13} />
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {steps.map((step) => {
+          const status = stepStatuses[step.id];
+          const isComplete = status === 'complete';
+          const isSkipped = status === 'skipped';
+          const isPending = status === 'pending';
+
+          return (
+            <div
+              key={step.id}
+              className={cn(
+                'flex items-start gap-3 rounded-xl border px-3 py-2.5 transition-colors',
+                isComplete
+                  ? 'border-accent-green/15 bg-accent-green/5 opacity-70'
+                  : isSkipped
+                    ? 'border-border-subtle bg-bg-deep/20 opacity-50'
+                    : isPending
+                      ? 'border-border-subtle bg-bg-deep/30 opacity-60'
+                      : 'border-purple/20 bg-purple/8',
+              )}
+            >
+              <div
+                className={cn(
+                  'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold',
+                  isComplete
+                    ? 'border-accent-green/30 bg-accent-green/10 text-accent-green'
+                    : isSkipped
+                      ? 'border-border-subtle bg-bg-deep/40 text-text-muted'
+                      : isPending
+                        ? 'border-border-subtle bg-transparent text-text-muted'
+                        : 'border-purple/30 bg-purple/10 text-purple',
+                )}
+              >
+                {STATUS_ICON[status]}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className={cn('text-sm font-semibold', isComplete || isSkipped ? 'text-text-muted line-through' : 'text-text-primary')}>
+                    {step.title}
+                  </span>
+                  {step.optional && (
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted">Optional</span>
+                  )}
+                </div>
+                {!isComplete && !isSkipped && (
+                  <p className="mt-0.5 text-xs leading-5 text-text-secondary">{step.description}</p>
+                )}
+              </div>
+              {!isComplete && !isSkipped && !isPending && (
+                <div className="flex shrink-0 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => onAction(step)}
+                    className="inline-flex h-7 items-center gap-1 rounded-full border border-purple/25 bg-purple/10 px-2.5 text-[11px] font-semibold text-text-primary transition-colors hover:border-purple/40 hover:bg-purple/15"
+                  >
+                    {step.actionLabel}
+                    <ArrowRight size={11} />
+                  </button>
+                  {step.optional && (
+                    <button
+                      type="button"
+                      onClick={() => onSkip(step.id)}
+                      className="inline-flex h-7 items-center rounded-full border border-border-subtle bg-transparent px-2 text-[11px] text-text-muted transition-colors hover:border-border-medium hover:text-text-primary"
+                    >
+                      Skip
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
