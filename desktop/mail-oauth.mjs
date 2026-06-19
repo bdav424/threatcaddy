@@ -31,10 +31,13 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import { getMailProvider } from '../src/lib/mail-providers.js';
 
-// TODO: load from your local config / env — never commit real values here
+// Load from env — set in desktop/.env.desktop (gitignored). Never commit real values.
+// desktop/.env.desktop example:
+//   TC_GOOGLE_CLIENT_ID=<your-client-id>.apps.googleusercontent.com
+//   TC_MICROSOFT_CLIENT_ID=<your-azure-app-client-id>
 const OAUTH_CLIENT_IDS = {
-  // google: 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com',
-  // microsoft: 'YOUR_MICROSOFT_APPLICATION_CLIENT_ID',
+  ...(process.env.TC_GOOGLE_CLIENT_ID    ? { google:    process.env.TC_GOOGLE_CLIENT_ID    } : {}),
+  ...(process.env.TC_MICROSOFT_CLIENT_ID ? { microsoft: process.env.TC_MICROSOFT_CLIENT_ID } : {}),
 };
 
 // --- PKCE helpers ---
