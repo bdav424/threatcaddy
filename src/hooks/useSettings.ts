@@ -61,6 +61,22 @@ function loadSettings(): Settings {
   return DEFAULT_SETTINGS;
 }
 
+/** Read the current settings snapshot from localStorage without creating React state. */
+export function loadStoredSettings(): Settings {
+  return loadSettings();
+}
+
+/** Merge updates into the stored settings. Does NOT trigger any React re-renders. */
+export function patchStoredSettings(updates: Partial<Settings>): void {
+  try {
+    const current = loadSettings();
+    const next = { ...current, ...updates };
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+  } catch {
+    // ignore
+  }
+}
+
 /** Reads and persists user settings from localStorage. Returns the current settings object and an update function. */
 export function useSettings() {
   const [settings, setSettingsState] = useState<Settings>(loadSettings);

@@ -27,7 +27,9 @@ import {
 import { useNavigation } from '../../contexts/NavigationContext';
 import { useUIModals } from '../../contexts/UIModalContext';
 import { cn } from '../../lib/utils';
-import type { ViewMode } from '../../types';
+import type { LLMProvider, Settings, ViewMode } from '../../types';
+import { loadStoredSettings, patchStoredSettings } from '../../hooks/useSettings';
+import { resolveAssistantLLMConfig } from '../../lib/assistant-llm-config';
 
 const WIDGET_STORAGE_KEY = 'threatcaddy-assistantcaddy-overview-widgets-v2';
 const OVERVIEW_MODULE_IDS = ['route-details', 'quick-actions', 'signals', 'today'] as const;
@@ -532,6 +534,30 @@ export function CaddyAssistantOverviewPanel() {
   const [setupPanelMode, setSetupPanelMode] = useState<SetupPanelMode>('compact');
   const visibleModules = useMemo(() => new Set(visibleModuleIds), [visibleModuleIds]);
 
+  const [llmSettings, setLlmSettings] = useState<Settings>(() => loadStoredSettings());
+
+  const configuredProviders = useMemo((): LLMProvider[] => {
+    const providers: LLMProvider[] = [];
+    if (llmSettings.llmAnthropicApiKey?.trim()) providers.push('anthropic');
+    if (llmSettings.llmOpenAIApiKey?.trim()) providers.push('openai');
+    if (llmSettings.llmGeminiApiKey?.trim()) providers.push('gemini');
+    if (llmSettings.llmMistralApiKey?.trim()) providers.push('mistral');
+    const localEndpoint = llmSettings.assistantLlmLocalEndpoint || llmSettings.llmLocalEndpoint;
+    const localModel = llmSettings.assistantLlmLocalModelName || llmSettings.llmLocalModelName;
+    if (localEndpoint?.trim() && localModel?.trim()) providers.push('local');
+    return providers;
+  }, [llmSettings]);
+
+  const effectiveConfig = useMemo(() => resolveAssistantLLMConfig(llmSettings), [llmSettings]);
+
+  const selectAssistantProvider = (provider: LLMProvider | 'inherit') => {
+    const updates: Partial<Settings> = provider === 'inherit'
+      ? { assistantLlmSeparate: false }
+      : { assistantLlmSeparate: true, assistantLlmDefaultProvider: provider };
+    patchStoredSettings(updates);
+    setLlmSettings((prev) => ({ ...prev, ...updates }));
+  };
+
   const setupCards = [
     {
       id: 'ai',
@@ -996,6 +1022,15 @@ export function CaddyAssistantOverviewPanel() {
             </div>
           )}
 
+          <AssistantProviderPicker
+            configuredProviders={configuredProviders}
+            isSeparate={llmSettings.assistantLlmSeparate === true}
+            activeProvider={effectiveConfig.provider}
+            activeModel={effectiveConfig.model}
+            onSelect={selectAssistantProvider}
+            onOpenAiSettings={() => openSettings('ai')}
+          />
+
           <div className="rounded-2xl border border-border-subtle bg-bg-primary/55 p-2.5">
             <div className="flex flex-wrap items-center gap-2">
               <div className="mr-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-text-muted">
@@ -1191,5 +1226,107 @@ export function CaddyAssistantOverviewPanel() {
         AssistantCaddy can make mistakes. Verify important information before acting on it.
       </p>
     </WorkspaceShell>
+  );
+}
+
+const PROVIDER_LABELS: Record<LLMProvider, string> = {
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  gemini: 'Gemini',
+  mistral: 'Mistral',
+  local: 'Local',
+};
+
+const PROVIDER_SHORT: Record<LLMProvider, string> = {
+  anthropic: 'Claude',
+  openai: 'GPT',
+  gemini: 'Gemini',
+  mistral: 'Mistral',
+  local: 'Local',
+};
+
+function AssistantProviderPicker({
+  configuredProviders,
+  isSeparate,
+  activeProvider,
+  activeModel,
+  onSelect,
+  onOpenAiSettings,
+}: {
+  configuredProviders: LLMProvider[];
+  isSeparate: boolean;
+  activeProvider: LLMProvider;
+  activeModel: string;
+  onSelect: (provider: LLMProvider | 'inherit') => void;
+  onOpenAiSettings: () => void;
+}) {
+  const hasProviders = configuredProviders.length > 0;
+
+  return (
+    <div
+      aria-label="AssistantCaddy AI model picker"
+      className="rounded-xl border border-border-subtle bg-bg-deep/40 px-3 py-2"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">
+          AI model
+        </span>
+
+        {!hasProviders && (
+          <span className="text-xs text-text-muted">
+            No provider configured —
+          </span>
+        )}
+
+        {hasProviders && (
+          <button
+            type="button"
+            onClick={() => onSelect('inherit')}
+            aria-pressed={!isSeparate}
+            className={cn(
+              'inline-flex h-7 items-center rounded-full border px-2.5 text-[11px] font-semibold transition-colors',
+              !isSeparate
+                ? 'border-purple/30 bg-purple/15 text-text-primary'
+                : 'border-border-subtle bg-transparent text-text-secondary hover:border-border-medium hover:text-text-primary',
+            )}
+          >
+            Inherits CaddyAI
+          </button>
+        )}
+
+        {configuredProviders.map((provider) => (
+          <button
+            key={provider}
+            type="button"
+            onClick={() => onSelect(provider)}
+            aria-pressed={isSeparate && activeProvider === provider}
+            title={PROVIDER_LABELS[provider]}
+            className={cn(
+              'inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-semibold transition-colors',
+              isSeparate && activeProvider === provider
+                ? 'border-purple/30 bg-purple/15 text-text-primary'
+                : 'border-border-subtle bg-transparent text-text-secondary hover:border-border-medium hover:text-text-primary',
+            )}
+          >
+            {PROVIDER_SHORT[provider]}
+          </button>
+        ))}
+
+        {(hasProviders) && (
+          <span className="ml-1 truncate text-[11px] text-text-muted" title={activeModel}>
+            {activeModel || 'No model set'}
+          </span>
+        )}
+
+        <button
+          type="button"
+          onClick={onOpenAiSettings}
+          className="ml-auto inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-border-subtle bg-transparent px-2 text-[11px] text-text-muted transition-colors hover:border-border-medium hover:text-text-primary"
+        >
+          <Settings2 size={11} />
+          AI settings
+        </button>
+      </div>
+    </div>
   );
 }
