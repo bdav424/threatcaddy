@@ -1,11 +1,12 @@
 import { useState, useCallback, useRef, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileText, Plus, Trash2, Download, Copy, ChevronRight, ArrowLeft, LayoutTemplate, X } from 'lucide-react';
+import { FileText, Plus, Trash2, Download, Copy, ChevronRight, ArrowLeft, LayoutTemplate, X, Camera } from 'lucide-react';
 import { useReportTemplates } from '../../hooks/useReportTemplates';
 import { useInvestigation } from '../../contexts/InvestigationContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useWorkspacePanelChromeState } from '../WorkspacePanels/WorkspacePanel';
 import { buildReportContext, renderSectionTemplate } from '../../lib/report-template-renderer';
+import { useGraphSnapshots } from '../../hooks/useGraphSnapshots';
 import { nanoid } from 'nanoid';
 import type { ReportTemplate, ReportSection } from '../../types';
 
@@ -159,12 +160,17 @@ function SectionEditor({
   section,
   content,
   onChange,
+  folderId,
 }: {
   section: ReportSection;
   content: string;
   onChange: (value: string) => void;
+  folderId: string | null;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [showSnapPicker, setShowSnapPicker] = useState(false);
+  const { snapshots } = useGraphSnapshots(folderId);
+  const hasGraphHint = section.entityHints?.includes('graph');
 
   const autoResize = useCallback(() => {
     const ta = textareaRef.current;
@@ -176,11 +182,72 @@ function SectionEditor({
   // Resize on mount so pre-filled bodyTemplate content isn't clipped
   useLayoutEffect(() => { autoResize(); }, [autoResize]);
 
+  const insertSnapshot = useCallback((snap: { dataUrl: string; caption: string; nodeCount: number; edgeCount: number }) => {
+    const label = snap.caption || `Investigation graph — ${snap.nodeCount} nodes, ${snap.edgeCount} edges`;
+    const mdImage = `\n![${label}](${snap.dataUrl})\n*${label}*\n`;
+    onChange(content + mdImage);
+    setShowSnapPicker(false);
+    setTimeout(autoResize, 0);
+  }, [content, onChange, autoResize]);
+
   return (
     <div className="mb-5">
-      <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
-        {section.title}
-      </label>
+      <div className="flex items-center justify-between mb-1.5">
+        <label className="block text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+          {section.title}
+        </label>
+        {hasGraphHint && (
+          <button
+            type="button"
+            onClick={() => setShowSnapPicker(v => !v)}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] transition-colors"
+            style={showSnapPicker
+              ? { background: 'var(--color-accent)', color: '#fff' }
+              : { background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)' }}
+            title="Insert a saved graph snapshot"
+          >
+            <Camera size={10} />
+            Insert snapshot
+          </button>
+        )}
+      </div>
+
+      {hasGraphHint && showSnapPicker && (
+        <div
+          className="mb-2 rounded-lg border p-2"
+          style={{ background: 'var(--color-bg-deep)', borderColor: 'var(--color-border-subtle)' }}
+        >
+          {snapshots.length === 0 ? (
+            <p className="text-[11px] py-2 text-center" style={{ color: 'var(--color-text-muted)' }}>
+              No snapshots yet — capture one from the Graph panel using the <Camera size={10} className="inline" /> button.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {snapshots.map(snap => (
+                <button
+                  key={snap.id}
+                  type="button"
+                  onClick={() => insertSnapshot(snap)}
+                  className="flex flex-col items-start gap-1 p-1.5 rounded-md border transition-colors hover:border-[color:var(--color-accent)]"
+                  style={{ background: 'var(--color-bg-raised)', borderColor: 'var(--color-border-medium)', maxWidth: 120 }}
+                  title={snap.caption || `${snap.nodeCount} nodes · ${snap.edgeCount} edges`}
+                >
+                  <img
+                    src={snap.dataUrl}
+                    alt="Graph snapshot"
+                    className="w-full rounded"
+                    style={{ height: 60, objectFit: 'cover' }}
+                  />
+                  <span className="text-[10px] truncate w-full" style={{ color: 'var(--color-text-muted)' }}>
+                    {snap.caption || `${snap.nodeCount}n · ${snap.edgeCount}e`}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <textarea
         ref={textareaRef}
         value={content}
@@ -224,6 +291,7 @@ function ReportEditor({
 }) {
   const { t } = useTranslation();
   const { showToast } = useToast();
+  const { selectedFolderId } = useInvestigation();
   const [activeSectionIdx, setActiveSectionIdx] = useState<number | null>(null);
   const compact = Boolean(useWorkspacePanelChromeState()?.compact);
 
@@ -339,6 +407,7 @@ function ReportEditor({
                 section={sec}
                 content={getSectionContent(sec.id)}
                 onChange={val => onUpdateSection(sec.id, val)}
+                folderId={selectedFolderId}
               />
             </div>
           ))}

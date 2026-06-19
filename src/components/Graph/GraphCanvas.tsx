@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
 import cytoscape from 'cytoscape';
 // @ts-expect-error no type declarations for this package
 import coseBilkent from 'cytoscape-cose-bilkent';
@@ -8,6 +8,10 @@ import type { GraphData } from '../../lib/graph-data';
 cytoscape.use(coseBilkent);
 
 export type LayoutName = 'cose-bilkent' | 'circle' | 'breadthfirst';
+
+export interface GraphCanvasHandle {
+  captureSnapshot(): { dataUrl: string; nodeCount: number; edgeCount: number } | null;
+}
 
 interface GraphCanvasProps {
   data: GraphData;
@@ -20,7 +24,7 @@ interface GraphCanvasProps {
   fitTrigger?: number;
 }
 
-export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickNode, onSelectMulti, onLinkNodes, theme, fitTrigger }: GraphCanvasProps) {
+const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(function GraphCanvas({ data, layout, onSelectNode, onDoubleClickNode, onSelectMulti, onLinkNodes, theme, fitTrigger }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
   // Stable refs for callbacks so cytoscape event handlers always use latest versions
@@ -37,6 +41,15 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
   const linkDragActiveRef = useRef(false);
 
   const isDark = theme === 'dark';
+
+  useImperativeHandle(ref, () => ({
+    captureSnapshot() {
+      const cy = cyRef.current;
+      if (!cy) return null;
+      const dataUrl = cy.png({ output: 'base64uri', full: true, scale: 1.5 }) as string;
+      return { dataUrl, nodeCount: cy.nodes().length, edgeCount: cy.edges().length };
+    },
+  }));
 
   const getLayoutOptions = useCallback((name: LayoutName) => {
     switch (name) {
@@ -422,4 +435,6 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
   }, []);
 
   return <div ref={containerRef} className="w-full h-full" role="img" aria-label="Investigation graph visualization" tabIndex={0} onKeyDown={handleKeyDown} />;
-}
+});
+
+export default GraphCanvas;

@@ -44,6 +44,7 @@ export interface BackupPayload {
     installedIntegrations?: unknown[];
     customSlashCommands?: unknown[];
     reportTemplates?: unknown[];
+    graphSnapshots?: unknown[];
   };
   deletedIds?: Record<string, string[]>;
 }

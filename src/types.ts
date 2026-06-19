@@ -1160,6 +1160,16 @@ export interface ReportTemplate {
   updatedAt: number;
 }
 
+export interface GraphSnapshot {
+  id: string;
+  folderId: string | null;
+  dataUrl: string;
+  caption: string;
+  nodeCount: number;
+  edgeCount: number;
+  createdAt: number;
+}
+
 export interface ExportData {
   version: 1;
   exportedAt: number;
@@ -1181,6 +1191,7 @@ export interface ExportData {
   noteTemplates?: NoteTemplate[];
   playbookTemplates?: PlaybookTemplate[];
   reportTemplates?: ReportTemplate[];
+  graphSnapshots?: GraphSnapshot[];
 }
 
 export const TAG_COLORS = [

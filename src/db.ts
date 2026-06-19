@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, ReportTemplate, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus } from './types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, ReportTemplate, GraphSnapshot, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus } from './types';
 import type { IntegrationTemplate, InstalledIntegration, IntegrationRun } from './types/integration-types';
 import { installEncryptionMiddleware } from './lib/encryptionMiddleware';
 
@@ -27,6 +27,7 @@ const db = new Dexie('ThreatCaddyDB') as Dexie & {
   agentDeployments: EntityTable<AgentDeployment, 'id'>;
   agentMeetings: EntityTable<AgentMeeting, 'id'>;
   reportTemplates: EntityTable<ReportTemplate, 'id'>;
+  graphSnapshots: EntityTable<GraphSnapshot, 'id'>;
 };
 
 db.version(1).stores({
@@ -298,6 +299,11 @@ db.version(32).stores({
 // Version 33 adds the report templates table (S5 — report/template builder).
 db.version(33).stores({
   reportTemplates: 'id, name, category, source, createdAt, updatedAt',
+});
+
+// Version 34 adds graph snapshots (S5-ext-a — pivot graph as report artifact).
+db.version(34).stores({
+  graphSnapshots: 'id, folderId, createdAt',
 });
 
 function evidenceKindFromExtension(value: string): EvidenceKind {

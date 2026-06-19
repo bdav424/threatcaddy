@@ -1,6 +1,6 @@
-import React, { Suspense, useState, useMemo, useCallback } from 'react';
+import React, { Suspense, useState, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, Search, Network, Maximize2, ChevronDown, ChevronRight, HelpCircle, X as XIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Loader2, Search, Network, Maximize2, ChevronDown, ChevronRight, HelpCircle, X as XIcon, PanelLeftClose, PanelLeftOpen, Camera } from 'lucide-react';
 import type { Note, Task, TimelineEvent, Settings, IOCType, StandaloneIOC } from '../../types';
 import { IOC_TYPE_LABELS } from '../../types';
 import { buildGraphData } from '../../lib/graph-data';
@@ -8,10 +8,12 @@ import type { GraphNode, GraphEdge } from '../../lib/graph-data';
 import { GraphDetailPanel } from './GraphDetailPanel';
 import { GraphIOCEditDialog } from './GraphIOCEditDialog';
 import { GraphLinkDialog } from './GraphLinkDialog';
-import type { LayoutName } from './GraphCanvas';
+import type { LayoutName, GraphCanvasHandle } from './GraphCanvas';
 import { getLegendEntries } from '../../lib/graph-icons';
 import { useNavigation } from '../../contexts/NavigationContext';
 import { useInvestigation } from '../../contexts/InvestigationContext';
+import { useGraphSnapshots } from '../../hooks/useGraphSnapshots';
+import { useToast } from '../../contexts/ToastContext';
 
 const GraphCanvas = React.lazy(() => import('./GraphCanvas'));
 
@@ -65,10 +67,29 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
   const [fitTrigger, setFitTrigger] = useState(0);
   const [legendOpen, setLegendOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+  const canvasRef = useRef<GraphCanvasHandle | null>(null);
+  const { saveSnapshot } = useGraphSnapshots(selectedFolderId);
+  const { showToast } = useToast();
   // Reset scope mode when investigation changes
   React.useEffect(() => {
     setScopeMode('investigation');
   }, [selectedFolderId]);
+
+  const handleCaptureSnapshot = useCallback(async () => {
+    if (!canvasRef.current) return;
+    setCapturing(true);
+    try {
+      const snap = canvasRef.current.captureSnapshot();
+      if (!snap) { showToast('Graph not ready', 'error'); return; }
+      await saveSnapshot(snap.dataUrl, snap.nodeCount, snap.edgeCount);
+      showToast(`Snapshot saved (${snap.nodeCount} nodes)`, 'success');
+    } catch {
+      showToast('Snapshot failed', 'error');
+    } finally {
+      setCapturing(false);
+    }
+  }, [saveSnapshot, showToast]);
 
   // Determine which data arrays to use based on scope
   const effectiveNotes = selectedFolderId && scopeMode === 'investigation' && scopedNotes ? scopedNotes : notes;
@@ -374,6 +395,15 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
             >
               <Maximize2 size={14} />
             </button>
+            <button
+              onClick={handleCaptureSnapshot}
+              disabled={capturing || filteredGraphData.nodes.length === 0}
+              className="p-1 rounded bg-gray-800 border border-gray-700 text-gray-400 hover:text-gray-200 hover:border-accent disabled:opacity-40 disabled:cursor-not-allowed"
+              title={t('view.captureSnapshot', { defaultValue: 'Save graph snapshot for reports' })}
+              aria-label={t('view.captureSnapshot', { defaultValue: 'Save graph snapshot for reports' })}
+            >
+              <Camera size={14} className={capturing ? 'animate-pulse' : ''} />
+            </button>
           </div>
         </div>
 
@@ -409,6 +439,7 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
             </div>
           }>
             <GraphCanvas
+              ref={canvasRef}
               data={filteredGraphData}
               layout={layout}
               onSelectNode={handleSelectNode}
