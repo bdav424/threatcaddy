@@ -6,9 +6,9 @@ Observations collected during the theme/optimization sweep (June 2026). Items ar
 
 ## High Priority
 
-### 1. `data-email-inline-nINTELe` prop warning
+### 1. `data-email-inline-notice` prop warning
 **File:** Any component that renders email inline previews  
-**Issue:** React warns that `data-email-inline-nINTELe` contains uppercase chars and won't be passed to the DOM correctly. The prop name should be fully lowercase (`data-email-inline-nintele`).  
+**Issue:** React warns that `data-email-inline-notice` contains uppercase chars and won't be passed to the DOM correctly. The prop name should be fully lowercase (`data-email-inline-nintele`).  
 **Effort:** 15 min — grep and rename the prop across the codebase.
 
 ### 2. ReportsPanel uses `useTranslation()` default namespace but keys use flat dot-notation

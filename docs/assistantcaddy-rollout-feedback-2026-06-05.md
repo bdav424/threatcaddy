@@ -129,7 +129,7 @@ Status: `DONE` for focused EmailCaddy usability polish; `PARTIAL` for standalone
 - `DONE`: compose, reply, reply-all, and forward flows now stage editable drafts with To, CC, BCC, Subject, Body, sensitivity, classification, and audience-depth fields.
 - `DONE`: reply/reply-all/forward drafts retain quoted source context and show source/attachment chips; forward preserves attachment reference chips without pretending to send provider attachments.
 - `DONE`: assistant aids include AI draft staging, `Sanitize`, `What am I forgetting?`, ask extraction, sensitivity warning/classification controls, and explicit guardrails that CaddyAI may draft/analyze but does not send mail.
-- `DONE`: safe keyboard behavior covers Enter via row/action buttons, Escape clearing transient assist/nINTELe UI, and Delete/Backspace deleting selected visible rows only when focus is outside draft/editable fields.
+- `DONE`: safe keyboard behavior covers Enter via row/action buttons, Escape clearing transient assist/notice UI, and Delete/Backspace deleting selected visible rows only when focus is outside draft/editable fields.
 - `PARTIAL`: no standalone browser smoke was run in this lane, so tester/integrator should still verify visual density and keyboard feel in the final built artifact.
 - Validation: `pnpm exec vitest run src/__tests__/caddyassistant-workspaces.test.tsx` passed with 15 tests. `pnpm exec tsc --noEmit --pretty false` passed.
 

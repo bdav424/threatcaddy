@@ -530,7 +530,7 @@ export function IntegrationSourceDashboard({ onOpenLegacyTools }: IntegrationSou
   const [query, setQuery] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<SourceGroupId>>(() => new Set());
   const [showSlackWorkflow, setShowSlackWorkflow] = useState(false);
-  const passiveNINTELeId = useId();
+  const passiveNoticeId = useId();
   const summaryId = useId();
   const sourceGroups = useMemo(() => buildIntegrationSourceGroups(), []);
 
@@ -581,14 +581,14 @@ export function IntegrationSourceDashboard({ onOpenLegacyTools }: IntegrationSou
     <section
       className="space-y-5"
       aria-label="Integrations source catalog"
-      aria-describedby={`${passiveNINTELeId} ${summaryId}`}
+      aria-describedby={`${passiveNoticeId} ${summaryId}`}
       data-integration-catalog-source="shared-local-catalog"
       data-connector-runtime-ui-wiring="integrations"
       data-connector-runtime-ui-contract={INTEGRATIONS_RUNTIME_UI_WIRING_PLAN.contract}
       data-connector-runtime-ui-executable={String(INTEGRATIONS_RUNTIME_UI_WIRING_PLAN.executable)}
       data-connector-runtime-ui-side-effects={INTEGRATIONS_RUNTIME_UI_WIRING_PLAN.sideEffects}
     >
-      <p id={passiveNINTELeId} className="sr-only">
+      <p id={passiveNoticeId} className="sr-only">
         This view is passive. Opening Settings does not connect providers, install tools, test credentials, or expose live connector actions.
       </p>
       <div className="sr-only" data-connector-runtime-ui-hidden-summary="true">
@@ -655,7 +655,7 @@ export function IntegrationSourceDashboard({ onOpenLegacyTools }: IntegrationSou
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            aria-describedby={passiveNINTELeId}
+            aria-describedby={passiveNoticeId}
             placeholder="Search providers, aliases, or catalog capabilities"
             className="h-8 w-full rounded-[10px] border border-border-subtle bg-bg-primary/80 ps-9 pe-3 text-[11px] font-medium text-text-primary outline-none transition-colors placeholder:text-text-tertiary hover:border-border-medium focus:border-accent/50"
           />
@@ -686,7 +686,7 @@ export function IntegrationSourceDashboard({ onOpenLegacyTools }: IntegrationSou
           <button
             type="button"
             onClick={onOpenLegacyTools}
-            aria-describedby={passiveNINTELeId}
+            aria-describedby={passiveNoticeId}
             className="rounded-md border border-border-subtle bg-bg-primary/70 px-3 py-1.5 text-[11px] font-medium text-text-secondary transition-colors hover:border-accent/40 hover:text-text-primary"
           >
             Installed integrations

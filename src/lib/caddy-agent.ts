@@ -913,7 +913,7 @@ async function _runAgentCycleInner(
 
           // Watch for task escalation signals so the cycle summary + metrics
           // surface "stuck delegation" immediately instead of waiting for a
-          // human to nINTELe the pinned note.
+          // human to notice the pinned note.
           if (!result.isError && toolCall.name === 'review_completed_task') {
             try {
               const parsed = JSON.parse(result.result);

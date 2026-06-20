@@ -316,7 +316,7 @@ export class BotManager {
           activeRuns: this.activeRuns,
           totalDropped: this.stats.dropped,
         });
-        // Notify the bot owner so drops don't go unnINTELed
+        // Notify the bot owner so drops don't go unnoticed
         createNotification({
           userId: config.createdBy,
           type: 'bot_error',

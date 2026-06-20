@@ -174,7 +174,7 @@ const TYPE_CONTENT: Record<string, { headlines: string[]; omens: string[]; watch
       'The next useful clue will arrive dressed as routine.',
       'A low-signal artifact is about to become important.',
       'The easy answer will look polished and still be wrong.',
-      'A recurring thread is finally ready to be nINTELed.',
+      'A recurring thread is finally ready to be noticed.',
     ],
     omens: [
       'A neat explanation will arrive before the truthful one. Let the artifact have the last word.',
@@ -246,7 +246,7 @@ const TYPE_CONTENT: Record<string, { headlines: string[]; omens: string[]; watch
       'Ritual advice: let the facts stay slightly awkward instead of forcing them into a cleaner shape.',
       'Ritual advice: save one sentence in your briefing for what you do not know yet.',
       'Ritual advice: choose the question that reduces risk, not the one that sounds smartest.',
-      'Ritual advice: make room for the analyst who nINTELes the detail nobody else wanted.',
+      'Ritual advice: make room for the analyst who notices the detail nobody else wanted.',
     ],
   },
   weirdness: {
@@ -263,7 +263,7 @@ const TYPE_CONTENT: Record<string, { headlines: string[]; omens: string[]; watch
     omens: [
       'A tiny inconsistency will reveal more than the loudest claim in the room.',
       'The least glamorous host in the cluster is hiding the best story.',
-      'A coincidence will keep repeating until someone nINTELes it is not one.',
+      'A coincidence will keep repeating until someone notices it is not one.',
       'The funniest artifact on the page will end up being the most sincere.',
       'Something that looks mislabeled may actually be the label that finally tells the truth.',
       'The wrong-looking sample will explain the rest of the set.',

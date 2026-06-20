@@ -318,7 +318,7 @@ const threads: EmailThread[] = [
     tone: 'purple',
     body: [
       'A new sign-in challenge was triggered for the Proton mailbox.',
-      'The alert looks informational, but it should still be reviewed against the day’s other account nINTELes.',
+      'The alert looks informational, but it should still be reviewed against the day’s other account notices.',
       'If the pattern repeats, convert it into a tracked follow-up rather than letting it live only in the inbox.',
     ],
     asks: [
@@ -326,7 +326,7 @@ const threads: EmailThread[] = [
       'Escalate to a task if the pattern repeats.',
     ],
     draft: [
-      'I reviewed the sign-in alert and it currently reads like an informational nINTELe rather than a confirmed issue.',
+      'I reviewed the sign-in alert and it currently reads like an informational notice rather than a confirmed issue.',
       'If the same pattern repeats, I would convert it into a tracked task and compare it against the rest of the account activity.',
     ],
   },
@@ -671,7 +671,7 @@ export function EmailCaddyWorkspaceContent({
   const [draft, setDraft] = useState<EmailDraft | null>(null);
   const [showCc, setShowCc] = useState(false);
   const [showBcc, setShowBcc] = useState(false);
-  const [draftNINTELe, setDraftNINTELe] = useState<string | null>(null);
+  const [draftNotice, setDraftNotice] = useState<string | null>(null);
   const [contextRequested, setContextRequested] = useState(false);
   const [rowMenu, setRowMenu] = useState<EmailRowMenuState | null>(null);
   const [accountSetupOpen, setAccountSetupOpen] = useState(false);
@@ -962,7 +962,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
     setSelectionMode('manual');
     setSelectedThreadId((current) => current && selectedIds.has(current) ? null : current);
     setDraft((current) => current?.sourceThreadId && selectedIds.has(current.sourceThreadId) ? null : current);
-    setDraftNINTELe(
+    setDraftNotice(
       `${visibleSelectedIds.length} selected email${visibleSelectedIds.length === 1 ? '' : 's'} removed from this prototype inbox.`,
     );
   };
@@ -992,7 +992,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
     setRowMenu(null);
     setShowCc(Boolean(nextDraft.cc));
     setShowBcc(false);
-    setDraftNINTELe(null);
+    setDraftNotice(null);
 
     if (compactPanel) {
       draftPanel.setGeometry(getCompactDraftPanelGeometry(emailPanel.panel.geometry, draftPanel.panel.geometry));
@@ -1022,11 +1022,11 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
 
     if (draft.status !== 'saved' && draft.status !== 'queued') {
       const shouldSave = window.confirm('Save this unsent email as a draft before closing?');
-      setDraftNINTELe(shouldSave
+      setDraftNotice(shouldSave
         ? 'Draft saved locally in EmailCaddy before closing. Provider sync is not wired in this prototype.'
         : 'Draft closed without saving.');
     } else {
-      setDraftNINTELe(null);
+      setDraftNotice(null);
     }
 
     setDraft(null);
@@ -1062,7 +1062,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
 
       return { ...current, body: nextBody, status: 'editing' };
     });
-    setDraftNINTELe('AI staged editable draft text only. It did not send email or contact a provider.');
+    setDraftNotice('AI staged editable draft text only. It did not send email or contact a provider.');
   };
 
   const handleSanitizeDraft = () => {
@@ -1073,13 +1073,13 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
         : `[Sanitized]\n${current.body.replace(/\binternal\b/gi, 'sensitive').replace(/\binvestigation\b/gi, 'review')}`;
       return { ...current, body, sanitized: true, status: 'editing' };
     });
-    setDraftNINTELe('Sanitization pass applied. Review the wording before using platform send.');
+    setDraftNotice('Sanitization pass applied. Review the wording before using platform send.');
   };
 
   const handleExtractAsks = () => {
     setContextRequested(true);
     const asks = draftSourceThread?.asks || selectedThread?.asks || [];
-    setDraftNINTELe(
+    setDraftNotice(
       asks.length > 0
         ? `Ask extraction: ${asks.join(' | ')}`
         : 'Ask extraction: no direct asks found in the selected message.',
@@ -1089,7 +1089,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
   const handleCoverageCheck = () => {
     setContextRequested(true);
     const askCount = draftSourceThread?.asks.length || selectedThread?.asks.length || 0;
-    setDraftNINTELe(
+    setDraftNotice(
       askCount > 0
         ? `Coverage check: ${askCount} extracted ask${askCount === 1 ? '' : 's'} found. Confirm each is answered or explicitly deferred.`
         : 'Coverage check: no extracted asks were found for this draft.',
@@ -1098,12 +1098,12 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
 
   const handleSaveDraft = () => {
     setDraft((current) => current ? { ...current, status: 'saved' } : current);
-    setDraftNINTELe('Draft saved locally in EmailCaddy. Provider sync is not wired in this prototype.');
+    setDraftNotice('Draft saved locally in EmailCaddy. Provider sync is not wired in this prototype.');
   };
 
   const handleQueuePlatformSend = () => {
     setDraft((current) => current ? { ...current, status: 'queued' } : current);
-    setDraftNINTELe('Staged for provider send review. CaddyAI did not send this email; no provider send connector is active.');
+    setDraftNotice('Staged for provider send review. CaddyAI did not send this email; no provider send connector is active.');
   };
 
   const handleProviderChange = (providerId: EmailProviderId) => {
@@ -1113,7 +1113,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
 
   const handleOpenAccountSetup = () => {
     setAccountSetupOpen(true);
-    setDraftNINTELe(null);
+    setDraftNotice(null);
   };
 
   const handleReviewLocalSetupChecklist = () => {
@@ -1137,7 +1137,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
 
   const handleCloseTransientUi = () => {
     setAssistantPreview(null);
-    setDraftNINTELe(null);
+    setDraftNotice(null);
     setRowMenu(null);
     setAccountSetupOpen(false);
     setAddAccountOpen(false);
@@ -1153,7 +1153,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
     setAddAccountPass('');
     setAddAccountImapHost('');
     setAddAccountImapPort('993');
-    setDraftNINTELe(null);
+    setDraftNotice(null);
   }, []);
 
   const handleConnectOAuthAccount = useCallback(async (providerId: EmailProviderId) => {
@@ -2065,12 +2065,12 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
           </div>
         )}
 
-        {draftNINTELe && !lowerPaneActive && (
+        {draftNotice && !lowerPaneActive && (
           <div
             className="shrink-0 border-b border-accent/15 bg-accent/5 px-3 py-2 text-[12px] leading-5 text-text-secondary"
-            data-email-inline-nINTELe="true"
+            data-email-inline-notice="true"
           >
-            {draftNINTELe}
+            {draftNotice}
           </div>
         )}
 
@@ -2365,7 +2365,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
                   </div>
                 </div>
 
-                {(selectedThread || draft || contextRequested || (draftNINTELe && !draft)) && (
+                {(selectedThread || draft || contextRequested || (draftNotice && !draft)) && (
                 <div className="min-h-0 overflow-y-auto overscroll-contain px-3.5 py-3">
                   <div className={cn(
                     'grid min-w-0 gap-3',
@@ -2612,9 +2612,9 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
                             </div>
                           )}
 
-                          {draftNINTELe && (
+                          {draftNotice && (
                             <div className="rounded-[12px] border border-accent/15 bg-accent/5 px-3 py-2 text-[12px] leading-5 text-text-secondary">
-                              {draftNINTELe}
+                              {draftNotice}
                             </div>
                           )}
 
@@ -2686,9 +2686,9 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
                     </aside>
                     )}
                   </div>
-                  {draftNINTELe && !draft && (
+                  {draftNotice && !draft && (
                     <div className="mt-3 rounded-[12px] border border-accent/15 bg-accent/5 px-3 py-2 text-[12px] leading-5 text-text-secondary">
-                      {draftNINTELe}
+                      {draftNotice}
                     </div>
                   )}
                 </div>
@@ -2974,9 +2974,9 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
                     </div>
                   )}
 
-                  {draftNINTELe && (
+                  {draftNotice && (
                     <div className="rounded-[12px] border border-accent/15 bg-accent/5 px-3 py-2 text-[12px] leading-5 text-text-secondary">
-                      {draftNINTELe}
+                      {draftNotice}
                     </div>
                   )}
                 </div>

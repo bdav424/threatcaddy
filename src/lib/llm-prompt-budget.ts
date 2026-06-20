@@ -136,7 +136,7 @@ export function compactToolResultForModel(
       ...existingRef,
       preview: truncateMiddle(String(existingRef.preview || ''), previewChars, 'cached tool-result preview'),
       preview_chars: previewChars,
-      nINTELe: 'The full tool output is retained in CaddyAI tool activity and assistant audit history. This cached preview was further compacted for the local prompt budget.',
+      notice: 'The full tool output is retained in CaddyAI tool activity and assistant audit history. This cached preview was further compacted for the local prompt budget.',
     }, null, 2);
   }
 
@@ -152,7 +152,7 @@ export function compactToolResultForModel(
     preview_chars: Math.min(content.length, previewChars),
     json_shape: describeJsonShape(content),
     preview: truncateMiddle(content, previewChars, 'cached tool-result preview'),
-    nINTELe: 'The full tool output is retained in CaddyAI tool activity and assistant audit history. The local model receives this compact preview to stay within the prompt limit; ask the analyst to inspect the cached result if exact omitted fields are required.',
+    notice: 'The full tool output is retained in CaddyAI tool activity and assistant audit history. The local model receives this compact preview to stay within the prompt limit; ask the analyst to inspect the cached result if exact omitted fields are required.',
   };
 
   return JSON.stringify(compact, null, 2);

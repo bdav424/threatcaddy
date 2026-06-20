@@ -1253,13 +1253,13 @@ export function ChatView({
       clsLevel: activeThread.clsLevel,
     });
     // Add a system message to the new branch so it's clear what happened
-    const branchNINTELe: ChatMessage = {
+    const branchNotice: ChatMessage = {
       id: nanoid(),
       role: 'assistant',
       content: `Branched from **${activeThread.title}** at message ${messageIndex + 1} of ${activeThread.messages.length}. You can continue this conversation independently.`,
       createdAt: Date.now(),
     };
-    await onAddMessage(branched.id, branchNINTELe);
+    await onAddMessage(branched.id, branchNotice);
     onSelectThread(branched.id);
     addToast('success', t('view.branchedAt', { index: messageIndex + 1 }));
   }, [activeThread, onCreateThread, onSelectThread, onAddMessage, addToast]);

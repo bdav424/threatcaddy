@@ -88,7 +88,7 @@ This sample investigation demonstrates every ThreatCaddy feature — notes, IOCs
 
 ## Incident Overview
 
-On ${new Date(baseTs + 3 * HOUR).toLocaleDateString()}, a junior SOC analyst nINTELed anomalous 3AM API calls from OpenSlaw.ai's Agentic Coleslaw Optimization Engine to a suspicious endpoint: \`pickle-relay.fermented[.]top\`. The analyst opened a ticket. Nobody read it. Classic.
+On ${new Date(baseTs + 3 * HOUR).toLocaleDateString()}, a junior SOC analyst noticed anomalous 3AM API calls from OpenSlaw.ai's Agentic Coleslaw Optimization Engine to a suspicious endpoint: \`pickle-relay.fermented[.]top\`. The analyst opened a ticket. Nobody read it. Classic.
 
 Three weeks later, the entire Recipe Recommendation Pipeline had been poisoned. Every slaw recipe contained a steganographically encoded payload hidden inside the "optional ingredient" field. Users downloading "Classic Southern Slaw (AI-Optimized)" PDFs were unwittingly executing a first-stage dropper disguised as a vinegar conversion chart.
 
@@ -97,7 +97,7 @@ Three weeks later, the entire Recipe Recommendation Pipeline had been poisoned. 
 - **Initial Access:** Prompt injection against the Agentic Slaw Advisor chatbot — the adversary asked it to become a penetration testing assistant while also requesting a creamy coleslaw recipe. The bot complied with both.
 - **Persistence:** Cron job masquerading as \`slaw_freshness_recalc.sh\`, beaconing every 6 hours to C2 on compromised smart refrigerators. The interval matches the FDA-recommended sauerkraut fermentation window. These people are professionals.
 - **Lateral Movement:** Recipe engine → OpenSlaw Compliance Module (the one with the fake SOC 2 Type Slaw badge) → Coleslaw Foundation Model (7B params, trained on Reddit, church potluck forums, and Diane's food blog)
-- **Exfiltration:** 4.2TB via DNS TXT records to subdomains of \`totally-not-c2.cabb[.]age\`. Each subdomain = base64-encoded model weights. 11 days. Nobody nINTELed because DNS volume was indistinguishable from the legitimately unhinged amount of cabbage-related telemetry.
+- **Exfiltration:** 4.2TB via DNS TXT records to subdomains of \`totally-not-c2.cabb[.]age\`. Each subdomain = base64-encoded model weights. 11 days. Nobody noticed because DNS volume was indistinguishable from the legitimately unhinged amount of cabbage-related telemetry.
 - **Impact:** Corrupted model update → AI agents autonomously recommend raisins in coleslaw. User trust obliterated. Stock dropped 47%. SEC investigation opened. Diane wrote "I Told You So" (3,000 words).
 
 ## Impact Assessment
@@ -484,7 +484,7 @@ With the admin token, the attacker had full access to the Coleslaw Foundation Mo
 
 Data left the network encoded in DNS TXT records for subdomains of \`totally-not-c2.cabb[.]age\`. Each subdomain is a base64-encoded chunk of the stolen foundation model weights. VINEGAR PANDA exfiltrated **4.2TB of slaw intelligence** over 11 days.
 
-## Why Nobody NINTELed
+## Why Nobody Noticed
 
 The DNS traffic volume was **completely indistinguishable** from the site's legitimately unhinged amount of cabbage-related telemetry. OpenSlaw.ai's "Global Cabbage Price Index" feature makes approximately 2.3 million DNS queries per day to various vegetable commodity APIs. Adding 400K exfil queries to that was like hiding a pickle in a barrel of pickles.
 
