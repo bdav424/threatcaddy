@@ -1,5 +1,6 @@
 import { createLabelProxy, createLabelColorProxy, noteColorLabel, iocTableColumnLabel } from './lib/i18n-labels';
 import type { EmailAccountConfig } from './lib/email-onboarding';
+import type { CalendarAccountConfig } from './lib/calendar-accounts';
 
 export type EventSource =
   | 'ThreatCaddy Work' | 'Research' | 'Family' | 'Zoom' | 'PTO'
@@ -379,6 +380,8 @@ export interface Settings {
   language?: string;
   /** Sanitized EmailCaddy account onboarding metadata. Never store OAuth tokens, passwords, or app passwords here. */
   emailAccounts?: EmailAccountConfig[];
+  /** Sanitized CalendarCaddy account metadata. Never store OAuth tokens here — tokens live in OS safeStorage keyed by credRefId. */
+  calendarAccounts?: CalendarAccountConfig[];
 }
 
 // ── Agent Host Types ─────────────────────────────────────────────────

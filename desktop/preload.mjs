@@ -20,13 +20,21 @@ contextBridge.exposeInMainWorld('threatcaddyMail', {
     ipcRenderer.invoke('threatcaddy-mail:start-oauth', { providerId }),
 });
 
-// Calendar sync bridge — pull/push via main-process IPC (tokens stay in main)
+// Calendar sync bridge — pull/push via main-process IPC (tokens stay in main).
+// Credential lifecycle:
+//   startOAuth(provider)  — opens PKCE popout, stores tokens in safeStorage,
+//                           returns { credRefId, email } (no tokens to renderer)
+//   registerAccount(acct) — populates the in-memory accountRegistry in main.mjs
+//                           so IPC pull/create/update/remove handlers can resolve it.
+//                           Must be called on app start for each saved account.
 contextBridge.exposeInMainWorld('threatcaddy', {
   calendar: {
-    pull:   (accountId, range)    => ipcRenderer.invoke('calendar:pull',   accountId, range),
-    create: (accountId, event)    => ipcRenderer.invoke('calendar:create', accountId, event),
-    update: (accountId, event)    => ipcRenderer.invoke('calendar:update', accountId, event),
-    remove: (accountId, remoteId) => ipcRenderer.invoke('calendar:remove', accountId, remoteId),
+    startOAuth:      (providerId)          => ipcRenderer.invoke('calendar:start-oauth',      { providerId }),
+    registerAccount: (account)             => ipcRenderer.invoke('calendar:register-account', account),
+    pull:            (accountId, range)    => ipcRenderer.invoke('calendar:pull',              accountId, range),
+    create:          (accountId, event)    => ipcRenderer.invoke('calendar:create',            accountId, event),
+    update:          (accountId, event)    => ipcRenderer.invoke('calendar:update',            accountId, event),
+    remove:          (accountId, remoteId) => ipcRenderer.invoke('calendar:remove',            accountId, remoteId),
   },
 });
 

@@ -41,6 +41,8 @@ import { cn } from '../../lib/utils';
 import { calendarCaddyPanelRegistrations } from './workspacePanelRegistrations';
 import { sortEvents } from './calendar-utils';
 import { useCalendarSync, type PendingDeletion, type CalendarSyncAccount } from '../../hooks/useCalendarSync';
+import { useCalendarAccounts } from '../../hooks/useCalendarAccounts';
+import { toSyncAccount } from '../../lib/calendar-accounts';
 import type { CalendarEvent, EventSource } from '../../types';
 
 type CalendarViewMode = 'week' | 'month' | 'year';
@@ -1060,11 +1062,19 @@ export function CalendarCaddyWorkspaceContent({
     selectedAgendaPanel.setMode(mode);
   }, [onWorkspaceOwnPanel, selectedAgendaPanel]);
 
-  // Calendar sync — no accounts wired yet; button renders and will error gracefully
-  const calendarAccounts: CalendarSyncAccount[] = [];
+  // Calendar accounts — persisted in settings (credRefId only, no tokens)
+  const { accounts: calendarAccountConfigs, addAccount: addCalendarAccount, removeAccount: removeCalendarAccount } = useCalendarAccounts();
+  const calendarAccounts: CalendarSyncAccount[] = calendarAccountConfigs.map(toSyncAccount);
+  const primaryAccountId = calendarAccountConfigs.find((a) => a.calendarEnabled && a.status === 'connected')?.id ?? null;
+
   const { syncing, lastSyncedAt, error: syncError, sync } = useCalendarSync(
-    events, setEvents, pendingDeletions, setPendingDeletions, calendarAccounts, null,
+    events, setEvents, pendingDeletions, setPendingDeletions, calendarAccounts, primaryAccountId,
   );
+
+  // Calendar connect panel state
+  const [calSettingsOpen, setCalSettingsOpen] = useState(false);
+  const [connectingProvider, setConnectingProvider] = useState<'google' | 'microsoft' | null>(null);
+  const [connectError, setConnectError] = useState<string | null>(null);
 
   const density = densityClasses[densityMode];
   const activeStamp = activeStampId ? STAMP_BY_ID[activeStampId] : null;
@@ -1081,6 +1091,59 @@ export function CalendarCaddyWorkspaceContent({
     () => events.find((event) => event.id === selectedEventId) ?? null,
     [events, selectedEventId],
   );
+
+  // Re-register saved calendar accounts with the desktop main process on mount so
+  // that IPC pull/create/update/remove handlers can resolve account → token.
+  useEffect(() => {
+    const bridge = (globalThis as unknown as {
+      threatcaddy?: { calendar?: { registerAccount: (a: unknown) => Promise<unknown> } };
+    }).threatcaddy?.calendar;
+    if (!bridge?.registerAccount) return;
+    for (const acct of calendarAccountConfigs) {
+      if (acct.status === 'connected') {
+        void bridge.registerAccount({
+          id: acct.id,
+          provider: acct.provider,
+          label: acct.label,
+          email: acct.email,
+          credRefId: acct.credRefId,
+        });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally run once on mount
+  }, []);
+
+  const handleConnectProvider = useCallback(async (provider: 'google' | 'microsoft') => {
+    const bridge = (globalThis as unknown as {
+      threatcaddy?: {
+        calendar?: {
+          startOAuth: (p: string) => Promise<{ credRefId: string; email: string }>;
+          registerAccount: (a: unknown) => Promise<unknown>;
+        };
+      };
+    }).threatcaddy?.calendar;
+
+    if (!bridge?.startOAuth) {
+      setConnectError('Calendar OAuth is only available in the ThreatCaddy desktop app.');
+      return;
+    }
+
+    setConnectingProvider(provider);
+    setConnectError(null);
+
+    try {
+      const result = await bridge.startOAuth(provider);
+      const { credRefId, email } = result;
+      const label = email || (provider === 'google' ? 'Google Calendar' : 'Microsoft 365');
+      addCalendarAccount({ id: credRefId, provider, label, email: email || undefined, credRefId });
+      await bridge.registerAccount({ id: credRefId, provider, label, email: email || undefined, credRefId });
+      setCalSettingsOpen(false);
+    } catch (e) {
+      setConnectError(e instanceof Error ? e.message : 'Connection failed. Check your OAuth client ID configuration.');
+    } finally {
+      setConnectingProvider(null);
+    }
+  }, [addCalendarAccount]);
 
   useEffect(() => {
     if (viewMode !== 'week' || !weekScrollerRef.current) {
@@ -1143,6 +1206,17 @@ export function CalendarCaddyWorkspaceContent({
       window.removeEventListener('keydown', closeMenuOnEscape);
     };
   }, [eventContextMenu]);
+
+  useEffect(() => {
+    if (!calSettingsOpen) return undefined;
+    const close = (e: globalThis.MouseEvent) => {
+      if (!(e.target as Element).closest('[data-cal-settings-panel]')) {
+        setCalSettingsOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', close);
+    return () => window.removeEventListener('mousedown', close);
+  }, [calSettingsOpen]);
 
   const openCreateDrawer = (date: Date, hour = 9) => {
     setSelectedDate(startOfDay(date));
@@ -2832,10 +2906,78 @@ export function CalendarCaddyWorkspaceContent({
             </div>
 
             {!compactPanel && (
-              <div className="flex shrink-0 items-center gap-1.5">
-                <button type="button" className={cn('flex items-center justify-center border border-border-subtle bg-bg-raised/70 text-text-primary transition-colors hover:border-border-medium hover:bg-bg-hover', density.toolbarIconButton)} aria-label="Calendar settings">
+              <div className="relative flex shrink-0 items-center gap-1.5" data-cal-settings-panel="true">
+                <button
+                  type="button"
+                  onClick={() => { setCalSettingsOpen((v) => !v); setConnectError(null); }}
+                  aria-label="Calendar account settings"
+                  aria-expanded={calSettingsOpen}
+                  className={cn(
+                    'flex items-center justify-center border transition-colors',
+                    density.toolbarIconButton,
+                    calSettingsOpen
+                      ? 'border-accent/30 bg-accent/10 text-accent'
+                      : 'border-border-subtle bg-bg-raised/70 text-text-primary hover:border-border-medium hover:bg-bg-hover',
+                  )}
+                >
                   <Settings size={density.toolbarIconSize} />
                 </button>
+
+                {/* Calendar accounts panel */}
+                {calSettingsOpen && (
+                  <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-[16px] border border-border-subtle bg-bg-primary shadow-[0_8px_32px_rgba(0,0,0,0.28)] backdrop-blur-sm">
+                    <div className="border-b border-border-subtle px-4 py-3">
+                      <p className="text-[13px] font-semibold text-text-primary">Calendar accounts</p>
+                      <p className="mt-0.5 text-[11px] text-text-muted">Tokens are stored in the OS keychain. ThreatCaddy holds only a credential reference.</p>
+                    </div>
+
+                    {calendarAccountConfigs.length > 0 && (
+                      <ul className="divide-y divide-border-subtle/60 px-2 py-1">
+                        {calendarAccountConfigs.map((acct) => (
+                          <li key={acct.id} className="flex items-center justify-between gap-2 py-2 px-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-[12px] font-medium text-text-primary">{acct.label}</p>
+                              <p className="truncate text-[11px] text-text-muted capitalize">{acct.provider} · {acct.status}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeCalendarAccount(acct.id)}
+                              className="shrink-0 text-[11px] text-text-muted transition-colors hover:text-red-400"
+                              aria-label={`Remove ${acct.label}`}
+                            >
+                              <X size={13} />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
+                    <div className="space-y-2 px-3 py-3">
+                      {connectError && (
+                        <p className="rounded-[10px] bg-red-500/10 px-3 py-2 text-[11px] text-red-400">{connectError}</p>
+                      )}
+                      <button
+                        type="button"
+                        disabled={connectingProvider !== null}
+                        onClick={() => { void handleConnectProvider('google'); }}
+                        className="flex w-full items-center gap-2 rounded-[11px] border border-border-subtle bg-bg-raised/70 px-3 py-2.5 text-[12px] font-medium text-text-primary transition-colors hover:border-border-medium hover:bg-bg-hover disabled:opacity-50"
+                      >
+                        <CalendarDays size={14} className="shrink-0 text-[#7ec4ff]" />
+                        {connectingProvider === 'google' ? 'Connecting…' : 'Connect Google Calendar'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={connectingProvider !== null}
+                        onClick={() => { void handleConnectProvider('microsoft'); }}
+                        className="flex w-full items-center gap-2 rounded-[11px] border border-border-subtle bg-bg-raised/70 px-3 py-2.5 text-[12px] font-medium text-text-primary transition-colors hover:border-border-medium hover:bg-bg-hover disabled:opacity-50"
+                      >
+                        <CalendarDays size={14} className="shrink-0 text-[#8fa8ff]" />
+                        {connectingProvider === 'microsoft' ? 'Connecting…' : 'Connect Microsoft 365'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={() => { void sync(); }}
