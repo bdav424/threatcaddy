@@ -355,7 +355,7 @@ describe('Sidebar', () => {
     expect(screen.getByText('EmailCaddy')).toBeInTheDocument();
     expect(screen.getByText('CalendarCaddy')).toBeInTheDocument();
     expect(screen.getByText('FortuneINT')).toBeInTheDocument();
-    expect(screen.getByText('Team Feed')).toBeInTheDocument();
+    expect(screen.getByText('Templates')).toBeInTheDocument();
     expect(screen.getByText('AgentCaddy')).toBeInTheDocument();
   });
 
