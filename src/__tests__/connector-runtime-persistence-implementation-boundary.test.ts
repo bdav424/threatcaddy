@@ -90,11 +90,13 @@ function readinessEvidence(): ConnectorRuntimeImportExportReadinessEvidenceDescr
 }
 
 function readinessPlanDecision() {
-  return evaluateConnectorRuntimeImportExportReadinessPlan({
-    owner,
-    persistenceGuardDecision: persistenceGuardDecision(),
-    evidence: readinessEvidence(),
-  });
+  return evaluateConnectorRuntimeImportExportReadinessPlan(
+    trustedObject({
+      owner,
+      persistenceGuardDecision: persistenceGuardDecision(),
+      evidence: readinessEvidence(),
+    }) as unknown as Parameters<typeof evaluateConnectorRuntimeImportExportReadinessPlan>[0],
+  );
 }
 
 function implementationEvidence(

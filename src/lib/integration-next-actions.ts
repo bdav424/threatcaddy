@@ -53,12 +53,14 @@ const KNOWN_TARGET_IDS_BY_SURFACE: NextActionTargetMap = Object.freeze({
   ]),
   'integration-template': new Set([
     'abuseipdb',
+    'alienvault-otx',
     'censys',
     'flashpoint',
     'greynoise',
     'shodan',
     'slack',
     'urlhaus-malwarebazaar',
+    'urlscan',
     'virustotal',
   ]),
   'provider-catalog': new Set([

@@ -351,7 +351,7 @@ function normalize(value: string): string {
 function hasForbiddenBranding(value: unknown, seen = new WeakSet<object>()): boolean {
   if (typeof value === 'string') {
     const normalized = normalize(value);
-    return BRAND_MARKERS.some((marker) => normalized.includes(marker));
+    return BRAND_MARKERS.some((marker) => normalized.includes(marker.toLowerCase()));
   }
   if (value === null || value === undefined || typeof value !== 'object') return false;
   if (seen.has(value)) return false;

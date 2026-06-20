@@ -13,8 +13,26 @@ import {
   type ProviderRuntimeActivationActionBinding,
   type ProviderRuntimeActivationOwnerReview,
 } from '../lib/provider-runtime-activation-plan';
+import {
+  createRuntimeTrustedContractObject,
+  type RuntimeTrustedContractEntry,
+  type RuntimeTrustedContractObject,
+  type RuntimeTrustedContractValue,
+} from '../lib/runtime-trusted-contract-object';
 
 const NOW = 1_800_000_000_000;
+
+function trustedValue(value: unknown): RuntimeTrustedContractValue {
+  if (value === null || value === undefined || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+  if (Array.isArray(value)) return value.map(trustedValue);
+  if (typeof value === 'object') return trustedObject(value as Record<string, unknown>);
+  throw new TypeError('Trusted provider fixture cannot include executable values.');
+}
+function trustedObject(value: Record<string, unknown>): RuntimeTrustedContractObject {
+  return createRuntimeTrustedContractObject(
+    Object.entries(value).map(([k, v]) => [k, trustedValue(v)] as RuntimeTrustedContractEntry),
+  );
+}
 
 function providerIdentity(
   overrides: Partial<ProviderLiveActivationProviderIdentityFact> = {},
@@ -38,7 +56,7 @@ function accountIntent(
     reviewState: 'reviewed',
     providerId: 'google-gmail',
     accountId: 'analyst@example.test',
-    credentialReferenceId: 'google-gmail:oauth-reference',
+    credentialReferenceId: 'provider-oauth:google-gmail-analyst-ref',
     accountIntentReviewed: true,
     ...overrides,
   };
@@ -52,7 +70,7 @@ function actionScope(
     reviewState: 'reviewed',
     providerId: 'google-gmail',
     accountId: 'analyst@example.test',
-    credentialReferenceId: 'google-gmail:oauth-reference',
+    credentialReferenceId: 'provider-oauth:google-gmail-analyst-ref',
     scopeId: 'google-gmail:auth-sync-send',
     actions: Object.freeze(['provider_auth', 'provider_sync', 'provider_send']),
     sendRequiresExplicitUserApproval: true,
@@ -67,7 +85,7 @@ function credentialReference(
   return {
     schemaVersion: 1,
     kind: 'provider-managed-oauth',
-    id: 'google-gmail:oauth-reference',
+    id: 'provider-oauth:google-gmail-analyst-ref',
     storageOwner: 'external-provider',
     providerId: 'google-gmail',
     connectorId: 'provider-runtime-adapter',
@@ -86,7 +104,7 @@ function consentSession(
     reviewState: 'reviewed',
     providerId: 'google-gmail',
     accountId: 'analyst@example.test',
-    credentialReferenceId: 'google-gmail:oauth-reference',
+    credentialReferenceId: 'provider-oauth:google-gmail-analyst-ref',
     scopeId: 'google-gmail:auth-sync-send',
     userConsentGranted: true,
     sessionFresh: true,
@@ -107,7 +125,7 @@ function runtimeOwnership(
     runtimeId: 'provider-runtime-adapter.v1',
     providerId: 'google-gmail',
     accountId: 'analyst@example.test',
-    credentialReferenceId: 'google-gmail:oauth-reference',
+    credentialReferenceId: 'provider-oauth:google-gmail-analyst-ref',
     scopeId: 'google-gmail:auth-sync-send',
     supportedActions: Object.freeze(['provider_auth', 'provider_sync', 'provider_send']),
     noSendWithoutUserApproval: true,
@@ -118,15 +136,17 @@ function runtimeOwnership(
 
 function liveActivationDecision(overrides: Record<string, unknown> = {}) {
   return {
-    ...evaluateProviderLiveActivationGate({
-      providerIdentity: providerIdentity(),
-      accountIntent: accountIntent(),
-      actionScope: actionScope(),
-      credentialReference: credentialReference(),
-      consentSession: consentSession(),
-      runtimeOwnership: runtimeOwnership(),
-      now: NOW,
-    }),
+    ...evaluateProviderLiveActivationGate(
+      trustedObject({
+        providerIdentity: providerIdentity(),
+        accountIntent: accountIntent(),
+        actionScope: actionScope(),
+        credentialReference: credentialReference(),
+        consentSession: consentSession(),
+        runtimeOwnership: runtimeOwnership(),
+        now: NOW,
+      }) as unknown as Parameters<typeof evaluateProviderLiveActivationGate>[0],
+    ),
     ...overrides,
   };
 }
@@ -142,7 +162,7 @@ function runtimeOwnerReview(
     providerId: 'google-gmail',
     connectorId: 'provider-runtime-adapter',
     accountId: 'analyst@example.test',
-    credentialReferenceId: 'google-gmail:oauth-reference',
+    credentialReferenceId: 'provider-oauth:google-gmail-analyst-ref',
     supportedActions: Object.freeze(['provider_auth', 'provider_sync', 'provider_send']),
     noAutoSend: true,
     runtimeOwnerReviewed: true,
@@ -160,7 +180,7 @@ function actionBinding(
     connectorId: 'provider-runtime-adapter',
     runtimeId: 'provider-runtime-adapter.v1',
     accountId: 'analyst@example.test',
-    credentialReferenceId: 'google-gmail:oauth-reference',
+    credentialReferenceId: 'provider-oauth:google-gmail-analyst-ref',
     action: 'provider_sync',
     requiresUserApprovalBeforeSend: true,
     noAutoSend: true,

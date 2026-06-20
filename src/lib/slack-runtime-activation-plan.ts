@@ -233,7 +233,7 @@ function hasForbiddenBranding(value: unknown): boolean {
     const current = pending.pop();
     if (typeof current === 'string') {
       const normalized = normalizedText(current);
-      if (BRAND_MARKERS.some((marker) => normalized.includes(marker))) return true;
+      if (BRAND_MARKERS.some((marker) => normalized.includes(marker.toLowerCase()))) return true;
       continue;
     }
     if (typeof current === 'function') return true;
