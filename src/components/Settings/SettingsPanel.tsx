@@ -911,7 +911,6 @@ function AssistantCaddyAISetup({
               {routeSelection === 'openai' && (openAIConfigured ? 'OpenAI-compatible key is present in existing settings.' : 'Add an API key below in the legacy route key settings block.')}
               {routeSelection === 'local' && (localConfigured ? 'Local endpoint and model are present in the explicit runtime controls block.' : 'Configure endpoint and model below in explicit runtime controls.')}
               {routeSelection === 'caddyai' && 'AssistantCaddy follows the existing CaddyAI baseline route.'}
-              {routeSelection === 'generic' && 'Placeholder only. Open Integrations to continue connector work.'}
             </div>
           </div>
         </div>

@@ -69,8 +69,8 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
   const [helpOpen, setHelpOpen] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const canvasRef = useRef<GraphCanvasHandle | null>(null);
-  const { saveSnapshot } = useGraphSnapshots(selectedFolderId);
-  const { showToast } = useToast();
+  const { saveSnapshot } = useGraphSnapshots(selectedFolderId ?? null);
+  const { addToast } = useToast();
   // Reset scope mode when investigation changes
   React.useEffect(() => {
     setScopeMode('investigation');
@@ -81,15 +81,15 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
     setCapturing(true);
     try {
       const snap = canvasRef.current.captureSnapshot();
-      if (!snap) { showToast('Graph not ready', 'error'); return; }
+      if (!snap) { addToast('error', 'Graph not ready'); return; }
       await saveSnapshot(snap.dataUrl, snap.nodeCount, snap.edgeCount);
-      showToast(`Snapshot saved (${snap.nodeCount} nodes)`, 'success');
+      addToast('success', `Snapshot saved (${snap.nodeCount} nodes)`);
     } catch {
-      showToast('Snapshot failed', 'error');
+      addToast('error', 'Snapshot failed');
     } finally {
       setCapturing(false);
     }
-  }, [saveSnapshot, showToast]);
+  }, [saveSnapshot, addToast]);
 
   // Determine which data arrays to use based on scope
   const effectiveNotes = selectedFolderId && scopeMode === 'investigation' && scopedNotes ? scopedNotes : notes;

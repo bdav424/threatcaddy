@@ -256,6 +256,21 @@ const SOURCE_STYLES: Record<EventSource, { color: string; softBackground: string
     softBackground: 'rgba(244, 191, 97, 0.16)',
     ring: 'rgba(244, 191, 97, 0.28)',
   },
+  'Google Calendar': {
+    color: '#7ec4ff',
+    softBackground: 'rgba(126, 196, 255, 0.16)',
+    ring: 'rgba(126, 196, 255, 0.28)',
+  },
+  'Microsoft 365': {
+    color: '#8fa8ff',
+    softBackground: 'rgba(143, 168, 255, 0.16)',
+    ring: 'rgba(143, 168, 255, 0.28)',
+  },
+  CalDAV: {
+    color: '#9fe0c8',
+    softBackground: 'rgba(159, 224, 200, 0.16)',
+    ring: 'rgba(159, 224, 200, 0.28)',
+  },
 };
 
 const initialEvents: CalendarEvent[] = [

@@ -10,7 +10,7 @@ const mockExtraHeaders = vi.fn<() => Record<string, string>>();
 
 vi.mock('../lib/cloud-providers', () => ({
   CLOUD_PROVIDERS: {
-    External Backup: {
+    'external-backup': {
       name: 'Cloud Object Storage',
       validateUrl: (...args: Parameters<typeof mockValidateUrl>) => mockValidateUrl(...args),
       buildObjectUrl: (...args: Parameters<typeof mockBuildObjectUrl>) => mockBuildObjectUrl(...args),

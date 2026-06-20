@@ -1,4 +1,4 @@
-import type { Settings } from '../types';
+import type { Settings, ViewMode } from '../types';
 
 export type OnboardingStepId =
   | 'configure-ai'
@@ -13,7 +13,7 @@ export interface OnboardingStep {
   title: string;
   description: string;
   actionLabel: string;
-  actionTarget: { kind: 'settings'; tab: string } | { kind: 'view'; target: string };
+  actionTarget: { kind: 'settings'; tab: string } | { kind: 'view'; target: ViewMode };
   optional?: boolean;
 }
 

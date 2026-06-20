@@ -313,7 +313,7 @@ function ReportEditor({
   onDelete: () => void;
 }) {
   const { t } = useTranslation();
-  const { showToast } = useToast();
+  const { addToast } = useToast();
   const { selectedFolderId } = useInvestigation();
   const [activeSectionIdx, setActiveSectionIdx] = useState<number | null>(null);
   const compact = Boolean(useWorkspacePanelChromeState()?.compact);
@@ -327,8 +327,8 @@ function ReportEditor({
   const handleCopyMd = useCallback(async () => {
     const md = buildMarkdown(report, template);
     await navigator.clipboard.writeText(md);
-    showToast('Copied to clipboard', 'success');
-  }, [report, template, showToast]);
+    addToast('success', 'Copied to clipboard');
+  }, [report, template, addToast]);
 
   const getSectionContent = (sectionId: string) =>
     report.sections.find(s => s.sectionId === sectionId)?.content ?? '';
@@ -430,7 +430,7 @@ function ReportEditor({
                 section={sec}
                 content={getSectionContent(sec.id)}
                 onChange={val => onUpdateSection(sec.id, val)}
-                folderId={selectedFolderId}
+                folderId={selectedFolderId ?? null}
               />
             </div>
           ))}

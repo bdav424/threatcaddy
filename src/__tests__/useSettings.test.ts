@@ -96,7 +96,7 @@ describe('useSettings', () => {
     const dests = result.current.settings.backupDestinations;
     expect(dests).toBeDefined();
     expect(dests).toHaveLength(1);
-    expect(dests![0].provider).toBe('External Backup');
+    expect(dests![0].provider).toBe('external-backup');
     expect(dests![0].label).toBe('My External Backup');
     expect(dests![0].url).toBe('https://storage.region-1.example.invalid/upload/token/container/path/');
     expect(dests![0].enabled).toBe(true);

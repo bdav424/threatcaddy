@@ -58,7 +58,9 @@ export function mergeRemote(local: CalendarEvent[], remote: CalendarEvent[]): Ca
 }
 
 export function useCalendarSync(
-  events: CalendarEvent[],
+  // Current events are read through the setEvents updater (mergeRemote), so this
+  // positional arg is retained for API symmetry but intentionally unused.
+  _events: CalendarEvent[],
   setEvents: (updater: (current: CalendarEvent[]) => CalendarEvent[]) => void,
   pendingDeletions: PendingDeletion[],
   setPendingDeletions: (next: PendingDeletion[]) => void,

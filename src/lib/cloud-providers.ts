@@ -148,7 +148,7 @@ const gcsConfig: CloudProviderConfig = {
 // ---- Registry ----
 
 export const CLOUD_PROVIDERS: Record<CloudProvider, CloudProviderConfig> = {
-  'External Backup': ociConfig,
+  'external-backup': ociConfig,
   'aws-s3': awsS3Config,
   'azure-blob': azureBlobConfig,
   'gcs': gcsConfig,
@@ -164,7 +164,7 @@ export function detectProvider(url: string): CloudProvider | null {
   } catch {
     return null;
   }
-  if (/^storage-service\..*\.VENDORcloud\.com$/i.test(hostname)) return 'External Backup';
+  if (/^storage-service\..*\.VENDORcloud\.com$/i.test(hostname)) return 'external-backup';
   if (/(?:^|\.)s3[.-].*\.amazonaws\.com$/i.test(hostname)) return 'aws-s3';
   if (/\.blob\.core\.windows\.net$/i.test(hostname)) return 'azure-blob';
   if (hostname === 'storage.googleapis.com' || hostname === 'storage.cloud.google.com') return 'gcs';
