@@ -43,16 +43,16 @@ function requireHttps(url: string): { parsed: URL } | { error: string } {
 const ociConfig: CloudProviderConfig = {
   name: 'Cloud Object Storage',
   placeholder: 'https://storage.region-1.example.invalid/upload/.../path/',
-  hostnameHint: 'storage-service.*.storage.example.invalid',
+  hostnameHint: 'storage.*.example.invalid',
   validateUrl(url) {
     if (!url || typeof url !== 'string') return { valid: false, error: 'URL is required' };
     const result = requireHttps(url);
     if ('error' in result) return { valid: false, error: result.error };
-    if (!/^storage-service\..*\.VENDORcloud\.com$/i.test(result.parsed.hostname)) {
-      return { valid: false, error: 'External Backup URL must be an storage-service.*.storage.example.invalid endpoint' };
+    if (!/^storage\..*\.example\.invalid$/i.test(result.parsed.hostname)) {
+      return { valid: false, error: 'External Backup URL must be a storage.example.invalid endpoint (e.g. storage.<region>.example.invalid)' };
     }
-    if (!url.includes('/p/') || !url.includes('/o/')) {
-      return { valid: false, error: 'External Backup signed URL must contain /p/ and /o/ path segments' };
+    if (!url.includes('/upload/')) {
+      return { valid: false, error: 'External Backup signed URL must contain an /upload/ path segment' };
     }
     return { valid: true };
   },
@@ -164,7 +164,7 @@ export function detectProvider(url: string): CloudProvider | null {
   } catch {
     return null;
   }
-  if (/^storage-service\..*\.VENDORcloud\.com$/i.test(hostname)) return 'external-backup';
+  if (/^storage\..*\.example\.invalid$/i.test(hostname)) return 'external-backup';
   if (/(?:^|\.)s3[.-].*\.amazonaws\.com$/i.test(hostname)) return 'aws-s3';
   if (/\.blob\.core\.windows\.net$/i.test(hostname)) return 'azure-blob';
   if (hostname === 'storage.googleapis.com' || hostname === 'storage.cloud.google.com') return 'gcs';
