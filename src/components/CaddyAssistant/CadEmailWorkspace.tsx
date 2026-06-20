@@ -1979,7 +1979,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
         </div>
         )}
 
-        {!hasConfiguredAccount && !accountSetupOpen && (
+        {emailAccounts.length === 0 && !addAccountOpen && !accountSetupOpen && (
           <div
             className={cn(
               'shrink-0 border-b border-accent/15 bg-accent/5 text-text-secondary',
@@ -1989,21 +1989,21 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span>
-                No real email account is configured. This mailbox is demo/mock mirrored data until a provider or local bridge is staged.
+                No email account connected. Add an account to sync your inbox.
               </span>
               <button
                 type="button"
-                onClick={handleOpenAccountSetup}
+                onClick={handleOpenAddAccount}
                 className="inline-flex h-7 items-center gap-1.5 rounded-[9px] border border-accent/25 bg-accent/10 px-2.5 text-[10px] font-semibold text-accent transition-colors hover:bg-accent/15"
               >
-                <ShieldCheck size={12} />
-                Set up account
+                <Plus size={12} />
+                Add email account
               </button>
             </div>
           </div>
         )}
 
-        {hasConfiguredAccount && !accountSetupOpen && (
+        {emailAccounts.length > 0 && !accountSetupOpen && (
           <div
             className={cn(
               'shrink-0 border-b border-accent/15 bg-accent/5 text-text-secondary',
@@ -2013,18 +2013,17 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span>
-                {proofedAccountCount > 0
-                  ? 'Local test transport proof passed. Mail data remains demo/mock or local-bridge pending, and live sync and real send are disabled.'
-                  : 'Local checklist staged. Mail data remains demo/mock or local-bridge pending, and provider readiness, live sync, and send are disabled.'}
+                {emailAccounts.length} account{emailAccounts.length === 1 ? '' : 's'} connected.
+                {' '}Live sync activates once the desktop app is running.
               </span>
               <button
                 type="button"
-                onClick={handleOpenAccountSetup}
+                onClick={handleOpenAddAccount}
                 className="inline-flex h-7 items-center gap-1.5 rounded-[9px] border border-accent/25 bg-accent/10 px-2.5 text-[10px] font-semibold text-accent transition-colors hover:bg-accent/15"
-                aria-label="Manage EmailCaddy accounts"
+                aria-label="Add another email account"
               >
-                <ShieldCheck size={12} />
-                Manage accounts
+                <Plus size={12} />
+                Add account
               </button>
             </div>
           </div>
