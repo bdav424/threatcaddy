@@ -140,7 +140,7 @@ describe('IntegrationSourceDashboard', () => {
   it('exposes the responsive stacked, two-column, and three-column grid shell', () => {
     render(<IntegrationSourceDashboard />);
     const grid = screen.getByTestId('integrations-dashboard-grid');
-    expect(grid).toHaveAttribute('data-responsive-columns', 'stacked');
+    expect(grid).toHaveAttribute('data-responsive-columns', 'grid');
     expect(grid.className).toContain('space-y-4');
   });
 

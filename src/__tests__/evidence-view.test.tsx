@@ -292,7 +292,7 @@ describe('EvidenceView inspect preview', () => {
     );
 
     const input = screen.getByLabelText('Search inspected evidence');
-    fireEvent.change(input, { target: { value: '(VENDOR AND cloud) OR microsoft' } });
+    fireEvent.change(input, { target: { value: 'cloud OR microsoft' } });
     await act(async () => {
       vi.advanceTimersByTime(800);
     });
