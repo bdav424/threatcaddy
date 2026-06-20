@@ -4,7 +4,7 @@ import {
   FileText, FileSearch, ListChecks, Clock, Trash2, Briefcase,
   Archive, Settings as SettingsIcon,
   PanelLeftClose, PanelLeft, Github, Download, Chrome, PenTool, Activity, Network, Search, Shield,
-  LayoutDashboard, PanelsTopLeft, MessageSquare, MessagesSquare, ChevronLeft, ChevronDown, ChevronRight,
+  LayoutDashboard, PanelsTopLeft, MessageSquare, LayoutTemplate, ChevronLeft, ChevronDown, ChevronRight,
   Bot, FileOutput, FlaskConical, Sparkles, Mail, CalendarDays,
 } from 'lucide-react';
 import type { Timeline, Whiteboard, ViewMode } from '../../types';
@@ -480,7 +480,7 @@ export function Sidebar({
   const collapsedBottomItems: CollapsedNavItem[] = [
     {
       key: 'caddyshack',
-      icon: MessagesSquare,
+      icon: LayoutTemplate,
       label: t('sidebar.caddyShack'),
       active: activeView === 'caddyshack' && !showTrash && !showArchive,
       onClick: () => nav(() => navToView('caddyshack')),
@@ -1038,7 +1038,7 @@ export function Sidebar({
         )}
         <div data-tour="caddyshack">
           <NavItem
-            icon={<MessagesSquare size={16} />}
+            icon={<LayoutTemplate size={16} />}
             label={t('sidebar.caddyShack')}
             active={activeView === 'caddyshack' && !showTrash && !showArchive}
             onClick={() => nav(() => navToView('caddyshack'))}
