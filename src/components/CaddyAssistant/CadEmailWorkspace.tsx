@@ -202,6 +202,54 @@ function isElectronDesktop() {
   return Boolean((window as MailBridgeWindow).threatcaddyDesktop?.isDesktop);
 }
 
+// --- Live inbox mapping (mail-bridge.mjs → EmailThread) ---
+// The bridge returns plain message records over IPC; map them onto the UI's EmailThread
+// shape. Bodies are fetched lazily when a thread is opened (see the reader effect).
+interface LiveListMessage { uid: number; subject?: string; from?: string[]; date?: string | null; seen?: boolean }
+interface LiveFetchMessage {
+  subject?: string; from?: string; to?: string; date?: string | null;
+  text?: string; html?: string | null;
+  attachments?: Array<{ filename?: string; contentType?: string; size?: number }>;
+}
+
+const LIVE_TONES: ThreadTone[] = ['sky', 'green', 'purple', 'amber', 'rose'];
+const LIVE_COLORS = ['#7ec4ff', '#7fd694', '#d28cff', '#f4bf61', '#df6f79'];
+
+// Deterministic accent so the same sender keeps a stable colour/tone across reloads.
+function liveAccent(seed: string): { tone: ThreadTone; color: string } {
+  let h = 0;
+  for (let i = 0; i < seed.length; i += 1) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  const idx = h % LIVE_TONES.length;
+  return { tone: LIVE_TONES[idx], color: LIVE_COLORS[idx] };
+}
+
+function formatLiveDate(date?: string | null): string {
+  if (!date) return '';
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function mapLiveMessageToThread(accountId: string, accountLabel: string, m: LiveListMessage): EmailThread {
+  const fromAddr = m.from?.[0] ?? '';
+  const accent = liveAccent(fromAddr || accountId);
+  return {
+    id: `live:${accountId}:${m.uid}`,
+    accountId,
+    senderLabel: fromAddr || accountLabel,
+    fromAddress: fromAddr || undefined,
+    senderColor: accent.color,
+    subject: m.subject || '(no subject)',
+    preview: '',
+    receivedAt: formatLiveDate(m.date),
+    unread: m.seen === false,
+    tone: accent.tone,
+    body: [],
+    asks: [],
+    draft: [],
+  };
+}
+
 
 
 const mailboxViews = ['INBOX', 'Needs reply', 'Meetings'];
@@ -791,6 +839,87 @@ const [addAccountOpen, setAddAccountOpen] = useState(false);
     [draft?.sourceThreadId, threadItems],
   );
   const contextThread = selectedThread ?? draftSourceThread;
+
+  // Stable key over connected, credentialed accounts so the live-inbox effect doesn't
+  // re-run on every render (emailAccounts is re-sanitized to a fresh array each render).
+  const liveAccountsKey = useMemo(
+    () => emailAccounts
+      .filter((account) => account.status === 'connected' && account.credentialRef?.id)
+      .map((account) => `${account.id}:${account.credentialRef?.id}`)
+      .join('|'),
+    [emailAccounts],
+  );
+
+  // Last mile: when the desktop bridge + a connected account exist, replace the demo
+  // mirror with the real INBOX listing from mail-bridge.mjs. Web/standalone (no bridge)
+  // or no connected account keeps the demo mirror.
+  useEffect(() => {
+    const bridge = getMailBridge();
+    if (!bridge?.execute) return;
+    const connected = emailAccounts.filter(
+      (account) => account.status === 'connected' && account.credentialRef?.id,
+    );
+    if (connected.length === 0) {
+      setThreadItems(threads);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const collected: EmailThread[] = [];
+      for (const account of connected) {
+        try {
+          const res = (await bridge.execute('list', account.credentialRef!.id, {
+            mailbox: 'INBOX',
+            limit: 50,
+          })) as { messages?: LiveListMessage[] } | undefined;
+          for (const m of res?.messages ?? []) {
+            collected.push(mapLiveMessageToThread(account.id, account.label, m));
+          }
+        } catch {
+          // One account failing must not wipe the others; skip it.
+        }
+      }
+      if (!cancelled && collected.length > 0) setThreadItems(collected);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on liveAccountsKey
+  }, [liveAccountsKey]);
+
+  // Lazily fetch the real message body when a live thread is opened in the reader.
+  useEffect(() => {
+    if (!selectedThread || !selectedThread.id.startsWith('live:')) return;
+    if (selectedThread.body.length > 0) return;
+    const bridge = getMailBridge();
+    const account = emailAccounts.find((a) => a.id === selectedThread.accountId);
+    const credId = account?.credentialRef?.id;
+    if (!bridge?.execute || !credId) return;
+    const uid = Number(selectedThread.id.split(':')[2]);
+    if (!Number.isFinite(uid)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = (await bridge.execute('fetch', credId, { mailbox: 'INBOX', uid })) as
+          { message?: LiveFetchMessage } | undefined;
+        const msg = res?.message;
+        if (cancelled || !msg) return;
+        const text = (msg.text ?? '').trim();
+        const paragraphs = text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+        setThreadItems((prev) => prev.map((t) => (t.id === selectedThread.id
+          ? {
+              ...t,
+              body: paragraphs.length ? paragraphs : [text || '(No text content in this message.)'],
+              preview: t.preview || text.slice(0, 140),
+              hasAttachment: (msg.attachments?.length ?? 0) > 0,
+              toRecipients: msg.to ? [msg.to] : t.toRecipients,
+            }
+          : t)));
+      } catch {
+        // Leave the body empty; reopening the thread retries the fetch.
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the opened thread id
+  }, [selectedThread?.id]);
   const rowMenuThread = useMemo(
     () => rowMenu ? threadItems.find((thread) => thread.id === rowMenu.threadId) ?? null : null,
     [rowMenu, threadItems],
