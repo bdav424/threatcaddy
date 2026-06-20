@@ -10,7 +10,7 @@ import { useGraphSnapshots } from '../../hooks/useGraphSnapshots';
 import { nanoid } from 'nanoid';
 import type { ReportTemplate, ReportSection } from '../../types';
 
-interface ActiveReport {
+export interface ActiveReport {
   id: string;
   title: string;
   templateId: string;
@@ -297,7 +297,8 @@ function SectionEditor({
 
 // ─── Report editor ────────────────────────────────────────────────────────────
 
-function ReportEditor({
+// Exported for the toast-regression test (verifies copy → addToast wiring).
+export function ReportEditor({
   report,
   template,
   onUpdateSection,
