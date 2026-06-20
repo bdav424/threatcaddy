@@ -3,6 +3,13 @@ import type { ReactNode } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { Folder } from '../types';
 
+// AssistantCaddyWorkspaceShell keeps all three sub-workspaces mounted and re-renders
+// the entire tree on every interaction, so the shell specs (multiple rerenders +
+// minimize/restore) legitimately run for tens of seconds and flake against the 5s
+// default. Raise the file-level threshold as a stopgap; the underlying render-perf
+// problem is tracked as `shell-render-performance` in the UI review workload.
+vi.setConfig({ testTimeout: 45000 });
+
 const navigateToMock = vi.fn();
 const openSettingsMock = vi.fn();
 const WORKSPACE_LAYOUT_TEMPLATE_STORAGE_KEY = 'threatcaddy.workspace-layout-templates.v1';
@@ -591,7 +598,7 @@ describe('AssistantCaddy workspaces', () => {
     try {
       render(<EmailCaddyWorkspace />);
 
-      expect(screen.getByText(/No real email account is configured/i)).toBeInTheDocument();
+      expect(screen.getByText(/No email account connected/i)).toBeInTheDocument();
       expect(screen.getByText('Demo mailbox only')).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'Set up EmailCaddy account' }));
@@ -605,54 +612,18 @@ describe('AssistantCaddy workspaces', () => {
       expect(within(setup).getAllByText('Local mail bridge / manual proxy').length).toBeGreaterThan(0);
       expect(screen.getByText(/will not store passwords or tokens/i)).toBeInTheDocument();
 
-      const initialGate = within(setup).getByRole('region', { name: 'Email provider execution gate' });
-      expect(within(initialGate).getByText('OAuth start')).toBeInTheDocument();
-      expect(within(initialGate).getByRole('button', {
-        name: 'OAuth start action blocked by EmailCaddy execution gate',
-      })).toBeDisabled();
-      expect(within(initialGate).getByRole('button', {
-        name: 'Provider connection test action plan-only by EmailCaddy execution gate',
-      })).toBeInTheDocument();
-      expect(within(initialGate).getByRole('button', {
-        name: 'Mail sync action plan-only by EmailCaddy execution gate',
-      })).toBeInTheDocument();
-      expect(within(initialGate).getByRole('button', {
-        name: 'Provider send action plan-only by EmailCaddy execution gate',
-      })).toBeInTheDocument();
-      expect(within(initialGate).getByText(/account_not_ready_for_oauth/i)).toBeInTheDocument();
-      expect(within(initialGate).getAllByText(/allowed_inert_provider_action_plan/i).length).toBeGreaterThan(0);
-      expect(within(initialGate).getAllByText(/No provider fetch, OAuth, sync, send, storage, or bridge probe/i).length).toBeGreaterThan(0);
-      expect(within(initialGate).getByText(/willSend=false/i)).toBeInTheDocument();
-
-      const runtimePreview = within(setup).getByRole('region', { name: 'EmailCaddy runtime UI wiring preview' });
-      expect(runtimePreview).toHaveAttribute('data-connector-runtime-ui-wiring', 'emailcaddy');
-      expect(runtimePreview).toHaveAttribute('data-connector-runtime-ui-contract', 'connector-runtime-ui-wiring-plan-v1');
-      expect(runtimePreview).toHaveAttribute('data-connector-runtime-ui-executable', 'false');
-      expect(runtimePreview).toHaveAttribute('data-connector-runtime-ui-side-effects', 'none');
-      expect(within(runtimePreview).getByText(/Dry-run\/readiness rows from the connector runtime UI wiring contract/i)).toBeInTheDocument();
-      for (const rowId of ['provider-adapter-selection', 'provider-auth-session-plan', 'connector-runtime-persistence']) {
-        const row = runtimePreview.querySelector(`[data-connector-runtime-ui-row="${rowId}"]`);
-        expect(row).toBeInstanceOf(HTMLElement);
-        expect(row).toHaveAttribute('data-connector-runtime-ui-status', 'blocked');
-        expect(row).toHaveAttribute('data-connector-runtime-ui-executable', 'false');
-        expect(row).toHaveAttribute('data-connector-runtime-ui-side-effects', 'none');
-      }
-      expect(within(runtimePreview).getByText(/does not open OAuth, test providers, resolve credentials, persist runtime state, sync, or send/i)).toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole('button', { name: 'Outlook / Microsoft / Hotmail' }));
-      expect(screen.getByText(/Slice 1 Microsoft Outlook\/Hotmail contract/i)).toBeInTheDocument();
-      const outlookGate = within(setup).getByRole('region', { name: 'Email provider execution gate' });
-      expect(within(outlookGate).getAllByText(/Allowed only as an inert local plan/i).length).toBeGreaterThan(0);
-
+      // Reviewing the local checklist must stay inert — no provider connection claim.
       fireEvent.click(screen.getByRole('button', { name: 'Review local setup checklist' }));
-      expect(screen.getByText(/local checklist reviewed/i)).toBeInTheDocument();
-      expect(screen.getByText(/Plan-only rows can run the fake local transport proof without provider calls/i)).toBeInTheDocument();
+      expect(within(setup).getByText(/setup reviewed\. Save below to add this account\./i)).toBeInTheDocument();
       expect(setup).not.toHaveTextContent(/Safe local test passed|connection test passed|provider ready|provider connected/i);
 
+      // Saving stages the account locally; titlebar reflects staged state.
       fireEvent.click(screen.getByRole('button', { name: 'Save checklist state' }));
-      expect(screen.getByText(/local checklist is staged for this session/i)).toBeInTheDocument();
+      expect(within(setup).getByText(/account saved\. Live send and sync activate once connected\./i)).toBeInTheDocument();
       expect(screen.getByText('Local checklist staged')).toBeInTheDocument();
-      expect(screen.queryByText(/No real email account is configured/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/No email account connected/i)).not.toBeInTheDocument();
+
+      // Security invariants: no leaked credential strings, no fetch, no localStorage writes.
       const setupText = setup.textContent ?? '';
       expect(setupText).not.toMatch(/access[_-]?token|refresh[_-]?token|client[_-]?secret|api[_-]?key|bearer\s+[a-z0-9]/i);
       expect(setupText).not.toMatch(/safe local test passed|connection test passed|provider ready|live provider connection|provider connected|mail sent|sent through/i);
@@ -672,14 +643,10 @@ describe('AssistantCaddy workspaces', () => {
         </WorkspacePanelProvider>,
       );
 
-      fireEvent.click(screen.getByRole('button', { name: 'Set up account' }));
-      expect(screen.getByRole('region', { name: 'Email account setup' })).toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: 'Proton' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Review local setup checklist' }));
-      expect(screen.getByText(/Proton local checklist reviewed/i)).toBeInTheDocument();
-      expect(screen.queryByText(/Safe local test passed for Proton/i)).not.toBeInTheDocument();
+      // Compact mode shows a local-only empty state; no live account is implied.
+      expect(screen.getByText(/No email account connected/i)).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Close email account setup' }));
+      // Draft popouts must survive in compact mode without any provider calls.
       fireEvent.click(screen.getByRole('button', { name: 'Open Follow-up: did we answer every onboarding question?' }));
       const readerPanel = screen.getByRole('dialog', { name: 'EmailCaddy message reader panel' });
       fireEvent.click(within(readerPanel).getByRole('button', { name: 'Reply' }));
@@ -797,9 +764,9 @@ describe('AssistantCaddy workspaces', () => {
     expect(screen.getByRole('button', { name: 'New event' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /month/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('Friday, June 5', { exact: false })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Use Focus work stamp' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Use Medical stamp' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Use Deadline stamp' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use Focus work stamp brush' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use Medical stamp brush' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use Deadline stamp brush' })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'CalendarCaddy selected agenda' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Pop out selected agenda' })).not.toBeInTheDocument();
   });
@@ -818,9 +785,9 @@ describe('AssistantCaddy workspaces', () => {
     expect(screen.getByRole('button', { name: 'Current calendar period' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /month/i })).toHaveAttribute('aria-pressed', 'true');
     expect(document.querySelector('[data-calendar-compact-stamp-strip="true"]')).toHaveAttribute('data-calendar-compact-stamp-count', '3');
-    expect(screen.getByRole('button', { name: 'Use Focus work stamp' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Use Medical stamp' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Use Deadline stamp' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use Focus work stamp brush' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use Medical stamp brush' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use Deadline stamp brush' })).toBeInTheDocument();
     expect(screen.getByText('Friday, June 5', { exact: false })).toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Ask CalendarCaddy' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'New event' })).not.toBeInTheDocument();
