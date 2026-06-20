@@ -40,7 +40,7 @@ function requireHttps(url: string): { parsed: URL } | { error: string } {
 
 // ---- External Backup ----
 
-const ociConfig: CloudProviderConfig = {
+const externalBackupConfig: CloudProviderConfig = {
   name: 'Cloud Object Storage',
   placeholder: 'https://storage.region-1.example.invalid/upload/.../path/',
   hostnameHint: 'storage.*.example.invalid',
@@ -121,7 +121,7 @@ const azureBlobConfig: CloudProviderConfig = {
 // ---- GCS ----
 
 const gcsConfig: CloudProviderConfig = {
-  name: 'Google External Backup',
+  name: 'Google Cloud Storage',
   placeholder: 'https://storage.googleapis.com/bucket/...',
   hostnameHint: 'storage.googleapis.com',
   validateUrl(url) {
@@ -148,7 +148,7 @@ const gcsConfig: CloudProviderConfig = {
 // ---- Registry ----
 
 export const CLOUD_PROVIDERS: Record<CloudProvider, CloudProviderConfig> = {
-  'external-backup': ociConfig,
+  'external-backup': externalBackupConfig,
   'aws-s3': awsS3Config,
   'azure-blob': azureBlobConfig,
   'gcs': gcsConfig,

@@ -627,8 +627,8 @@ export const BUILTIN_NOTE_TEMPLATES: NoteTemplate[] = [
     updatedAt: 0,
   },
   {
-    id: 'bt-External Backup-user',
-    get name() { return i18n.t('builtinTemplate.ociUser.name', { ns: 'notes' }); },
+    id: 'bt-external-backup-user',
+    get name() { return i18n.t('builtinTemplate.externalBackupUser.name', { ns: 'notes' }); },
     icon: '\uD83D\uDD11',
     get category() { return i18n.t('builtinTemplateCategory.cloud', { ns: 'notes' }); },
     source: 'builtin',
@@ -681,8 +681,8 @@ export const BUILTIN_NOTE_TEMPLATES: NoteTemplate[] = [
     updatedAt: 0,
   },
   {
-    id: 'bt-External Backup-account',
-    get name() { return i18n.t('builtinTemplate.ociaccount.name', { ns: 'notes' }); },
+    id: 'bt-external-backup-account',
+    get name() { return i18n.t('builtinTemplate.externalBackupAccount.name', { ns: 'notes' }); },
     icon: '\uD83C\uDFE2',
     get category() { return i18n.t('builtinTemplateCategory.cloud', { ns: 'notes' }); },
     source: 'builtin',
@@ -738,3 +738,17 @@ export const BUILTIN_TEMPLATE_CATEGORIES = [
   'Incident Response',
   'Cloud',
 ] as const;
+
+// Legacy → canonical builtin template id aliases. The original bulk-import baseline shipped two
+// cloud templates with corrupted, vendor-specific ids ("bt-External Backup-user/-account", a
+// botched anonymization of "bt-oci-*"). Those ids may already be persisted in a user's
+// `folder.noteTemplateIds`, so resolve old → new on read and normalize to canonical on save rather
+// than renaming blind. (Same "don't orphan stable ids" caution as builtin agent-profile ids.)
+export const BUILTIN_TEMPLATE_ID_ALIASES: Record<string, string> = {
+  'bt-External Backup-user': 'bt-external-backup-user',
+  'bt-External Backup-account': 'bt-external-backup-account',
+};
+
+export function resolveBuiltinTemplateId(id: string): string {
+  return BUILTIN_TEMPLATE_ID_ALIASES[id] ?? id;
+}

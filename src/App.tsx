@@ -56,6 +56,7 @@ import { DEFAULT_QUICK_LINKS } from './types';
 const DashboardView = lazy(() => import('./components/Dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
 import { FileText, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { cn } from './lib/utils';
+import { resolveBuiltinTemplateId } from './lib/builtin-templates';
 import { exportJSON, importJSON, mergeImportJSON, downloadFile, exportInvestigationJSON } from './lib/export';
 import { ConfirmDialog } from './components/Common/ConfirmDialog';
 const SearchOverlay = lazy(() => import('./components/Search/SearchOverlay').then(m => ({ default: m.SearchOverlay })));
@@ -1183,7 +1184,7 @@ const AppInner = memo(function AppInner({
 
   const attachedInvestigationTemplates = useMemo(
     () => (selectedFolder?.noteTemplateIds ?? [])
-      .map((templateId) => noteTemplateMap.get(templateId))
+      .map((templateId) => noteTemplateMap.get(resolveBuiltinTemplateId(templateId)))
       .filter((template): template is NoteTemplate => Boolean(template)),
     [noteTemplateMap, selectedFolder?.noteTemplateIds],
   );
@@ -1231,7 +1232,7 @@ const AppInner = memo(function AppInner({
   }, [loggedCreateNote, selectedFolderId, showQuickCapture, folders, handleSearchNavigateToNote]);
 
   const handleCreateNoteFromTemplate = useCallback(async (templateId: string) => {
-    const template = noteTemplateMap.get(templateId);
+    const template = noteTemplateMap.get(resolveBuiltinTemplateId(templateId));
     if (!template) {
       addToast('error', 'Template is no longer available.');
       return;
@@ -1254,7 +1255,9 @@ const AppInner = memo(function AppInner({
       addToast('warning', 'Open an investigation before attaching templates.');
       return;
     }
-    const uniqueIds = Array.from(new Set(templateIds)).filter((templateId) => noteTemplateMap.has(templateId));
+    // Normalize any legacy/aliased ids to canonical so saves persist the clean id going forward.
+    const uniqueIds = Array.from(new Set(templateIds.map(resolveBuiltinTemplateId)))
+      .filter((templateId) => noteTemplateMap.has(templateId));
     await updateFolder(selectedFolderId, { noteTemplateIds: uniqueIds });
     addToast('success', uniqueIds.length === 0 ? 'No templates attached to this investigation.' : `${uniqueIds.length} template${uniqueIds.length === 1 ? '' : 's'} attached to this investigation.`);
   }, [addToast, noteTemplateMap, selectedFolderId, updateFolder]);
