@@ -37,6 +37,7 @@ import {
   type EmailProviderId,
 } from '../../lib/email-onboarding';
 import { cn } from '../../lib/utils';
+import { getMailBridge, isDesktopBridge } from '../../lib/bridges';
 import { useEmailAccounts } from '../../hooks/useEmailAccounts';
 
 type ThreadTone = 'rose' | 'green' | 'purple' | 'amber' | 'sky';
@@ -184,23 +185,6 @@ const emailProviderOptions: EmailProviderOption[] = EMAIL_PROVIDER_LIST.map((pro
   id: provider.id,
   ...emailProviderUiText[provider.id],
 }));
-
-type MailBridgeWindow = Window & {
-  threatcaddyMail?: {
-    saveCredential: (ref: string, cred: unknown) => Promise<{ ok: boolean }>;
-    execute: (action: string, ref: string, params?: Record<string, unknown>) => Promise<unknown>;
-    startOAuth: (providerId: string) => Promise<{ credRefId: string; email: string | null }>;
-  };
-  threatcaddyDesktop?: { isDesktop?: boolean };
-};
-
-function getMailBridge() {
-  return (window as MailBridgeWindow).threatcaddyMail;
-}
-
-function isElectronDesktop() {
-  return Boolean((window as MailBridgeWindow).threatcaddyDesktop?.isDesktop);
-}
 
 // --- Live inbox mapping (mail-bridge.mjs → EmailThread) ---
 // The bridge returns plain message records over IPC; map them onto the UI's EmailThread
@@ -1636,7 +1620,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
 
         <div className="min-w-0 rounded-[12px] border border-border-subtle/35 bg-bg-primary/60 p-3">
           {(addAccountProviderId === 'google-gmail' || addAccountProviderId === 'microsoft-outlook') ? (
-            isElectronDesktop() ? (
+            isDesktopBridge() ? (
               <div className="space-y-3">
                 <p className="text-[12px] leading-5 text-text-secondary">
                   {addAccountProviderId === 'google-gmail'

@@ -38,6 +38,7 @@ import {
 } from '../WorkspacePanels/WorkspacePanelProvider';
 import { useWorkspacePanel } from '../WorkspacePanels/useWorkspacePanels';
 import { cn } from '../../lib/utils';
+import { getCalendarBridge } from '../../lib/bridges';
 import { calendarCaddyPanelRegistrations } from './workspacePanelRegistrations';
 import { sortEvents } from './calendar-utils';
 import { useCalendarSync, type PendingDeletion, type CalendarSyncAccount } from '../../hooks/useCalendarSync';
@@ -1095,9 +1096,7 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
   // Re-register saved calendar accounts with the desktop main process on mount so
   // that IPC pull/create/update/remove handlers can resolve account → token.
   useEffect(() => {
-    const bridge = (globalThis as unknown as {
-      threatcaddy?: { calendar?: { registerAccount: (a: unknown) => Promise<unknown> } };
-    }).threatcaddy?.calendar;
+    const bridge = getCalendarBridge();
     if (!bridge?.registerAccount) return;
     for (const acct of calendarAccountConfigs) {
       if (acct.status === 'connected') {
@@ -1114,14 +1113,7 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
   }, []);
 
   const handleConnectProvider = useCallback(async (provider: 'google' | 'microsoft') => {
-    const bridge = (globalThis as unknown as {
-      threatcaddy?: {
-        calendar?: {
-          startOAuth: (p: string) => Promise<{ credRefId: string; email: string }>;
-          registerAccount: (a: unknown) => Promise<unknown>;
-        };
-      };
-    }).threatcaddy?.calendar;
+    const bridge = getCalendarBridge();
 
     if (!bridge?.startOAuth) {
       setConnectError('Calendar OAuth is only available in the ThreatCaddy desktop app.');

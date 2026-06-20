@@ -13,6 +13,7 @@
 
 import { useCallback, useState } from 'react';
 import type { CalendarEvent } from '../types';
+import { getCalendarBridge } from '../lib/bridges';
 
 export interface CalendarSyncAccount {
   id: string;
@@ -26,17 +27,6 @@ export interface PendingDeletion {
   syncAccountId: string;
 }
 
-interface CalendarBridge {
-  pull(accountId: string, range: { timeMinISO: string; timeMaxISO: string }): Promise<CalendarEvent[]>;
-  create(accountId: string, event: CalendarEvent): Promise<{ remoteId: string; etag?: string }>;
-  update(accountId: string, event: CalendarEvent): Promise<{ remoteId: string; etag?: string }>;
-  remove(accountId: string, remoteId: string): Promise<{ ok: boolean }>;
-}
-
-function getBridge(): CalendarBridge | null {
-  const tc = (globalThis as unknown as { threatcaddy?: { calendar?: CalendarBridge } }).threatcaddy;
-  return tc?.calendar ?? null;
-}
 
 export function mergeRemote(local: CalendarEvent[], remote: CalendarEvent[]): CalendarEvent[] {
   const byRemoteId = new Map(local.filter((e) => e.remoteId).map((e) => [e.remoteId as string, e]));
@@ -69,7 +59,7 @@ export function useCalendarSync(
   const [error, setError] = useState<string | null>(null);
 
   const sync = useCallback(async () => {
-    const bridge = getBridge();
+    const bridge = getCalendarBridge();
     if (!bridge) {
       setError('Calendar sync runs in the desktop app. Open ThreatCaddy Desktop to sync.');
       return;
