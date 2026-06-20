@@ -169,8 +169,9 @@ function SectionEditor({
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showSnapPicker, setShowSnapPicker] = useState(false);
-  const { snapshots } = useGraphSnapshots(folderId);
-  const hasGraphHint = section.entityHints?.includes('graph');
+  const { snapshots, updateCaption } = useGraphSnapshots(folderId);
+  const [editingCaptionId, setEditingCaptionId] = useState<string | null>(null);
+  const [draftCaption, setDraftCaption] = useState('');
 
   const autoResize = useCallback(() => {
     const ta = textareaRef.current;
@@ -196,7 +197,7 @@ function SectionEditor({
         <label className="block text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
           {section.title}
         </label>
-        {hasGraphHint && (
+        {snapshots.length > 0 && (
           <button
             type="button"
             onClick={() => setShowSnapPicker(v => !v)}
@@ -207,30 +208,28 @@ function SectionEditor({
             title="Insert a saved graph snapshot"
           >
             <Camera size={10} />
-            Insert snapshot
+            Insert snapshot ({snapshots.length})
           </button>
         )}
       </div>
 
-      {hasGraphHint && showSnapPicker && (
+      {showSnapPicker && snapshots.length > 0 && (
         <div
           className="mb-2 rounded-lg border p-2"
           style={{ background: 'var(--color-bg-deep)', borderColor: 'var(--color-border-subtle)' }}
         >
-          {snapshots.length === 0 ? (
-            <p className="text-[11px] py-2 text-center" style={{ color: 'var(--color-text-muted)' }}>
-              No snapshots yet — capture one from the Graph panel using the <Camera size={10} className="inline" /> button.
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {snapshots.map(snap => (
+          <div className="flex flex-wrap gap-2">
+            {snapshots.map(snap => (
+              <div
+                key={snap.id}
+                className="flex flex-col items-start gap-1 p-1.5 rounded-md border"
+                style={{ background: 'var(--color-bg-raised)', borderColor: 'var(--color-border-medium)', maxWidth: 130 }}
+              >
                 <button
-                  key={snap.id}
                   type="button"
                   onClick={() => insertSnapshot(snap)}
-                  className="flex flex-col items-start gap-1 p-1.5 rounded-md border transition-colors hover:border-[color:var(--color-accent)]"
-                  style={{ background: 'var(--color-bg-raised)', borderColor: 'var(--color-border-medium)', maxWidth: 120 }}
-                  title={snap.caption || `${snap.nodeCount} nodes · ${snap.edgeCount} edges`}
+                  className="w-full rounded overflow-hidden hover:opacity-80 transition-opacity"
+                  title="Click to insert this snapshot"
                 >
                   <img
                     src={snap.dataUrl}
@@ -238,13 +237,37 @@ function SectionEditor({
                     className="w-full rounded"
                     style={{ height: 60, objectFit: 'cover' }}
                   />
-                  <span className="text-[10px] truncate w-full" style={{ color: 'var(--color-text-muted)' }}>
-                    {snap.caption || `${snap.nodeCount}n · ${snap.edgeCount}e`}
-                  </span>
                 </button>
-              ))}
-            </div>
-          )}
+                {editingCaptionId === snap.id ? (
+                  <input
+                    autoFocus
+                    value={draftCaption}
+                    onChange={(e) => setDraftCaption(e.target.value)}
+                    onBlur={async () => {
+                      await updateCaption(snap.id, draftCaption);
+                      setEditingCaptionId(null);
+                    }}
+                    onKeyDown={async (e) => {
+                      if (e.key === 'Enter') { await updateCaption(snap.id, draftCaption); setEditingCaptionId(null); }
+                      if (e.key === 'Escape') setEditingCaptionId(null);
+                    }}
+                    className="w-full text-[10px] bg-transparent border-b border-dashed outline-none"
+                    style={{ borderColor: 'var(--color-accent)', color: 'var(--color-text-primary)' }}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => { setEditingCaptionId(snap.id); setDraftCaption(snap.caption || ''); }}
+                    className="text-[10px] truncate w-full text-start hover:underline"
+                    style={{ color: 'var(--color-text-muted)' }}
+                    title="Click to edit caption"
+                  >
+                    {snap.caption || `${snap.nodeCount}n · ${snap.edgeCount}e`}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

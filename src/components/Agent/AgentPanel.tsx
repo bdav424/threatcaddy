@@ -777,6 +777,21 @@ function PolicyEditor({ folder, settings, onFolderChanged }: { folder: Folder; s
         )}
       </div>
 
+      {/* Agent Hosts */}
+      {(settings.agentHosts ?? []).length > 0 && (
+        <div className="pt-1 border-t border-border-subtle">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">Agent Hosts</div>
+              <div className="text-[10px] text-text-muted mt-0.5">
+                {(settings.agentHosts ?? []).length} external skill host{(settings.agentHosts ?? []).length === 1 ? '' : 's'} configured —
+                {' '}skills appear as <code className="font-mono">host:&lt;name&gt;:&lt;skill&gt;</code> tools in agent runs
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Investigation memory */}
       <div className="pt-1 border-t border-border-subtle">
         <div className="text-[11px] font-medium text-text-secondary uppercase tracking-wide mb-2">Memory</div>
