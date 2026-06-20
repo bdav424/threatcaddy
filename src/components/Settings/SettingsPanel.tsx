@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import DOMPurify from 'dompurify';
-import { Github, Download, FlaskConical, Trash2, Bot, X, Shield, RefreshCw, RotateCcw, Plus, Pencil, Wrench, Loader2, CheckCircle2, AlertTriangle, LayoutGrid, Palette, Database, FileText, Link, Keyboard } from 'lucide-react';
+import { Github, Download, FlaskConical, Trash2, Bot, X, Shield, RefreshCw, RotateCcw, Plus, Pencil, Wrench, Loader2, CheckCircle2, AlertTriangle, LayoutGrid, Palette, Database, FileText, Link, Keyboard, Zap } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES } from '../../i18n';
 import { useToast } from '../../contexts/ToastContext';
@@ -1710,6 +1710,9 @@ function LocalLLMConfig({ settings, onUpdateSettings, onTestStatusChange }: Loca
   const [fetchingSkills, setFetchingSkills] = useState(false);
   const [skillsError, setSkillsError] = useState('');
   const [showSkills, setShowSkills] = useState(false);
+  const [showDiscover, setShowDiscover] = useState(false);
+  const [discovering, setDiscovering] = useState(false);
+  const [discoverProbes, setDiscoverProbes] = useState<import('../../lib/local-endpoint-discovery').EndpointProbe[]>([]);
 
   const labelClass = 'text-xs text-gray-400 font-medium';
   const inputClass = 'w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent';
@@ -1886,7 +1889,63 @@ function LocalLLMConfig({ settings, onUpdateSettings, onTestStatusChange }: Loca
         <p className="text-[10px] text-red-400">{testError}</p>
       )}
       <div>
-        <label className={labelClass}>{t('ai.endpointUrl')}</label>
+        <div className="flex items-center justify-between mb-1">
+          <label className={labelClass}>{t('ai.endpointUrl')}</label>
+          <button
+            type="button"
+            onClick={async () => {
+              if (!showDiscover) {
+                setShowDiscover(true);
+                setDiscovering(true);
+                const { uniqueEndpoints, probeEndpoint } = await import('../../lib/local-endpoint-discovery');
+                const endpoints = uniqueEndpoints(settings.llmLocalEndpoint);
+                setDiscoverProbes(endpoints.map((ep) => ({ endpoint: ep, status: 'probing', message: 'Scanning…', models: [] })));
+                const results = await Promise.all(endpoints.map(probeEndpoint));
+                setDiscoverProbes(results);
+                setDiscovering(false);
+              } else {
+                setShowDiscover(false);
+              }
+            }}
+            className="flex items-center gap-1 text-[10px] text-accent-blue hover:underline"
+          >
+            <Zap size={10} />
+            {showDiscover ? 'Hide' : 'Discover local models'}
+          </button>
+        </div>
+        {showDiscover && (
+          <div className="mb-2 rounded-lg border border-gray-700 overflow-hidden">
+            {discoverProbes.map((probe) => (
+              <div key={probe.endpoint} className="flex items-center gap-2 px-2 py-1.5 border-b border-gray-700/50 last:border-b-0 text-xs">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-mono text-gray-300">{probe.endpoint}</div>
+                  <div className="text-[10px] text-gray-500 truncate">
+                    {discovering && probe.status === 'probing' ? 'Scanning…' : probe.message}
+                    {probe.durationMs != null ? ` · ${probe.durationMs}ms` : ''}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={probe.status !== 'ok'}
+                  onClick={() => {
+                    onUpdateSettings({
+                      llmLocalEndpoint: probe.endpoint,
+                      llmDefaultProvider: 'local',
+                      ...(probe.models[0] ? { llmLocalModelName: probe.models[0], llmDefaultModel: probe.models[0] } : {}),
+                    });
+                    setAvailableModels(probe.models);
+                    setShowDiscover(false);
+                    setTestStatus('idle');
+                    onTestStatusChange?.('idle');
+                  }}
+                  className="shrink-0 rounded border border-gray-700 bg-gray-800 px-2 py-0.5 text-[10px] font-semibold text-gray-300 hover:border-accent-blue hover:text-accent-blue disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
+                >
+                  {probe.status === 'ok' ? 'Use' : probe.status === 'probing' ? '…' : '✗'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <input
           type="text"
           value={settings.llmLocalEndpoint || ''}
