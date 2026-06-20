@@ -620,6 +620,7 @@ const AppInner = memo(function AppInner({
   }, [autoEnrichCreatedIOCs, notes, settings.tiDefaultConfidence, standaloneIOCsHook]);
 
   const demoProcessedRef = useRef(false);
+  const shareProcessedRef = useRef(false);
 
   // Warn before closing tab with unsaved editor changes
   useEffect(() => {
@@ -1790,6 +1791,37 @@ const AppInner = memo(function AppInner({
       handleLoadSample().then(() => setShowDemoModal(true));
     }
   }, [sampleLoaded, handleLoadSample, navigateTo, setSelectedFolderId]);
+
+  // PWA share_target handler — fires when the user shares a URL/text to ThreatCaddy from
+  // a mobile browser. The manifest delivers ?share_title=&share_text=&share_url= on the root.
+  // Inbound content is treated as DATA only — no evaluation or execution of shared text.
+  useEffect(() => {
+    if (shareProcessedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const shareTitle = params.get('share_title');
+    const shareText = params.get('share_text');
+    const shareUrl = params.get('share_url');
+    if (!shareTitle && !shareText && !shareUrl) return;
+    shareProcessedRef.current = true;
+    // Clean share params from URL so they don't persist on refresh
+    const url = new URL(window.location.href);
+    url.searchParams.delete('share_title');
+    url.searchParams.delete('share_text');
+    url.searchParams.delete('share_url');
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+    if (!selectedFolderId) {
+      addToast('info', 'Open an investigation to capture this shared content');
+      return;
+    }
+    const titleLine = shareTitle ? `# ${shareTitle}\n\n` : '';
+    const urlLine = shareUrl ? `${shareUrl}\n\n` : '';
+    const body = `${titleLine}${urlLine}${shareText ?? ''}`.trim();
+    void notes.createNote({ folderId: selectedFolderId, content: body }).then((note) => {
+      navigateTo('notes');
+      setSelectedNoteId(note.id);
+      addToast('success', 'Captured shared content as a new note');
+    });
+  }, [selectedFolderId, notes, navigateTo, setSelectedNoteId, addToast]);
 
   // Keyboard shortcuts
   // Search overlay navigation callbacks
