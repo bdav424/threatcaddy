@@ -1236,40 +1236,6 @@ export const ACTIVITY_CATEGORY_LABELS: Record<ActivityCategory, { label: string;
   'activityCategory', ACTIVITY_CATEGORY_COLORS,
 );
 
-// ─── Social / Team Types ────────────────────────────────────────
-
-export interface PostAttachment {
-  id: string;
-  url: string;
-  type: 'image' | 'video' | 'audio' | 'document';
-  mimeType: string;
-  filename: string;
-  size?: number;
-  thumbnailUrl?: string;
-  alt?: string;
-}
-
-export interface Post {
-  id: string;
-  authorId: string;
-  content: string;
-  attachments: PostAttachment[];
-  folderId?: string | null;
-  parentId?: string | null;
-  replyToId?: string | null;
-  replyToAuthorName?: string;
-  mentions: string[];
-  clsLevel?: string | null;
-  pinned: boolean;
-  deleted: boolean;
-  createdAt: string;
-  updatedAt: string;
-  authorDisplayName?: string;
-  authorAvatarUrl?: string | null;
-  reactions?: Record<string, { count: number; userIds: string[] }>;
-  replyCount?: number;
-  replies?: Post[];
-}
 
 export type NotificationType = 'mention' | 'reply' | 'reaction' | 'invite' | 'entity-update';
 

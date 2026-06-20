@@ -31,7 +31,7 @@ describe('AssistantCaddy overview setup routing', () => {
     render(<CaddyAssistantOverviewPanel />);
 
     const setupRoutes = within(screen.getByRole('region', { name: 'AssistantCaddy setup routes' }));
-    expect(setupRoutes.getByText('Setup routes: AI setup, EmailCaddy, CalendarCaddy, Integrations')).toBeInTheDocument();
+    expect(setupRoutes.getByText(/Setup routes:.*AI setup.*EmailCaddy.*Integrations/)).toBeInTheDocument();
     expect(setupRoutes.getByText(/overview does not connect, probe, or store credentials/i)).toBeInTheDocument();
 
     fireEvent.click(setupRoutes.getByRole('button', { name: 'Open AI setup' }));

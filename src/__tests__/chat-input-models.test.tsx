@@ -9,71 +9,74 @@ const defaultProps = {
   extensionAvailable: true,
   model: 'claude-sonnet-4-6',
   onModelChange: vi.fn(),
+  configuredProviders: new Set(['anthropic', 'openai', 'gemini', 'mistral']),
 };
 
 describe('ChatInput', () => {
-  it('renders the model selector', () => {
+  it('renders provider pill buttons for configured providers', () => {
     render(<ChatInput {...defaultProps} />);
+    // ProviderModelPicker renders provider pills as buttons
+    expect(screen.getByRole('button', { name: /Claude/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /GPT/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Gemini/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Mistral/i })).toBeInTheDocument();
+  });
+
+  it('marks the active provider pill as pressed', () => {
+    render(<ChatInput {...defaultProps} model="claude-sonnet-4-6" />);
+    const claudePill = screen.getByRole('button', { name: /Claude/i });
+    expect(claudePill).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('shows a model select when the active provider has multiple models', () => {
+    render(<ChatInput {...defaultProps} model="claude-sonnet-4-6" />);
+    // Anthropic has multiple models so a combobox should appear
     const select = screen.getByRole('combobox');
     expect(select).toBeInTheDocument();
   });
 
-  it('uses optgroup grouping for models', () => {
-    const { container } = render(<ChatInput {...defaultProps} />);
-    const groups = container.querySelectorAll('optgroup');
-    expect(groups.length).toBeGreaterThanOrEqual(4); // Anthropic, OpenAI, Google, Mistral
-  });
-
-  it('has all 10 static models', () => {
-    const { container } = render(<ChatInput {...defaultProps} />);
-    const options = container.querySelectorAll('option');
-    expect(options.length).toBeGreaterThanOrEqual(10);
-  });
-
-  it('calls onModelChange with anthropic provider for Claude models', () => {
+  it('calls onModelChange when selecting a different model', () => {
     const onModelChange = vi.fn();
-    render(<ChatInput {...defaultProps} onModelChange={onModelChange} />);
+    render(<ChatInput {...defaultProps} onModelChange={onModelChange} model="claude-sonnet-4-6" />);
     const select = screen.getByRole('combobox');
     fireEvent.change(select, { target: { value: 'claude-opus-4-6' } });
     expect(onModelChange).toHaveBeenCalledWith('claude-opus-4-6', 'anthropic');
   });
 
-  it('calls onModelChange with openai provider for GPT models', () => {
+  it('calls onModelChange with first model when switching provider via pill', () => {
     const onModelChange = vi.fn();
-    render(<ChatInput {...defaultProps} onModelChange={onModelChange} />);
-    const select = screen.getByRole('combobox');
-    fireEvent.change(select, { target: { value: 'gpt-4o' } });
-    expect(onModelChange).toHaveBeenCalledWith('gpt-4o', 'openai');
+    render(<ChatInput {...defaultProps} onModelChange={onModelChange} model="claude-sonnet-4-6" />);
+    const gptPill = screen.getByRole('button', { name: /GPT/i });
+    fireEvent.click(gptPill);
+    // Should call with the first OpenAI model
+    expect(onModelChange).toHaveBeenCalledWith(expect.stringContaining('gpt'), 'openai');
   });
 
-  it('calls onModelChange with gemini provider for Gemini models', () => {
-    const onModelChange = vi.fn();
-    render(<ChatInput {...defaultProps} onModelChange={onModelChange} />);
-    const select = screen.getByRole('combobox');
-    fireEvent.change(select, { target: { value: 'gemini-2.5-pro-preview-06-05' } });
-    expect(onModelChange).toHaveBeenCalledWith('gemini-2.5-pro-preview-06-05', 'gemini');
+  it('shows local provider pill when local endpoint is configured', () => {
+    render(
+      <ChatInput
+        {...defaultProps}
+        configuredProviders={new Set(['local'])}
+        localModelName="llama3"
+        model="llama3"
+      />,
+    );
+    expect(screen.getByRole('button', { name: /Local/i })).toBeInTheDocument();
   });
 
-  it('calls onModelChange with mistral provider for Mistral models', () => {
-    const onModelChange = vi.fn();
-    render(<ChatInput {...defaultProps} onModelChange={onModelChange} />);
-    const select = screen.getByRole('combobox');
-    fireEvent.change(select, { target: { value: 'mistral-large-latest' } });
-    expect(onModelChange).toHaveBeenCalledWith('mistral-large-latest', 'mistral');
+  it('does not show local provider when not configured', () => {
+    render(
+      <ChatInput
+        {...defaultProps}
+        configuredProviders={new Set(['anthropic'])}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /Local/i })).not.toBeInTheDocument();
   });
 
-  it('shows local model when localModelName is set', () => {
-    render(<ChatInput {...defaultProps} localModelName="llama3" />);
-    const options = screen.getAllByRole('option');
-    const localOption = options.find(o => o.textContent?.includes('Local: llama3'));
-    expect(localOption).toBeDefined();
-  });
-
-  it('hides local model when localModelName is not set', () => {
-    render(<ChatInput {...defaultProps} />);
-    const options = screen.getAllByRole('option');
-    const localOption = options.find(o => o.textContent?.includes('Local:'));
-    expect(localOption).toBeUndefined();
+  it('shows no-provider message when no providers configured', () => {
+    render(<ChatInput {...defaultProps} configuredProviders={new Set()} />);
+    expect(screen.getByText(/No provider configured/i)).toBeInTheDocument();
   });
 
   it('shows Stop button when streaming', () => {
