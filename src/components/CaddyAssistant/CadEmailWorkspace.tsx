@@ -34,34 +34,8 @@ import {
 import {
   EMAIL_PROVIDER_METADATA,
   EMAIL_PROVIDER_LIST,
-  type EmailAccountConfig,
-  type EmailConnectionTestResult,
-  type EmailCredentialReference,
   type EmailProviderId,
 } from '../../lib/email-onboarding';
-import {
-  createEmailConnectionConsentContract,
-  recordEmailConnectionTestPrerequisite,
-  reviewEmailConnectionConsent,
-} from '../../lib/email-connection-policy';
-import type { ConnectorCredentialReference } from '../../lib/connector-credential-boundary';
-import { evaluateEmailConnectorRuntimeReadiness } from '../../lib/email-connector-readiness';
-import {
-  evaluateEmailProviderExecutionGate,
-  type EmailProviderActionExplicitConsent,
-  type EmailProviderExecutionAction,
-  type EmailProviderExecutionGateDecision,
-} from '../../lib/email-provider-execution-gate';
-import {
-  executeEmailProviderRuntimeAction,
-  type EmailProviderRuntimeExecutionResult,
-  type EmailProviderRuntimeLocalTestTransport,
-} from '../../lib/email-provider-runtime-executor';
-import { createLocalBridgeDiscoveryPlan, type LocalBridgeDiscoveryPlan } from '../../lib/local-bridge-discovery';
-import {
-  createConnectorRuntimeUiWiringPlan,
-  type ConnectorRuntimeUiWiringStatusRow,
-} from '../../lib/connector-runtime-ui-wiring-plan';
 import { cn } from '../../lib/utils';
 import { useEmailAccounts } from '../../hooks/useEmailAccounts';
 
@@ -228,224 +202,7 @@ function isElectronDesktop() {
   return Boolean((window as MailBridgeWindow).threatcaddyDesktop?.isDesktop);
 }
 
-const EMAIL_SETUP_GATE_ACTIONS: EmailProviderExecutionAction[] = [
-  'start_oauth',
-  'test_connection',
-  'sync_mail',
-  'send_mail',
-];
-const EMAIL_SETUP_GATE_ACTION_LABELS: Record<EmailProviderExecutionAction, string> = {
-  start_oauth: 'OAuth start',
-  test_connection: 'Provider connection test',
-  sync_mail: 'Mail sync',
-  send_mail: 'Provider send',
-};
-const EMAIL_SETUP_GATE_TIMESTAMP = 1_725_000_000_000;
-const EMAIL_SETUP_GATE_BOUNDARY_COPY = 'No provider fetch, OAuth, sync, send, storage, or bridge probe.';
-const EMAIL_RUNTIME_UI_WIRING_PLAN = createConnectorRuntimeUiWiringPlan({
-  expectedOwnerSurface: 'emailcaddy',
-});
-const EMAIL_RUNTIME_UI_WIRING_ROWS = EMAIL_RUNTIME_UI_WIRING_PLAN.rows.filter((row) => (
-  row.id === 'provider-adapter-selection'
-    || row.id === 'provider-auth-session-plan'
-    || row.id === 'connector-runtime-persistence'
-));
 
-interface EmailSetupGateRow {
-  action: EmailProviderExecutionAction;
-  label: string;
-  statusLabel: 'Blocked' | 'Plan-only';
-  reason: EmailProviderExecutionGateDecision['reason'];
-  description: string;
-}
-
-function providerUsesLocalBridge(providerId: EmailProviderId): boolean {
-  return EMAIL_PROVIDER_METADATA[providerId].capabilities.requiresLocalBridge;
-}
-
-function buildEmailSetupCredentialRef(provider: EmailProviderOption): EmailCredentialReference {
-  return providerUsesLocalBridge(provider.id)
-    ? {
-        kind: 'local-bridge',
-        id: `local-bridge:emailcaddy/${provider.id}`,
-        label: `${provider.label} local bridge reference`,
-        storedBy: 'local-bridge',
-      }
-    : {
-        kind: 'oauth-token',
-        id: `provider-oauth:emailcaddy/${provider.id}`,
-        label: `${provider.label} external OAuth reference`,
-        storedBy: 'external-provider',
-      };
-}
-
-function buildEmailSetupGateAccount(provider: EmailProviderOption): EmailAccountConfig {
-  return {
-    schemaVersion: 1,
-    id: `emailcaddy-setup-${provider.id}`,
-    providerId: provider.id,
-    label: provider.label,
-    address: `${provider.id}@emailcaddy.local`,
-    status: 'connected',
-    credentialRef: buildEmailSetupCredentialRef(provider),
-    sendPolicy: 'manual_confirm',
-    lastTestedAt: EMAIL_SETUP_GATE_TIMESTAMP,
-    createdAt: EMAIL_SETUP_GATE_TIMESTAMP,
-    updatedAt: EMAIL_SETUP_GATE_TIMESTAMP,
-  };
-}
-
-function buildEmailSetupConnectionResult(account: EmailAccountConfig): EmailConnectionTestResult {
-  return {
-    accountId: account.id,
-    providerId: account.providerId,
-    ok: true,
-    status: 'connected',
-    code: 'mock_connected',
-    message: 'Local test transport proof passed without contacting a provider.',
-    testedAt: EMAIL_SETUP_GATE_TIMESTAMP,
-  };
-}
-
-function buildEmailSetupGateConsent(account: EmailAccountConfig) {
-  const reviewed = reviewEmailConnectionConsent(
-    createEmailConnectionConsentContract(account, EMAIL_SETUP_GATE_TIMESTAMP),
-    {
-      allowRead: true,
-      allowDraft: true,
-      allowSend: true,
-      reviewedAt: EMAIL_SETUP_GATE_TIMESTAMP,
-    },
-  );
-  return recordEmailConnectionTestPrerequisite(reviewed, buildEmailSetupConnectionResult(account));
-}
-
-function buildEmailSetupConnectorCredentialReference(account: EmailAccountConfig): ConnectorCredentialReference {
-  const localBridge = providerUsesLocalBridge(account.providerId);
-  return {
-    schemaVersion: 1,
-    kind: localBridge ? 'local-bridge' : 'provider-managed-oauth',
-    id: localBridge
-      ? `local-bridge:emailcaddy/${account.providerId}`
-      : `provider-oauth:emailcaddy/${account.providerId}`,
-    storageOwner: localBridge ? 'local-bridge' : 'external-provider',
-    providerId: account.providerId,
-    accountId: account.id,
-    connectorId: 'email',
-    displayName: `${account.label} opaque test reference`,
-    createdAt: EMAIL_SETUP_GATE_TIMESTAMP,
-  };
-}
-
-function buildEmailSetupLocalBridgePlan(account: EmailAccountConfig): LocalBridgeDiscoveryPlan | null {
-  if (!providerUsesLocalBridge(account.providerId)) return null;
-  return createLocalBridgeDiscoveryPlan({
-    bridgeKind: 'mail',
-    candidates: ['127.0.0.1:8765'],
-    consentGranted: true,
-    defaultProbePath: '/health',
-  });
-}
-
-function buildEmailSetupGateExplicitConsent(
-  action: EmailProviderExecutionAction,
-  account: EmailAccountConfig,
-): EmailProviderActionExplicitConsent {
-  return {
-    action,
-    accountId: account.id,
-    providerId: account.providerId,
-    granted: true,
-    reviewedAt: EMAIL_SETUP_GATE_TIMESTAMP,
-  };
-}
-
-function describeEmailSetupGateReason(decision: EmailProviderExecutionGateDecision): string {
-  switch (decision.reason) {
-    case 'allowed_inert_provider_action_plan':
-      return 'Allowed only as an inert local plan. EmailCaddy does not open OAuth, contact a provider, probe a bridge, sync, or send.';
-    case 'missing_credential_reference':
-      return 'Blocked until an external connector credential reference exists. EmailCaddy stores no token, password, or raw secret.';
-    case 'send_consent_not_granted':
-      return 'Blocked because send consent is not granted in the reviewed local contract. No provider send can start here.';
-    case 'action_not_supported_by_provider':
-      return 'Blocked because this provider path does not support that live action from EmailCaddy.';
-    case 'runtime_readiness_not_ready':
-      return `Blocked by connector readiness: ${decision.readinessDecision?.reason ?? 'not ready'}.`;
-    case 'send_policy_blocked':
-      return `Blocked by send policy: ${decision.sendPolicyDecision?.reason ?? 'manual send policy is not ready'}.`;
-    case 'manual_send_confirmation_missing':
-      return 'Blocked until a later reviewed connector flow supplies explicit manual send confirmation.';
-    case 'read_consent_not_granted':
-    case 'draft_consent_not_granted':
-    case 'consent_not_reviewed':
-    case 'missing_consent_contract':
-      return 'Blocked until a reviewed local consent contract grants the required mail access.';
-    default:
-      return `Blocked by the local execution gate: ${decision.reason.replace(/_/g, ' ')}.`;
-  }
-}
-
-function buildEmailSetupGateRows(provider: EmailProviderOption): EmailSetupGateRow[] {
-  const account = buildEmailSetupGateAccount(provider);
-  const consentContract = buildEmailSetupGateConsent(account);
-  const connectorCredentialReference = buildEmailSetupConnectorCredentialReference(account);
-  const localBridgePlan = buildEmailSetupLocalBridgePlan(account);
-  const readinessDecision = evaluateEmailConnectorRuntimeReadiness({
-    account,
-    consentContract,
-    connectorCredentialReference,
-    localBridgePlan,
-  });
-
-  return EMAIL_SETUP_GATE_ACTIONS.map((action) => {
-    const decision = evaluateEmailProviderExecutionGate({
-      action,
-      account,
-      consentContract,
-      explicitConsent: buildEmailSetupGateExplicitConsent(action, account),
-      connectorCredentialReference,
-      localBridgePlan,
-      readinessDecision,
-      manualSendConfirmation: true,
-    });
-
-    return {
-      action,
-      label: EMAIL_SETUP_GATE_ACTION_LABELS[action],
-      statusLabel: decision.allowed ? 'Plan-only' : 'Blocked',
-      reason: decision.reason,
-      description: describeEmailSetupGateReason(decision),
-    };
-  });
-}
-
-function buildEmailSetupLocalTestTransport(
-  account: EmailAccountConfig,
-  connectorCredentialReference: ConnectorCredentialReference,
-): EmailProviderRuntimeLocalTestTransport {
-  return {
-    contract: 'email-provider-local-test-transport-v1',
-    runtimeOwner: 'email-provider-runtime-local-test-transport',
-    accountId: account.id,
-    providerId: account.providerId,
-    credentialReferenceId: connectorCredentialReference.id,
-    supportedActions: ['start_oauth', 'test_connection', 'sync_mail', 'send_mail'],
-    proofMode: 'auth-sync-send-binding',
-    executable: false,
-    willSend: false,
-    willFetch: false,
-    willOpenSocket: false,
-    willMutateStorage: false,
-    sideEffectBoundary: 'local-test-transport-no-provider-sdk-no-oauth-no-fetch-no-socket-no-storage-no-send',
-  };
-}
-
-function runtimeUiWiringStatusClass(row: ConnectorRuntimeUiWiringStatusRow): string {
-  return row.status === 'ready'
-    ? 'border-accent/20 bg-accent/8 text-accent'
-    : 'border-border-subtle bg-bg-primary/80 text-text-muted';
-}
 
 const mailboxViews = ['INBOX', 'Needs reply', 'Meetings'];
 const categoryViews = ['All', 'Flagged', 'Attachments'];
@@ -921,9 +678,7 @@ export function EmailCaddyWorkspaceContent({
   const [selectedProviderId, setSelectedProviderId] = useState<EmailProviderId>('google-gmail');
   const [accountSetupStatus, setAccountSetupStatus] = useState<EmailAccountSetupStatus>('idle');
   const [configuredAccounts, setConfiguredAccounts] = useState<ConfiguredEmailAccount[]>([]);
-  const [localTransportProof, setLocalTransportProof] = useState<EmailProviderRuntimeExecutionResult | null>(null);
-  const localTransportProofPassedRef = useRef(false);
-  const [addAccountOpen, setAddAccountOpen] = useState(false);
+const [addAccountOpen, setAddAccountOpen] = useState(false);
   const [addAccountProviderId, setAddAccountProviderId] = useState<EmailProviderId>('google-gmail');
   const [addAccountImapHost, setAddAccountImapHost] = useState('');
   const [addAccountImapPort, setAddAccountImapPort] = useState('993');
@@ -1048,11 +803,7 @@ export function EmailCaddyWorkspaceContent({
     () => emailProviderOptions.map((provider) => ({ value: provider.id, label: provider.label })),
     [],
   );
-  const emailSetupGateRows = useMemo(
-    () => buildEmailSetupGateRows(selectedProvider),
-    [selectedProvider],
-  );
-  const hasConfiguredAccount = configuredAccounts.length > 0;
+const hasConfiguredAccount = configuredAccounts.length > 0;
   const proofedAccountCount = configuredAccounts.filter((account) => account.status === 'local-test-transport-proofed').length;
   const accountConnectionSummary = hasConfiguredAccount
     ? `${configuredAccounts.length} local account${configuredAccounts.length === 1 ? '' : 's'} staged${proofedAccountCount > 0 ? `; ${proofedAccountCount} local proof${proofedAccountCount === 1 ? '' : 's'} passed` : ''}. Live sync is still disabled.`
@@ -1358,8 +1109,6 @@ export function EmailCaddyWorkspaceContent({
   const handleProviderChange = (providerId: EmailProviderId) => {
     setSelectedProviderId(providerId);
     setAccountSetupStatus('idle');
-    setLocalTransportProof(null);
-    localTransportProofPassedRef.current = false;
   };
 
   const handleOpenAccountSetup = () => {
@@ -1371,59 +1120,12 @@ export function EmailCaddyWorkspaceContent({
     setAccountSetupStatus('reviewed');
   };
 
-  const handleRunLocalTransportProof = async (action: EmailProviderExecutionAction) => {
-    const account = buildEmailSetupGateAccount(selectedProvider);
-    const consentContract = buildEmailSetupGateConsent(account);
-    const connectorCredentialReference = buildEmailSetupConnectorCredentialReference(account);
-    const localBridgePlan = buildEmailSetupLocalBridgePlan(account);
-    const readinessDecision = evaluateEmailConnectorRuntimeReadiness({
-      account,
-      consentContract,
-      connectorCredentialReference,
-      localBridgePlan,
-    });
-    const result = await executeEmailProviderRuntimeAction({
-      action,
-      account,
-      consentContract,
-      explicitConsent: buildEmailSetupGateExplicitConsent(action, account),
-      connectorCredentialReference,
-      localBridgePlan,
-      readinessDecision,
-      manualSendConfirmation: action === 'send_mail',
-      localTestTransport: buildEmailSetupLocalTestTransport(account, connectorCredentialReference),
-      payload: {
-        proofRequest: 'emailcaddy-local-test-transport',
-      },
-    });
-    setLocalTransportProof(result);
-    if (result.reason === 'local_test_transport_completed') {
-      localTransportProofPassedRef.current = true;
-      setConfiguredAccounts((current) => {
-        const withoutProvider = current.filter((accountState) => accountState.providerId !== selectedProvider.id);
-        return [...withoutProvider, {
-          id: selectedProvider.id,
-          providerId: selectedProvider.id,
-          label: selectedProvider.label,
-          status: 'local-test-transport-proofed',
-          proofCode: result.adapterResult?.code,
-        }];
-      });
-      setAccountSetupStatus('proofed');
-      return;
-    }
-    setAccountSetupStatus('reviewed');
-  };
-
   const handleSaveLocalAccountSetup = () => {
     const nextAccount: ConfiguredEmailAccount = {
       id: selectedProvider.id,
       providerId: selectedProvider.id,
       label: selectedProvider.label,
-      status: localTransportProofPassedRef.current || accountSetupStatus === 'proofed'
-        ? 'local-test-transport-proofed'
-        : 'local-checklist-reviewed',
-      proofCode: localTransportProof?.adapterResult?.code,
+      status: 'local-checklist-reviewed',
     };
 
     setConfiguredAccounts((current) => {
@@ -1439,8 +1141,6 @@ export function EmailCaddyWorkspaceContent({
     setRowMenu(null);
     setAccountSetupOpen(false);
     setAddAccountOpen(false);
-    setLocalTransportProof(null);
-    localTransportProofPassedRef.current = false;
     setShowCc((current) => draft?.cc ? current : false);
     setShowBcc((current) => draft?.bcc ? current : false);
   };
@@ -1686,153 +1386,11 @@ export function EmailCaddyWorkspaceContent({
             ))}
           </ol>
 
-          <div
-            className="mt-3 rounded-[10px] border border-border-subtle bg-bg-primary/70 p-3"
-            role="region"
-            aria-label="Email provider execution gate"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
-                Execution gate
-              </div>
-              <span className="rounded-full border border-accent/20 bg-accent/8 px-2 py-0.5 text-[10px] font-semibold uppercase text-accent">
-                Local contract
-              </span>
-            </div>
-            <p className="mt-2 text-[11px] leading-5 text-text-secondary">
-              These decisions come from the local email execution gate. Live controls stay disabled or plan-only here; {EMAIL_SETUP_GATE_BOUNDARY_COPY}
-            </p>
-            <div className="mt-2 grid gap-2 lg:grid-cols-2">
-              {emailSetupGateRows.map((row) => (
-                <div
-                  key={row.action}
-                  className="min-w-0 rounded-[9px] border border-border-subtle/70 bg-bg-secondary/45 p-2"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="text-[11px] font-semibold text-text-primary">
-                        {row.label}
-                      </div>
-                      <div className="mt-0.5 text-[10px] text-text-muted">
-                        Reason: {row.reason}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => { void handleRunLocalTransportProof(row.action); }}
-                      disabled={row.statusLabel === 'Blocked'}
-                      className={cn(
-                        'shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase transition-colors',
-                        row.statusLabel === 'Plan-only'
-                          ? 'border-accent/20 bg-accent/8 text-accent hover:bg-accent/14'
-                          : 'cursor-not-allowed border-border-subtle bg-bg-primary/80 text-text-muted opacity-60',
-                      )}
-                      aria-label={`${row.label} action ${row.statusLabel.toLowerCase()} by EmailCaddy execution gate`}
-                    >
-                      {row.statusLabel === 'Plan-only' ? 'Run proof' : 'Blocked'}
-                    </button>
-                  </div>
-                  <p className="mt-1.5 text-[11px] leading-5 text-text-secondary">
-                    {row.description}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <p className="mt-2 text-[10px] font-medium text-text-muted">
-              Gate boundary: {EMAIL_SETUP_GATE_BOUNDARY_COPY} Gate reports willSend=false for every action.
-            </p>
-          </div>
-
-          {localTransportProof && (
-            <div
-              className="mt-3 rounded-[10px] border border-accent/20 bg-accent/8 p-3"
-              data-email-local-transport-proof="true"
-              data-email-local-transport-status={localTransportProof.status}
-              data-email-local-transport-reason={localTransportProof.reason}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-accent">
-                  Local test transport
-                </div>
-                <span className="rounded-full border border-accent/20 bg-bg-primary/70 px-2 py-0.5 text-[10px] font-semibold uppercase text-accent">
-                  {localTransportProof.status}
-                </span>
-              </div>
-              <p className="mt-2 text-[11px] leading-5 text-text-secondary">
-                {localTransportProof.reason === 'local_test_transport_completed'
-                  ? `${localTransportProof.adapterResult?.code ?? 'local-test-bound'} proved account, credential, consent, and ${localTransportProof.action.replace(/_/g, ' ')} binding without provider calls.`
-                  : `Proof blocked by ${localTransportProof.reason.replace(/_/g, ' ')}.`}
-              </p>
-              <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-semibold uppercase text-text-muted">
-                <span className="rounded-full border border-border-subtle bg-bg-primary/70 px-2 py-0.5">
-                  Adapter called: {String(localTransportProof.adapterCalled)}
-                </span>
-                <span className="rounded-full border border-border-subtle bg-bg-primary/70 px-2 py-0.5">
-                  Will send: {String(localTransportProof.willSend)}
-                </span>
-                <span className="rounded-full border border-border-subtle bg-bg-primary/70 px-2 py-0.5">
-                  Gate: {localTransportProof.gateReason}
-                </span>
-              </div>
-            </div>
-          )}
-
-          <div
-            className="mt-3 rounded-[10px] border border-border-subtle bg-bg-primary/70 p-3"
-            role="region"
-            aria-label="EmailCaddy runtime UI wiring preview"
-            data-connector-runtime-ui-wiring="emailcaddy"
-            data-connector-runtime-ui-contract={EMAIL_RUNTIME_UI_WIRING_PLAN.contract}
-            data-connector-runtime-ui-executable={String(EMAIL_RUNTIME_UI_WIRING_PLAN.executable)}
-            data-connector-runtime-ui-side-effects={EMAIL_RUNTIME_UI_WIRING_PLAN.sideEffects}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
-                Runtime UI wiring
-              </div>
-              <span className="rounded-full border border-border-subtle bg-bg-primary/80 px-2 py-0.5 text-[10px] font-semibold uppercase text-text-muted">
-                Preview only
-              </span>
-            </div>
-            <p className="mt-2 text-[11px] leading-5 text-text-secondary">
-              Dry-run/readiness rows from the connector runtime UI wiring contract. EmailCaddy displays missing prerequisites only; it does not open OAuth, test providers, resolve credentials, persist runtime state, sync, or send.
-            </p>
-            <div className="mt-2 grid gap-2">
-              {EMAIL_RUNTIME_UI_WIRING_ROWS.map((row) => (
-                <div
-                  key={row.id}
-                  className="rounded-[9px] border border-border-subtle/70 bg-bg-secondary/45 p-2"
-                  data-connector-runtime-ui-row={row.id}
-                  data-connector-runtime-ui-status={row.status}
-                  data-connector-runtime-ui-owner-surface={row.ownerSurface}
-                  data-connector-runtime-ui-executable={String(row.executable)}
-                  data-connector-runtime-ui-side-effects={row.sideEffects}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="text-[11px] font-semibold text-text-primary">{row.label}</div>
-                      <div className="mt-0.5 text-[10px] text-text-muted">{row.kind}</div>
-                    </div>
-                    <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase', runtimeUiWiringStatusClass(row))}>
-                      {row.status}
-                    </span>
-                  </div>
-                  <p className="mt-1.5 text-[11px] leading-5 text-text-secondary">
-                    {row.reason}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <p className="mt-2 text-[10px] font-medium text-text-muted">
-              Boundary: {EMAIL_RUNTIME_UI_WIRING_PLAN.sideEffectBoundary}
-            </p>
-          </div>
-
           <div className="mt-3 rounded-[10px] border border-border-subtle bg-bg-primary/70 px-3 py-2 text-[11px] leading-5 text-text-secondary">
-            {accountSetupStatus === 'idle' && 'Local setup checklist has not been reviewed. Provider test, live sync, bridge probe, and send remain blocked by the execution gate.'}
-            {accountSetupStatus === 'reviewed' && `${selectedProvider.label} local checklist reviewed. Plan-only rows can run the fake local transport proof without provider calls.`}
-            {accountSetupStatus === 'saved' && `${selectedProvider.label} local checklist is staged for this session. Provider readiness, live sync, and send remain disabled.`}
-            {accountSetupStatus === 'proofed' && `${selectedProvider.label} local test transport proof completed. Provider calls, OAuth, live sync, and real send remain disabled.`}
+            {accountSetupStatus === 'idle' && `Complete the checklist above to enable ${selectedProvider.label} in ThreatCaddy.`}
+            {accountSetupStatus === 'reviewed' && `${selectedProvider.label} setup reviewed. Save below to add this account.`}
+            {accountSetupStatus === 'saved' && `${selectedProvider.label} account saved. Live send and sync activate once connected.`}
+            {accountSetupStatus === 'proofed' && `${selectedProvider.label} connection verified locally. Live sync and send will be available after full connection.`}
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
