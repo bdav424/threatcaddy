@@ -1,5 +1,14 @@
-import type { Post, Notification, InvestigationMember } from '../types';
-import type { ActivityEntry } from '../components/CaddyShack/ActivityCard';
+import type { Notification, InvestigationMember } from '../types';
+
+export interface ActivityEntry {
+  id: string;
+  type: string;
+  actor?: { id: string; displayName: string; avatarUrl?: string };
+  target?: { type: string; id: string; title: string };
+  folderId?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
 import i18n from '../i18n';
 
 type GetTokenFn = () => Promise<string | null>;
@@ -279,69 +288,6 @@ export async function updateMemberRole(folderId: string, userId: string, role: s
   if (!resp.ok) throw await apiError(resp, 'Failed to update role');
 }
 
-// ─── CaddyShack ─────────────────────────────────────────────────
-
-export async function fetchFeed(opts: { cursor?: string; limit?: number; folderId?: string }): Promise<Post[]> {
-  const params = new URLSearchParams();
-  if (opts.cursor) params.set('cursor', opts.cursor);
-  if (opts.limit) params.set('limit', String(opts.limit));
-  if (opts.folderId) params.set('folderId', opts.folderId);
-  const resp = await apiFetch(`/api/caddyshack?${params}`);
-  if (!resp.ok) throw new Error('Failed to fetch feed');
-  return resp.json();
-}
-
-export async function createPost(data: {
-  content: string;
-  attachments?: Array<{ id: string; url: string; type: string; mimeType: string; filename: string; size?: number; thumbnailUrl?: string; alt?: string }>;
-  mentions?: string[];
-  folderId?: string | null;
-  parentId?: string | null;
-  replyToId?: string | null;
-  clsLevel?: string | null;
-}): Promise<Post> {
-  const resp = await apiFetch('/api/caddyshack/posts', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-  if (!resp.ok) throw await apiError(resp, 'Failed to create post');
-  return resp.json();
-}
-
-export async function fetchPost(postId: string): Promise<Post> {
-  const resp = await apiFetch(`/api/caddyshack/posts/${postId}`);
-  if (!resp.ok) throw new Error('Failed to fetch post');
-  return resp.json();
-}
-
-export async function editPost(postId: string, updates: { content?: string; pinned?: boolean }) {
-  const resp = await apiFetch(`/api/caddyshack/posts/${postId}`, {
-    method: 'PATCH',
-    body: JSON.stringify(updates),
-  });
-  if (!resp.ok) throw await apiError(resp, 'Failed to edit post');
-}
-
-export async function deletePost(postId: string) {
-  const resp = await apiFetch(`/api/caddyshack/posts/${postId}`, { method: 'DELETE' });
-  if (!resp.ok) throw await apiError(resp, 'Failed to delete post');
-}
-
-export async function addReaction(postId: string, emoji: string) {
-  const resp = await apiFetch(`/api/caddyshack/posts/${postId}/reactions`, {
-    method: 'POST',
-    body: JSON.stringify({ emoji }),
-  });
-  if (!resp.ok) throw new Error('Failed to add reaction');
-}
-
-export async function removeReaction(postId: string, emoji: string) {
-  const resp = await apiFetch(`/api/caddyshack/posts/${postId}/reactions/${encodeURIComponent(emoji)}`, {
-    method: 'DELETE',
-  });
-  if (!resp.ok) throw new Error('Failed to remove reaction');
-}
-
 // ─── Files ──────────────────────────────────────────────────────
 
 export async function uploadFile(file: File, folderId?: string): Promise<{
@@ -443,16 +389,6 @@ export async function fetchAuditLog(opts: { folderId?: string; userId?: string; 
   return resp.json();
 }
 
-export async function fetchTeamActivity(opts: { since?: string; category?: string; limit?: number } = {}): Promise<ActivityEntry[]> {
-  const params = new URLSearchParams();
-  if (opts.since) params.set('since', opts.since);
-  if (opts.category) params.set('category', opts.category);
-  if (opts.limit) params.set('limit', String(opts.limit));
-  const resp = await apiFetch(`/api/audit/team?${params}`);
-  if (!resp.ok) throw new Error('Failed to fetch team activity');
-  return resp.json();
-}
-
 // ─── Notifications ──────────────────────────────────────────────
 
 export async function fetchNotifications(unread = false, limit = 50): Promise<Notification[]> {
@@ -494,23 +430,7 @@ export async function fetchUserProfile(userId: string): Promise<UserProfile> {
   return resp.json();
 }
 
-export async function fetchUserFeed(userId: string): Promise<Post[]> {
-  const resp = await apiFetch(`/api/users/${userId}/feed`);
-  if (!resp.ok) throw new Error('Failed to fetch user feed');
-  return resp.json();
-}
 
-export async function fetchUserLikes(userId: string): Promise<Post[]> {
-  const resp = await apiFetch(`/api/users/${userId}/likes`);
-  if (!resp.ok) throw new Error('Failed to fetch user likes');
-  return resp.json();
-}
-
-export async function fetchUserActivity(userId: string): Promise<ActivityEntry[]> {
-  const resp = await apiFetch(`/api/users/${userId}/activity`);
-  if (!resp.ok) throw new Error('Failed to fetch user activity');
-  return resp.json();
-}
 
 // ─── Backups ─────────────────────────────────────────────────────
 
