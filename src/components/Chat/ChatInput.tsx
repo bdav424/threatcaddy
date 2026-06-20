@@ -6,6 +6,7 @@ import { MODELS as STATIC_MODELS } from '../../lib/models';
 import { cn } from '../../lib/utils';
 import { searchMentions, MENTION_CATEGORIES, type MentionSuggestion } from '../../lib/chat-mentions';
 import { FortuneIntIcon } from '../Common/FortuneIntIcon';
+import { ProviderModelPicker } from '../Common/ProviderModelPicker';
 
 const SLASH_COMMAND_DEFS = [
   { command: '/fetch', descKey: 'slash.fetch', placeholder: '<url>', icon: Globe },
@@ -296,36 +297,24 @@ export function ChatInput({ onSend, onStop, isStreaming, extensionAvailable, mod
 
   return (
     <div className="border-t border-border-subtle p-3 space-y-2">
-      {/* Model selector + extension status */}
-      <div className="flex items-center gap-2 text-xs">
-        {MODELS.length === 0 ? (
-          <span className="text-text-muted text-[10px] italic">{t('input.noApiKeys')}</span>
-        ) : (
-          <select
-            value={model}
-            onChange={(e) => {
-              const m = MODELS.find((m) => m.value === e.target.value);
-              if (m) onModelChange(m.value, m.provider);
-            }}
-            className="bg-bg-deep border border-border-medium rounded px-2 py-1 text-text-secondary focus:outline-none focus:border-purple text-xs"
-          >
-            {Array.from(new Set(MODELS.map(m => m.group))).map(group => (
-              <optgroup key={group} label={group}>
-                {MODELS.filter(m => m.group === group).map(m => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        )}
-        <div className="flex-1" />
-        <div className={cn(
-          'flex items-center gap-1 text-[10px]',
-          canSend ? 'text-accent-green' : 'text-text-muted'
-        )}>
-          {canSend ? <Wifi size={10} /> : <WifiOff size={10} />}
-          {extensionAvailable ? t('input.extensionStatus') : effectiveLocalModelName ? t('input.localLlmStatus') : t('input.noConnection')}
-        </div>
+      {/* Provider + model picker */}
+      <ProviderModelPicker
+        configuredProviders={Array.from(configuredProviders ?? []) as LLMProvider[]}
+        activeProvider={(MODELS.find((m) => m.value === model)?.provider ?? 'anthropic') as LLMProvider}
+        activeModel={model}
+        availableModels={MODELS}
+        onSelectProvider={(provider) => {
+          if (provider === 'inherit') return;
+          const first = MODELS.find((m) => m.provider === provider);
+          if (first) onModelChange(first.value, first.provider);
+        }}
+        onSelectModel={(m, p) => onModelChange(m, p)}
+        onOpenSettings={onOpenSettings}
+      />
+      {/* Connection status */}
+      <div className={cn('flex items-center gap-1 text-[10px]', canSend ? 'text-accent-green' : 'text-text-muted')}>
+        {canSend ? <Wifi size={10} /> : <WifiOff size={10} />}
+        {extensionAvailable ? t('input.extensionStatus') : effectiveLocalModelName ? t('input.localLlmStatus') : t('input.noConnection')}
       </div>
 
       {/* Connection required banner */}
