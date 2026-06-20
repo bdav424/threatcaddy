@@ -776,6 +776,64 @@ function PolicyEditor({ folder, settings, onFolderChanged }: { folder: Folder; s
           </div>
         )}
       </div>
+
+      {/* Investigation memory */}
+      <div className="pt-1 border-t border-border-subtle">
+        <div className="text-[11px] font-medium text-text-secondary uppercase tracking-wide mb-2">Memory</div>
+        <div className="space-y-1.5">
+          {([
+            {
+              field: 'investigationMemoryEnabled' as const,
+              label: 'Investigation memory',
+              description: 'CaddyAI remembers context within this case',
+            },
+            {
+              field: 'sealedCaseMemory' as const,
+              label: 'Sensitive case mode',
+              description: 'Seal boundary — suppress reusable lessons',
+            },
+            {
+              field: 'suppressAgentLearning' as const,
+              label: 'Suppress agent learning',
+              description: 'Prevent this case from informing future investigations',
+            },
+          ] as const).map(({ field, label, description }) => {
+            const checked = Boolean(folder[field]);
+            const disabled = field === 'suppressAgentLearning' && Boolean(folder.sealedCaseMemory);
+            return (
+              <button
+                key={field}
+                role="checkbox"
+                aria-checked={checked}
+                aria-label={label}
+                disabled={disabled}
+                onClick={async () => {
+                  const update: Partial<Folder> = { [field]: !checked };
+                  if (field === 'sealedCaseMemory' && !checked) update.suppressAgentLearning = true;
+                  await db.folders.update(folder.id, update);
+                  onFolderChanged?.();
+                }}
+                className={cn(
+                  'flex w-full items-center gap-2 text-start px-2 py-1.5 rounded border transition-colors',
+                  disabled ? 'opacity-40 cursor-not-allowed border-border-subtle bg-surface' :
+                  checked ? 'border-accent-amber/30 bg-accent-amber/5' : 'border-border-subtle bg-surface',
+                )}
+              >
+                <div className={cn(
+                  'w-3 h-3 rounded-sm border flex items-center justify-center shrink-0',
+                  checked ? 'bg-accent-amber border-accent-amber text-white' : 'border-border-medium',
+                )}>
+                  {checked && <span className="text-[8px]">✓</span>}
+                </div>
+                <div>
+                  <div className="text-xs text-text-primary">{label}</div>
+                  <div className="text-[10px] text-text-muted">{description}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import {
   Brain,
   CheckCircle2,
-  Database,
   FileText,
   GitBranch,
   Loader2,
@@ -11,7 +10,6 @@ import {
   Search,
   Server,
   ShieldCheck,
-  SlidersHorizontal,
   Clipboard,
   PlayCircle,
   XCircle,
@@ -32,7 +30,6 @@ interface EndpointProbe {
 interface ExperimentalViewProps {
   folder?: Folder;
   settings: Settings;
-  onUpdateFolder: (id: string, updates: Partial<Folder>) => void | Promise<void>;
   onUpdateSettings: (updates: Partial<Settings>) => void;
   onOpenChat: () => void;
 }
@@ -166,36 +163,6 @@ async function probeEndpoint(endpoint: string): Promise<EndpointProbe> {
   }
 }
 
-function ToggleRow({
-  title,
-  description,
-  checked,
-  disabled,
-  onChange,
-}: {
-  title: string;
-  description: string;
-  checked: boolean;
-  disabled?: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className="flex w-full items-center justify-between gap-4 rounded-xl border border-border-subtle bg-bg-base/55 px-4 py-3 text-left transition hover:border-border-medium disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      <span>
-        <span className="block text-sm font-semibold text-text-primary">{title}</span>
-        <span className="mt-1 block text-xs leading-5 text-text-muted">{description}</span>
-      </span>
-      <span className={`relative h-6 w-11 shrink-0 rounded-full border transition ${checked ? 'border-accent-blue bg-accent-blue' : 'border-border-medium bg-bg-surface'}`}>
-        <span className={`absolute top-0.5 h-[1.125rem] w-[1.125rem] rounded-full bg-white shadow transition ${checked ? 'left-5' : 'left-0.5'}`} />
-      </span>
-    </button>
-  );
-}
 
 function ProbeStatusIcon({ status }: { status: EndpointProbeStatus }) {
   if (status === 'probing') return <Loader2 className="animate-spin text-accent-blue" size={16} />;
@@ -368,7 +335,7 @@ function ActionRequestPanel({
   );
 }
 
-export function ExperimentalView({ folder, settings, onUpdateFolder, onUpdateSettings, onOpenChat }: ExperimentalViewProps) {
+export function ExperimentalView({ folder, settings, onUpdateSettings, onOpenChat }: ExperimentalViewProps) {
   const [activeLane, setActiveLane] = useState<PrototypeLane | null>(null);
   const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>({});
   const [customEndpoint, setCustomEndpoint] = useState('');
@@ -381,14 +348,6 @@ export function ExperimentalView({ folder, settings, onUpdateFolder, onUpdateSet
     }))
   ));
   const [probing, setProbing] = useState(false);
-  const [previewMemoryEnabled, setPreviewMemoryEnabled] = useState(false);
-  const [previewSealedCaseMemory, setPreviewSealedCaseMemory] = useState(false);
-  const [previewSuppressAgentLearning, setPreviewSuppressAgentLearning] = useState(false);
-
-  const memoryEnabled = folder ? folder.investigationMemoryEnabled === true : previewMemoryEnabled;
-  const sealedCaseMemory = folder ? folder.sealedCaseMemory === true : previewSealedCaseMemory;
-  const suppressAgentLearning = folder ? folder.suppressAgentLearning === true : previewSuppressAgentLearning;
-
   async function scanEndpoints() {
     const endpoints = uniqueEndpoints(settings.llmLocalEndpoint, customEndpoint);
     setProbing(true);
@@ -397,23 +356,6 @@ export function ExperimentalView({ folder, settings, onUpdateFolder, onUpdateSet
     const results = await Promise.all(endpoints.map((endpoint) => probeEndpoint(endpoint)));
     setProbes(results);
     setProbing(false);
-  }
-
-  function updateFolderMemory(updates: Partial<Folder>) {
-    if (folder) {
-      void onUpdateFolder(folder.id, updates);
-      return;
-    }
-
-    if (updates.investigationMemoryEnabled !== undefined) {
-      setPreviewMemoryEnabled(updates.investigationMemoryEnabled);
-    }
-    if (updates.sealedCaseMemory !== undefined) {
-      setPreviewSealedCaseMemory(updates.sealedCaseMemory);
-    }
-    if (updates.suppressAgentLearning !== undefined) {
-      setPreviewSuppressAgentLearning(updates.suppressAgentLearning);
-    }
   }
 
   function selectEndpoint(probe: EndpointProbe) {
@@ -534,51 +476,7 @@ export function ExperimentalView({ folder, settings, onUpdateFolder, onUpdateSet
           />
         )}
 
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-          <article className="rounded-2xl border border-amber-400/30 bg-bg-raised p-5">
-            <div className="mb-5 flex items-start justify-between gap-3">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">
-                  <Database size={14} />
-                  Memory hygiene
-                </div>
-                <h2 className="mt-3 text-lg font-semibold text-text-primary">Investigation memory controls</h2>
-                <p className="mt-2 text-sm leading-6 text-text-secondary">
-                  Prototype narrow CaddyAI memory as an investigation-local feature. Sensitive cases can suppress durable learning before any memory table exists.
-                </p>
-              </div>
-              <SlidersHorizontal className="text-text-muted" size={22} />
-            </div>
-
-            <div className="grid gap-3">
-              <ToggleRow
-                title="Enable investigation memory"
-                description="Allow CaddyAI to remember reviewed context only for this investigation. Default is off."
-                checked={memoryEnabled}
-                onChange={(checked) => updateFolderMemory({ investigationMemoryEnabled: checked })}
-              />
-              <ToggleRow
-                title="Sensitive case mode"
-                description="Seal the case boundary and suppress reusable lessons for this investigation."
-                checked={sealedCaseMemory}
-                onChange={(checked) => updateFolderMemory({ sealedCaseMemory: checked, suppressAgentLearning: checked ? true : suppressAgentLearning })}
-              />
-              <ToggleRow
-                title="Suppress reusable agent learning"
-                description="Prevent this case from contributing memories, patterns, or defaults to future investigations."
-                checked={suppressAgentLearning}
-                disabled={sealedCaseMemory}
-                onChange={(checked) => updateFolderMemory({ suppressAgentLearning: checked })}
-              />
-            </div>
-
-            <div className="mt-4 rounded-xl border border-border-subtle bg-bg-base/50 p-3 text-xs leading-5 text-text-muted">
-              {folder
-                ? 'These controls persist on the selected investigation record only. They do not create a new database table or export memory content.'
-                : 'Preview mode: these toggles are interactive here, but they will not persist until an investigation is selected.'}
-            </div>
-          </article>
-
+        <section className="grid gap-4">
           <article className="rounded-2xl border border-rose-400/30 bg-bg-raised p-5">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>

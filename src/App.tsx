@@ -2389,7 +2389,6 @@ const AppInner = memo(function AppInner({
     <ExperimentalView
       folder={selectedFolder}
       settings={settings}
-      onUpdateFolder={updateFolder}
       onUpdateSettings={updateSettings}
       onOpenChat={() => navigateTo('chat')}
     />
