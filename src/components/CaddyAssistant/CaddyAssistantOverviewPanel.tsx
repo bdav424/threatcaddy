@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import {
   AlertCircle,
   ArrowRight,
@@ -530,7 +530,7 @@ function SignalSummaryCard({
   );
 }
 
-export function CaddyAssistantOverviewPanel() {
+export const CaddyAssistantOverviewPanel = memo(function CaddyAssistantOverviewPanel() {
   const { navigateTo } = useNavigation();
   const { openSettings } = useUIModals();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -1277,7 +1277,7 @@ export function CaddyAssistantOverviewPanel() {
       </p>
     </WorkspaceShell>
   );
-}
+});
 
 const STATUS_ICON: Record<OnboardingStepStatus, string> = {
   complete: '✓',

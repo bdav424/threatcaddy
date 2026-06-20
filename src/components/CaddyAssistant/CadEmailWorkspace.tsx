@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
 import {
   Check,
   CornerUpLeft,
@@ -696,7 +696,7 @@ export function EmailCaddyWorkspace() {
   );
 }
 
-export function EmailCaddyWorkspaceContent({
+export const EmailCaddyWorkspaceContent = memo(function EmailCaddyWorkspaceContent({
   compactPanel = false,
   onWorkspaceOwnPanel,
   onWorkspacePanelDragStart,
@@ -3140,6 +3140,6 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
       </div>
     </section>
   );
-}
+});
 
 export const CadEmailWorkspace = EmailCaddyWorkspace;

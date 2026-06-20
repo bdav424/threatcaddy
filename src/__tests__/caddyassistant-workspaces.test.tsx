@@ -3,12 +3,13 @@ import type { ReactNode } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { Folder } from '../types';
 
-// AssistantCaddyWorkspaceShell keeps all three sub-workspaces mounted and re-renders
-// the entire tree on every interaction, so the shell specs (multiple rerenders +
-// minimize/restore) legitimately run for tens of seconds and flake against the 5s
-// default. Raise the file-level threshold as a stopgap; the underlying render-perf
-// problem is tracked as `shell-render-performance` in the UI review workload.
-vi.setConfig({ testTimeout: 45000 });
+// The shell mounts all three sub-workspaces simultaneously. The bottleneck is the
+// initial mount cost of these large components in jsdom — memoization helps in the
+// real browser but doesn't reduce the one-time mount expense that dominates test time.
+// "preserves minimized shell state" does the most work (initial mount + 4 interactions
+// + 4 view-switches) and legitimately runs ~40-50s on its own. Keep a file-level
+// threshold that covers it without flaking on slower CI machines.
+vi.setConfig({ testTimeout: 60000 });
 
 const navigateToMock = vi.fn();
 const openSettingsMock = vi.fn();

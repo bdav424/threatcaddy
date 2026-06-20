@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
 import {
   AudioLines,
   Baby,
@@ -1000,7 +1000,7 @@ export function CalendarCaddyWorkspace() {
   );
 }
 
-export function CalendarCaddyWorkspaceContent({
+export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspaceContent({
   compactPanel = false,
   compactPanelWidth,
   onWorkspaceOwnPanel,
@@ -3596,4 +3596,4 @@ export function CalendarCaddyWorkspaceContent({
       )}
     </section>
   );
-}
+});

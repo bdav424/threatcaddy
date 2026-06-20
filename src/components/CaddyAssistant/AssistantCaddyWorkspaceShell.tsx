@@ -1,4 +1,4 @@
-import { useCallback, type DragEvent, type ReactNode } from 'react';
+import { useCallback, useMemo, type DragEvent, type ReactNode } from 'react';
 import { useNavigation } from '../../contexts/NavigationContext';
 import { WorkspacePanel } from '../WorkspacePanels/WorkspacePanel';
 import { WorkspacePanelDock } from '../WorkspacePanels/WorkspacePanelDock';
@@ -82,6 +82,31 @@ export function AssistantCaddyWorkspaceShellContent({
   const calendarWorkspacePanelActive = (shellPanelActive && view === 'calendar')
     || (workspaceActive && workspaceOwnedPanelIds.has(CALENDARCADDY_WORKSPACE_PANEL_ID));
 
+  const emailChildren = useCallback(
+    (compact: boolean, surfaceDragStart?: (event: DragEvent<HTMLElement>) => void) => (
+      <EmailCaddyWorkspaceContent
+        compactPanel={compact}
+        onWorkspaceOwnPanel={onWorkspaceOwnPanel}
+        onWorkspacePanelDragStart={surfaceDragStart}
+      />
+    ),
+    [onWorkspaceOwnPanel],
+  );
+
+  const calendarChildren = useCallback(
+    (compact: boolean, width: number, surfaceDragStart?: (event: DragEvent<HTMLElement>) => void) => (
+      <CalendarCaddyWorkspaceContent
+        compactPanel={compact}
+        compactPanelWidth={width}
+        onWorkspaceOwnPanel={onWorkspaceOwnPanel}
+        onWorkspacePanelDragStart={surfaceDragStart}
+      />
+    ),
+    [onWorkspaceOwnPanel],
+  );
+
+  const overviewChild = useMemo(() => <CaddyAssistantOverviewPanel />, []);
+
   return (
     <>
       <AssistantCaddyOverviewWorkspacePanel
@@ -90,7 +115,7 @@ export function AssistantCaddyWorkspaceShellContent({
         onWorkspaceOwnPanel={onWorkspaceOwnPanel}
         onWorkspaceClosePanel={onWorkspaceClosePanel}
       >
-        <CaddyAssistantOverviewPanel />
+        {overviewChild}
       </AssistantCaddyOverviewWorkspacePanel>
       <EmailCaddyWorkspacePanel
         routeActive={emailRouteActive}
@@ -98,13 +123,7 @@ export function AssistantCaddyWorkspaceShellContent({
         onWorkspaceOwnPanel={onWorkspaceOwnPanel}
         onWorkspaceClosePanel={onWorkspaceClosePanel}
       >
-        {(compact, surfaceDragStart) => (
-          <EmailCaddyWorkspaceContent
-            compactPanel={compact}
-            onWorkspaceOwnPanel={onWorkspaceOwnPanel}
-            onWorkspacePanelDragStart={surfaceDragStart}
-          />
-        )}
+        {emailChildren}
       </EmailCaddyWorkspacePanel>
       <CalendarCaddyWorkspacePanel
         routeActive={calendarRouteActive}
@@ -112,14 +131,7 @@ export function AssistantCaddyWorkspaceShellContent({
         onWorkspaceOwnPanel={onWorkspaceOwnPanel}
         onWorkspaceClosePanel={onWorkspaceClosePanel}
       >
-        {(compact, width, surfaceDragStart) => (
-          <CalendarCaddyWorkspaceContent
-            compactPanel={compact}
-            compactPanelWidth={width}
-            onWorkspaceOwnPanel={onWorkspaceOwnPanel}
-            onWorkspacePanelDragStart={surfaceDragStart}
-          />
-        )}
+        {calendarChildren}
       </CalendarCaddyWorkspacePanel>
     </>
   );
