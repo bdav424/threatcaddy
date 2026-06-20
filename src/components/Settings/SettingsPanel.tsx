@@ -885,6 +885,7 @@ function AssistantCaddyAISetup({
                 }
                 onOpenIntegrations();
               }}
+              aria-label="Assistant route"
               className={`${selectClass} mt-1 w-full`}
             >
               <option value="caddyai">Existing CaddyAI route</option>
@@ -893,9 +894,10 @@ function AssistantCaddyAISetup({
               <option value="generic">Generic adapter placeholder</option>
             </select>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={hasAnyRoute ? 'configured' : 'not-configured'} />
-            {routeSelection === 'local' && <StatusPill status={localStatus} />}
+            <StatusPill status={openAIConfigured ? 'configured' : 'not-configured'} />
+            <StatusPill status={localStatus} />
           </div>
         </div>
         <div className="grid gap-3 lg:grid-cols-2">
@@ -1069,7 +1071,7 @@ function AssistantCaddyAISetup({
         </p>
       </section>
       <div className="flex flex-col gap-2 rounded-lg border border-gray-800 bg-gray-900/25 p-3 text-[11px] leading-5 text-gray-500 sm:flex-row sm:items-center sm:justify-between">
-        <span>AssistantCaddy route selection stays separate from email, calendar, and connector-specific setup surfaces.</span>
+        <span>Email and calendar setup live under Integrations/route-specific setup, not AssistantCaddy AI.</span>
         <button
           type="button"
           onClick={onOpenIntegrations}

@@ -626,14 +626,20 @@ describe('SettingsPanel', () => {
     render(<SettingsPanel {...defaultProps} onUpdateSettings={onUpdateSettings} />);
     clickTab('AI');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Use OpenAI-compatible API' }));
+    const routeSelect = screen.getByRole('combobox', { name: 'Assistant route' });
+
+    fireEvent.change(routeSelect, { target: { value: 'openai' } });
     expect(lastSettingsUpdate(onUpdateSettings)).toEqual({
-      llmDefaultProvider: 'openai',
-      llmDefaultModel: 'gpt-4.1',
+      assistantLlmSeparate: true,
+      assistantLlmDefaultProvider: 'openai',
+      assistantLlmDefaultModel: 'gpt-4.1',
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Use local Ollama / localhost' }));
-    expect(lastSettingsUpdate(onUpdateSettings)).toEqual({ llmDefaultProvider: 'local' });
+    fireEvent.change(routeSelect, { target: { value: 'local' } });
+    expect(lastSettingsUpdate(onUpdateSettings)).toEqual({
+      assistantLlmSeparate: true,
+      assistantLlmDefaultProvider: 'local',
+    });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
