@@ -493,7 +493,6 @@ export function createProviderAuthSessionAdapterPlan(
   let credentialRejectReason: ConnectorCredentialReferenceRejectReason | undefined;
   let sessionHandleReference: ProviderAuthSessionHandleReference | undefined;
   let callbackMetadata: ProviderAuthSessionCallbackMetadata | undefined;
-  let adapterCapabilities: ProviderAuthSessionAdapterCapabilities | undefined;
 
   if (hasConnectorSecretMaterial(planInput) || hasConnectorSecretMaterial(planInput.additionalUntrustedInputs)) {
     blockReasons.push('raw_secret_material_detected');
@@ -507,7 +506,7 @@ export function createProviderAuthSessionAdapterPlan(
   if (accountIdState === 'invalid') blockReasons.push('invalid_account_id');
 
   const parsedCapabilities = parseAdapterCapabilities(planInput.adapterCapabilities);
-  adapterCapabilities = parsedCapabilities.capabilities;
+  const adapterCapabilities: ProviderAuthSessionAdapterCapabilities | undefined = parsedCapabilities.capabilities;
   if (parsedCapabilities.executableClaimBlocked) blockReasons.push('adapter_executable_claim_blocked');
   if (!adapterCapabilities) {
     blockReasons.push('missing_adapter_capabilities');

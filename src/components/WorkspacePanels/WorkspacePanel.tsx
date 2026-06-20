@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- chrome-state hooks are co-located with the panel component by design */
 import {
   createContext,
   useCallback,

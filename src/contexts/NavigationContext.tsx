@@ -187,13 +187,15 @@ export function NavigationProvider({
   const [pendingNewEvent, setPendingNewEvent] = useState(false);
 
   // -- Refs --
-  const initialHistoryStateRef = useRef<NavState>({
+  // Captured once at first render (lazy useState initializer) so it can be read during
+  // render without tripping the "no ref access during render" rule.
+  const [initialHistoryState] = useState<NavState>(() => ({
     view: activeView,
     selectedNoteId,
     selectedTimelineId,
     selectedWhiteboardId,
     selectedFolderId,
-  });
+  }));
   const notesContainerRef = useRef<HTMLDivElement | null>(null);
   const noteNavGraceRef = useRef(false);
 
@@ -208,7 +210,7 @@ export function NavigationProvider({
   }, [onCloseSettings, onRestoreFolderId]);
 
   const { navigate: navPush } = useNavigationHistory({
-    initialState: initialHistoryStateRef.current,
+    initialState: initialHistoryState,
     onViewChange: handleNavRestore,
   });
 

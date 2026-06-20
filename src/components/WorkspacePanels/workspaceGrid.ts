@@ -2,7 +2,7 @@ import type { WorkspacePanelGeometry } from './workspace-panel-context';
 
 export type WorkspaceGridKey = '1x1' | '1x2' | '2x1' | '2x2' | '3x2' | '3x3' | '4x2' | '4x1' | '4x4';
 
-export interface WorkspaceCanvasRect extends WorkspacePanelGeometry {}
+export type WorkspaceCanvasRect = WorkspacePanelGeometry;
 
 export interface WorkspaceGridSpec {
   key: WorkspaceGridKey;

@@ -386,6 +386,7 @@ describe('connector explicit consent grant contract', () => {
   });
 
   it('blocks missing or mismatched side-effect acknowledgement', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured out to omit it from the rest
     const { sideEffectAcknowledgement: _sideEffectAcknowledgement, ...withoutAcknowledgement } = grant();
 
     expect(evaluateConnectorExplicitConsent({

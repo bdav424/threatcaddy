@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- panel-id constants are co-located with the shell component by design */
 import { Bot, Briefcase, Download, Maximize2, Save, Upload } from 'lucide-react';
 import {
   createContext,

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- geometry helpers + hooks are co-located with the provider by design */
 import {
   useMemo,
   useReducer,
