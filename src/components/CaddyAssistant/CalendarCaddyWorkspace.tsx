@@ -1068,7 +1068,7 @@ export function CalendarCaddyWorkspaceContent({
   const primaryAccountId = calendarAccountConfigs.find((a) => a.calendarEnabled && a.status === 'connected')?.id ?? null;
 
   const { syncing, lastSyncedAt, error: syncError, sync } = useCalendarSync(
-    events, setEvents, pendingDeletions, setPendingDeletions, calendarAccounts, primaryAccountId,
+    setEvents, pendingDeletions, setPendingDeletions, calendarAccounts, primaryAccountId,
   );
 
   // Calendar connect panel state
