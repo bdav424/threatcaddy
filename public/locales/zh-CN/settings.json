@@ -437,5 +437,17 @@
   "security.totpConfirmDisable": "禁用两步验证",
   "security.unusedBackupCodes": "剩余{{count}}个未使用备用代码",
   "security.totpEnabledToast": "双因素身份验证已启用",
-  "security.totpDisabledToast": "双因素身份验证已禁用"
+  "security.totpDisabledToast": "双因素身份验证已禁用",
+  "passkeys.title": "通行密钥",
+  "passkeys.desc": "使用设备生物特征或PIN码而非密码登录。",
+  "passkeys.none": "未注册任何通行密钥",
+  "passkeys.loading": "正在加载通行密钥...",
+  "passkeys.register": "添加通行密钥",
+  "passkeys.registering": "正在注册...",
+  "passkeys.namePlaceholder": "通行密钥名称（可选）",
+  "passkeys.delete": "删除通行密钥",
+  "passkeys.registeredToast": "通行密钥\"{{name}}\"已添加",
+  "passkeys.deletedToast": "通行密钥已删除",
+  "server.passkeyLogin": "使用通行密钥登录",
+  "server.passkeyLoggingIn": "等待通行密钥..."
 }

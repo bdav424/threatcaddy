@@ -437,5 +437,17 @@
   "security.totpConfirmDisable": "غیرفعال کردن ۲FA",
   "security.unusedBackupCodes": "{{count}} کد پشتیبان استفاده‌نشده باقی مانده",
   "security.totpEnabledToast": "احراز هویت دو مرحله‌ای فعال شد",
-  "security.totpDisabledToast": "احراز هویت دو مرحله‌ای غیرفعال شد"
+  "security.totpDisabledToast": "احراز هویت دو مرحله‌ای غیرفعال شد",
+  "passkeys.title": "کلیدهای عبور",
+  "passkeys.desc": "با بیومتریک دستگاه یا PIN به جای رمز عبور وارد شوید.",
+  "passkeys.none": "هیچ کلید عبوری ثبت نشده است",
+  "passkeys.loading": "در حال بارگذاری کلیدهای عبور...",
+  "passkeys.register": "افزودن کلید عبور",
+  "passkeys.registering": "در حال ثبت‌نام...",
+  "passkeys.namePlaceholder": "نام کلید عبور (اختیاری)",
+  "passkeys.delete": "حذف کلید عبور",
+  "passkeys.registeredToast": "کلید عبور «{{name}}» اضافه شد",
+  "passkeys.deletedToast": "کلید عبور حذف شد",
+  "server.passkeyLogin": "ورود با کلید عبور",
+  "server.passkeyLoggingIn": "در انتظار کلید عبور..."
 }

@@ -437,5 +437,17 @@
   "security.totpConfirmDisable": "2FA uitschakelen",
   "security.unusedBackupCodes": "{{count}} ongebruikte back-upcodes resterend",
   "security.totpEnabledToast": "Tweefactorauthenticatie ingeschakeld",
-  "security.totpDisabledToast": "Tweefactorauthenticatie uitgeschakeld"
+  "security.totpDisabledToast": "Tweefactorauthenticatie uitgeschakeld",
+  "passkeys.title": "Passkeys",
+  "passkeys.desc": "Log in met de biometrie of PIN van uw apparaat in plaats van een wachtwoord.",
+  "passkeys.none": "Geen passkeys geregistreerd",
+  "passkeys.loading": "Passkeys laden...",
+  "passkeys.register": "Passkey toevoegen",
+  "passkeys.registering": "Registreren...",
+  "passkeys.namePlaceholder": "Passkey naam (optioneel)",
+  "passkeys.delete": "Passkey verwijderen",
+  "passkeys.registeredToast": "Passkey \"{{name}}\" toegevoegd",
+  "passkeys.deletedToast": "Passkey verwijderd",
+  "server.passkeyLogin": "Inloggen met passkey",
+  "server.passkeyLoggingIn": "Wachten op passkey..."
 }

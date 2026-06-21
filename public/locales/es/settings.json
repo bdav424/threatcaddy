@@ -437,5 +437,17 @@
   "security.totpConfirmDisable": "Desactivar 2FA",
   "security.unusedBackupCodes": "{{count}} códigos de respaldo sin usar restantes",
   "security.totpEnabledToast": "Autenticación en dos pasos activada",
-  "security.totpDisabledToast": "Autenticación en dos pasos desactivada"
+  "security.totpDisabledToast": "Autenticación en dos pasos desactivada",
+  "passkeys.title": "Llaves de acceso",
+  "passkeys.desc": "Inicia sesión con la biometría de tu dispositivo o PIN en lugar de contraseña.",
+  "passkeys.none": "No hay llaves de acceso registradas",
+  "passkeys.loading": "Cargando llaves de acceso...",
+  "passkeys.register": "Agregar llave de acceso",
+  "passkeys.registering": "Registrando...",
+  "passkeys.namePlaceholder": "Nombre de la llave (opcional)",
+  "passkeys.delete": "Eliminar llave de acceso",
+  "passkeys.registeredToast": "Llave de acceso \"{{name}}\" añadida",
+  "passkeys.deletedToast": "Llave de acceso eliminada",
+  "server.passkeyLogin": "Iniciar sesión con llave de acceso",
+  "server.passkeyLoggingIn": "Esperando llave de acceso..."
 }

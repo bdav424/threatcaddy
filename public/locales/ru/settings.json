@@ -437,5 +437,17 @@
   "security.totpConfirmDisable": "Отключить 2FA",
   "security.unusedBackupCodes": "Осталось {{count}} неиспользованных резервных кодов",
   "security.totpEnabledToast": "Двухфакторная аутентификация включена",
-  "security.totpDisabledToast": "Двухфакторная аутентификация отключена"
+  "security.totpDisabledToast": "Двухфакторная аутентификация отключена",
+  "passkeys.title": "Пассключи",
+  "passkeys.desc": "Входите с помощью биометрии устройства или PIN-кода вместо пароля.",
+  "passkeys.none": "Нет зарегистрированных пассключей",
+  "passkeys.loading": "Загрузка пассключей...",
+  "passkeys.register": "Добавить пассключ",
+  "passkeys.registering": "Регистрация...",
+  "passkeys.namePlaceholder": "Название пассключа (необязательно)",
+  "passkeys.delete": "Удалить пассключ",
+  "passkeys.registeredToast": "Пассключ \"{{name}}\" добавлен",
+  "passkeys.deletedToast": "Пассключ удалён",
+  "server.passkeyLogin": "Войти с пассключом",
+  "server.passkeyLoggingIn": "Ожидание пассключа..."
 }

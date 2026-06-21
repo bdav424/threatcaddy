@@ -437,5 +437,17 @@
   "security.totpConfirmDisable": "Tắt 2FA",
   "security.unusedBackupCodes": "Còn {{count}} mã dự phòng chưa sử dụng",
   "security.totpEnabledToast": "Đã bật xác thực hai yếu tố",
-  "security.totpDisabledToast": "Đã tắt xác thực hai yếu tố"
+  "security.totpDisabledToast": "Đã tắt xác thực hai yếu tố",
+  "passkeys.title": "Passkey",
+  "passkeys.desc": "Đăng nhập bằng sinh trắc học hoặc PIN của thiết bị thay vì mật khẩu.",
+  "passkeys.none": "Không có passkey nào được đăng ký",
+  "passkeys.loading": "Đang tải passkey...",
+  "passkeys.register": "Thêm passkey",
+  "passkeys.registering": "Đang đăng ký...",
+  "passkeys.namePlaceholder": "Tên passkey (tùy chọn)",
+  "passkeys.delete": "Xóa passkey",
+  "passkeys.registeredToast": "Đã thêm passkey \"{{name}}\"",
+  "passkeys.deletedToast": "Đã xóa passkey",
+  "server.passkeyLogin": "Đăng nhập bằng passkey",
+  "server.passkeyLoggingIn": "Đang chờ passkey..."
 }

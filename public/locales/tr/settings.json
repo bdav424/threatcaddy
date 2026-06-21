@@ -437,5 +437,17 @@
   "security.totpConfirmDisable": "2FA'yı devre dışı bırak",
   "security.unusedBackupCodes": "{{count}} kullanılmamış yedek kod kaldı",
   "security.totpEnabledToast": "İki faktörlü kimlik doğrulama etkinleştirildi",
-  "security.totpDisabledToast": "İki faktörlü kimlik doğrulama devre dışı bırakıldı"
+  "security.totpDisabledToast": "İki faktörlü kimlik doğrulama devre dışı bırakıldı",
+  "passkeys.title": "Geçiş Anahtarları",
+  "passkeys.desc": "Şifre yerine cihazınızın biyometrik verilerini veya PIN'inizi kullanarak giriş yapın.",
+  "passkeys.none": "Kayıtlı geçiş anahtarı yok",
+  "passkeys.loading": "Geçiş anahtarları yükleniyor...",
+  "passkeys.register": "Geçiş anahtarı ekle",
+  "passkeys.registering": "Kaydediliyor...",
+  "passkeys.namePlaceholder": "Anahtar adı (isteğe bağlı)",
+  "passkeys.delete": "Geçiş anahtarını kaldır",
+  "passkeys.registeredToast": "\"{{name}}\" geçiş anahtarı eklendi",
+  "passkeys.deletedToast": "Geçiş anahtarı kaldırıldı",
+  "server.passkeyLogin": "Geçiş anahtarıyla giriş yap",
+  "server.passkeyLoggingIn": "Geçiş anahtarı bekleniyor..."
 }

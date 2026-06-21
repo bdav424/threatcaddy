@@ -31,6 +31,7 @@ import caddyAgentRoutes, { heartbeatManager } from './routes/caddy-agents.js';
 import webhookRoutes from './routes/webhooks.js';
 import adminRoutes from './routes/admin/index.js';
 import { mfaRouter } from './routes/mfa.js';
+import { passkeyRouter } from './routes/passkeys.js';
 import { botManager } from './bots/bot-manager.js';
 import { prePullSandboxImages } from './bots/sandbox.js';
 import { initAdminSecret, initRegistrationMode, initServerName, getServerName, backfillFolderOwners, initAdminSystemUser } from './services/admin-secret.js';
@@ -253,6 +254,7 @@ app.post('/api/proxy-fetch', requireAuth as never, async (c) => {
 // API routes
 app.route('/api/auth', authRoutes);
 app.route('/api/mfa', mfaRouter);
+app.route('/api/passkeys', passkeyRouter);
 app.route('/api/sync', syncRoutes);
 app.route('/api/investigations', investigationRoutes);
 app.route('/api/caddyshack', caddyshackRoutes);

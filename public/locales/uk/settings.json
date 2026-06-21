@@ -437,5 +437,17 @@
   "security.totpConfirmDisable": "Вимкнути 2FA",
   "security.unusedBackupCodes": "Залишилось {{count}} невикористаних резервних кодів",
   "security.totpEnabledToast": "Двофакторну автентифікацію увімкнено",
-  "security.totpDisabledToast": "Двофакторну автентифікацію вимкнено"
+  "security.totpDisabledToast": "Двофакторну автентифікацію вимкнено",
+  "passkeys.title": "Паскі",
+  "passkeys.desc": "Входьте за допомогою біометрії пристрою або PIN замість пароля.",
+  "passkeys.none": "Немає зареєстрованих паскі",
+  "passkeys.loading": "Завантаження паскі...",
+  "passkeys.register": "Додати паскі",
+  "passkeys.registering": "Реєстрація...",
+  "passkeys.namePlaceholder": "Назва паскі (необов'язково)",
+  "passkeys.delete": "Видалити паскі",
+  "passkeys.registeredToast": "Паскі «{{name}}» додано",
+  "passkeys.deletedToast": "Паскі видалено",
+  "server.passkeyLogin": "Увійти з паскі",
+  "server.passkeyLoggingIn": "Очікування паскі..."
 }

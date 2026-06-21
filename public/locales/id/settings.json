@@ -437,5 +437,17 @@
   "security.totpConfirmDisable": "Nonaktifkan 2FA",
   "security.unusedBackupCodes": "{{count}} kode cadangan yang belum digunakan tersisa",
   "security.totpEnabledToast": "Autentikasi dua faktor diaktifkan",
-  "security.totpDisabledToast": "Autentikasi dua faktor dinonaktifkan"
+  "security.totpDisabledToast": "Autentikasi dua faktor dinonaktifkan",
+  "passkeys.title": "Passkey",
+  "passkeys.desc": "Masuk dengan biometrik atau PIN perangkat Anda, bukan kata sandi.",
+  "passkeys.none": "Tidak ada passkey yang terdaftar",
+  "passkeys.loading": "Memuat passkey...",
+  "passkeys.register": "Tambah passkey",
+  "passkeys.registering": "Mendaftarkan...",
+  "passkeys.namePlaceholder": "Nama passkey (opsional)",
+  "passkeys.delete": "Hapus passkey",
+  "passkeys.registeredToast": "Passkey \"{{name}}\" ditambahkan",
+  "passkeys.deletedToast": "Passkey dihapus",
+  "server.passkeyLogin": "Masuk dengan passkey",
+  "server.passkeyLoggingIn": "Menunggu passkey..."
 }

@@ -437,5 +437,17 @@
   "security.totpConfirmDisable": "Désactiver la 2FA",
   "security.unusedBackupCodes": "{{count}} codes de secours non utilisés restants",
   "security.totpEnabledToast": "Authentification à deux facteurs activée",
-  "security.totpDisabledToast": "Authentification à deux facteurs désactivée"
+  "security.totpDisabledToast": "Authentification à deux facteurs désactivée",
+  "passkeys.title": "Clés d'accès",
+  "passkeys.desc": "Connectez-vous avec la biométrie de votre appareil ou un code PIN plutôt qu'un mot de passe.",
+  "passkeys.none": "Aucune clé d'accès enregistrée",
+  "passkeys.loading": "Chargement des clés d'accès...",
+  "passkeys.register": "Ajouter une clé d'accès",
+  "passkeys.registering": "Enregistrement...",
+  "passkeys.namePlaceholder": "Nom de la clé (optionnel)",
+  "passkeys.delete": "Supprimer la clé d'accès",
+  "passkeys.registeredToast": "Clé d'accès \"{{name}}\" ajoutée",
+  "passkeys.deletedToast": "Clé d'accès supprimée",
+  "server.passkeyLogin": "Se connecter avec une clé d'accès",
+  "server.passkeyLoggingIn": "En attente de la clé d'accès..."
 }

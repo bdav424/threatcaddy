@@ -437,5 +437,17 @@
   "security.totpConfirmDisable": "2FA 비활성화",
   "security.unusedBackupCodes": "미사용 백업 코드 {{count}}개 남음",
   "security.totpEnabledToast": "이중 인증이 활성화되었습니다",
-  "security.totpDisabledToast": "이중 인증이 비활성화되었습니다"
+  "security.totpDisabledToast": "이중 인증이 비활성화되었습니다",
+  "passkeys.title": "패스키",
+  "passkeys.desc": "비밀번호 대신 기기 생체 인증 또는 PIN으로 로그인하세요.",
+  "passkeys.none": "등록된 패스키 없음",
+  "passkeys.loading": "패스키 로드 중...",
+  "passkeys.register": "패스키 추가",
+  "passkeys.registering": "등록 중...",
+  "passkeys.namePlaceholder": "패스키 이름 (선택사항)",
+  "passkeys.delete": "패스키 제거",
+  "passkeys.registeredToast": "패스키 \"{{name}}\" 추가됨",
+  "passkeys.deletedToast": "패스키가 제거되었습니다",
+  "server.passkeyLogin": "패스키로 로그인",
+  "server.passkeyLoggingIn": "패스키 대기 중..."
 }

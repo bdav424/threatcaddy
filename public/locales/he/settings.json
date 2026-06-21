@@ -437,5 +437,17 @@
   "security.totpConfirmDisable": "בטל אימות דו-שלבי",
   "security.unusedBackupCodes": "{{count}} קודי גיבוי שלא נוצלו נותרו",
   "security.totpEnabledToast": "אימות דו-שלבי הופעל",
-  "security.totpDisabledToast": "אימות דו-שלבי הושבת"
+  "security.totpDisabledToast": "אימות דו-שלבי הושבת",
+  "passkeys.title": "מפתחות גישה",
+  "passkeys.desc": "התחבר עם הביומטריה או ה-PIN של המכשיר שלך במקום סיסמה.",
+  "passkeys.none": "לא נרשמו מפתחות גישה",
+  "passkeys.loading": "טוען מפתחות גישה...",
+  "passkeys.register": "הוסף מפתח גישה",
+  "passkeys.registering": "מאגיסטר...",
+  "passkeys.namePlaceholder": "שם מפתח גישה (אופציונלי)",
+  "passkeys.delete": "הסר מפתח גישה",
+  "passkeys.registeredToast": "מפתח גישה \"{{name}}\" נוסף",
+  "passkeys.deletedToast": "מפתח גישה הוסר",
+  "server.passkeyLogin": "התחבר עם מפתח גישה",
+  "server.passkeyLoggingIn": "ממתין למפתח גישה..."
 }

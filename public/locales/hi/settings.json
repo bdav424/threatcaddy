@@ -437,5 +437,17 @@
   "security.totpConfirmDisable": "2FA अक्षम करें",
   "security.unusedBackupCodes": "{{count}} अप्रयुक्त बैकअप कोड शेष",
   "security.totpEnabledToast": "दो-चरण प्रमाणीकरण सक्षम किया गया",
-  "security.totpDisabledToast": "दो-चरण प्रमाणीकरण अक्षम किया गया"
+  "security.totpDisabledToast": "दो-चरण प्रमाणीकरण अक्षम किया गया",
+  "passkeys.title": "पासकी",
+  "passkeys.desc": "पासवर्ड की जगह अपने डिवाइस बायोमेट्रिक्स या PIN से साइन इन करें।",
+  "passkeys.none": "कोई पासकी पंजीकृत नहीं",
+  "passkeys.loading": "पासकी लोड हो रही हैं...",
+  "passkeys.register": "पासकी जोड़ें",
+  "passkeys.registering": "पंजीकृत हो रहा है...",
+  "passkeys.namePlaceholder": "पासकी नाम (वैकल्पिक)",
+  "passkeys.delete": "पासकी हटाएं",
+  "passkeys.registeredToast": "पासकी \"{{name}}\" जोड़ी गई",
+  "passkeys.deletedToast": "पासकी हटा दी गई",
+  "server.passkeyLogin": "पासकी से साइन इन करें",
+  "server.passkeyLoggingIn": "पासकी का इंतजार..."
 }

@@ -437,5 +437,17 @@
   "security.totpConfirmDisable": "تعطيل المصادقة بخطوتين",
   "security.unusedBackupCodes": "{{count}} رمز احتياطي غير مستخدم متبقٍ",
   "security.totpEnabledToast": "تم تفعيل المصادقة بخطوتين",
-  "security.totpDisabledToast": "تم تعطيل المصادقة بخطوتين"
+  "security.totpDisabledToast": "تم تعطيل المصادقة بخطوتين",
+  "passkeys.title": "مفاتيح المرور",
+  "passkeys.desc": "سجّل الدخول ببيانات الجهاز البيومترية أو رمز PIN بدلاً من كلمة المرور.",
+  "passkeys.none": "لا توجد مفاتيح مرور مسجّلة",
+  "passkeys.loading": "جارٍ تحميل مفاتيح المرور...",
+  "passkeys.register": "إضافة مفتاح مرور",
+  "passkeys.registering": "جارٍ التسجيل...",
+  "passkeys.namePlaceholder": "اسم مفتاح المرور (اختياري)",
+  "passkeys.delete": "حذف مفتاح المرور",
+  "passkeys.registeredToast": "تمت إضافة مفتاح المرور \"{{name}}\"",
+  "passkeys.deletedToast": "تم حذف مفتاح المرور",
+  "server.passkeyLogin": "تسجيل الدخول بمفتاح المرور",
+  "server.passkeyLoggingIn": "في انتظار مفتاح المرور..."
 }

@@ -37,6 +37,7 @@
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.0",
+    "@simplewebauthn/browser": "^13.3.0",
     "@types/nunjucks": "^3.2.6",
     "cytoscape": "^3.33.1",
     "cytoscape-cose-bilkent": "^4.1.0",

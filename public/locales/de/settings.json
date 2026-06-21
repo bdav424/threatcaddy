@@ -437,5 +437,17 @@
   "security.totpConfirmDisable": "2FA deaktivieren",
   "security.unusedBackupCodes": "{{count}} unbenutzte Backup-Codes verbleibend",
   "security.totpEnabledToast": "Zwei-Faktor-Authentifizierung aktiviert",
-  "security.totpDisabledToast": "Zwei-Faktor-Authentifizierung deaktiviert"
+  "security.totpDisabledToast": "Zwei-Faktor-Authentifizierung deaktiviert",
+  "passkeys.title": "Passkeys",
+  "passkeys.desc": "Melden Sie sich mit Ihren Geräte-Biometriedaten oder PIN statt eines Passworts an.",
+  "passkeys.none": "Keine Passkeys registriert",
+  "passkeys.loading": "Passkeys werden geladen...",
+  "passkeys.register": "Passkey hinzufügen",
+  "passkeys.registering": "Wird registriert...",
+  "passkeys.namePlaceholder": "Passkey-Name (optional)",
+  "passkeys.delete": "Passkey entfernen",
+  "passkeys.registeredToast": "Passkey \"{{name}}\" hinzugefügt",
+  "passkeys.deletedToast": "Passkey entfernt",
+  "server.passkeyLogin": "Mit Passkey anmelden",
+  "server.passkeyLoggingIn": "Auf Passkey wird gewartet..."
 }

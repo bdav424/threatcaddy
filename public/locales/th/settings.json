@@ -437,5 +437,17 @@
   "security.totpConfirmDisable": "ปิดใช้งาน 2FA",
   "security.unusedBackupCodes": "เหลือรหัสสำรองที่ยังไม่ได้ใช้ {{count}} รายการ",
   "security.totpEnabledToast": "เปิดใช้งานการยืนยันตัวตนสองขั้นตอนแล้ว",
-  "security.totpDisabledToast": "ปิดใช้งานการยืนยันตัวตนสองขั้นตอนแล้ว"
+  "security.totpDisabledToast": "ปิดใช้งานการยืนยันตัวตนสองขั้นตอนแล้ว",
+  "passkeys.title": "พาสคีย์",
+  "passkeys.desc": "เข้าสู่ระบบด้วยข้อมูลชีวมิติหรือ PIN แทนรหัสผ่าน",
+  "passkeys.none": "ไม่มีพาสคีย์ที่ลงทะเบียน",
+  "passkeys.loading": "กำลังโหลดพาสคีย์...",
+  "passkeys.register": "เพิ่มพาสคีย์",
+  "passkeys.registering": "กำลังลงทะเบียน...",
+  "passkeys.namePlaceholder": "ชื่อพาสคีย์ (ไม่บังคับ)",
+  "passkeys.delete": "ลบพาสคีย์",
+  "passkeys.registeredToast": "เพิ่มพาสคีย์ \"{{name}}\" แล้ว",
+  "passkeys.deletedToast": "ลบพาสคีย์แล้ว",
+  "server.passkeyLogin": "เข้าสู่ระบบด้วยพาสคีย์",
+  "server.passkeyLoggingIn": "กำลังรอพาสคีย์..."
 }

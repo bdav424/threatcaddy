@@ -26,6 +26,7 @@ import { KeyboardShortcuts } from './KeyboardShortcuts';
 import { EncryptionSettings } from '../Encryption/EncryptionSettings';
 import { ServerConnection } from './ServerConnection';
 import { TotpManagement } from './TotpManagement';
+import { PasskeyManagement } from './PasskeyManagement';
 import { IntegrationPanel } from '../Integrations/IntegrationPanel';
 import { IntegrationSourceDashboard } from '../Integrations/IntegrationSourceDashboard';
 import { AppearanceSettings } from './AppearanceSettings';
@@ -1148,6 +1149,9 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
 
           {/* Security — TOTP / 2FA */}
           <TotpManagement />
+
+          {/* Security — Passkeys */}
+          <PasskeyManagement />
 
           {/* Identity */}
           {(() => {

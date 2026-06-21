@@ -437,5 +437,17 @@
   "security.totpConfirmDisable": "Disabilita 2FA",
   "security.unusedBackupCodes": "{{count}} codici di backup non utilizzati rimanenti",
   "security.totpEnabledToast": "Autenticazione a due fattori abilitata",
-  "security.totpDisabledToast": "Autenticazione a due fattori disabilitata"
+  "security.totpDisabledToast": "Autenticazione a due fattori disabilitata",
+  "passkeys.title": "Passkey",
+  "passkeys.desc": "Accedi con la biometria o il PIN del tuo dispositivo invece di una password.",
+  "passkeys.none": "Nessun passkey registrato",
+  "passkeys.loading": "Caricamento passkey...",
+  "passkeys.register": "Aggiungi passkey",
+  "passkeys.registering": "Registrazione...",
+  "passkeys.namePlaceholder": "Nome passkey (facoltativo)",
+  "passkeys.delete": "Rimuovi passkey",
+  "passkeys.registeredToast": "Passkey \"{{name}}\" aggiunto",
+  "passkeys.deletedToast": "Passkey rimosso",
+  "server.passkeyLogin": "Accedi con passkey",
+  "server.passkeyLoggingIn": "In attesa del passkey..."
 }

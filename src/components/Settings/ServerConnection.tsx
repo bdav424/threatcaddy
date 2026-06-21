@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Server, LogIn, LogOut, UserPlus, CheckCircle, XCircle, Wifi, WifiOff, RotateCw, X } from 'lucide-react';
+import { Server, LogIn, LogOut, UserPlus, CheckCircle, XCircle, Wifi, WifiOff, RotateCw, X, Fingerprint } from 'lucide-react';
+import { browserSupportsWebAuthn } from '../../lib/passkey-client';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -37,7 +38,8 @@ interface ServerConnectionProps {
 
 export function ServerConnection({ settings, onUpdateSettings }: ServerConnectionProps) {
   const { t } = useTranslation('settings');
-  const { user, connected, serverUrl, login, completeMfaLogin, register, logout, setServerUrl } = useAuth();
+  const { user, connected, serverUrl, login, completeMfaLogin, loginWithPasskey, register, logout, setServerUrl } = useAuth();
+  const passkeySupported = browserSupportsWebAuthn();
   const { addToast } = useToast();
   const [mode, setMode] = useState<'connect' | 'login' | 'register' | 'reconnect'>('connect');
   const [url, setUrl] = useState(settings.serverUrl || '');
@@ -104,6 +106,19 @@ export function ServerConnection({ settings, onUpdateSettings }: ServerConnectio
       await completeMfaLogin(pendingMfa.challengeToken, mfaCode.trim(), pendingMfa.mfaServerUrl);
       setPendingMfa(null);
       setMfaCode('');
+      addToast('success', t('server.connectedToast'));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasskeyLogin = async (loginEmail?: string, loginServerUrl?: string) => {
+    setError('');
+    setLoading(true);
+    try {
+      await loginWithPasskey(loginServerUrl, loginEmail || email || undefined);
       addToast('success', t('server.connectedToast'));
     } catch (err) {
       setError((err as Error).message);
@@ -294,6 +309,17 @@ export function ServerConnection({ settings, onUpdateSettings }: ServerConnectio
             {loading ? t('server.connecting') : <><RotateCw size={14} /> {t('server.reconnect')}</>}
           </button>
 
+          {passkeySupported && (
+            <button
+              onClick={() => handlePasskeyLogin(lastSession?.email, lastSession?.serverUrl)}
+              disabled={loading}
+              className="w-full px-3 py-2 border border-[var(--border)] text-[var(--text-secondary)] rounded-lg text-sm flex items-center justify-center gap-2 hover:border-blue-500 disabled:opacity-50 transition-colors"
+            >
+              <Fingerprint size={14} />
+              {loading ? t('server.passkeyLoggingIn') : t('server.passkeyLogin')}
+            </button>
+          )}
+
           <button
             onClick={() => { setMode('connect'); setError(''); }}
             className="w-full text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
@@ -445,6 +471,17 @@ export function ServerConnection({ settings, onUpdateSettings }: ServerConnectio
           >
             {loading ? 'Connecting...' : mode === 'login' ? 'Login' : 'Register'}
           </button>
+
+          {mode === 'login' && passkeySupported && (
+            <button
+              onClick={() => handlePasskeyLogin(email || undefined)}
+              disabled={loading}
+              className="w-full px-3 py-2 border border-[var(--border)] text-[var(--text-secondary)] rounded-lg text-sm flex items-center justify-center gap-2 hover:border-blue-500 disabled:opacity-50"
+            >
+              <Fingerprint size={14} />
+              {loading ? t('server.passkeyLoggingIn') : t('server.passkeyLogin')}
+            </button>
+          )}
 
           <button
             onClick={() => { setMode('connect'); setServerUrl(null); }}

@@ -437,5 +437,17 @@
   "security.totpConfirmDisable": "Wyłącz 2FA",
   "security.unusedBackupCodes": "Pozostało {{count}} nieużywanych kodów zapasowych",
   "security.totpEnabledToast": "Uwierzytelnianie dwuskładnikowe włączone",
-  "security.totpDisabledToast": "Uwierzytelnianie dwuskładnikowe wyłączone"
+  "security.totpDisabledToast": "Uwierzytelnianie dwuskładnikowe wyłączone",
+  "passkeys.title": "Klucze dostępu",
+  "passkeys.desc": "Zaloguj się przy użyciu biometrii urządzenia lub PIN-u zamiast hasła.",
+  "passkeys.none": "Brak zarejestrowanych kluczy dostępu",
+  "passkeys.loading": "Ładowanie kluczy dostępu...",
+  "passkeys.register": "Dodaj klucz dostępu",
+  "passkeys.registering": "Rejestrowanie...",
+  "passkeys.namePlaceholder": "Nazwa klucza (opcjonalnie)",
+  "passkeys.delete": "Usuń klucz dostępu",
+  "passkeys.registeredToast": "Klucz dostępu \"{{name}}\" dodany",
+  "passkeys.deletedToast": "Klucz dostępu usunięty",
+  "server.passkeyLogin": "Zaloguj się kluczem dostępu",
+  "server.passkeyLoggingIn": "Oczekiwanie na klucz dostępu..."
 }

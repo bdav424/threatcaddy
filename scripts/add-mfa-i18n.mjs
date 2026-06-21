@@ -1,3 +1,4 @@
+// Run with: node scripts/add-passkey-i18n.mjs
 import { readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { fileURLToPath } from 'url';

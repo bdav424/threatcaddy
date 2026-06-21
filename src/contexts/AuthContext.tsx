@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import type { TeamUser } from '../types';
+import { authenticateWithPasskey } from '../lib/passkey-client';
 
 export interface MfaChallenge {
   mfaRequired: true;
@@ -13,6 +14,7 @@ interface AuthState {
   serverUrl: string | null;
   login(email: string, password: string, overrideServerUrl?: string): Promise<MfaChallenge | void>;
   completeMfaLogin(challengeToken: string, code: string, serverUrl: string): Promise<void>;
+  loginWithPasskey(overrideServerUrl?: string, email?: string): Promise<void>;
   register(email: string, displayName: string, password: string): Promise<void>;
   logout(): Promise<void>;
   getAccessToken(): Promise<string | null>;
@@ -27,6 +29,7 @@ const AuthContext = createContext<AuthState>({
   serverUrl: null,
   login: async () => {},
   completeMfaLogin: async () => {},
+  loginWithPasskey: async () => {},
   register: async () => {},
   logout: async () => {},
   getAccessToken: async () => null,
@@ -176,6 +179,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     persist(url, data.accessToken, data.refreshToken, teamUser);
   }, [serverUrl, persist]);
 
+  const loginWithPasskey = useCallback(async (overrideServerUrl?: string, email?: string) => {
+    const url = overrideServerUrl || serverUrl;
+    if (!url) throw new Error('No server URL configured');
+
+    const data = await authenticateWithPasskey(url, email);
+
+    const teamUser: TeamUser = {
+      id: data.user.id,
+      email: data.user.email,
+      displayName: data.user.displayName,
+      avatarUrl: data.user.avatarUrl,
+      role: data.user.role,
+    };
+
+    if (overrideServerUrl) setServerUrlState(overrideServerUrl);
+    setUser(teamUser);
+    setConnected(true);
+    persist(url, data.accessToken, data.refreshToken, teamUser);
+  }, [serverUrl, persist]);
+
   const register = useCallback(async (email: string, displayName: string, password: string) => {
     if (!serverUrl) throw new Error('No server URL configured');
 
@@ -297,6 +320,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       serverUrl,
       login,
       completeMfaLogin,
+      loginWithPasskey,
       register,
       logout,
       getAccessToken,
