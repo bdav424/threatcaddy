@@ -6943,3 +6943,34 @@ Status: `INTEGRATED GATES PASSED / UI/BROWSER PROOF DEFERRED / SOURCE ACCEPTED /
 - `no-live scan`: no `fetch`/`WebSocket`/`exec`/`postMessage` in `src/lib/`; `passkey-client.ts` and `AuthContext.tsx` are renderer-facing but only call `fetch` to own server endpoints (not third parties)
 - Security: TOTP secrets AES-256-GCM encrypted at rest; backup codes argon2id hashed; challenge tokens short-lived HS256; WebAuthn counter enforced; passkey public keys stored as hex TEXT (no credential IDs in localStorage)
 - `NEXT`: UI/browser smoke test on passkey registration + TOTP setup; also complete deferred standalone promotion from S7.
+
+---
+
+## Work Plan 2026-06-21 (Session follow-up)
+
+### Item 1: P2-1 Render-perf root cause — DONE
+- Commit `3fd6d2e` (prior session): deferMount prop on WorkspacePanel; defers children mount until first panel activation
+- Commit `662c6af` (this session): fixed 5 react-hooks/refs lint errors introduced by P2-1 ref-during-render pattern; replaced with useState lazy init + useEffect
+
+### Item 2: Censys connector — Already DONE (no action needed)
+- `censys-host-lookup` fully implemented in `builtin-integrations.ts` (dual auth: Bearer + legacy Basic)
+
+### Item 3: Local enrichment caching — DONE
+**Commit:** `662c6af`
+
+**What was added:**
+- `src/types.ts`: `EnrichmentCacheEntry` type + `Settings.enrichmentCacheTtlHours` (default 24h, 0 = disabled)
+- `src/db.ts`: Dexie v35 adds `enrichmentCache` table; intentionally excluded from backup/export (regenerates via TTL)
+- `src/lib/enrichment-cache.ts`: `buildEnrichmentCacheKey`, `getFromEnrichmentCache`, `setInEnrichmentCache`, `pruneExpiredEnrichmentCache`, `listEnrichmentCacheByTemplate`, `clearEnrichmentCache`
+- `src/lib/llm-tools.ts`: `executeEnrichIOC` now checks cache before API call; stores successful results after run
+- `src/components/Settings/SettingsPanel.tsx`: TTL slider in Integrations tab (0–168h)
+- i18n: 5 keys × 21 locales
+
+**Gates:**
+- `tsc --noEmit`: exit 0
+- `pnpm lint`: 0 errors (501 warnings, all pre-existing)
+- `pnpm test:run`: all relevant tests pass (db.test 48/48, caddyassistant-workspaces 73/73)
+
+### NEXT
+- Item 4: UI-6 leftovers — integration run-history view + "run this playbook" CTA
+- Item 5: Command-palette quick-pivot bar + auto-drafted hunt narrative (largest scope)
