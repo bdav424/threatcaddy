@@ -29,13 +29,24 @@
 import { BrowserWindow } from 'electron';
 import http from 'node:http';
 import crypto from 'node:crypto';
-import { getMailProvider } from '../src/lib/mail-providers.js';
+import { getMailProvider } from './mail-providers.mjs';
 
-// Load from env — set in desktop/.env.desktop (gitignored). Never commit real values.
-// desktop/.env.desktop example:
+// Dev override: set in desktop/.env.desktop (gitignored) to use a different client ID locally
+// without rebuilding. desktop/.env.desktop example:
 //   TC_GOOGLE_CLIENT_ID=<your-client-id>.apps.googleusercontent.com
 //   TC_MICROSOFT_CLIENT_ID=<your-azure-app-client-id>
+//
+// Packaged-build default: a Google OAuth "Desktop app" client ID is a public identifier, not a
+// secret — this client type has no client secret and relies on PKCE (see runOAuthPopout below),
+// so baking it into the shipped binary is the normal, documented pattern for desktop OAuth clients
+// (same reasoning electron apps and CLIs use). The env var above still takes precedence in dev.
+// See docs/handoff/DESKTOP-PACKAGING-PLAN.md for the decision record.
+const BAKED_IN_OAUTH_CLIENT_IDS = {
+  google: '399738137685-fg92p2mlem7c86akb9pdjb1v554lbe45.apps.googleusercontent.com',
+};
+
 const OAUTH_CLIENT_IDS = {
+  ...BAKED_IN_OAUTH_CLIENT_IDS,
   ...(process.env.TC_GOOGLE_CLIENT_ID    ? { google:    process.env.TC_GOOGLE_CLIENT_ID    } : {}),
   ...(process.env.TC_MICROSOFT_CLIENT_ID ? { microsoft: process.env.TC_MICROSOFT_CLIENT_ID } : {}),
 };
