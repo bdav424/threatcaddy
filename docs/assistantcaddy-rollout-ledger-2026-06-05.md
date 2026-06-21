@@ -6890,3 +6890,56 @@ Status: `INTEGRATED GATES PASSED / UI/BROWSER PROOF DEFERRED / SOURCE ACCEPTED /
 - `17 pre-existing test failures cleared` this session across utils, evidence-view, integration-source-dashboard, slack-runtime-activation-plan, slack-live-delivery-activation-gate, integration-next-actions, provider-runtime-activation-plan, connector-runtime-persistence, slash-commands, and backup-crypto.
 - `SOURCE ACCEPTED`: vertical capability enablement repairs (A/B/C/D) are integrated-gate-clear. Standalone promotion held until UI/browser proof passes.
 - `NEXT`: rebuild desktop app artifact, run UI/browser smoke on credential-reference flow and calendar OAuth, confirm no-regression on agent cycle display and email bridge. If clean, promote standalone.
+
+---
+
+## S8 — MFA Sync Auth: TOTP + Passkeys (2026-06-21)
+
+### S8 Phase 1: TOTP Two-Factor Authentication
+
+**Server:**
+- DB migration `0020_mfa_totp_and_passkeys.sql`: adds `totp_secret`, `totp_enabled`, `totp_backup_codes` columns to `users`; creates `user_passkeys` table
+- `server/src/services/totp-service.ts`: AES-256-GCM encryption of TOTP secrets (`TOTP_SECRET_KEY` env var = 64 hex chars), OTPAUTH URI generation, TOTP verify (window=1), argon2id-hashed backup codes (8 × nanoid(10))
+- `server/src/services/mfa-challenge.ts`: short-lived HS256 JWTs (5 min, `purpose: 'mfa-challenge'`, key = `JWT_SECRET + ':mfa-challenge'`)
+- `server/src/routes/mfa.ts`: GET `/api/mfa/totp/setup`, POST `/api/mfa/totp/enable`, POST `/api/mfa/totp/disable`, GET `/api/mfa/status`
+- `server/src/routes/auth.ts`: POST `/login` now issues MFA challenge when `user.totpEnabled`; POST `/api/auth/mfa/verify` added
+- `server/src/types/error-codes.ts`: `MFA_REQUIRED`, `MFA_NOT_ENABLED`, `MFA_INVALID_CODE`, `MFA_CHALLENGE_EXPIRED`
+
+**Client:**
+- `src/contexts/AuthContext.tsx`: `MfaChallenge` interface, `login()` return type updated to `MfaChallenge | void`, `completeMfaLogin(challengeToken, code, serverUrl)` added
+- `src/components/Settings/ServerConnection.tsx`: MFA step overlay shown when server returns `mfaRequired: true`; passkey login button (Phase 2)
+- `src/components/Settings/TotpManagement.tsx`: Security section in Settings — QR code setup, code verification to enable, backup codes display, disable with code confirmation
+- i18n: 28 MFA/security keys added to all 21 locales via `scripts/add-mfa-i18n.mjs`
+
+**Commits:** `9404e29`
+
+### S8 Phase 2: Passkeys (WebAuthn)
+
+**Server:**
+- `server/src/services/passkey-challenge.ts`: in-memory challenge store with 5-min TTL (single-process; Redis needed for clusters)
+- `server/src/routes/passkeys.ts`:
+  - POST `/api/passkeys/register/begin|finish` — requireAuth, WebAuthn registration ceremony
+  - POST `/api/passkeys/auth/begin|finish` — public, WebAuthn authentication → full tokens
+  - GET `/api/passkeys` — list user's registered passkeys
+  - DELETE `/api/passkeys/:id` — remove a passkey
+- RP_ID/origin/name configurable via `PASSKEY_RP_ID`, `PASSKEY_ORIGIN`, `PASSKEY_RP_NAME` env vars (defaults: `localhost`, `http://localhost:5173`, `ThreatCaddy`)
+- Uses `@simplewebauthn/server` v13.3.1; counter updated on each auth to prevent replay
+
+**Client:**
+- `src/lib/passkey-client.ts`: browser helpers via `@simplewebauthn/browser` v13.3.0 — `registerPasskey`, `authenticateWithPasskey`, `listPasskeys`, `deletePasskey`, `browserSupportsWebAuthn`
+- `src/contexts/AuthContext.tsx`: `loginWithPasskey(overrideServerUrl?, email?)` added
+- `src/components/Settings/PasskeyManagement.tsx`: lists registered passkeys, add with optional name, delete; hidden if WebAuthn not supported
+- `src/components/Settings/ServerConnection.tsx`: "Sign in with passkey" button in login + reconnect flows (hidden if not supported)
+- i18n: 12 passkey keys added to all 21 locales via `scripts/add-passkey-i18n.mjs`
+
+**Commits:** `54aa9e1`
+
+### S8 Gates
+- `tsc --noEmit` (client): exit 0
+- `tsc --noEmit` (server): exit 0
+- `pnpm lint`: exit 0, no errors
+- `pnpm build`: exit 0
+- `pnpm test:run`: 3141 passed, 17 skipped, 1 pre-existing flake (`assistant-provider-runtime-executor` parallel-load race, confirmed isolated-pass in prior sessions)
+- `no-live scan`: no `fetch`/`WebSocket`/`exec`/`postMessage` in `src/lib/`; `passkey-client.ts` and `AuthContext.tsx` are renderer-facing but only call `fetch` to own server endpoints (not third parties)
+- Security: TOTP secrets AES-256-GCM encrypted at rest; backup codes argon2id hashed; challenge tokens short-lived HS256; WebAuthn counter enforced; passkey public keys stored as hex TEXT (no credential IDs in localStorage)
+- `NEXT`: UI/browser smoke test on passkey registration + TOTP setup; also complete deferred standalone promotion from S7.
