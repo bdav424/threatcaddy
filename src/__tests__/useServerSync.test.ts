@@ -44,6 +44,7 @@ vi.mock('../lib/sync-engine', () => ({
     resolveConflicts: (...args: unknown[]) => mockResolveConflicts(...args),
     sync: () => mockSync(),
     applyRemoteChange: (...args: unknown[]) => mockApplyRemoteChange(...args),
+    setSyncKey: () => {},
   },
 }));
 
