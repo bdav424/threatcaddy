@@ -1,13 +1,38 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, X, FileText, Paperclip, ListChecks, Clock, PenTool, Save, Briefcase, ChevronDown, Shield, MessageSquare, Calendar, Pencil } from 'lucide-react';
+import { Search, X, FileText, Paperclip, ListChecks, Clock, PenTool, Save, Briefcase, ChevronDown, Shield, MessageSquare, Calendar, Pencil, Terminal, LayoutDashboard, Network, Bot, BarChart2, BookOpen, ScanSearch, Zap } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatDate } from '../../lib/utils';
 import { unifiedSearch, type SearchMode, type SearchQuery, type SearchResult, type SearchResultType, type UnifiedSearchResult } from '../../lib/search';
 import { useSavedSearches } from '../../hooks/useSavedSearches';
-import type { Note, Task, TimelineEvent, Whiteboard, StandaloneIOC, ChatThread, Folder } from '../../types';
+import type { Note, Task, TimelineEvent, Whiteboard, StandaloneIOC, ChatThread, Folder, ViewMode } from '../../types';
 import { TagPills } from '../Common/TagPills';
 import SearchWorker from '../../workers/search.worker?worker';
+
+// ── Command mode types ───────────────────────────────────────────────────────
+
+interface QuickCommand {
+  id: string;
+  label: string;
+  description?: string;
+  icon: typeof Search;
+  action: () => void;
+}
+
+const VIEW_COMMANDS: Array<{ label: string; view: ViewMode; icon: typeof Search }> = [
+  { label: 'Dashboard', view: 'dashboard', icon: LayoutDashboard },
+  { label: 'Notes', view: 'notes', icon: FileText },
+  { label: 'Tasks', view: 'tasks', icon: ListChecks },
+  { label: 'Timeline', view: 'timeline', icon: Clock },
+  { label: 'Whiteboards', view: 'whiteboard', icon: PenTool },
+  { label: 'IOC Intel', view: 'ioc-stats', icon: Shield },
+  { label: 'Graph', view: 'graph', icon: Network },
+  { label: 'Agents', view: 'agent', icon: Bot },
+  { label: 'Reports', view: 'reports', icon: BookOpen },
+  { label: 'Chat', view: 'chat', icon: MessageSquare },
+  { label: 'Activity', view: 'activity', icon: BarChart2 },
+  { label: 'Investigations', view: 'investigations', icon: Briefcase },
+];
 
 interface SearchOverlayProps {
   open: boolean;
@@ -31,6 +56,12 @@ interface SearchOverlayProps {
   scopedTimelineEvents?: TimelineEvent[];
   scopedWhiteboards?: Whiteboard[];
   folders?: Folder[];
+  /** Quick-pivot: switch active investigation */
+  onSwitchInvestigation?: (folderId: string) => void;
+  /** Quick-pivot: navigate to a view */
+  onNavigateToView?: (view: ViewMode) => void;
+  /** Quick-pivot: open CaddyAI with a pre-seeded hunt narrative prompt */
+  onDraftHuntNarrative?: (iocValue: string, iocType: string) => void;
 }
 
 const TYPE_ICONS: Record<SearchResultType, typeof FileText> = {
@@ -72,6 +103,9 @@ export function SearchOverlay({
   selectedFolderId,
   // scopedNotes, scopedTasks, scopedTimelineEvents, scopedWhiteboards — kept in interface for backwards compat
   folders = [],
+  onSwitchInvestigation,
+  onNavigateToView,
+  onDraftHuntNarrative,
 }: SearchOverlayProps) {
   const { t } = useTranslation('search');
   const [query, setQuery] = useState('');
@@ -94,6 +128,50 @@ export function SearchOverlay({
   const resultsRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>(undefined);
   const { searches, saveSearch, deleteSearch, renameSearch, clearAll } = useSavedSearches();
+
+  // Command mode: query starting with '>' triggers quick-pivot palette
+  const isCommandMode = query.startsWith('>');
+  const commandQuery = isCommandMode ? query.slice(1).trimStart().toLowerCase() : '';
+
+  const quickCommands = useMemo<QuickCommand[]>(() => {
+    if (!isCommandMode) return [];
+    const cmds: QuickCommand[] = [];
+
+    // View navigation commands
+    if (onNavigateToView) {
+      for (const vc of VIEW_COMMANDS) {
+        if (!commandQuery || vc.label.toLowerCase().includes(commandQuery)) {
+          cmds.push({
+            id: `view:${vc.view}`,
+            label: `Go to ${vc.label}`,
+            icon: vc.icon,
+            action: () => { onNavigateToView(vc.view); onClose(); },
+          });
+        }
+      }
+    }
+
+    // Investigation switch commands
+    if (onSwitchInvestigation) {
+      for (const f of folders.filter(f => (f.status || 'active') !== 'archived')) {
+        if (!commandQuery || f.name.toLowerCase().includes(commandQuery)) {
+          cmds.push({
+            id: `switch:${f.id}`,
+            label: `Switch to: ${f.name}`,
+            description: f.status === 'closed' ? 'closed' : undefined,
+            icon: Briefcase,
+            action: () => { onSwitchInvestigation(f.id); onClose(); },
+          });
+        }
+      }
+    }
+
+    return cmds.slice(0, 12);
+  }, [isCommandMode, commandQuery, onNavigateToView, onSwitchInvestigation, folders, onClose]);
+
+  const [activeCommandIndex, setActiveCommandIndex] = useState(0);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setActiveCommandIndex(0); }, [quickCommands]);
 
   // Debounce query
   useEffect(() => {
@@ -260,6 +338,24 @@ export function SearchOverlay({
       }
       return;
     }
+
+    if (isCommandMode) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActiveCommandIndex((prev) => Math.min(prev + 1, quickCommands.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActiveCommandIndex((prev) => Math.max(prev - 1, 0));
+      } else if (e.key === 'Enter' && quickCommands[activeCommandIndex]) {
+        e.preventDefault();
+        quickCommands[activeCommandIndex].action();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+      return;
+    }
+
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setActiveIndex((prev) => Math.min(prev + 1, flatResults.length - 1));
@@ -273,7 +369,7 @@ export function SearchOverlay({
       e.preventDefault();
       onClose();
     }
-  }, [flatResults, activeIndex, handleSelect, onClose, folderDropdownOpen]);
+  }, [flatResults, activeIndex, handleSelect, onClose, folderDropdownOpen, isCommandMode, quickCommands, activeCommandIndex]);
 
   // Scroll active result into view
   useEffect(() => {
@@ -437,7 +533,8 @@ export function SearchOverlay({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={
-                  mode === 'simple' ? 'Search notes, tasks, timeline, whiteboards, IOCs, chats...' :
+                  isCommandMode ? 'Type a command: go to a view or switch investigation...' :
+                  mode === 'simple' ? 'Search notes, tasks, timeline, whiteboards, IOCs, chats... (or type > for commands)' :
                   mode === 'regex' ? 'Enter regex pattern...' :
                   'title:contains("foo") AND tags:contains("bar")...'
                 }
@@ -576,14 +673,52 @@ export function SearchOverlay({
 
         {/* Results */}
         <div ref={resultsRef} className="flex-1 overflow-y-auto min-h-0" aria-live="polite">
-          {debouncedQuery && results.length === 0 && !error && (
+          {/* ── Command mode ─────────────────────────────────────── */}
+          {isCommandMode && (
+            <div>
+              <div className="px-3 py-1.5 flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-900/80 sticky top-0">
+                <Terminal size={11} />
+                Commands
+              </div>
+              {quickCommands.length === 0 && (
+                <div className="px-4 py-8 text-center text-sm text-gray-600">No matching commands</div>
+              )}
+              {quickCommands.map((cmd, idx) => {
+                const Icon = cmd.icon;
+                return (
+                  <button
+                    key={cmd.id}
+                    onClick={cmd.action}
+                    onMouseEnter={() => setActiveCommandIndex(idx)}
+                    className={cn(
+                      'w-full text-start px-4 py-2 flex items-center gap-3 transition-colors',
+                      idx === activeCommandIndex ? 'bg-accent/10' : 'hover:bg-gray-800/50'
+                    )}
+                  >
+                    <Icon size={15} className="text-gray-400 shrink-0" />
+                    <span className="text-sm text-gray-200 flex-1">{cmd.label}</span>
+                    {cmd.description && <span className="text-[10px] text-gray-600">{cmd.description}</span>}
+                    <span className="text-[10px] text-gray-600">↵</span>
+                  </button>
+                );
+              })}
+              <div className="px-4 py-2 border-t border-gray-800 flex items-center gap-2 text-[10px] text-gray-600">
+                <kbd className="px-1 py-0.5 rounded bg-gray-800 font-mono">↑↓</kbd> navigate
+                <kbd className="px-1 py-0.5 rounded bg-gray-800 font-mono">↵</kbd> run
+                <span className="ms-auto">Remove <kbd className="px-1 py-0.5 rounded bg-gray-800 font-mono">&gt;</kbd> to search</span>
+              </div>
+            </div>
+          )}
+
+          {/* ── Normal search results ─────────────────────────────── */}
+          {!isCommandMode && debouncedQuery && results.length === 0 && !error && (
             <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-500">
               <Search size={40} strokeWidth={1.5} className="text-gray-600" />
               <p className="text-sm">{t('noResults')}</p>
             </div>
           )}
 
-          {(['note', 'clip', 'task', 'timeline', 'whiteboard', 'ioc', 'chat'] as SearchResultType[]).map((type) => {
+          {!isCommandMode && (['note', 'clip', 'task', 'timeline', 'whiteboard', 'ioc', 'chat'] as SearchResultType[]).map((type) => {
             if (!activeTypes.has(type)) return null;
             const group = grouped[type];
             if (!group || group.length === 0) return null;
@@ -596,34 +731,66 @@ export function SearchOverlay({
                   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                   const idx = indexMap.get(result.id)!;
                   const Icon = TYPE_ICONS[result.type];
+                  const isIOC = result.type === 'ioc';
+                  const ioc = isIOC ? standaloneIOCs?.find((i) => i.id === result.id) : undefined;
                   return (
-                    <button
+                    <div
                       key={result.id}
-                      data-index={idx}
-                      onClick={() => handleSelect(result)}
-                      onMouseEnter={() => setActiveIndex(idx)}
-                      aria-label={`${t(TYPE_LABEL_KEYS[result.type])}: ${result.title}`}
                       className={cn(
-                        'w-full text-start px-3 py-2 flex items-start gap-3 transition-colors cursor-pointer',
+                        'group flex items-start gap-3 px-3 py-2 transition-colors',
                         idx === activeIndex ? 'bg-accent/10' : 'hover:bg-gray-800/50'
                       )}
+                      onMouseEnter={() => setActiveIndex(idx)}
                     >
-                      <Icon size={16} className="text-gray-500 mt-0.5 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-gray-200 truncate">{result.title}</span>
-                          <span className="text-xs text-gray-600 shrink-0">{formatDate(result.updatedAt)}</span>
-                        </div>
-                        {result.snippet && result.snippet !== result.title && (
-                          <p className="text-xs text-gray-500 truncate mt-0.5">{result.snippet}</p>
-                        )}
-                        {result.tags.length > 0 && (
-                          <div className="mt-1">
-                            <TagPills tags={result.tags} />
+                      <button
+                        data-index={idx}
+                        onClick={() => handleSelect(result)}
+                        aria-label={`${t(TYPE_LABEL_KEYS[result.type])}: ${result.title}`}
+                        className="flex items-start gap-3 flex-1 min-w-0 text-start"
+                      >
+                        <Icon size={16} className="text-gray-500 mt-0.5 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-200 truncate">{result.title}</span>
+                            <span className="text-xs text-gray-600 shrink-0">{formatDate(result.updatedAt)}</span>
                           </div>
-                        )}
-                      </div>
-                    </button>
+                          {result.snippet && result.snippet !== result.title && (
+                            <p className="text-xs text-gray-500 truncate mt-0.5">{result.snippet}</p>
+                          )}
+                          {result.tags.length > 0 && (
+                            <div className="mt-1">
+                              <TagPills tags={result.tags} />
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                      {/* Hunt narrative CTA for IOC results */}
+                      {isIOC && ioc && onDraftHuntNarrative && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDraftHuntNarrative(ioc.value, ioc.type);
+                            onClose();
+                          }}
+                          title="Draft hunt narrative in CaddyAI"
+                          className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-gray-500 hover:text-accent hover:bg-accent/10 opacity-0 group-hover:opacity-100 transition-all mt-0.5"
+                        >
+                          <Zap size={10} />
+                          Narrative
+                        </button>
+                      )}
+                      {/* Enrich shortcut for IOC results */}
+                      {isIOC && ioc && onNavigateToIOC && (
+                        <button
+                          onClick={() => handleSelect(result)}
+                          title="Go to IOC"
+                          className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-gray-500 hover:text-gray-300 hover:bg-gray-800 opacity-0 group-hover:opacity-100 transition-all mt-0.5"
+                        >
+                          <ScanSearch size={10} />
+                          View
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>

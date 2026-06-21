@@ -51,7 +51,7 @@ import { clipBuffer } from './lib/clipBuffer';
 import { formatBytes, openFilePicker, getDroppedFiles, dispatchFile, type FileOpenDetail } from './lib/file-handler';
 import { hasPendingChanges } from './lib/pending-changes';
 import { useInvestigationData } from './hooks/useInvestigationData';
-import type { ConfidenceLevel, EvidenceItem, IOCType, Note, NoteTemplate, Task, TimelineEvent, ChatThread, ChatAttachment, StandaloneIOC } from './types';
+import type { ConfidenceLevel, EvidenceItem, IOCType, Note, NoteTemplate, Task, TimelineEvent, ChatThread, ChatAttachment, StandaloneIOC, ViewMode } from './types';
 import { DEFAULT_QUICK_LINKS } from './types';
 const DashboardView = lazy(() => import('./components/Dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
 import { FileText, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
@@ -1856,6 +1856,44 @@ const AppInner = memo(function AppInner({
     navigateTo('chat');
   }, [navigateTo]);
 
+  // ── Command-palette quick-pivot callbacks ─────────────────────────────────
+
+  const handlePaletteSwitchInvestigation = useCallback((folderId: string) => {
+    setSelectedFolderId(folderId);
+    setSearchOverlayOpen(false);
+  }, [setSelectedFolderId, setSearchOverlayOpen]);
+
+  const handlePaletteNavigateToView = useCallback((view: ViewMode) => {
+    navigateTo(view);
+    setSearchOverlayOpen(false);
+  }, [navigateTo, setSearchOverlayOpen]);
+
+  const handleDraftHuntNarrative = useCallback(async (iocValue: string, iocType: string) => {
+    try {
+      const thread = await loggedCreateChatThread({
+        title: `Hunt narrative: ${iocValue}`,
+        folderId: selectedFolderId,
+        model: settings.llmDefaultModel || 'claude-sonnet-4-6',
+        provider: (settings.llmDefaultProvider as ChatThread['provider']) || 'anthropic',
+        tags: ['hunt-narrative'],
+      });
+      const investigationName = folders.find((f) => f.id === selectedFolderId)?.name ?? 'N/A';
+      const prompt = [
+        `Draft a threat hunt narrative for the following indicator:`,
+        ``,
+        `IOC: ${iocValue} (${iocType})`,
+        `Investigation: ${investigationName}`,
+        ``,
+        `Cover: what this IOC suggests, hunting queries for logs/network/endpoint, likely hypotheses, recommended next steps, and relevant MITRE ATT&CK techniques.`,
+      ].join('\n');
+      setPendingChatDraft({ id: `hunt-${iocValue}-${Date.now()}`, threadId: thread.id, text: prompt });
+      setSelectedChatThreadId(thread.id);
+      navigateTo('chat');
+    } catch { /* ignore */ }
+  }, [loggedCreateChatThread, selectedFolderId, settings.llmDefaultModel, settings.llmDefaultProvider, folders, navigateTo]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   const [workspacePanelLaunchRequest, setWorkspacePanelLaunchRequest] = useState<WorkspacePanelLaunchRequest | null>(null);
   const [assistantWorkspacePanelLaunchRequest, setAssistantWorkspacePanelLaunchRequest] = useState<AssistantWorkspacePanelLaunchRequest | null>(null);
   const handleOpenWorkspacePanel = useCallback((view: WorkspacePanelLaunchView) => {
@@ -2977,6 +3015,9 @@ const AppInner = memo(function AppInner({
         scopedTimelineEvents={investigationTimelineEvents}
         scopedWhiteboards={investigationWhiteboards}
         folders={folders}
+        onSwitchInvestigation={handlePaletteSwitchInvestigation}
+        onNavigateToView={handlePaletteNavigateToView}
+        onDraftHuntNarrative={handleDraftHuntNarrative}
       /></Suspense>
 
       {editingFolder && (
