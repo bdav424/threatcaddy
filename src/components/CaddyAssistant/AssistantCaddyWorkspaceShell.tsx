@@ -184,6 +184,7 @@ function EmailCaddyWorkspacePanel({
       onClose={handleClose}
       active={workspacePanelActive}
       preserveChildrenAcrossModes
+      deferMount
       minWidth={680}
       minHeight={500}
       compactWidth={860}
@@ -253,6 +254,7 @@ function CalendarCaddyWorkspacePanel({
       onClose={handleClose}
       active={workspacePanelActive}
       preserveChildrenAcrossModes
+      deferMount
       minWidth={520}
       minHeight={360}
       compactWidth={760}
@@ -331,6 +333,7 @@ function AssistantCaddyOverviewWorkspacePanel({
       onClose={handleClose}
       active={workspacePanelActive}
       preserveChildrenAcrossModes
+      deferMount
       minWidth={440}
       minHeight={360}
       compactWidth={720}

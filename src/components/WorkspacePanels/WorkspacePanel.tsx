@@ -6,6 +6,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type PointerEvent,
@@ -72,6 +73,8 @@ interface WorkspacePanelProps {
   restoreLabel?: string;
   preserveChildrenWhenMinimized?: boolean;
   preserveChildrenAcrossModes?: boolean;
+  /** Skip rendering bodyChildren until the panel is first activated, then keep them mounted. */
+  deferMount?: boolean;
   active?: boolean;
   minWidth?: number;
   minHeight?: number;
@@ -946,6 +949,7 @@ export function WorkspacePanel({
   restoreLabel,
   preserveChildrenWhenMinimized = false,
   preserveChildrenAcrossModes = false,
+  deferMount = false,
   active = true,
   minWidth = 300,
   minHeight = 220,
@@ -958,6 +962,11 @@ export function WorkspacePanel({
   onClose,
 }: WorkspacePanelProps) {
   const workspacePanelContext = useContext(WorkspacePanelContext);
+  // Tracks whether this panel has ever been active; once true, stays true so children stay mounted.
+  const hasEverBeenActiveRef = useRef(!deferMount || active);
+  if (!hasEverBeenActiveRef.current && (!deferMount || active)) {
+    hasEverBeenActiveRef.current = true;
+  }
   const [activeResizeEdge, setActiveResizeEdge] = useState<ResizeEdge | null>(null);
   const [activeSharedSeamEdge, setActiveSharedSeamEdge] = useState<ResizeEdge | null>(null);
   const [snapPreview, setSnapPreview] = useState<WorkspaceGridPlacement | null>(null);
@@ -1042,11 +1051,11 @@ export function WorkspacePanel({
     () => ({ compact, setHeaderAccessory }),
     [compact],
   );
-  const bodyChildren = (
+  const bodyChildren = hasEverBeenActiveRef.current ? (
     <WorkspacePanelChromeContext.Provider value={chromeContext}>
       {children}
     </WorkspacePanelChromeContext.Provider>
-  );
+  ) : null;
 
   useLayoutEffect(() => {
     if (mode !== 'floating' || panelPlacement.kind === 'affixed') return;

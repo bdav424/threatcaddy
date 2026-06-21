@@ -3,13 +3,11 @@ import type { ReactNode } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { Folder } from '../types';
 
-// The shell mounts all three sub-workspaces simultaneously. The bottleneck is the
-// initial mount cost of these large components in jsdom — memoization helps in the
-// real browser but doesn't reduce the one-time mount expense that dominates test time.
-// "preserves minimized shell state" does the most work (initial mount + 4 interactions
-// + 4 view-switches) and legitimately runs ~40-50s on its own. Keep a file-level
-// threshold that covers it without flaking on slower CI machines.
-vi.setConfig({ testTimeout: 60000 });
+// WorkspacePanel.deferMount means each sub-workspace panel only mounts its heavy content
+// when first activated, then keeps it mounted. The shell now spreads mount cost across
+// view switches rather than paying all three simultaneously. The "preserves minimized
+// shell state" test is the heaviest (initial mount + interactions + 3 new-view mounts).
+vi.setConfig({ testTimeout: 25000 });
 
 const navigateToMock = vi.fn();
 const openSettingsMock = vi.fn();
@@ -830,6 +828,50 @@ describe('AssistantCaddy workspaces', () => {
     expect(screen.queryByRole('button', { name: 'Restore message context panel' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'CalendarCaddy selected agenda' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Pop out selected agenda' })).not.toBeInTheDocument();
+  });
+
+  it('defers mount of inactive workspace panels until first activation (deferMount)', () => {
+    const { rerender } = render(<AssistantCaddyWorkspaceShell view="email" />);
+
+    // Email panel is immediately active — its body must have rendered content.
+    const emailBody = document.querySelector(
+      '[data-workspace-panel="emailcaddy-workspace"] [data-workspace-panel-body="true"]',
+    );
+    expect(emailBody).not.toBeNull();
+    expect(emailBody!.children.length).toBeGreaterThan(0);
+
+    // Overview and calendar panels have never been active — their body must be empty (deferred).
+    const overviewBody = document.querySelector(
+      '[data-workspace-panel="assistantcaddy-workspace"] [data-workspace-panel-body="true"]',
+    );
+    expect(overviewBody).not.toBeNull();
+    expect(overviewBody!.children).toHaveLength(0);
+
+    const calendarBody = document.querySelector(
+      '[data-workspace-panel="calendarcaddy-workspace"] [data-workspace-panel-body="true"]',
+    );
+    expect(calendarBody).not.toBeNull();
+    expect(calendarBody!.children).toHaveLength(0);
+
+    // After switching to overview, that panel mounts its content.
+    rerender(<AssistantCaddyWorkspaceShell view="overview" />);
+    expect(document.querySelector(
+      '[data-workspace-panel="assistantcaddy-workspace"] [data-workspace-panel-body="true"]',
+    )!.children.length).toBeGreaterThan(0);
+
+    // Calendar is still deferred (never been active).
+    expect(document.querySelector(
+      '[data-workspace-panel="calendarcaddy-workspace"] [data-workspace-panel-body="true"]',
+    )!.children).toHaveLength(0);
+
+    // After switching to calendar, it mounts; overview content stays mounted.
+    rerender(<AssistantCaddyWorkspaceShell view="calendar" />);
+    expect(document.querySelector(
+      '[data-workspace-panel="calendarcaddy-workspace"] [data-workspace-panel-body="true"]',
+    )!.children.length).toBeGreaterThan(0);
+    expect(document.querySelector(
+      '[data-workspace-panel="assistantcaddy-workspace"] [data-workspace-panel-body="true"]',
+    )!.children.length).toBeGreaterThan(0);
   });
 
   it('preserves minimized shell state across AssistantCaddy workspace switches without dock chips', () => {
