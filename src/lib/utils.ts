@@ -51,9 +51,9 @@ export function truncate(text: string, maxLength: number): string {
 
 export function isOverdue(dueDate?: string): boolean {
   if (!dueDate) return false;
-  const due = new Date(dueDate);
-  due.setHours(23, 59, 59, 999);
-  return due.getTime() < Date.now();
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return dueDate < todayStr;
 }
 
 export function cn(...classes: (string | boolean | undefined | null)[]): string {

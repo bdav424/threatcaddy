@@ -83,18 +83,21 @@ describe('isOverdue', () => {
   it('returns false for future date', () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    expect(isOverdue(tomorrow.toISOString().split('T')[0])).toBe(false);
+    const s = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    expect(isOverdue(s(tomorrow))).toBe(false);
   });
 
   it('returns true for past date', () => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    expect(isOverdue(yesterday.toISOString().split('T')[0])).toBe(true);
+    const s = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    expect(isOverdue(s(yesterday))).toBe(true);
   });
 
   it('returns false for today', () => {
-    const today = new Date().toISOString().split('T')[0];
-    expect(isOverdue(today)).toBe(false);
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    expect(isOverdue(todayStr)).toBe(false);
   });
 });
 
