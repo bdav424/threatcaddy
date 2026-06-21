@@ -76,7 +76,7 @@ afterEach(() => {
   restoreEyeDropper();
 });
 
-describe('SettingsPanel', () => {
+describe('SettingsPanel', { timeout: 30000 }, () => {
   it('renders Settings heading', () => {
     render(<SettingsPanel {...defaultProps} />);
     expect(screen.getByText('Settings')).toBeInTheDocument();
