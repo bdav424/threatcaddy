@@ -151,8 +151,11 @@ function createWindow() {
   const win = new BrowserWindow({
     width:    1480,
     height:   960,
-    minWidth: 1120,
-    minHeight: 760,
+    // Kept low on purpose: analysts run ThreatCaddy at half-screen widths (~700-900px)
+    // alongside a browser for OSINT work. Don't raise this without re-checking that
+    // workflow — see OVERVIEW.md panel compact-width convention (700px).
+    minWidth: 700,
+    minHeight: 560,
     show:     false,
     transparent:    true,
     backgroundColor: '#00000000',
