@@ -88,9 +88,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     activeServerUrl: string,
     accessToken: string,
   ) => {
-    let salt = saltFromServer;
-    if (!salt) {
-      salt = generateSyncKeySalt();
+    let salt: string = saltFromServer ?? generateSyncKeySalt();
+    if (!saltFromServer) {
       try {
         const resp = await fetch(`${activeServerUrl}/api/sync/key-setup`, {
           method: 'POST',
@@ -99,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         if (resp.ok) {
           const data = await resp.json();
-          salt = data.syncKeySalt ?? salt;
+          if (typeof data.syncKeySalt === 'string') salt = data.syncKeySalt;
         }
       } catch { /* non-fatal — key derivation continues with locally-generated salt */ }
     }
