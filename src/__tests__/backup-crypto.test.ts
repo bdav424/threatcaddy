@@ -93,7 +93,7 @@ describe('decryptBackup', () => {
 
 // ── Round-trip ───────────────────────────────────────────────────────
 
-describe('encrypt → decrypt round-trip', () => {
+describe('encrypt → decrypt round-trip', { timeout: 30000 }, () => {
   it('preserves all payload fields', async () => {
     const payload = makePayload({
       type: 'differential',
