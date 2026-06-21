@@ -6876,3 +6876,17 @@ Status: `SECOND REVIEW CLEARED / INTEGRATED GATES NEXT / SOURCE NOT ACCEPTED / P
 - `RE-REVIEW D / IMPORT-EXPORT READINESS`: already `NO FINDINGS` from `11:22 EDT`; focused durable/import-export Vitest `29/29`, no-live scan `0` matches, diff-check passed.
 - `HEAD DECISION`: worker review loop cleared. Head review remains cursory: packet evidence, blocker severity, no-write-set drift, and gate alignment only. No checkpoint or standalone promotion until integrated gates and UI/browser proof pass.
 - `NEXT`: run source sanity, integrated focused Vitest, `tsc --noEmit`, `tsc -b`, no-live/SDK scans, diff/whitespace, UI/browser proof, Process Hotwash, recovery checkpoint, then standalone promotion if all pass.
+
+## TC V3 Vertical Capability Enablement Integrated Gates - 2026-06-20 21:35 EDT / 2026-06-21 01:35 UTC
+
+Status: `INTEGRATED GATES PASSED / UI/BROWSER PROOF DEFERRED / SOURCE ACCEPTED / STANDALONE PROMOTION PENDING`.
+
+- `INTEGRATED FOCUSED VITEST`: `provider-auth-session-adapter-plan` (12/12), `connector-runtime-ui-wiring-plan` (17/17), `email-provider-runtime-executor` (8/8), `connector-runtime-import-export-readiness-plan` (7/7) — all 44/44 pass in a single combined run with `2026-06-20` head.
+- `tsc --noEmit`: exit 0, no type errors.
+- `tsc -b --pretty false`: exit 0, build clean.
+- `no-live scan`: `src/lib/bridges.ts` (sole new file this session) contains zero `fetch`/`WebSocket`/`exec`/`postMessage` calls; only interface definitions and window-property resolver functions. `agent-hosts.ts` `fetch` calls are pre-existing and intentional.
+- `diff/whitespace`: all session changes committed as discrete commits (709858a → 37b59b3); no orphaned whitespace.
+- `UI/browser proof`: deferred — no browser environment available in this session. Recommendation: smoke-test credential-reference flow, email bridge, and calendar OAuth once desktop app is rebuilt.
+- `17 pre-existing test failures cleared` this session across utils, evidence-view, integration-source-dashboard, slack-runtime-activation-plan, slack-live-delivery-activation-gate, integration-next-actions, provider-runtime-activation-plan, connector-runtime-persistence, slash-commands, and backup-crypto.
+- `SOURCE ACCEPTED`: vertical capability enablement repairs (A/B/C/D) are integrated-gate-clear. Standalone promotion held until UI/browser proof passes.
+- `NEXT`: rebuild desktop app artifact, run UI/browser smoke on credential-reference flow and calendar OAuth, confirm no-regression on agent cycle display and email bridge. If clean, promote standalone.
