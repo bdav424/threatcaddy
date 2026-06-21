@@ -409,5 +409,6 @@
   "agents.bearerTokenPlaceholder": "Token Bearer",
   "agents.disableHost": "Disattiva {{name}}",
   "agents.enableHost": "Attiva {{name}}",
-  "agents.deleteHost": "Elimina {{name}}"
+  "agents.deleteHost": "Elimina {{name}}",
+  "agents.supervisorRetention": "Conservazione note"
 }

@@ -409,5 +409,6 @@
   "agents.bearerTokenPlaceholder": "Bearer トークン",
   "agents.disableHost": "{{name}} を無効化",
   "agents.enableHost": "{{name}} を有効化",
-  "agents.deleteHost": "{{name}} を削除"
+  "agents.deleteHost": "{{name}} を削除",
+  "agents.supervisorRetention": "ノート保持数"
 }

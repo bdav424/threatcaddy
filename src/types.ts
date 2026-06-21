@@ -382,6 +382,8 @@ export interface Settings {
   emailAccounts?: EmailAccountConfig[];
   /** Sanitized CalendarCaddy account metadata. Never store OAuth tokens here — tokens live in OS safeStorage keyed by credRefId. */
   calendarAccounts?: CalendarAccountConfig[];
+  /** Max notes the Supervisor keeps in its folder before trashing the oldest. Range 50–500; default 200. */
+  supervisorNoteRetention?: number;
 }
 
 // ── Agent Host Types ─────────────────────────────────────────────────

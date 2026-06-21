@@ -409,5 +409,6 @@
   "agents.bearerTokenPlaceholder": "Токен Bearer",
   "agents.disableHost": "Вимкнути {{name}}",
   "agents.enableHost": "Увімкнути {{name}}",
-  "agents.deleteHost": "Видалити {{name}}"
+  "agents.deleteHost": "Видалити {{name}}",
+  "agents.supervisorRetention": "Збереження нотаток"
 }

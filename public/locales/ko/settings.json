@@ -409,5 +409,6 @@
   "agents.bearerTokenPlaceholder": "Bearer 토큰",
   "agents.disableHost": "{{name}} 비활성화",
   "agents.enableHost": "{{name}} 활성화",
-  "agents.deleteHost": "{{name}} 삭제"
+  "agents.deleteHost": "{{name}} 삭제",
+  "agents.supervisorRetention": "메모 보존"
 }

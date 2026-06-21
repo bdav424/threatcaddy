@@ -1613,18 +1613,33 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
               </button>
             </div>
             {settings.agentSupervisorEnabled && (
-              <div className="flex items-center gap-3 mt-2">
-                <label className="text-xs text-gray-400 shrink-0">{t('agents.interval')}</label>
-                <input
-                  type="range"
-                  min={10}
-                  max={120}
-                  step={10}
-                  value={settings.agentSupervisorIntervalMinutes || 30}
-                  onChange={(e) => onUpdateSettings({ agentSupervisorIntervalMinutes: parseInt(e.target.value) })}
-                  className="flex-1 h-1 accent-accent-blue"
-                />
-                <span className="text-xs text-gray-400 w-12 text-end">{settings.agentSupervisorIntervalMinutes || 30}m</span>
+              <div className="space-y-2 mt-2">
+                <div className="flex items-center gap-3">
+                  <label className="text-xs text-gray-400 shrink-0">{t('agents.interval')}</label>
+                  <input
+                    type="range"
+                    min={10}
+                    max={120}
+                    step={10}
+                    value={settings.agentSupervisorIntervalMinutes || 30}
+                    onChange={(e) => onUpdateSettings({ agentSupervisorIntervalMinutes: parseInt(e.target.value) })}
+                    className="flex-1 h-1 accent-accent-blue"
+                  />
+                  <span className="text-xs text-gray-400 w-12 text-end">{settings.agentSupervisorIntervalMinutes || 30}m</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="text-xs text-gray-400 shrink-0">{t('agents.supervisorRetention')}</label>
+                  <input
+                    type="range"
+                    min={50}
+                    max={500}
+                    step={50}
+                    value={settings.supervisorNoteRetention ?? 200}
+                    onChange={(e) => onUpdateSettings({ supervisorNoteRetention: parseInt(e.target.value) })}
+                    className="flex-1 h-1 accent-accent-blue"
+                  />
+                  <span className="text-xs text-gray-400 w-12 text-end">{settings.supervisorNoteRetention ?? 200}</span>
+                </div>
               </div>
             )}
           </div>

@@ -409,5 +409,6 @@
   "agents.bearerTokenPlaceholder": "Mã Bearer",
   "agents.disableHost": "Tắt {{name}}",
   "agents.enableHost": "Bật {{name}}",
-  "agents.deleteHost": "Xóa {{name}}"
+  "agents.deleteHost": "Xóa {{name}}",
+  "agents.supervisorRetention": "Lưu giữ ghi chú"
 }

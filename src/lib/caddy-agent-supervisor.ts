@@ -227,7 +227,7 @@ export async function runSupervisorCycle(
     return { findings: ['Skipped: fewer than 2 active investigations to compare.'], escalations: [] };
   }
 
-  // Rolling retention: keep the newest SUPERVISOR_NOTE_RETENTION notes, soft-trash the rest.
+  // Rolling retention: keep the newest notes up to the user-configured cap, soft-trash the rest.
   // Walks the [folderId+updatedAt] index in reverse — no full-table sort, no per-note
   // update round-trip. Bulk modify runs in a single IDB transaction.
   try {
@@ -239,7 +239,8 @@ export async function runSupervisorCycle(
       .reverse()
       .each(n => {
         if (n.trashed || n.isFolder) return;
-        if (kept < SUPERVISOR_NOTE_RETENTION) { kept++; return; }
+        const cap = Math.min(500, Math.max(50, settings.supervisorNoteRetention ?? SUPERVISOR_NOTE_RETENTION));
+        if (kept < cap) { kept++; return; }
         toTrashIds.push(n.id);
       });
     if (toTrashIds.length > 0) {

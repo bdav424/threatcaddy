@@ -409,5 +409,6 @@
   "agents.bearerTokenPlaceholder": "رمز Bearer",
   "agents.disableHost": "تعطيل {{name}}",
   "agents.enableHost": "تمكين {{name}}",
-  "agents.deleteHost": "حذف {{name}}"
+  "agents.deleteHost": "حذف {{name}}",
+  "agents.supervisorRetention": "الاحتفاظ بالملاحظات"
 }

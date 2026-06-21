@@ -409,5 +409,6 @@
   "agents.bearerTokenPlaceholder": "Token Bearer",
   "agents.disableHost": "Nonaktifkan {{name}}",
   "agents.enableHost": "Aktifkan {{name}}",
-  "agents.deleteHost": "Hapus {{name}}"
+  "agents.deleteHost": "Hapus {{name}}",
+  "agents.supervisorRetention": "Retensi catatan"
 }

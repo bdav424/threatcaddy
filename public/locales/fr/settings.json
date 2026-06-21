@@ -409,5 +409,6 @@
   "agents.bearerTokenPlaceholder": "Jeton Bearer",
   "agents.disableHost": "Désactiver {{name}}",
   "agents.enableHost": "Activer {{name}}",
-  "agents.deleteHost": "Supprimer {{name}}"
+  "agents.deleteHost": "Supprimer {{name}}",
+  "agents.supervisorRetention": "Rétention de notes"
 }

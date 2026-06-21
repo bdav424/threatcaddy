@@ -409,5 +409,6 @@
   "agents.bearerTokenPlaceholder": "Bearer-Token",
   "agents.disableHost": "{{name}} deaktivieren",
   "agents.enableHost": "{{name}} aktivieren",
-  "agents.deleteHost": "{{name}} löschen"
+  "agents.deleteHost": "{{name}} löschen",
+  "agents.supervisorRetention": "Notiz-Aufbewahrung"
 }

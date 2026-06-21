@@ -409,5 +409,6 @@
   "agents.bearerTokenPlaceholder": "Bearer belirteci",
   "agents.disableHost": "{{name}} devre dışı bırak",
   "agents.enableHost": "{{name}} etkinleştir",
-  "agents.deleteHost": "{{name}} sil"
+  "agents.deleteHost": "{{name}} sil",
+  "agents.supervisorRetention": "Not saklama"
 }

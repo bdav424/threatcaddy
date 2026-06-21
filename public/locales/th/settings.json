@@ -409,5 +409,6 @@
   "agents.bearerTokenPlaceholder": "โทเค็น Bearer",
   "agents.disableHost": "ปิดใช้งาน {{name}}",
   "agents.enableHost": "เปิดใช้งาน {{name}}",
-  "agents.deleteHost": "ลบ {{name}}"
+  "agents.deleteHost": "ลบ {{name}}",
+  "agents.supervisorRetention": "การเก็บบันทึก"
 }

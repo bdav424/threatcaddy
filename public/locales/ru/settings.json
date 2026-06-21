@@ -409,5 +409,6 @@
   "agents.bearerTokenPlaceholder": "Токен Bearer",
   "agents.disableHost": "Отключить {{name}}",
   "agents.enableHost": "Включить {{name}}",
-  "agents.deleteHost": "Удалить {{name}}"
+  "agents.deleteHost": "Удалить {{name}}",
+  "agents.supervisorRetention": "Хранение заметок"
 }

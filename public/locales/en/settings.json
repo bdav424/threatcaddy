@@ -139,6 +139,7 @@
   "agents.supervisorInterval": "Runs every {{minutes}} minutes",
   "agents.supervisorAriaLabel": "Enable supervisor agent",
   "agents.interval": "Interval",
+  "agents.supervisorRetention": "Note retention",
   "agents.hosts": "Agent Hosts",
   "agents.hostsDesc": "Connect external agent hosts (Claude Code, custom runtimes) that expose skills via REST API. Discovered skills become available as LLM tools.",
   "agents.refreshAll": "Refresh All",

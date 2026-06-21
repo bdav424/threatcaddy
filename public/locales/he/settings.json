@@ -409,5 +409,6 @@
   "agents.bearerTokenPlaceholder": "אסימון Bearer",
   "agents.disableHost": "השבת {{name}}",
   "agents.enableHost": "הפעל {{name}}",
-  "agents.deleteHost": "מחק {{name}}"
+  "agents.deleteHost": "מחק {{name}}",
+  "agents.supervisorRetention": "שמירת הערות"
 }

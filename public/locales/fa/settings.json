@@ -409,5 +409,6 @@
   "agents.bearerTokenPlaceholder": "توکن Bearer",
   "agents.disableHost": "غیرفعال کردن {{name}}",
   "agents.enableHost": "فعال کردن {{name}}",
-  "agents.deleteHost": "حذف {{name}}"
+  "agents.deleteHost": "حذف {{name}}",
+  "agents.supervisorRetention": "نگهداری یادداشت‌ها"
 }

@@ -409,5 +409,6 @@
   "agents.bearerTokenPlaceholder": "Bearer 令牌",
   "agents.disableHost": "禁用 {{name}}",
   "agents.enableHost": "启用 {{name}}",
-  "agents.deleteHost": "删除 {{name}}"
+  "agents.deleteHost": "删除 {{name}}",
+  "agents.supervisorRetention": "笔记保留数量"
 }
