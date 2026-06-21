@@ -11,6 +11,7 @@ import { logActivity } from '../services/audit-service.js';
 import { isLocked, recordFailedAttempt, resetAttempts } from '../services/login-limiter.js';
 import type { AuthUser } from '../types.js';
 import { ErrorCodes } from '../types/error-codes.js';
+import { handleMfaVerify, signMfaChallenge } from './mfa.js';
 
 const app = new Hono<{ Variables: { user: AuthUser } }>();
 
@@ -190,6 +191,14 @@ app.post('/login', async (c) => {
   }
 
   resetAttempts(email);
+
+  // If TOTP is enabled, issue a short-lived MFA challenge token instead of full tokens.
+  if (user.totpEnabled) {
+    const challengeToken = await signMfaChallenge(user.id);
+    await logActivity({ userId: user.id, category: 'auth', action: 'login.mfa-required', detail: 'MFA challenge issued' });
+    return c.json({ mfaRequired: true, challengeToken, mfaMethod: 'totp' });
+  }
+
   await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
 
   const authUser: AuthUser = {
@@ -206,6 +215,39 @@ app.post('/login', async (c) => {
   return c.json({
     ...tokens,
     user: { id: user.id, email: user.email, displayName: user.displayName, role: user.role, avatarUrl: user.avatarUrl },
+  });
+});
+
+// POST /api/auth/mfa/verify — second step: challenge token + TOTP/backup code → full tokens
+app.post('/mfa/verify', async (c) => {
+  const body = await c.req.json();
+  const { challengeToken, code } = body ?? {};
+  if (!challengeToken || !code) {
+    return c.json({ error: 'Missing challengeToken or code', code: ErrorCodes.VALIDATION_FAILED }, 400);
+  }
+
+  const result = await handleMfaVerify(String(challengeToken), String(code));
+  if ('error' in result) {
+    return c.json({ error: result.error, code: result.code }, result.status as 400 | 401);
+  }
+
+  const [row] = await db.select().from(users).where(eq(users.id, result.userId)).limit(1);
+  if (!row?.active) {
+    return c.json({ error: 'Account disabled', code: ErrorCodes.ACCOUNT_DISABLED }, 403);
+  }
+
+  await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, row.id));
+
+  const authUser: AuthUser = {
+    id: row.id, email: row.email, role: row.role, displayName: row.displayName, avatarUrl: row.avatarUrl,
+  };
+  const tokens = await createTokenPair(authUser);
+
+  await logActivity({ userId: row.id, category: 'auth', action: 'login', detail: 'Login completed via MFA' });
+
+  return c.json({
+    ...tokens,
+    user: { id: row.id, email: row.email, displayName: row.displayName, role: row.role, avatarUrl: row.avatarUrl },
   });
 });
 

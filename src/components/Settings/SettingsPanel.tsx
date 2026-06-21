@@ -25,6 +25,7 @@ import { ServerBackup } from './ServerBackup';
 import { KeyboardShortcuts } from './KeyboardShortcuts';
 import { EncryptionSettings } from '../Encryption/EncryptionSettings';
 import { ServerConnection } from './ServerConnection';
+import { TotpManagement } from './TotpManagement';
 import { IntegrationPanel } from '../Integrations/IntegrationPanel';
 import { IntegrationSourceDashboard } from '../Integrations/IntegrationSourceDashboard';
 import { AppearanceSettings } from './AppearanceSettings';
@@ -1144,6 +1145,9 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
             settings={settings}
             onUpdateSettings={onUpdateSettings}
           />
+
+          {/* Security — TOTP / 2FA */}
+          <TotpManagement />
 
           {/* Identity */}
           {(() => {

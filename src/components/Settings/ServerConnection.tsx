@@ -37,7 +37,7 @@ interface ServerConnectionProps {
 
 export function ServerConnection({ settings, onUpdateSettings }: ServerConnectionProps) {
   const { t } = useTranslation('settings');
-  const { user, connected, serverUrl, login, register, logout, setServerUrl } = useAuth();
+  const { user, connected, serverUrl, login, completeMfaLogin, register, logout, setServerUrl } = useAuth();
   const { addToast } = useToast();
   const [mode, setMode] = useState<'connect' | 'login' | 'register' | 'reconnect'>('connect');
   const [url, setUrl] = useState(settings.serverUrl || '');
@@ -47,6 +47,8 @@ export function ServerConnection({ settings, onUpdateSettings }: ServerConnectio
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [lastSession, setLastSession] = useState<LastSession | null>(null);
+  const [pendingMfa, setPendingMfa] = useState<{ challengeToken: string; mfaServerUrl: string } | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
 
   // Check for cached session on mount
   useEffect(() => {
@@ -79,8 +81,29 @@ export function ServerConnection({ settings, onUpdateSettings }: ServerConnectio
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
-      setPassword('');
+      const result = await login(email, password);
+      if (result?.mfaRequired) {
+        setPendingMfa({ challengeToken: result.challengeToken, mfaServerUrl: serverUrl ?? url });
+        setPassword('');
+      } else {
+        setPassword('');
+        addToast('success', t('server.connectedToast'));
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMfaSubmit = async () => {
+    if (!pendingMfa || !mfaCode.trim()) return;
+    setError('');
+    setLoading(true);
+    try {
+      await completeMfaLogin(pendingMfa.challengeToken, mfaCode.trim(), pendingMfa.mfaServerUrl);
+      setPendingMfa(null);
+      setMfaCode('');
       addToast('success', t('server.connectedToast'));
     } catch (err) {
       setError((err as Error).message);
@@ -108,10 +131,15 @@ export function ServerConnection({ settings, onUpdateSettings }: ServerConnectio
     setError('');
     setLoading(true);
     try {
-      await login(lastSession.email, password, lastSession.serverUrl);
+      const result = await login(lastSession.email, password, lastSession.serverUrl);
       onUpdateSettings({ serverUrl: lastSession.serverUrl });
-      setPassword('');
-      addToast('success', t('server.reconnectedToast'));
+      if (result?.mfaRequired) {
+        setPendingMfa({ challengeToken: result.challengeToken, mfaServerUrl: lastSession.serverUrl });
+        setPassword('');
+      } else {
+        setPassword('');
+        addToast('success', t('server.reconnectedToast'));
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -313,7 +341,44 @@ export function ServerConnection({ settings, onUpdateSettings }: ServerConnectio
         </div>
       )}
 
-      {(mode === 'login' || mode === 'register') && (
+      {pendingMfa && (
+        <div className="border border-[var(--border)] rounded-lg p-4 bg-[var(--bg-secondary)] space-y-3">
+          <div className="text-sm font-medium text-[var(--text-primary)]">{t('server.mfaTitle')}</div>
+          <p className="text-xs text-[var(--text-tertiary)]">{t('server.mfaDesc')}</p>
+          {error && (
+            <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 px-3 py-2 rounded">
+              <XCircle size={14} /> {error}
+            </div>
+          )}
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="\d{6,10}"
+            maxLength={10}
+            value={mfaCode}
+            onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
+            placeholder={t('server.mfaCodePlaceholder')}
+            className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg text-sm tracking-widest font-mono"
+            autoFocus
+            onKeyDown={(e) => { if (e.key === 'Enter') handleMfaSubmit(); }}
+          />
+          <button
+            onClick={handleMfaSubmit}
+            disabled={loading || mfaCode.length < 6}
+            className="w-full px-3 py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {loading ? t('server.verifying') : t('server.mfaVerify')}
+          </button>
+          <button
+            onClick={() => { setPendingMfa(null); setMfaCode(''); setError(''); }}
+            className="w-full text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+          >
+            {t('server.mfaCancel')}
+          </button>
+        </div>
+      )}
+
+      {!pendingMfa && (mode === 'login' || mode === 'register') && (
         <div className="border border-[var(--border)] rounded-lg p-4 bg-[var(--bg-secondary)] space-y-3">
           <div className="flex items-center gap-2 mb-1">
             <Server size={14} className="text-blue-400" />

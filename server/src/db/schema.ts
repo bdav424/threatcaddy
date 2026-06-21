@@ -13,7 +13,27 @@ export const users = pgTable('users', {
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  // MFA fields — totp_secret is AES-256-GCM encrypted at rest
+  totpSecret:      text('totp_secret'),
+  totpEnabled:     boolean('totp_enabled').notNull().default(false),
+  totpBackupCodes: jsonb('totp_backup_codes').notNull().default([]),
 });
+
+// ─── Passkeys (WebAuthn) ────────────────────────────────────────
+
+export const userPasskeys = pgTable('user_passkeys', {
+  id:           text('id').primaryKey(),
+  userId:       text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  credentialId: text('credential_id').notNull().unique(),
+  publicKey:    text('public_key').notNull(),
+  counter:      integer('counter').notNull().default(0),
+  deviceType:   text('device_type'),
+  aaguid:       text('aaguid'),
+  name:         text('name').notNull().default('Passkey'),
+  createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  idxPasskeysUserId: index('idx_passkeys_user_id').on(t.userId),
+}));
 
 export const sessions = pgTable('sessions', {
   id: text('id').primaryKey(),

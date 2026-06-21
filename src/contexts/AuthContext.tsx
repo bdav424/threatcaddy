@@ -1,11 +1,18 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import type { TeamUser } from '../types';
 
+export interface MfaChallenge {
+  mfaRequired: true;
+  challengeToken: string;
+  mfaMethod: 'totp';
+}
+
 interface AuthState {
   user: TeamUser | null;
   connected: boolean;
   serverUrl: string | null;
-  login(email: string, password: string, overrideServerUrl?: string): Promise<void>;
+  login(email: string, password: string, overrideServerUrl?: string): Promise<MfaChallenge | void>;
+  completeMfaLogin(challengeToken: string, code: string, serverUrl: string): Promise<void>;
   register(email: string, displayName: string, password: string): Promise<void>;
   logout(): Promise<void>;
   getAccessToken(): Promise<string | null>;
@@ -19,6 +26,7 @@ const AuthContext = createContext<AuthState>({
   connected: false,
   serverUrl: null,
   login: async () => {},
+  completeMfaLogin: async () => {},
   register: async () => {},
   logout: async () => {},
   getAccessToken: async () => null,
@@ -94,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const login = useCallback(async (email: string, password: string, overrideServerUrl?: string) => {
+  const login = useCallback(async (email: string, password: string, overrideServerUrl?: string): Promise<MfaChallenge | void> => {
     const url = overrideServerUrl || serverUrl;
     if (!url) throw new Error('No server URL configured');
 
@@ -114,6 +122,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await resp.json();
+
+    if (data.mfaRequired) {
+      if (overrideServerUrl) setServerUrlState(overrideServerUrl);
+      return { mfaRequired: true, challengeToken: data.challengeToken, mfaMethod: data.mfaMethod };
+    }
+
     const teamUser: TeamUser = {
       id: data.user.id,
       email: data.user.email,
@@ -125,6 +139,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (overrideServerUrl) {
       setServerUrlState(overrideServerUrl);
     }
+    setUser(teamUser);
+    setConnected(true);
+    persist(url, data.accessToken, data.refreshToken, teamUser);
+  }, [serverUrl, persist]);
+
+  const completeMfaLogin = useCallback(async (challengeToken: string, code: string, mfaServerUrl: string) => {
+    const url = mfaServerUrl || serverUrl;
+    if (!url) throw new Error('No server URL configured');
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15_000);
+    const resp = await fetch(`${url}/api/auth/mfa/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challengeToken, code }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error || 'MFA verification failed');
+    }
+
+    const data = await resp.json();
+    const teamUser: TeamUser = {
+      id: data.user.id,
+      email: data.user.email,
+      displayName: data.user.displayName,
+      avatarUrl: data.user.avatarUrl,
+      role: data.user.role,
+    };
     setUser(teamUser);
     setConnected(true);
     persist(url, data.accessToken, data.refreshToken, teamUser);
@@ -250,6 +296,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       connected,
       serverUrl,
       login,
+      completeMfaLogin,
       register,
       logout,
       getAccessToken,
