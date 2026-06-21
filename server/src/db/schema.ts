@@ -68,8 +68,8 @@ export const investigationMembers = pgTable('investigation_members', {
 
 export const notes = pgTable('notes', {
   id: text('id').primaryKey(),
-  title: text('title').notNull(),
-  content: text('content').notNull().default(''),
+  title: text('title'),
+  content: text('content').default(''),
   folderId: text('folder_id'),
   tags: jsonb('tags').notNull().default([]),
   pinned: boolean('pinned').notNull().default(false),
@@ -105,7 +105,7 @@ export const notes = pgTable('notes', {
 
 export const tasks = pgTable('tasks', {
   id: text('id').primaryKey(),
-  title: text('title').notNull(),
+  title: text('title'),
   description: text('description'),
   completed: boolean('completed').notNull().default(false),
   priority: text('priority', { enum: ['none', 'low', 'medium', 'high'] }).notNull().default('none'),
@@ -146,7 +146,7 @@ export const tasks = pgTable('tasks', {
 
 export const folders = pgTable('folders', {
   id: text('id').primaryKey(),
-  name: text('name').notNull(),
+  name: text('name'),
   icon: text('icon'),
   color: text('color'),
   order: integer('order').notNull().default(0),
@@ -173,8 +173,8 @@ export const folders = pgTable('folders', {
 
 export const tags = pgTable('tags', {
   id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  color: text('color').notNull(),
+  name: text('name'),
+  color: text('color'),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
   updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
@@ -191,10 +191,10 @@ export const timelineEvents = pgTable('timeline_events', {
   id: text('id').primaryKey(),
   timestamp: timestamp('timestamp', { withTimezone: true }).notNull(),
   timestampEnd: timestamp('timestamp_end', { withTimezone: true }),
-  title: text('title').notNull(),
+  title: text('title'),
   description: text('description'),
-  eventType: text('event_type').notNull(),
-  source: text('source').notNull().default(''),
+  eventType: text('event_type'),
+  source: text('source').default(''),
   confidence: text('confidence', { enum: ['low', 'medium', 'high', 'confirmed'] }).notNull().default('medium'),
   linkedIOCIds: jsonb('linked_ioc_ids').notNull().default([]),
   linkedNoteIds: jsonb('linked_note_ids').notNull().default([]),
@@ -234,7 +234,7 @@ export const timelineEvents = pgTable('timeline_events', {
 
 export const timelines = pgTable('timelines', {
   id: text('id').primaryKey(),
-  name: text('name').notNull(),
+  name: text('name'),
   description: text('description'),
   color: text('color'),
   order: integer('order').notNull().default(0),
@@ -252,8 +252,8 @@ export const timelines = pgTable('timelines', {
 
 export const whiteboards = pgTable('whiteboards', {
   id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  elements: text('elements').notNull().default('[]'),
+  name: text('name'),
+  elements: text('elements').default('[]'),
   appState: text('app_state'),
   folderId: text('folder_id'),
   tags: jsonb('tags').notNull().default([]),
@@ -278,9 +278,9 @@ export const whiteboards = pgTable('whiteboards', {
 
 export const standaloneIOCs = pgTable('standalone_iocs', {
   id: text('id').primaryKey(),
-  type: text('type').notNull(),
-  value: text('value').notNull(),
-  confidence: text('confidence', { enum: ['low', 'medium', 'high', 'confirmed'] }).notNull().default('medium'),
+  type: text('type'),
+  value: text('value'),
+  confidence: text('confidence', { enum: ['low', 'medium', 'high', 'confirmed'] }).default('medium'),
   analystNotes: text('analyst_notes'),
   attribution: text('attribution'),
   iocSubtype: text('ioc_subtype'),
@@ -315,10 +315,10 @@ export const standaloneIOCs = pgTable('standalone_iocs', {
 
 export const chatThreads = pgTable('chat_threads', {
   id: text('id').primaryKey(),
-  title: text('title').notNull(),
-  messages: jsonb('messages').notNull().default([]),
-  model: text('model').notNull(),
-  provider: text('provider').notNull(),
+  title: text('title'),
+  messages: jsonb('messages').default([]),
+  model: text('model'),
+  provider: text('provider'),
   folderId: text('folder_id'),
   tags: jsonb('tags').notNull().default([]),
   clsLevel: text('cls_level'),

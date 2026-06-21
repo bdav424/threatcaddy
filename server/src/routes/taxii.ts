@@ -145,6 +145,8 @@ function buildSTIXBundle(iocs: typeof standaloneIOCs.$inferSelect[], investigati
 
   for (const ioc of iocs) {
     if (ioc.trashed || ioc.archived) continue;
+    // Skip encrypted IOCs — type/value are null when the client uses encrypted sync
+    if (!ioc.type || !ioc.value) continue;
 
     // Validate IOC value format — skip malformed values to prevent pattern injection
     const formatRe = IOC_FORMAT_RE[ioc.type];
@@ -192,7 +194,7 @@ function buildSTIXBundle(iocs: typeof standaloneIOCs.$inferSelect[], investigati
       pattern: patternInfo.pattern,
       pattern_type: patternInfo.pattern_type,
       valid_from: ioc.createdAt.toISOString(),
-      confidence: CONFIDENCE_MAP[ioc.confidence] ?? 50,
+      confidence: CONFIDENCE_MAP[ioc.confidence ?? 'low'] ?? 50,
       created_by_ref: identityId,
     };
 
@@ -363,7 +365,7 @@ app.get('/collections/:id/objects/', async (c) => {
     .from(standaloneIOCs)
     .where(eq(standaloneIOCs.folderId, folderId));
 
-  const bundle = buildSTIXBundle(iocs, folder[0].name);
+  const bundle = buildSTIXBundle(iocs, folder[0].name ?? 'Unnamed Investigation');
   return c.json(bundle);
 });
 

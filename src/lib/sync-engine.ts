@@ -9,6 +9,33 @@ import type { WSClient } from './ws-client';
 // Cast db for dynamic table access (sync tables aren't in the typed schema)
 const dynamicDb = db as unknown as DexieType;
 
+// Per-table fields that contain investigation content and must be stripped from the server
+// payload when encryption is active. The server stores only routing metadata + encryptedData.
+const SYNC_CONTENT_FIELDS: Record<string, ReadonlySet<string>> = {
+  notes: new Set([
+    'title', 'content', 'sourceUrl', 'sourceTitle', 'color', 'clsLevel',
+    'iocAnalysis', 'iocTypes', 'linkedNoteIds', 'linkedTaskIds', 'linkedTimelineEventIds', 'annotations',
+  ]),
+  tasks: new Set([
+    'title', 'description', 'dueDate', 'clsLevel',
+    'iocAnalysis', 'iocTypes', 'comments', 'linkedNoteIds', 'linkedTaskIds', 'linkedTimelineEventIds',
+  ]),
+  folders: new Set(['name', 'description', 'icon', 'color', 'clsLevel', 'papLevel', 'closureResolution', 'closedReason']),
+  tags: new Set(['name', 'color']),
+  timelineEvents: new Set([
+    'title', 'description', 'eventType', 'source', 'confidence', 'clsLevel',
+    'linkedIOCIds', 'linkedNoteIds', 'linkedTaskIds', 'mitreAttackIds',
+    'actor', 'assets', 'rawData', 'comments', 'iocAnalysis', 'iocTypes', 'latitude', 'longitude',
+  ]),
+  timelines: new Set(['name', 'description', 'color']),
+  whiteboards: new Set(['name', 'elements', 'appState', 'clsLevel']),
+  standaloneIOCs: new Set([
+    'type', 'value', 'analystNotes', 'attribution', 'iocSubtype', 'iocStatus', 'clsLevel',
+    'relationships', 'linkedNoteIds', 'linkedTaskIds', 'linkedTimelineEventIds', 'comments', 'assigneeName',
+  ]),
+  chatThreads: new Set(['title', 'messages', 'model', 'provider', 'clsLevel']),
+};
+
 const SYNC_INTERVAL = 30_000; // 30 seconds — safety-net full sync
 const PUSH_DEBOUNCE = 50;     // 50ms — fast debounce for near real-time sync
 const PUSH_MAX_WAIT = 300;    // 300ms — max time before forcing a push during continuous typing
@@ -58,6 +85,14 @@ export class SyncEngine {
     return Promise.all(changes.map(async (c) => {
       if (c.op === 'put' && c.data) {
         const encryptedData = await encryptSyncEntity(key, c.data);
+        const contentFields = SYNC_CONTENT_FIELDS[c.table];
+        if (contentFields) {
+          const stripped: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(c.data)) {
+            if (!contentFields.has(k)) stripped[k] = v;
+          }
+          return { ...c, data: { ...stripped, encryptedData } };
+        }
         return { ...c, data: { ...c.data, encryptedData } };
       }
       return c;

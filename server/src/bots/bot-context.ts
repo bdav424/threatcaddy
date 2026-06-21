@@ -145,7 +145,7 @@ export class BotExecutionContext {
       .where(and(...conditions))
       .limit(limit);
 
-    return rows.map((n) => ({ id: n.id, title: n.title, snippet: n.content.slice(0, 200), tags: n.tags }));
+    return rows.map((n) => ({ id: n.id, title: n.title, snippet: (n.content ?? '').slice(0, 200), tags: n.tags }));
   }
 
   async readNote(noteId: string): Promise<Record<string, unknown> | null> {
