@@ -15,6 +15,7 @@ export interface ModelPrice {
 
 const PRICES: Record<string, ModelPrice> = {
   // Anthropic
+  'claude-opus-4-8':          { inputPerM: 15,   outputPerM: 75 },
   'claude-opus-4-6':          { inputPerM: 15,   outputPerM: 75 },
   'claude-sonnet-4-6':        { inputPerM: 3,    outputPerM: 15 },
   'claude-haiku-4-5-20251001':{ inputPerM: 1,    outputPerM: 5  },
