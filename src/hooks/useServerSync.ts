@@ -10,6 +10,7 @@ interface AuthState {
   serverUrl: string | null;
   connected: boolean;
   getAccessToken: () => Promise<string | null>;
+  getSyncKey?: () => CryptoKey | null;
   invalidateAccessToken?: () => void;
   setReachable: (ok: boolean) => void;
 }
@@ -43,6 +44,7 @@ export function useServerSync(auth: AuthState, reloadFns: ReloadFns, onFolderInv
 
     if (auth.serverUrl && auth.connected) {
       configureServerApi(auth.serverUrl, auth.getAccessToken, auth.invalidateAccessToken);
+      syncEngine.setSyncKey(auth.getSyncKey?.() ?? null);
       enableSync();
       syncEngine.setConflictHandler((conflicts) => setSyncConflicts(conflicts));
       syncEngine.setReadyHandler(() => {

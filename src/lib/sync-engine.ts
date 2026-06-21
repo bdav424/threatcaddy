@@ -3,6 +3,7 @@ import type { Dexie as DexieType } from 'dexie';
 import { syncPush, syncPull, syncSnapshot, type SyncChange, type SyncResult } from './server-api';
 import { disableSync, enableSync } from './sync-middleware';
 import { sanitizeSyncEntity, sanitizeSyncBatch } from './sync-sanitize';
+import { encryptSyncEntity, decryptSyncEntity } from './sync-crypto';
 import type { WSClient } from './ws-client';
 
 // Cast db for dynamic table access (sync tables aren't in the typed schema)
@@ -29,6 +30,7 @@ export class SyncEngine {
   private pushing = false;
   private firstPendingAt: number | null = null;
   private wsClient: WSClient | null = null;
+  private syncKey: CryptoKey | null = null;
   private onConflict: ((conflicts: SyncResult[]) => void) | null = null;
   private onRemoteChange: ((changes: Record<string, unknown>[], tables: Set<string>) => void) | null = null;
   private onReady: (() => void) | null = null;
@@ -44,6 +46,22 @@ export class SyncEngine {
 
   setWSClient(ws: WSClient | null) {
     this.wsClient = ws;
+  }
+
+  setSyncKey(key: CryptoKey | null) {
+    this.syncKey = key;
+  }
+
+  private async applyEncryption(changes: SyncChange[]): Promise<SyncChange[]> {
+    const key = this.syncKey;
+    if (!key) return changes;
+    return Promise.all(changes.map(async (c) => {
+      if (c.op === 'put' && c.data) {
+        const encryptedData = await encryptSyncEntity(key, c.data);
+        return { ...c, data: { ...c.data, encryptedData } };
+      }
+      return c;
+    }));
   }
 
   /** Called once after the first full sync cycle (initial push + pull) completes. */
@@ -137,7 +155,8 @@ export class SyncEngine {
       }
 
       if (changes.length > 0) {
-        const { results } = await syncPush(changes);
+        const encrypted = await this.applyEncryption(changes);
+        const { results } = await syncPush(encrypted);
         const conflicts = results.filter((r) => r.status === 'conflict');
         if (conflicts.length > 0 && this.onConflict) {
           this.onConflict(conflicts);
@@ -212,13 +231,13 @@ export class SyncEngine {
       const queue: SyncQueueEntry[] = await dynamicDb.table('_syncQueue').toArray();
       if (queue.length === 0) return;
 
-      // Batch into sync changes
-      const changes: SyncChange[] = queue.map((entry) => ({
+      const rawChanges: SyncChange[] = queue.map((entry) => ({
         table: entry.table,
         op: entry.op,
         entityId: entry.entityId,
         data: entry.data,
       }));
+      const changes = await this.applyEncryption(rawChanges);
 
       const { results } = await syncPush(changes);
 
@@ -277,8 +296,18 @@ export class SyncEngine {
             arr.push(id);
             deletesByTable.set(tableName, arr);
           } else {
+            let raw = entityData as Record<string, unknown>;
+            // If the entity was encrypted, decrypt it to recover the full record
+            if (this.syncKey && typeof raw.encryptedData === 'string') {
+              try {
+                raw = await decryptSyncEntity(this.syncKey, raw.encryptedData);
+              } catch (err) {
+                console.warn('[sync-engine] Failed to decrypt entity', tableName, id, err);
+                continue; // skip undecryptable entities rather than writing garbage
+              }
+            }
             // Sanitize server data through allowlisted field extractors
-            const sanitized = sanitizeSyncEntity(tableName, entityData as Record<string, unknown>);
+            const sanitized = sanitizeSyncEntity(tableName, raw);
             if (!sanitized) continue; // skip invalid entities
 
             const arr = putsByTable.get(tableName) || [];
@@ -331,8 +360,13 @@ export class SyncEngine {
       if (op === 'delete') {
         await dynamicDb.table(tableName).delete(entityId);
       } else if (data) {
-        // Sanitize through allowlisted field extractors
-        const sanitized = sanitizeSyncEntity(tableName, data);
+        let raw = data;
+        if (this.syncKey && typeof raw.encryptedData === 'string') {
+          try {
+            raw = await decryptSyncEntity(this.syncKey, raw.encryptedData);
+          } catch { /* skip undecryptable WS push */ }
+        }
+        const sanitized = sanitizeSyncEntity(tableName, raw);
         if (sanitized) {
           await dynamicDb.table(tableName).put(sanitized);
         }
@@ -368,8 +402,11 @@ export class SyncEngine {
       try {
         for (const conflict of conflicts) {
           if (!conflict.table || !conflict.serverData) continue;
-          // Sanitize through allowlisted field extractors
-          const sanitized = sanitizeSyncEntity(conflict.table, conflict.serverData);
+          let raw = conflict.serverData;
+          if (this.syncKey && typeof raw.encryptedData === 'string') {
+            try { raw = await decryptSyncEntity(this.syncKey, raw.encryptedData); } catch { continue; }
+          }
+          const sanitized = sanitizeSyncEntity(conflict.table, raw);
           if (sanitized) {
             await dynamicDb.table(conflict.table).put(sanitized);
           }
@@ -410,8 +447,19 @@ export class SyncEngine {
         for (const [tableName, rows] of Object.entries(snapshot)) {
           if (!Array.isArray(rows) || rows.length === 0) continue;
           affectedTables.add(tableName);
-          // Sanitize through allowlisted field extractors
-          const sanitized = sanitizeSyncBatch(tableName, rows as Record<string, unknown>[]);
+          // Decrypt if encrypted, then sanitize
+          let decryptedRows = rows as Record<string, unknown>[];
+          if (this.syncKey) {
+            decryptedRows = await Promise.all(
+              decryptedRows.map(async (row) => {
+                if (typeof row.encryptedData === 'string') {
+                  try { return await decryptSyncEntity(this.syncKey!, row.encryptedData); } catch { return row; }
+                }
+                return row;
+              }),
+            );
+          }
+          const sanitized = sanitizeSyncBatch(tableName, decryptedRows);
           if (sanitized.length > 0) {
             await dynamicDb.table(tableName).bulkPut(sanitized);
           }
@@ -456,7 +504,8 @@ export class SyncEngine {
 
     if (changes.length === 0) return;
 
-    const { results } = await syncPush(changes);
+    const encrypted = await this.applyEncryption(changes);
+    const { results } = await syncPush(encrypted);
     const conflicts = results.filter((r) => r.status === 'conflict');
     if (conflicts.length > 0 && this.onConflict) {
       this.onConflict(conflicts);

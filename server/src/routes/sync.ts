@@ -8,7 +8,7 @@ import { logActivityBatch } from '../services/audit-service.js';
 import { logger } from '../lib/logger.js';
 import { broadcastToFolder } from '../ws/handler.js';
 import { db } from '../db/index.js';
-import { folders, investigationMembers } from '../db/schema.js';
+import { folders, investigationMembers, users } from '../db/schema.js';
 import type { AuthUser, SyncChange, SyncResult } from '../types.js';
 import { ErrorCodes } from '../types/error-codes.js';
 
@@ -281,6 +281,34 @@ app.get('/snapshot/:folderId', async (c) => {
 
   const snapshot = await getSnapshot(folderId);
   return c.json(snapshot);
+});
+
+// POST /api/sync/key-setup — save the per-account sync key salt on first setup.
+// The client generates this salt locally and calls here once so all devices can
+// derive the same AES-256-GCM content key from the account password.
+// Idempotent: if a salt is already set it is NOT overwritten (rotation requires
+// re-encrypting all data — a future, explicit operation).
+app.post('/key-setup', async (c) => {
+  const user = c.get('user');
+  const body = await c.req.json().catch(() => ({}));
+  const salt = body?.salt;
+  if (typeof salt !== 'string' || salt.length < 20) {
+    return c.json({ error: 'salt must be a non-empty base64 string' }, 400);
+  }
+
+  const [existing] = await db
+    .select({ syncKeySalt: users.syncKeySalt })
+    .from(users)
+    .where(eq(users.id, user.id))
+    .limit(1);
+
+  if (existing?.syncKeySalt) {
+    // Salt already set — return it so the client can derive the correct key.
+    return c.json({ syncKeySalt: existing.syncKeySalt, changed: false });
+  }
+
+  await db.update(users).set({ syncKeySalt: salt }).where(eq(users.id, user.id));
+  return c.json({ syncKeySalt: salt, changed: true });
 });
 
 export default app;

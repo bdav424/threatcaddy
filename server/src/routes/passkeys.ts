@@ -277,6 +277,7 @@ app.post('/auth/finish', async (c) => {
     accessToken,
     refreshToken: refreshTokenId,
     user: { id: userRow.id, email: userRow.email, displayName: userRow.displayName, role: userRow.role, avatarUrl: userRow.avatarUrl },
+    syncKeySalt: userRow.syncKeySalt ?? null,
   });
 });
 

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import type { TeamUser } from '../types';
 import { authenticateWithPasskey } from '../lib/passkey-client';
+import { deriveSyncKey, generateSyncKeySalt } from '../lib/sync-crypto';
 
 export interface MfaChallenge {
   mfaRequired: true;
@@ -18,6 +19,7 @@ interface AuthState {
   register(email: string, displayName: string, password: string): Promise<void>;
   logout(): Promise<void>;
   getAccessToken(): Promise<string | null>;
+  getSyncKey(): CryptoKey | null;
   invalidateAccessToken(): void;
   setServerUrl(url: string | null): void;
   setReachable(reachable: boolean): void;
@@ -33,6 +35,7 @@ const AuthContext = createContext<AuthState>({
   register: async () => {},
   logout: async () => {},
   getAccessToken: async () => null,
+  getSyncKey: () => null,
   invalidateAccessToken: () => {},
   setServerUrl: () => {},
   setReachable: () => {},
@@ -59,6 +62,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const accessTokenRef = useRef<string | null>(null);
   const refreshTokenRef = useRef<string | null>(null);
   const refreshPromiseRef = useRef<Promise<string | null> | null>(null);
+  const syncKeyRef = useRef<CryptoKey | null>(null);
+  const pendingMfaPasswordRef = useRef<string | null>(null);
 
   // Restore from localStorage on mount
   useEffect(() => {
@@ -73,6 +78,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setConnected(true);
       }
     } catch { /* ignore corrupt storage */ }
+  }, []);
+
+  const getSyncKey = useCallback(() => syncKeyRef.current, []);
+
+  const deriveSyncKeyForPassword = useCallback(async (
+    password: string,
+    saltFromServer: string | null,
+    activeServerUrl: string,
+    accessToken: string,
+  ) => {
+    let salt = saltFromServer;
+    if (!salt) {
+      salt = generateSyncKeySalt();
+      try {
+        const resp = await fetch(`${activeServerUrl}/api/sync/key-setup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+          body: JSON.stringify({ salt }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          salt = data.syncKeySalt ?? salt;
+        }
+      } catch { /* non-fatal — key derivation continues with locally-generated salt */ }
+    }
+    try {
+      syncKeyRef.current = await deriveSyncKey(password, salt);
+    } catch (err) {
+      console.warn('[auth] sync key derivation failed:', err);
+      syncKeyRef.current = null;
+    }
   }, []);
 
   const persist = useCallback((url: string, token: string, refresh: string, u: TeamUser) => {
@@ -128,6 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (data.mfaRequired) {
       if (overrideServerUrl) setServerUrlState(overrideServerUrl);
+      pendingMfaPasswordRef.current = password;
       return { mfaRequired: true, challengeToken: data.challengeToken, mfaMethod: data.mfaMethod };
     }
 
@@ -145,7 +182,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(teamUser);
     setConnected(true);
     persist(url, data.accessToken, data.refreshToken, teamUser);
-  }, [serverUrl, persist]);
+    // Derive sync key from password + server-supplied salt (fire-and-forget, non-blocking)
+    deriveSyncKeyForPassword(password, data.syncKeySalt ?? null, url, data.accessToken).catch(() => {});
+  }, [serverUrl, persist, deriveSyncKeyForPassword]);
 
   const completeMfaLogin = useCallback(async (challengeToken: string, code: string, mfaServerUrl: string) => {
     const url = mfaServerUrl || serverUrl;
@@ -177,7 +216,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(teamUser);
     setConnected(true);
     persist(url, data.accessToken, data.refreshToken, teamUser);
-  }, [serverUrl, persist]);
+    const pendingPwd = pendingMfaPasswordRef.current;
+    pendingMfaPasswordRef.current = null;
+    if (pendingPwd) {
+      deriveSyncKeyForPassword(pendingPwd, data.syncKeySalt ?? null, url, data.accessToken).catch(() => {});
+    }
+  }, [serverUrl, persist, deriveSyncKeyForPassword]);
 
   const loginWithPasskey = useCallback(async (overrideServerUrl?: string, email?: string) => {
     const url = overrideServerUrl || serverUrl;
@@ -252,6 +296,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setConnected(false);
     accessTokenRef.current = null;
     refreshTokenRef.current = null;
+    syncKeyRef.current = null;
+    pendingMfaPasswordRef.current = null;
     localStorage.removeItem(STORAGE_KEY);
   }, [serverUrl]);
 
@@ -324,6 +370,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       logout,
       getAccessToken,
+      getSyncKey,
       invalidateAccessToken,
       setServerUrl,
       setReachable,

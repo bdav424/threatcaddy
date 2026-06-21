@@ -135,6 +135,7 @@ app.post('/register', async (c) => {
   return c.json({
     ...tokens,
     user: { id: userId, email, displayName, role, avatarUrl: null },
+    syncKeySalt: null,
   }, 201);
 });
 
@@ -215,6 +216,7 @@ app.post('/login', async (c) => {
   return c.json({
     ...tokens,
     user: { id: user.id, email: user.email, displayName: user.displayName, role: user.role, avatarUrl: user.avatarUrl },
+    syncKeySalt: user.syncKeySalt ?? null,
   });
 });
 
@@ -248,6 +250,7 @@ app.post('/mfa/verify', async (c) => {
   return c.json({
     ...tokens,
     user: { id: row.id, email: row.email, displayName: row.displayName, role: row.role, avatarUrl: row.avatarUrl },
+    syncKeySalt: row.syncKeySalt ?? null,
   });
 });
 
