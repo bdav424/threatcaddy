@@ -454,5 +454,10 @@
   "server.onboarding.realTimeSyncDesc": "Your notes, tasks, and IOCs sync automatically across all connected team members.",
   "server.onboarding.presence": "Presence",
   "server.onboarding.presenceDesc": "See who's online and what investigations they're working on.",
-  "server.onboarding.getStarted": "Get Started"
+  "server.onboarding.getStarted": "Get Started",
+  "integrations.cacheTitle": "Enrichment Cache",
+  "integrations.cacheDesc": "Successful IOC enrichment results are stored locally so repeated lookups don't re-hit rate-limited APIs.",
+  "integrations.cacheTtl": "Cache TTL",
+  "integrations.cacheTtlValue": "{{hours}}h",
+  "integrations.cacheDisabled": "Disabled"
 }

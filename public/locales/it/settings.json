@@ -449,5 +449,10 @@
   "passkeys.registeredToast": "Passkey \"{{name}}\" aggiunto",
   "passkeys.deletedToast": "Passkey rimosso",
   "server.passkeyLogin": "Accedi con passkey",
-  "server.passkeyLoggingIn": "In attesa del passkey..."
+  "server.passkeyLoggingIn": "In attesa del passkey...",
+  "integrations.cacheTitle": "Cache di arricchimento",
+  "integrations.cacheDesc": "I risultati di arricchimento IOC riusciti vengono memorizzati localmente in modo che le ricerche ripetute non raggiungano nuovamente le API a frequenza limitata.",
+  "integrations.cacheTtl": "TTL cache",
+  "integrations.cacheTtlValue": "{{hours}}h",
+  "integrations.cacheDisabled": "Disabilitato"
 }

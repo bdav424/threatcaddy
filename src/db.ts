@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, ReportTemplate, GraphSnapshot, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus } from './types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, ReportTemplate, GraphSnapshot, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus, EnrichmentCacheEntry } from './types';
 import type { IntegrationTemplate, InstalledIntegration, IntegrationRun } from './types/integration-types';
 import { installEncryptionMiddleware } from './lib/encryptionMiddleware';
 
@@ -28,6 +28,7 @@ const db = new Dexie('ThreatCaddyDB') as Dexie & {
   agentMeetings: EntityTable<AgentMeeting, 'id'>;
   reportTemplates: EntityTable<ReportTemplate, 'id'>;
   graphSnapshots: EntityTable<GraphSnapshot, 'id'>;
+  enrichmentCache: EntityTable<EnrichmentCacheEntry, 'id'>;
 };
 
 db.version(1).stores({
@@ -304,6 +305,13 @@ db.version(33).stores({
 // Version 34 adds graph snapshots (S5-ext-a — pivot graph as report artifact).
 db.version(34).stores({
   graphSnapshots: 'id, folderId, createdAt',
+});
+
+// Version 35: local enrichment cache — stores API results keyed by templateId+iocType+iocValue
+// with a TTL so repeated lookups across investigations don't re-hit rate-limited APIs.
+// Intentionally excluded from backup/export (cache data regenerates automatically via TTL).
+db.version(35).stores({
+  enrichmentCache: 'id, cacheKey, templateId, iocType, expiresAt',
 });
 
 function evidenceKindFromExtension(value: string): EvidenceKind {

@@ -1689,6 +1689,31 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
         <div className="space-y-6" role="tabpanel" id="settings-panel-integrations" aria-labelledby="settings-tab-integrations">
           <IntegrationSourceDashboard />
           <IntegrationPanel />
+          {/* Enrichment Cache TTL */}
+          <div className="space-y-2 rounded-xl border border-border-subtle/40 bg-bg-primary/40 p-4">
+            <div>
+              <h3 className="text-sm font-semibold text-text-primary">{t('integrations.cacheTitle')}</h3>
+              <p className="text-xs text-text-secondary mt-0.5">{t('integrations.cacheDesc')}</p>
+            </div>
+            <div className="flex items-center gap-3 pt-1">
+              <label className="text-xs text-gray-400 shrink-0">{t('integrations.cacheTtl')}</label>
+              <input
+                type="range"
+                min={0}
+                max={168}
+                step={1}
+                value={settings.enrichmentCacheTtlHours ?? 24}
+                onChange={(e) => onUpdateSettings({ enrichmentCacheTtlHours: parseInt(e.target.value) })}
+                className="flex-1 accent-accent h-1.5"
+                aria-label={t('integrations.cacheTtl')}
+              />
+              <span className="text-xs text-gray-400 w-16 text-end">
+                {(settings.enrichmentCacheTtlHours ?? 24) === 0
+                  ? t('integrations.cacheDisabled')
+                  : t('integrations.cacheTtlValue', { hours: settings.enrichmentCacheTtlHours ?? 24 })}
+              </span>
+            </div>
+          </div>
         </div>
       )}
 

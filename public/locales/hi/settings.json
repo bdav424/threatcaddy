@@ -449,5 +449,10 @@
   "passkeys.registeredToast": "पासकी \"{{name}}\" जोड़ी गई",
   "passkeys.deletedToast": "पासकी हटा दी गई",
   "server.passkeyLogin": "पासकी से साइन इन करें",
-  "server.passkeyLoggingIn": "पासकी का इंतजार..."
+  "server.passkeyLoggingIn": "पासकी का इंतजार...",
+  "integrations.cacheTitle": "समृद्धि कैश",
+  "integrations.cacheDesc": "सफल IOC एनरिचमेंट परिणाम स्थानीय रूप से संग्रहीत किए जाते हैं ताकि बार-बार की जाने वाली खोजें दर-सीमित API को फिर से न चलाएं।",
+  "integrations.cacheTtl": "कैश TTL",
+  "integrations.cacheTtlValue": "{{hours}}घं",
+  "integrations.cacheDisabled": "अक्षम"
 }

@@ -449,5 +449,10 @@
   "passkeys.registeredToast": "מפתח גישה \"{{name}}\" נוסף",
   "passkeys.deletedToast": "מפתח גישה הוסר",
   "server.passkeyLogin": "התחבר עם מפתח גישה",
-  "server.passkeyLoggingIn": "ממתין למפתח גישה..."
+  "server.passkeyLoggingIn": "ממתין למפתח גישה...",
+  "integrations.cacheTitle": "מטמון העשרה",
+  "integrations.cacheDesc": "תוצאות הסמכה מוצלחות מאוחסנות מקומית כדי שחיפושים חוזרים לא יגיעו לממשקי API עם הגבלת קצב.",
+  "integrations.cacheTtl": "TTL מטמון",
+  "integrations.cacheTtlValue": "{{hours}}ש",
+  "integrations.cacheDisabled": "מושבת"
 }

@@ -449,5 +449,10 @@
   "passkeys.registeredToast": "Đã thêm passkey \"{{name}}\"",
   "passkeys.deletedToast": "Đã xóa passkey",
   "server.passkeyLogin": "Đăng nhập bằng passkey",
-  "server.passkeyLoggingIn": "Đang chờ passkey..."
+  "server.passkeyLoggingIn": "Đang chờ passkey...",
+  "integrations.cacheTitle": "Bộ nhớ đệm làm phong phú",
+  "integrations.cacheDesc": "Kết quả làm phong phú IOC thành công được lưu trữ cục bộ để các tra cứu lặp lại không cần truy cập lại API bị giới hạn tốc độ.",
+  "integrations.cacheTtl": "TTL bộ nhớ đệm",
+  "integrations.cacheTtlValue": "{{hours}}giờ",
+  "integrations.cacheDisabled": "Vô hiệu hóa"
 }

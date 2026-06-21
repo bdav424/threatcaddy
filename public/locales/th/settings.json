@@ -449,5 +449,10 @@
   "passkeys.registeredToast": "เพิ่มพาสคีย์ \"{{name}}\" แล้ว",
   "passkeys.deletedToast": "ลบพาสคีย์แล้ว",
   "server.passkeyLogin": "เข้าสู่ระบบด้วยพาสคีย์",
-  "server.passkeyLoggingIn": "กำลังรอพาสคีย์..."
+  "server.passkeyLoggingIn": "กำลังรอพาสคีย์...",
+  "integrations.cacheTitle": "แคชการเสริมข้อมูล",
+  "integrations.cacheDesc": "ผลลัพธ์การเสริมข้อมูล IOC ที่สำเร็จจะถูกเก็บไว้ในเครื่อง เพื่อไม่ให้การค้นหาซ้ำๆ เข้าถึง API ที่มีการจำกัดอัตราอีกครั้ง",
+  "integrations.cacheTtl": "TTL ของแคช",
+  "integrations.cacheTtlValue": "{{hours}}ชม.",
+  "integrations.cacheDisabled": "ปิดใช้งาน"
 }

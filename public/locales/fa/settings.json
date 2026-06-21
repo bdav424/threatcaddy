@@ -449,5 +449,10 @@
   "passkeys.registeredToast": "کلید عبور «{{name}}» اضافه شد",
   "passkeys.deletedToast": "کلید عبور حذف شد",
   "server.passkeyLogin": "ورود با کلید عبور",
-  "server.passkeyLoggingIn": "در انتظار کلید عبور..."
+  "server.passkeyLoggingIn": "در انتظار کلید عبور...",
+  "integrations.cacheTitle": "حافظه موقت غنی‌سازی",
+  "integrations.cacheDesc": "نتایج موفق غنی‌سازی IOC به صورت محلی ذخیره می‌شوند تا جستجوهای تکراری به APIهای محدود شده نرخ دوباره دسترسی نداشته باشند.",
+  "integrations.cacheTtl": "مدت اعتبار کش",
+  "integrations.cacheTtlValue": "{{hours}}ساعت",
+  "integrations.cacheDisabled": "غیرفعال"
 }

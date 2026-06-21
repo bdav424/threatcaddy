@@ -449,5 +449,10 @@
   "passkeys.registeredToast": "Пассключ \"{{name}}\" добавлен",
   "passkeys.deletedToast": "Пассключ удалён",
   "server.passkeyLogin": "Войти с пассключом",
-  "server.passkeyLoggingIn": "Ожидание пассключа..."
+  "server.passkeyLoggingIn": "Ожидание пассключа...",
+  "integrations.cacheTitle": "Кэш обогащения",
+  "integrations.cacheDesc": "Успешные результаты обогащения IOC хранятся локально, чтобы повторные запросы не обращались к API с ограничением частоты.",
+  "integrations.cacheTtl": "TTL кэша",
+  "integrations.cacheTtlValue": "{{hours}}ч",
+  "integrations.cacheDisabled": "Отключено"
 }

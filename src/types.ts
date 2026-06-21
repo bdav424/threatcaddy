@@ -384,6 +384,8 @@ export interface Settings {
   calendarAccounts?: CalendarAccountConfig[];
   /** Max notes the Supervisor keeps in its folder before trashing the oldest. Range 50–500; default 200. */
   supervisorNoteRetention?: number;
+  /** How long enrichment API results are cached locally in hours. 0 = disabled. Default 24. */
+  enrichmentCacheTtlHours?: number;
 }
 
 // ── Agent Host Types ─────────────────────────────────────────────────
@@ -1163,6 +1165,20 @@ export interface ReportTemplate {
   updatedBy?: string;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface EnrichmentCacheEntry {
+  id: string;
+  /** Composite cache key: '{templateId}:{iocType}:{normalizedValue}' */
+  cacheKey: string;
+  templateId: string;
+  iocType: string;
+  iocValue: string;
+  /** Serializable snapshot of the run's displayResults or enrichment delta */
+  result: unknown;
+  ttlHours: number;
+  expiresAt: number;
+  createdAt: number;
 }
 
 export interface GraphSnapshot {

@@ -449,5 +449,10 @@
   "passkeys.registeredToast": "Passkey \"{{name}}\" ditambahkan",
   "passkeys.deletedToast": "Passkey dihapus",
   "server.passkeyLogin": "Masuk dengan passkey",
-  "server.passkeyLoggingIn": "Menunggu passkey..."
+  "server.passkeyLoggingIn": "Menunggu passkey...",
+  "integrations.cacheTitle": "Cache pengayaan",
+  "integrations.cacheDesc": "Hasil pengayaan IOC yang berhasil disimpan secara lokal sehingga pencarian berulang tidak perlu mengakses API yang dibatasi kecepatan lagi.",
+  "integrations.cacheTtl": "TTL cache",
+  "integrations.cacheTtlValue": "{{hours}}j",
+  "integrations.cacheDisabled": "Dinonaktifkan"
 }

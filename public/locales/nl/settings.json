@@ -449,5 +449,10 @@
   "passkeys.registeredToast": "Passkey \"{{name}}\" toegevoegd",
   "passkeys.deletedToast": "Passkey verwijderd",
   "server.passkeyLogin": "Inloggen met passkey",
-  "server.passkeyLoggingIn": "Wachten op passkey..."
+  "server.passkeyLoggingIn": "Wachten op passkey...",
+  "integrations.cacheTitle": "Verrijkingscache",
+  "integrations.cacheDesc": "Succesvolle IOC-verrijkingsresultaten worden lokaal opgeslagen zodat herhaalde opzoekingen geen snelheidsbegrensde API's opnieuw hoeven te benaderen.",
+  "integrations.cacheTtl": "Cache-TTL",
+  "integrations.cacheTtlValue": "{{hours}}u",
+  "integrations.cacheDisabled": "Uitgeschakeld"
 }

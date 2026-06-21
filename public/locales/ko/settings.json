@@ -449,5 +449,10 @@
   "passkeys.registeredToast": "패스키 \"{{name}}\" 추가됨",
   "passkeys.deletedToast": "패스키가 제거되었습니다",
   "server.passkeyLogin": "패스키로 로그인",
-  "server.passkeyLoggingIn": "패스키 대기 중..."
+  "server.passkeyLoggingIn": "패스키 대기 중...",
+  "integrations.cacheTitle": "강화 캐시",
+  "integrations.cacheDesc": "성공적인 IOC 강화 결과는 로컬에 저장되어 반복 조회 시 속도 제한된 API에 다시 접근하지 않습니다.",
+  "integrations.cacheTtl": "캐시 TTL",
+  "integrations.cacheTtlValue": "{{hours}}시간",
+  "integrations.cacheDisabled": "비활성화됨"
 }

@@ -449,5 +449,10 @@
   "passkeys.registeredToast": "Chave de acesso \"{{name}}\" adicionada",
   "passkeys.deletedToast": "Chave de acesso removida",
   "server.passkeyLogin": "Entrar com chave de acesso",
-  "server.passkeyLoggingIn": "Aguardando chave de acesso..."
+  "server.passkeyLoggingIn": "Aguardando chave de acesso...",
+  "integrations.cacheTitle": "Cache de enriquecimento",
+  "integrations.cacheDesc": "Resultados bem-sucedidos de enriquecimento de IOC são armazenados localmente para que pesquisas repetidas não precisem acessar APIs com limite de taxa novamente.",
+  "integrations.cacheTtl": "TTL do cache",
+  "integrations.cacheTtlValue": "{{hours}}h",
+  "integrations.cacheDisabled": "Desativado"
 }

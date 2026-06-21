@@ -449,5 +449,10 @@
   "passkeys.registeredToast": "Klucz dostępu \"{{name}}\" dodany",
   "passkeys.deletedToast": "Klucz dostępu usunięty",
   "server.passkeyLogin": "Zaloguj się kluczem dostępu",
-  "server.passkeyLoggingIn": "Oczekiwanie na klucz dostępu..."
+  "server.passkeyLoggingIn": "Oczekiwanie na klucz dostępu...",
+  "integrations.cacheTitle": "Pamięć podręczna wzbogacania",
+  "integrations.cacheDesc": "Pomyślne wyniki wzbogacania IOC są przechowywane lokalnie, aby ponowne wyszukiwania nie musiały ponownie uderzać w API z ograniczeniem szybkości.",
+  "integrations.cacheTtl": "TTL pamięci podręcznej",
+  "integrations.cacheTtlValue": "{{hours}}g",
+  "integrations.cacheDisabled": "Wyłączone"
 }

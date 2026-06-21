@@ -6,7 +6,6 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
-  useRef,
   useState,
   type CSSProperties,
   type PointerEvent,
@@ -963,10 +962,10 @@ export function WorkspacePanel({
 }: WorkspacePanelProps) {
   const workspacePanelContext = useContext(WorkspacePanelContext);
   // Tracks whether this panel has ever been active; once true, stays true so children stay mounted.
-  const hasEverBeenActiveRef = useRef(!deferMount || active);
-  if (!hasEverBeenActiveRef.current && (!deferMount || active)) {
-    hasEverBeenActiveRef.current = true;
-  }
+  const [hasEverBeenActive, setHasEverBeenActive] = useState(() => !deferMount || active);
+  useEffect(() => {
+    if (!hasEverBeenActive && active) setHasEverBeenActive(true);
+  }, [active, hasEverBeenActive]);
   const [activeResizeEdge, setActiveResizeEdge] = useState<ResizeEdge | null>(null);
   const [activeSharedSeamEdge, setActiveSharedSeamEdge] = useState<ResizeEdge | null>(null);
   const [snapPreview, setSnapPreview] = useState<WorkspaceGridPlacement | null>(null);
@@ -1051,7 +1050,7 @@ export function WorkspacePanel({
     () => ({ compact, setHeaderAccessory }),
     [compact],
   );
-  const bodyChildren = hasEverBeenActiveRef.current ? (
+  const bodyChildren = hasEverBeenActive ? (
     <WorkspacePanelChromeContext.Provider value={chromeContext}>
       {children}
     </WorkspacePanelChromeContext.Provider>

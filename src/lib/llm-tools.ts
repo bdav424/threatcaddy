@@ -730,11 +730,23 @@ async function executeEnrichIOC(inp: Record<string, unknown>, folderId?: string,
 
   // Run each matching integration
   const { IntegrationExecutor } = await import('./integration-executor');
+  const { buildEnrichmentCacheKey, getFromEnrichmentCache, setInEnrichmentCache } = await import('./enrichment-cache');
+  const cacheTtlHours = settings?.enrichmentCacheTtlHours ?? 24;
   const folder = folderId ? await db.folders.get(folderId) : undefined;
   const results: { name: string; status: string; summary: string }[] = [];
 
   for (const { installation, template } of matching) {
     try {
+      // Check local cache before hitting the API
+      if (cacheTtlHours > 0) {
+        const cacheKey = buildEnrichmentCacheKey(template.id, ioc.type, ioc.value);
+        const cached = await getFromEnrichmentCache(cacheKey);
+        if (cached !== null) {
+          results.push({ name: template.name, status: 'cached', summary: `Returned from local cache (TTL ${cacheTtlHours}h)` });
+          continue;
+        }
+      }
+
       const executor = new IntegrationExecutor();
       const run = await executor.run(
         template,
@@ -784,6 +796,11 @@ async function executeEnrichIOC(inp: Record<string, unknown>, folderId?: string,
       );
 
       await db.integrationRuns.add(run);
+
+      // Cache successful results so repeated lookups don't re-hit rate-limited APIs
+      if (run.status === 'success' && cacheTtlHours > 0) {
+        await setInEnrichmentCache(template.id, ioc.type, ioc.value, run.displayResults ?? run.outputSummary, cacheTtlHours);
+      }
 
       results.push({
         name: template.name,

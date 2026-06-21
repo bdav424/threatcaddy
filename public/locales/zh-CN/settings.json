@@ -449,5 +449,10 @@
   "passkeys.registeredToast": "通行密钥\"{{name}}\"已添加",
   "passkeys.deletedToast": "通行密钥已删除",
   "server.passkeyLogin": "使用通行密钥登录",
-  "server.passkeyLoggingIn": "等待通行密钥..."
+  "server.passkeyLoggingIn": "等待通行密钥...",
+  "integrations.cacheTitle": "富化缓存",
+  "integrations.cacheDesc": "成功的IOC富化结果在本地存储，避免重复查询再次触达有速率限制的API。",
+  "integrations.cacheTtl": "缓存TTL",
+  "integrations.cacheTtlValue": "{{hours}}小时",
+  "integrations.cacheDisabled": "已禁用"
 }

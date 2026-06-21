@@ -449,5 +449,10 @@
   "passkeys.registeredToast": "تمت إضافة مفتاح المرور \"{{name}}\"",
   "passkeys.deletedToast": "تم حذف مفتاح المرور",
   "server.passkeyLogin": "تسجيل الدخول بمفتاح المرور",
-  "server.passkeyLoggingIn": "في انتظار مفتاح المرور..."
+  "server.passkeyLoggingIn": "في انتظار مفتاح المرور...",
+  "integrations.cacheTitle": "ذاكرة التخزين المؤقت للإثراء",
+  "integrations.cacheDesc": "يتم تخزين نتائج إثراء IOC الناجحة محليًا حتى لا تصل عمليات البحث المتكررة إلى واجهات برمجة التطبيقات ذات معدل الاستخدام المحدود.",
+  "integrations.cacheTtl": "مدة الصلاحية",
+  "integrations.cacheTtlValue": "{{hours}}س",
+  "integrations.cacheDisabled": "معطّل"
 }

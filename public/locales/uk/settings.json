@@ -449,5 +449,10 @@
   "passkeys.registeredToast": "Паскі «{{name}}» додано",
   "passkeys.deletedToast": "Паскі видалено",
   "server.passkeyLogin": "Увійти з паскі",
-  "server.passkeyLoggingIn": "Очікування паскі..."
+  "server.passkeyLoggingIn": "Очікування паскі...",
+  "integrations.cacheTitle": "Кеш збагачення",
+  "integrations.cacheDesc": "Успішні результати збагачення IOC зберігаються локально, щоб повторні запити не зверталися до API з обмеженням частоти.",
+  "integrations.cacheTtl": "TTL кешу",
+  "integrations.cacheTtlValue": "{{hours}}г",
+  "integrations.cacheDisabled": "Вимкнено"
 }

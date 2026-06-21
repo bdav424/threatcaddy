@@ -449,5 +449,10 @@
   "passkeys.registeredToast": "パスキー「{{name}}」が追加されました",
   "passkeys.deletedToast": "パスキーが削除されました",
   "server.passkeyLogin": "パスキーでサインイン",
-  "server.passkeyLoggingIn": "パスキーを待機中..."
+  "server.passkeyLoggingIn": "パスキーを待機中...",
+  "integrations.cacheTitle": "エンリッチメントキャッシュ",
+  "integrations.cacheDesc": "IOC エンリッチメントの成功結果はローカルに保存されるため、繰り返し検索でもレート制限された API に再度アクセスする必要がありません。",
+  "integrations.cacheTtl": "キャッシュTTL",
+  "integrations.cacheTtlValue": "{{hours}}時間",
+  "integrations.cacheDisabled": "無効"
 }
