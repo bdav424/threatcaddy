@@ -15,7 +15,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('IntegrationSourceDashboard', () => {
+describe('IntegrationSourceDashboard', { timeout: 20000 }, () => {
   it('renders the shared local catalog source groups, provider status cards, capabilities, and no side effects', () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);

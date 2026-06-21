@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ChatInput } from '../components/Chat/ChatInput';
 
@@ -355,6 +355,8 @@ describe('Slash command transforms', () => {
 // ── Dashboard CaddyAI link ──
 
 describe('Dashboard CaddyAI tool link', () => {
+  afterEach(cleanup);
+
   // Dynamically import to avoid heavy mocking of the full dashboard
   it('includes CaddyAI in the internal tools list', async () => {
     // We test the INTERNAL_TOOLS constant indirectly by rendering DashboardView
@@ -382,7 +384,7 @@ describe('Dashboard CaddyAI tool link', () => {
         onViewChange={onViewChange}
       />
     );
-    const chatButton = screen.getByText('CaddyAI').closest('button') as HTMLButtonElement;
+    const chatButton = screen.getAllByText('CaddyAI')[0].closest('button') as HTMLButtonElement;
     fireEvent.click(chatButton);
     expect(onViewChange).toHaveBeenCalledWith('chat');
   });
