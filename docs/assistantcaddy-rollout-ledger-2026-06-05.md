@@ -6974,3 +6974,39 @@ Status: `INTEGRATED GATES PASSED / UI/BROWSER PROOF DEFERRED / SOURCE ACCEPTED /
 ### NEXT
 - Item 4: UI-6 leftovers — integration run-history view + "run this playbook" CTA
 - Item 5: Command-palette quick-pivot bar + auto-drafted hunt narrative (largest scope)
+
+### Item 4: UI-6 leftovers — Already DONE (discovered during ground check)
+- Integration run-history view: `HistoryTab` component in `IntegrationPanel.tsx` (SubTab='history') — fully implemented
+- "Run this playbook" CTA: `onRunPlaybook` prop in `InvestigationDetailPanel.tsx` (lines 316-324) — fully implemented
+- No action needed
+
+### Item 5: Command-palette quick-pivot bar + auto-drafted hunt narrative — IN PROGRESS
+
+### Item 5: Command-palette quick-pivot bar + auto-drafted hunt narrative — DONE
+**Commit:** `9633283`
+
+**Implementation:** Extended `SearchOverlay.tsx` (Ctrl+K) with a command mode:
+- Query starting with `>` enters command mode; remaining text filters commands
+- **Navigate** to any `ViewMode` (Dashboard, Notes, Tasks, Timeline, IOC Intel, Graph, Agents, Reports, Chat, Activity, Investigations)
+- **Switch investigation** directly from the palette (fuzzy-match folder names); archived investigations excluded
+- Keyboard navigation (↑↓ + Enter); hint bar with keybindings
+- IOC search results: hover shows a "Narrative" button that opens CaddyAI pre-seeded with a threat hunt narrative prompt for that IOC value/type
+
+`App.tsx` wired three new callbacks:
+- `handlePaletteSwitchInvestigation` — sets selectedFolderId and closes palette
+- `handlePaletteNavigateToView` — calls navigateTo(view) and closes palette
+- `handleDraftHuntNarrative` — creates a new CaddyAI thread tagged `hunt-narrative`, seeds a structured prompt, navigates to chat
+
+**Gates:**
+- `tsc --noEmit`: exit 0
+- `pnpm lint`: 0 errors
+- `pnpm build`: exit 0 (59.9s)
+- `search.test.ts`: 46/46 passed
+
+### Session complete 2026-06-21
+Work plan items 1-5 all done:
+1. P2-1 render-perf deferMount — `3fd6d2e` + lint fix in `662c6af`
+2. Censys connector — already done
+3. Local enrichment cache — `662c6af`
+4. UI-6 leftovers — already done
+5. Command-palette + hunt narrative — `9633283`
