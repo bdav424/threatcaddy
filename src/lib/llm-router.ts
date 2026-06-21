@@ -94,7 +94,7 @@ function safeFakeProviderLabel(value: unknown, fallback: string): string {
 
 function waitForFakeChunkTurn(signal?: AbortSignal): Promise<boolean> {
   return new Promise((resolve) => {
-    setTimeout(() => resolve(signal?.aborted !== true), 0);
+    queueMicrotask(() => resolve(signal?.aborted !== true));
   });
 }
 
