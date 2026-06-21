@@ -923,7 +923,7 @@ describe('SearchOverlay', () => {
 
   it('renders the search input when open', () => {
     render(<SearchOverlay {...defaultProps} />);
-    const input = screen.getByPlaceholderText('Search notes, tasks, timeline, whiteboards, IOCs, chats...');
+    const input = screen.getByPlaceholderText('Search notes, tasks, timeline, whiteboards, IOCs, chats... (or type > for commands)');
     expect(input).toBeInTheDocument();
   });
 
@@ -996,14 +996,14 @@ describe('SearchOverlay', () => {
 
   it('updates query when typing in search input', () => {
     render(<SearchOverlay {...defaultProps} />);
-    const input = screen.getByPlaceholderText('Search notes, tasks, timeline, whiteboards, IOCs, chats...');
+    const input = screen.getByPlaceholderText('Search notes, tasks, timeline, whiteboards, IOCs, chats... (or type > for commands)');
     fireEvent.change(input, { target: { value: 'test query' } });
     expect(input).toHaveValue('test query');
   });
 
   it('shows clear button when query is non-empty', () => {
     render(<SearchOverlay {...defaultProps} />);
-    const input = screen.getByPlaceholderText('Search notes, tasks, timeline, whiteboards, IOCs, chats...');
+    const input = screen.getByPlaceholderText('Search notes, tasks, timeline, whiteboards, IOCs, chats... (or type > for commands)');
     fireEvent.change(input, { target: { value: 'something' } });
 
     // There should be a Clear button and an X button in the input
@@ -1012,7 +1012,7 @@ describe('SearchOverlay', () => {
 
   it('clears query when Clear button is clicked', () => {
     render(<SearchOverlay {...defaultProps} />);
-    const input = screen.getByPlaceholderText('Search notes, tasks, timeline, whiteboards, IOCs, chats...');
+    const input = screen.getByPlaceholderText('Search notes, tasks, timeline, whiteboards, IOCs, chats... (or type > for commands)');
     fireEvent.change(input, { target: { value: 'hello' } });
     expect(input).toHaveValue('hello');
 
