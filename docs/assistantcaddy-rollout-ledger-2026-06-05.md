@@ -6944,6 +6944,37 @@ Status: `INTEGRATED GATES PASSED / UI/BROWSER PROOF DEFERRED / SOURCE ACCEPTED /
 - Security: TOTP secrets AES-256-GCM encrypted at rest; backup codes argon2id hashed; challenge tokens short-lived HS256; WebAuthn counter enforced; passkey public keys stored as hex TEXT (no credential IDs in localStorage)
 - `NEXT`: UI/browser smoke test on passkey registration + TOTP setup; also complete deferred standalone promotion from S7.
 
+### S8 Phase 3: Device Enrollment Gate (2026-06-22)
+
+**Server:**
+- Migration `0024_sync_device_enrollment.sql`: `sync_devices` table (`id`, `user_id`, `device_fingerprint` sha256, `device_name`, `status` enum approved/pending/revoked, `enrolled_at`, `approved_at`, `last_seen_at`)
+- `server/src/types/error-codes.ts`: added `SYNC_ENROLLMENT_REQUIRED`, `SYNC_DEVICE_NOT_FOUND`, `SYNC_PAIRING_INVALID`, `SYNC_PAIRING_EXPIRED`
+- `server/src/services/pairing-challenge.ts`: in-memory 10-min TTL store for pairing codes (keyed by sha256 of code); same pattern as passkey-challenge.ts
+- `server/src/routes/sync-devices.ts`: GET `/api/sync/devices`, POST `/register` (auto-approves first device, pending for subsequent), POST `/pair/generate` (8-char alphanumeric code + QR data URL via `qrcode` npm), POST `/pair/complete` (redeems code → approved), DELETE `/:id` (revoke), PATCH `/:id` (rename)
+- `server/src/routes/sync.ts`: `checkEnrollment(userId, deviceKey)` helper; gates POST `/push`, GET `/pull`, GET `/snapshot/:folderId`, POST `/key-setup` with 403 + `SYNC_ENROLLMENT_REQUIRED` + `enrollmentStatus` when not enrolled
+
+**Client:**
+- `src/types.ts`: `SyncDevice` interface
+- `src/lib/server-api.ts`: `SyncEnrollmentError` class; `throwIfEnrollmentRequired()` called in `syncPush`/`syncPull`/`syncSnapshot`; device key generated once (`crypto.getRandomValues`) stored in `localStorage['tc-sync-device-key']`; `X-Device-Key` header injected on every `apiFetch` call; `initDeviceKey()`, `getOrCreateDeviceKey()`, `getDeviceName()`, `setDeviceName()`; full device management API (`fetchSyncDevices`, `revokeSyncDevice`, `renameSyncDevice`, `generatePairingCode`, `completePairing`, `registerSyncDevice`)
+- `src/lib/sync-engine.ts`: `setEnrollmentHandler(handler)`; push/pull/initialSync catch blocks detect `SyncEnrollmentError`, call `this.stop()` and fire handler
+- `src/hooks/useServerSync.ts`: calls `initDeviceKey()` on connect; wires `setEnrollmentHandler`; exposes `syncEnrollmentStatus` + `clearSyncEnrollmentStatus`
+- `src/hooks/useSyncDevices.ts`: `load`, `revoke`, `rename`, `startPairing`, `cancelPairing`, `redeemPairingCode`, `enrollThisDevice`
+- `src/components/Settings/SyncDevicesPanel.tsx`: device list with status badges, rename (inline edit), revoke (confirm-click), `PairingDialog` (choose: show QR+code vs. enter code); uses `useAuth().connected`
+- `src/components/Settings/SettingsPanel.tsx`: `<SyncDevicesPanel />` added in General tab below Passkeys section
+- i18n: `devices`, `pairing`, `enrollment` sections in `sync` namespace; `general.syncedDevices*` in `settings` namespace; all 21 locales
+
+**Safety invariant:** Pre-enrollment local data is never lost. `initialPushDone` flag in `_syncMeta` is only set after a successful push. When enrollment gate returns 403, `initialSync()` catch block swallows it and the flag stays false. On next `start()` after approval, all local data (notes/tasks/etc. created while pending) is pushed in the initial sync batch. Server handles duplicate puts idempotently.
+
+**Commits:** `d762d7e`
+
+**Gates (2026-06-22):**
+- `tsc --noEmit` (client): exit 0
+- `tsc --noEmit` (server): exit 0
+- `pnpm lint`: exit 0, no errors
+- `pnpm build`: exit 0
+- `pnpm test:run`: 3143 passed, 17 skipped
+- Security: device key stored only in localStorage (not sent to third parties); `X-Device-Key` transmitted over TLS only to own server; fingerprint stored as sha256 (server never sees raw key); pairing codes single-use, 10-min TTL; first device auto-approved bootstraps the ring
+
 ---
 
 ## Work Plan 2026-06-21 (Session follow-up)
