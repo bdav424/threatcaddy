@@ -2,6 +2,16 @@ import { createLabelProxy, createLabelColorProxy, noteColorLabel, iocTableColumn
 import type { EmailAccountConfig } from './lib/email-onboarding';
 import type { CalendarAccountConfig } from './lib/calendar-accounts';
 
+export interface SyncDevice {
+  id: string;
+  deviceName: string;
+  status: 'approved' | 'pending' | 'revoked';
+  enrolledAt: string;
+  approvedAt?: string | null;
+  lastSeenAt?: string | null;
+  isCurrent?: boolean;
+}
+
 export type EventSource =
   | 'ThreatCaddy Work' | 'Research' | 'Family' | 'Zoom' | 'PTO'
   | 'Google Calendar' | 'Microsoft 365' | 'CalDAV';

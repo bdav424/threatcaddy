@@ -37,6 +37,22 @@ export const userPasskeys = pgTable('user_passkeys', {
   idxPasskeysUserId: index('idx_passkeys_user_id').on(t.userId),
 }));
 
+// ─── Sync Device Enrollment ────────────────────────────────────
+
+export const syncDevices = pgTable('sync_devices', {
+  id:                text('id').primaryKey(),
+  userId:            text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  deviceName:        text('device_name').notNull().default('Unknown Device'),
+  deviceFingerprint: text('device_fingerprint').notNull(),
+  status:            text('status', { enum: ['approved', 'pending', 'revoked'] }).notNull().default('pending'),
+  enrolledAt:        timestamp('enrolled_at', { withTimezone: true }).notNull().defaultNow(),
+  approvedAt:        timestamp('approved_at', { withTimezone: true }),
+  lastSeenAt:        timestamp('last_seen_at', { withTimezone: true }),
+}, (t) => ({
+  uqUserFingerprint: unique('uq_sync_device_user_fingerprint').on(t.userId, t.deviceFingerprint),
+  idxSyncDevicesUserId: index('idx_sync_devices_user_id').on(t.userId),
+}));
+
 export const sessions = pgTable('sessions', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),

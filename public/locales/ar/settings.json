@@ -17,6 +17,8 @@
   "general.displayNameHelp": "يظهر على الملاحظات والـ IOCs والكيانات الأخرى التي تنشئها. الافتراضي \"محلل\" إذا لم يتم تعيينه.",
   "general.fromTeamServer": "من خادم الفريق",
   "general.preferences": "تفضيلات العرض",
+  "general.syncedDevices": "الأجهزة المتزامنة",
+  "general.syncedDevicesDesc": "أدِر الأجهزة التي يمكنها مزامنة البيانات المشفرة إلى حسابك. اطلب موافقة الجهاز قبل أن يتمكن جهاز جديد من دفع أو سحب بيانات المزامنة.",
   "general.editorMode": "وضع المحرر الافتراضي",
   "general.editorMode.edit": "تعديل فقط",
   "general.editorMode.split": "عرض مقسَّم",

@@ -7,5 +7,40 @@
   "passphraseApplying": "Application en cours…",
   "passphraseLater": "Plus tard",
   "passphraseError": "Échec de la définition de la phrase de passe de synchronisation. Veuillez réessayer.",
-  "passphrasePrivacy": "La phrase de passe ne quitte jamais votre appareil. Vos données sont chiffrées localement avant la synchronisation."
+  "passphrasePrivacy": "La phrase de passe ne quitte jamais votre appareil. Vos données sont chiffrées localement avant la synchronisation.",
+  "devices": {
+    "thisDevice": "Cet appareil",
+    "pendingApproval": "En attente d'approbation",
+    "revoked": "Révoqué",
+    "lastSeen": "Vu pour la dernière fois {{time}}",
+    "addDevice": "Ajouter un appareil",
+    "revoke": "Révoquer un appareil",
+    "confirmRevoke": "Confirmer la révocation",
+    "notConnected": "Connectez-vous à un serveur d'équipe pour gérer les appareils synchronisés.",
+    "loading": "Chargement des appareils…",
+    "empty": "Aucun appareil inscrit pour l'instant."
+  },
+  "pairing": {
+    "title": "Ajouter un appareil de synchronisation",
+    "chooseModeHint": "Choisissez si c'est l'appareil de confiance générant le code ou le nouvel appareil le rachetant.",
+    "showCode": "Afficher le code d'appairage",
+    "showCodeDesc": "C'est un appareil de confiance — générez un code que le nouvel appareil peut scanner ou saisir.",
+    "enterCode": "Entrer le code d'appairage",
+    "enterCodeDesc": "C'est le nouvel appareil — entrez le code affiché sur un appareil de confiance.",
+    "showCodeHint": "Scannez le code QR ou saisissez le code sur le nouvel appareil. Expire dans 10 minutes.",
+    "qrAlt": "Code QR d'appairage",
+    "expires": "Expire à {{time}}",
+    "enterCodeHint": "Entrez le code à 8 caractères affiché sur votre appareil de confiance.",
+    "confirm": "Appairer cet appareil",
+    "invalidCode": "Code d'appairage invalide ou expiré. Veuillez réessayer.",
+    "back": "Retour"
+  },
+  "enrollment": {
+    "pendingTitle": "Approbation de synchronisation en attente",
+    "pendingDesc": "Cet appareil attend l'approbation avant de pouvoir se synchroniser. Sur un appareil de confiance, allez à Paramètres → Appareils synchronisés et générez un code d'appairage.",
+    "revokedTitle": "Accès de synchronisation révoqué",
+    "revokedDesc": "Cet appareil a été supprimé du groupe de synchronisation. Contactez le propriétaire du compte ou réappairez à partir des paramètres.",
+    "notRegisteredTitle": "Synchronisation non configurée",
+    "notRegisteredDesc": "Cet appareil n'a pas encore rejoint le groupe de synchronisation chiffré."
+  }
 }

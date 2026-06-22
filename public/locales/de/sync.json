@@ -7,5 +7,40 @@
   "passphraseApplying": "Wird angewendet…",
   "passphraseLater": "Später",
   "passphraseError": "Fehler beim Festlegen der Synchronisierungspassphrase. Bitte versuchen Sie es erneut.",
-  "passphrasePrivacy": "Die Passphrase verlässt Ihr Gerät nie. Ihre Daten werden lokal verschlüsselt, bevor sie synchronisiert werden."
+  "passphrasePrivacy": "Die Passphrase verlässt Ihr Gerät nie. Ihre Daten werden lokal verschlüsselt, bevor sie synchronisiert werden.",
+  "devices": {
+    "thisDevice": "Dieses Gerät",
+    "pendingApproval": "Warten auf Genehmigung",
+    "revoked": "Widerrufen",
+    "lastSeen": "Zuletzt gesehen {{time}}",
+    "addDevice": "Gerät hinzufügen",
+    "revoke": "Gerät widerrufen",
+    "confirmRevoke": "Wideruf bestätigen",
+    "notConnected": "Verbinden Sie sich mit einem Team-Server, um synchronisierte Geräte zu verwalten.",
+    "loading": "Geräte werden geladen…",
+    "empty": "Noch keine Geräte registriert."
+  },
+  "pairing": {
+    "title": "Synchronisierungsgerät hinzufügen",
+    "chooseModeHint": "Wählen Sie, ob dies das vertrauenswürdige Gerät ist, das den Code generiert, oder das neue Gerät, das einen Code einlöst.",
+    "showCode": "Koppelungscode anzeigen",
+    "showCodeDesc": "Dies ist ein vertrauenswürdiges Gerät — generieren Sie einen Code, den das neue Gerät scannen oder eingeben kann.",
+    "enterCode": "Koppelungscode eingeben",
+    "enterCodeDesc": "Dies ist das neue Gerät — geben Sie den auf einem vertrauenswürdigen Gerät angezeigten Code ein.",
+    "showCodeHint": "Scannen Sie den QR-Code oder geben Sie den Code auf dem neuen Gerät ein. Verfällt in 10 Minuten.",
+    "qrAlt": "QR-Code für Gerätkopplung",
+    "expires": "Verfällt um {{time}}",
+    "enterCodeHint": "Geben Sie den 8-stelligen Code ein, der auf Ihrem vertrauenswürdigen Gerät angezeigt wird.",
+    "confirm": "Dieses Gerät koppeln",
+    "invalidCode": "Ungültiger oder abgelaufener Koppelungscode. Bitte versuchen Sie es erneut.",
+    "back": "Zurück"
+  },
+  "enrollment": {
+    "pendingTitle": "Synchronisierungsgenehmigung ausstehend",
+    "pendingDesc": "Dieses Gerät wartet auf Genehmigung, bevor es synchronisiert werden kann. Gehen Sie auf einem vertrauenswürdigen Gerät zu Einstellungen → Synchronisierte Geräte und generieren Sie einen Koppelungscode.",
+    "revokedTitle": "Synchronisierungszugriff widerrufen",
+    "revokedDesc": "Dieses Gerät wurde aus der Synchronisierungsgruppe entfernt. Kontaktieren Sie den Kontoinhaber oder koppeln Sie es erneut über Einstellungen.",
+    "notRegisteredTitle": "Synchronisierung nicht eingerichtet",
+    "notRegisteredDesc": "Dieses Gerät ist der verschlüsselten Synchronisierungsgruppe noch nicht beigetreten."
+  }
 }

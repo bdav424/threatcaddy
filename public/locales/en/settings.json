@@ -18,6 +18,8 @@
   "general.displayNameHelp": "Shown on notes, IOCs, and other entities you create. Defaults to \"Analyst\" if not set.",
   "general.fromTeamServer": "from team server",
   "general.preferences": "Display Preferences",
+  "general.syncedDevices": "Synced Devices",
+  "general.syncedDevicesDesc": "Manage which devices can sync encrypted data to your account. Require device approval before a new device can push or pull sync data.",
   "general.editorMode": "Default Editor Mode",
   "general.editorMode.edit": "Edit Only",
   "general.editorMode.split": "Split View",

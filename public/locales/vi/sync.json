@@ -7,5 +7,40 @@
   "passphraseApplying": "Đang Áp dụng…",
   "passphraseLater": "Để sau",
   "passphraseError": "Không thể đặt cụm mật khẩu đồng bộ. Vui lòng thử lại.",
-  "passphrasePrivacy": "Cụm mật khẩu không bao giờ rời khỏi thiết bị của bạn. Dữ liệu của bạn được mã hóa cục bộ trước khi đồng bộ."
+  "passphrasePrivacy": "Cụm mật khẩu không bao giờ rời khỏi thiết bị của bạn. Dữ liệu của bạn được mã hóa cục bộ trước khi đồng bộ.",
+  "devices": {
+    "thisDevice": "Thiết bị này",
+    "pendingApproval": "Chờ phê duyệt",
+    "revoked": "Bị thu hồi",
+    "lastSeen": "Lần cuối nhìn thấy {{time}}",
+    "addDevice": "Thêm thiết bị",
+    "revoke": "Thu hồi thiết bị",
+    "confirmRevoke": "Xác nhận thu hồi",
+    "notConnected": "Kết nối với máy chủ nhóm để quản lý các thiết bị được đồng bộ.",
+    "loading": "Đang tải thiết bị…",
+    "empty": "Chưa có thiết bị nào được đăng ký."
+  },
+  "pairing": {
+    "title": "Thêm thiết bị đồng bộ",
+    "chooseModeHint": "Chọn liệu đây là thiết bị đáng tin cậy tạo mã hay thiết bị mới đổi lấy mã.",
+    "showCode": "Hiển thị mã ghép đôi",
+    "showCodeDesc": "Đây là thiết bị đáng tin cậy — tạo mã mà thiết bị mới có thể quét hoặc nhập.",
+    "enterCode": "Nhập mã ghép đôi",
+    "enterCodeDesc": "Đây là thiết bị mới — nhập mã được hiển thị trên thiết bị đáng tin cậy.",
+    "showCodeHint": "Quét mã QR hoặc nhập mã trên thiết bị mới. Hết hạn trong 10 phút.",
+    "qrAlt": "Mã QR ghép đôi",
+    "expires": "Hết hạn {{time}}",
+    "enterCodeHint": "Nhập mã 8 ký tự được hiển thị trên thiết bị đáng tin cậy của bạn.",
+    "confirm": "Ghép đôi thiết bị này",
+    "invalidCode": "Mã ghép đôi không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.",
+    "back": "Quay lại"
+  },
+  "enrollment": {
+    "pendingTitle": "Chờ phê duyệt đồng bộ",
+    "pendingDesc": "Thiết bị này đang chờ phê duyệt trước khi có thể đồng bộ. Trên thiết bị đáng tin cậy, hãy vào Cài đặt → Thiết bị được đồng bộ và tạo mã ghép đôi.",
+    "revokedTitle": "Quyền truy cập đồng bộ bị thu hồi",
+    "revokedDesc": "Thiết bị này đã bị xóa khỏi nhóm đồng bộ. Liên hệ với chủ sở hữu tài khoản hoặc ghép đôi lại từ Cài đặt.",
+    "notRegisteredTitle": "Không được cài đặt đồng bộ",
+    "notRegisteredDesc": "Thiết bị này chưa tham gia nhóm đồng bộ được mã hóa."
+  }
 }

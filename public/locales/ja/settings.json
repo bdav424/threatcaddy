@@ -17,6 +17,8 @@
   "general.displayNameHelp": "作成したノート、IOC、その他のエンティティに表示されます。未設定の場合は「Analyst」がデフォルトです。",
   "general.fromTeamServer": "チームサーバーから",
   "general.preferences": "表示設定",
+  "general.syncedDevices": "同期されたデバイス",
+  "general.syncedDevicesDesc": "アカウントに暗号化データを同期できるデバイスを管理します。新しいデバイスが同期データをプッシュまたはプルする前に、デバイスの承認を要求します。",
   "general.editorMode": "デフォルトエディターモード",
   "general.editorMode.edit": "編集のみ",
   "general.editorMode.split": "分割表示",

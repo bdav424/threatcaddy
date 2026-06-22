@@ -17,6 +17,8 @@
   "general.displayNameHelp": "מוצג על הערות, IOCs וישויות אחרות שאתה יוצר. ברירת מחדל \"אנליסט\" אם לא הוגדר.",
   "general.fromTeamServer": "משרת הצוות",
   "general.preferences": "העדפות תצוגה",
+  "general.syncedDevices": "התקנים מסונכרנים",
+  "general.syncedDevicesDesc": "נהל אילו התקנים יכולים להסתנכרן נתונים מוצפנים לחשבונך. דרוש אישור התקן לפני שהתקן חדש יכול לדחוף או למשוך נתוני סנכרון.",
   "general.editorMode": "מצב עורך ברירת מחדל",
   "general.editorMode.edit": "עריכה בלבד",
   "general.editorMode.split": "תצוגה מפוצלת",

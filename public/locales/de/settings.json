@@ -17,6 +17,8 @@
   "general.displayNameHelp": "Wird auf Notizen, IOCs und anderen von Ihnen erstellten Entitäten angezeigt. Standardmäßig \"Analyst\", wenn nicht festgelegt.",
   "general.fromTeamServer": "vom Team-Server",
   "general.preferences": "Anzeigeeinstellungen",
+  "general.syncedDevices": "Synchronisierte Geräte",
+  "general.syncedDevicesDesc": "Verwalten Sie, welche Geräte verschlüsselte Daten mit Ihrem Konto synchronisieren können. Fordern Sie eine Gerätegenehmigung an, bevor ein neues Gerät Synchronisierungsdaten übertragen oder abrufen kann.",
   "general.editorMode": "Standard-Editormodus",
   "general.editorMode.edit": "Nur Bearbeiten",
   "general.editorMode.split": "Geteilte Ansicht",

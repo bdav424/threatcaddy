@@ -17,6 +17,8 @@
   "general.displayNameHelp": "Exibido em notas, IOCs e outras entidades que você cria. Padrão «Analista» se não definido.",
   "general.fromTeamServer": "do servidor de equipe",
   "general.preferences": "Preferências de exibição",
+  "general.syncedDevices": "Dispositivos sincronizados",
+  "general.syncedDevicesDesc": "Gerencie quais dispositivos podem sincronizar dados criptografados para sua conta. Exigir aprovação de dispositivo antes que um novo dispositivo possa enviar ou receber dados de sincronização.",
   "general.editorMode": "Modo de editor padrão",
   "general.editorMode.edit": "Somente edição",
   "general.editorMode.split": "Visualização dividida",

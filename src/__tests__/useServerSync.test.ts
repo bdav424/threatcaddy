@@ -41,6 +41,7 @@ vi.mock('../lib/sync-engine', () => ({
     setConflictHandler: (handler: unknown) => mockSetConflictHandler(handler),
     setRemoteChangeHandler: (handler: unknown) => mockSetRemoteChangeHandler(handler),
     setReadyHandler: (handler: unknown) => mockSetReadyHandler(handler),
+    setEnrollmentHandler: () => {},
     resolveConflicts: (...args: unknown[]) => mockResolveConflicts(...args),
     sync: () => mockSync(),
     applyRemoteChange: (...args: unknown[]) => mockApplyRemoteChange(...args),
@@ -49,8 +50,10 @@ vi.mock('../lib/sync-engine', () => ({
 }));
 
 const mockConfigureServerApi = vi.fn();
+const mockInitDeviceKey = vi.fn();
 vi.mock('../lib/server-api', () => ({
   configureServerApi: (...args: unknown[]) => mockConfigureServerApi(...args),
+  initDeviceKey: () => mockInitDeviceKey(),
 }));
 
 const mockEnableSync = vi.fn();

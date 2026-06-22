@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { PresenceUser } from '../types';
 import type { SyncResult } from '../lib/server-api';
-import { configureServerApi } from '../lib/server-api';
+import { configureServerApi, initDeviceKey } from '../lib/server-api';
 import { syncEngine } from '../lib/sync-engine';
 import { enableSync, disableSync } from '../lib/sync-middleware';
 import { WSClient } from '../lib/ws-client';
@@ -37,6 +37,7 @@ interface ReloadFns {
 export function useServerSync(auth: AuthState, reloadFns: ReloadFns, onFolderInvite?: (folderId: string) => void) {
   const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([]);
   const [syncConflicts, setSyncConflicts] = useState<SyncResult[]>([]);
+  const [syncEnrollmentStatus, setSyncEnrollmentStatus] = useState<string | null>(null);
   const wsClientRef = useRef<WSClient | null>(null);
 
   useEffect(() => {
@@ -44,8 +45,11 @@ export function useServerSync(auth: AuthState, reloadFns: ReloadFns, onFolderInv
 
     if (auth.serverUrl && auth.connected) {
       configureServerApi(auth.serverUrl, auth.getAccessToken, auth.invalidateAccessToken);
+      initDeviceKey();
       syncEngine.setSyncKey(auth.getSyncKey?.() ?? null);
       enableSync();
+      setSyncEnrollmentStatus(null);
+      syncEngine.setEnrollmentHandler((status) => setSyncEnrollmentStatus(status));
       syncEngine.setConflictHandler((conflicts) => setSyncConflicts(conflicts));
       syncEngine.setReadyHandler(() => {
         // Hooks already loaded local data on mount — just signal that
@@ -157,5 +161,7 @@ export function useServerSync(auth: AuthState, reloadFns: ReloadFns, onFolderInv
     setSyncConflicts,
     handleResolveConflict,
     handleResolveAllConflicts,
+    syncEnrollmentStatus,
+    clearSyncEnrollmentStatus: () => setSyncEnrollmentStatus(null),
   };
 }

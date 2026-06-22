@@ -17,6 +17,8 @@
   "general.displayNameHelp": "Affiché sur les notes, IOCs et autres entités que vous créez. signed URL défaut « Analyste » si non défini.",
   "general.fromTeamServer": "depuis le serveur d'équipe",
   "general.preferences": "Préférences d'affichage",
+  "general.syncedDevices": "Appareils synchronisés",
+  "general.syncedDevicesDesc": "Gérez les appareils qui peuvent synchroniser les données chiffrées de votre compte. Exigez l'approbation d'un appareil avant qu'un nouvel appareil puisse envoyer ou recevoir des données de synchronisation.",
   "general.editorMode": "Mode d'éditeur signed URL défaut",
   "general.editorMode.edit": "Édition uniquement",
   "general.editorMode.split": "Vue partagée",

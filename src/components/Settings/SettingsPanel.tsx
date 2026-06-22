@@ -27,6 +27,7 @@ import { EncryptionSettings } from '../Encryption/EncryptionSettings';
 import { ServerConnection } from './ServerConnection';
 import { TotpManagement } from './TotpManagement';
 import { PasskeyManagement } from './PasskeyManagement';
+import { SyncDevicesPanel } from './SyncDevicesPanel';
 import { IntegrationPanel } from '../Integrations/IntegrationPanel';
 import { IntegrationSourceDashboard } from '../Integrations/IntegrationSourceDashboard';
 import { AppearanceSettings } from './AppearanceSettings';
@@ -1321,6 +1322,13 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
 
           {/* Security — Passkeys */}
           <PasskeyManagement />
+
+          {/* Security — Synced Devices */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-300">{t('general.syncedDevices')}</h3>
+            <p className="text-xs text-gray-500">{t('general.syncedDevicesDesc')}</p>
+            <SyncDevicesPanel />
+          </div>
 
           {/* Identity */}
           {(() => {

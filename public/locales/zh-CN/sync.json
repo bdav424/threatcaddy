@@ -7,5 +7,40 @@
   "passphraseApplying": "正在应用…",
   "passphraseLater": "稍后",
   "passphraseError": "无法设置同步密码。请重试。",
-  "passphrasePrivacy": "密码永远不会离开您的设备。您的数据在同步前在本地加密。"
+  "passphrasePrivacy": "密码永远不会离开您的设备。您的数据在同步前在本地加密。",
+  "devices": {
+    "thisDevice": "此设备",
+    "pendingApproval": "等待批准",
+    "revoked": "已撤销",
+    "lastSeen": "最后查看 {{time}}",
+    "addDevice": "添加设备",
+    "revoke": "撤销设备",
+    "confirmRevoke": "确认撤销",
+    "notConnected": "连接到团队服务器以管理已同步的设备。",
+    "loading": "正在加载设备…",
+    "empty": "尚未注册任何设备。"
+  },
+  "pairing": {
+    "title": "添加同步设备",
+    "chooseModeHint": "选择这是生成代码的受信任设备，还是兑换代码的新设备。",
+    "showCode": "显示配对代码",
+    "showCodeDesc": "这是受信任的设备 — 生成新设备可以扫描或输入的代码。",
+    "enterCode": "输入配对代码",
+    "enterCodeDesc": "这是新设备 — 输入在受信任设备上显示的代码。",
+    "showCodeHint": "扫描二维码或在新设备上输入代码。10 分钟后过期。",
+    "qrAlt": "配对二维码",
+    "expires": "过期时间 {{time}}",
+    "enterCodeHint": "输入您受信任设备上显示的 8 个字符代码。",
+    "confirm": "配对此设备",
+    "invalidCode": "配对代码无效或已过期。请重试。",
+    "back": "返回"
+  },
+  "enrollment": {
+    "pendingTitle": "同步批准待处理",
+    "pendingDesc": "此设备正在等待批准后才能同步。在受信任的设备上，转到设置 → 已同步设备并生成配对代码。",
+    "revokedTitle": "同步访问已撤销",
+    "revokedDesc": "此设备已从同步组中删除。请联系账户所有者或从设置中重新配对。",
+    "notRegisteredTitle": "未设置同步",
+    "notRegisteredDesc": "此设备尚未加入加密同步组。"
+  }
 }

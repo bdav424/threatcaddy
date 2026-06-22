@@ -1,6 +1,6 @@
 import { db } from '../db';
 import type { Dexie as DexieType } from 'dexie';
-import { syncPush, syncPull, syncSnapshot, type SyncChange, type SyncResult } from './server-api';
+import { syncPush, syncPull, syncSnapshot, SyncEnrollmentError, type SyncChange, type SyncResult } from './server-api';
 import { disableSync, enableSync } from './sync-middleware';
 import { sanitizeSyncEntity, sanitizeSyncBatch } from './sync-sanitize';
 import { encryptSyncEntity, decryptSyncEntity } from './sync-crypto';
@@ -61,6 +61,7 @@ export class SyncEngine {
   private onConflict: ((conflicts: SyncResult[]) => void) | null = null;
   private onRemoteChange: ((changes: Record<string, unknown>[], tables: Set<string>) => void) | null = null;
   private onReady: (() => void) | null = null;
+  private onEnrollmentRequired: ((status: string) => void) | null = null;
   private readyFired = false;
 
   setConflictHandler(handler: (conflicts: SyncResult[]) => void) {
@@ -102,6 +103,11 @@ export class SyncEngine {
   /** Called once after the first full sync cycle (initial push + pull) completes. */
   setReadyHandler(handler: () => void) {
     this.onReady = handler;
+  }
+
+  /** Called when sync is blocked because this device is not enrolled. */
+  setEnrollmentHandler(handler: (status: string) => void) {
+    this.onEnrollmentRequired = handler;
   }
 
   start() {
@@ -205,6 +211,11 @@ export class SyncEngine {
         value: true,
       });
     } catch (err) {
+      if (err instanceof SyncEnrollmentError) {
+        this.stop();
+        this.onEnrollmentRequired?.(err.enrollmentStatus);
+        return;
+      }
       console.warn('SyncEngine: initial sync failed', err);
     }
   }
@@ -297,7 +308,11 @@ export class SyncEngine {
         this.onConflict(conflicts);
       }
     } catch (err) {
-      // "Not connected" is expected when server is temporarily unreachable — don't spam console
+      if (err instanceof SyncEnrollmentError) {
+        this.stop();
+        this.onEnrollmentRequired?.(err.enrollmentStatus);
+        return;
+      }
       if (err instanceof Error && err.message.includes('Not connected')) return;
       console.error('SyncEngine: push error', err);
     } finally {
@@ -374,7 +389,11 @@ export class SyncEngine {
       // Update last sync timestamp
       await dynamicDb.table('_syncMeta').put({ key: META_KEY_LAST_SYNC, value: serverTimestamp });
     } catch (err) {
-      // "Not connected" is expected when server is temporarily unreachable — don't spam console
+      if (err instanceof SyncEnrollmentError) {
+        this.stop();
+        this.onEnrollmentRequired?.(err.enrollmentStatus);
+        return;
+      }
       if (err instanceof Error && err.message.includes('Not connected')) return;
       console.error('SyncEngine: pull error', err);
     }

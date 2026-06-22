@@ -17,6 +17,8 @@
   "general.displayNameHelp": "Hiển thị trên ghi chú, IOC và thực thể khác bạn tạo. Mặc định là \"Nhà phân tích\" nếu không đặt.",
   "general.fromTeamServer": "từ máy chủ nhóm",
   "general.preferences": "Tùy chọn hiển thị",
+  "general.syncedDevices": "Thiết bị được đồng bộ",
+  "general.syncedDevicesDesc": "Quản lý thiết bị nào có thể đồng bộ dữ liệu được mã hóa với tài khoản của bạn. Yêu cầu phê duyệt thiết bị trước khi thiết bị mới có thể đẩy hoặc kéo dữ liệu đồng bộ.",
   "general.editorMode": "Chế độ soạn thảo mặc định",
   "general.editorMode.edit": "Chỉ sửa",
   "general.editorMode.split": "Chia đôi",

@@ -1,4 +1,56 @@
-import type { Notification, InvestigationMember } from '../types';
+import type { Notification, InvestigationMember, SyncDevice } from '../types';
+
+// ─── Sync Device Key ─────────────────────────────────────────────
+
+const DEVICE_KEY_LS = 'tc-sync-device-key';
+const DEVICE_NAME_LS = 'tc-sync-device-name';
+
+let _deviceKey: string | null = null;
+
+function generateDeviceKey(): string {
+  const arr = new Uint8Array(24);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function deriveDefaultDeviceName(): string {
+  const ua = navigator.userAgent;
+  if (/iPhone/i.test(ua)) return 'iPhone';
+  if (/iPad/i.test(ua)) return 'iPad';
+  if (/Android/i.test(ua)) return 'Android Device';
+  if (/Macintosh|Mac OS/i.test(ua)) return 'Mac';
+  if (/Windows/i.test(ua)) return 'Windows PC';
+  if (/Linux/i.test(ua)) return 'Linux Device';
+  return 'Browser';
+}
+
+export function getOrCreateDeviceKey(): string {
+  try {
+    const existing = localStorage.getItem(DEVICE_KEY_LS);
+    if (existing) return existing;
+    const key = generateDeviceKey();
+    localStorage.setItem(DEVICE_KEY_LS, key);
+    return key;
+  } catch {
+    return generateDeviceKey();
+  }
+}
+
+export function getDeviceName(): string {
+  try {
+    return localStorage.getItem(DEVICE_NAME_LS) || deriveDefaultDeviceName();
+  } catch {
+    return deriveDefaultDeviceName();
+  }
+}
+
+export function setDeviceName(name: string) {
+  try { localStorage.setItem(DEVICE_NAME_LS, name); } catch { /* ignore */ }
+}
+
+export function initDeviceKey() {
+  _deviceKey = getOrCreateDeviceKey();
+}
 
 export interface ActivityEntry {
   id: string;
@@ -125,6 +177,9 @@ async function apiFetch(path: string, opts: RequestInit = {}, _retry = false): P
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
+  if (_deviceKey) {
+    headers['X-Device-Key'] = _deviceKey;
+  }
 
   if (!(opts.body instanceof FormData)) {
     headers['Content-Type'] = headers['Content-Type'] || 'application/json';
@@ -211,11 +266,31 @@ export interface SyncResult {
   serverData?: Record<string, unknown>;
 }
 
+export class SyncEnrollmentError extends Error {
+  readonly code = 'SYNC_ENROLLMENT_REQUIRED' as const;
+  readonly enrollmentStatus: string;
+  constructor(enrollmentStatus: string) {
+    super('SYNC_ENROLLMENT_REQUIRED');
+    this.name = 'SyncEnrollmentError';
+    this.enrollmentStatus = enrollmentStatus;
+  }
+}
+
+async function throwIfEnrollmentRequired(resp: Response) {
+  if (resp.status === 403) {
+    const body = await resp.json().catch(() => ({})) as { code?: string; enrollmentStatus?: string };
+    if (body.code === 'SYNC_ENROLLMENT_REQUIRED') {
+      throw new SyncEnrollmentError(body.enrollmentStatus ?? 'unknown');
+    }
+  }
+}
+
 export async function syncPush(changes: SyncChange[]): Promise<{ results: SyncResult[] }> {
   const resp = await apiFetch('/api/sync/push', {
     method: 'POST',
     body: JSON.stringify({ changes }),
   });
+  await throwIfEnrollmentRequired(resp);
   if (!resp.ok) throw await apiError(resp, 'Sync push failed');
   return resp.json();
 }
@@ -224,13 +299,60 @@ export async function syncPull(since: string, folderId?: string): Promise<SyncPu
   const params = new URLSearchParams({ since });
   if (folderId) params.set('folderId', folderId);
   const resp = await apiFetch(`/api/sync/pull?${params}`);
+  await throwIfEnrollmentRequired(resp);
   if (!resp.ok) throw new Error('Sync pull failed');
   return resp.json();
 }
 
 export async function syncSnapshot(folderId: string): Promise<SyncSnapshotResult> {
   const resp = await apiFetch(`/api/sync/snapshot/${folderId}`);
+  await throwIfEnrollmentRequired(resp);
   if (!resp.ok) throw new Error('Sync snapshot failed');
+  return resp.json();
+}
+
+// ─── Sync Device Enrollment ──────────────────────────────────────
+
+export async function registerSyncDevice(deviceKey: string, deviceName: string): Promise<{ status: 'approved' | 'pending'; deviceId: string }> {
+  const resp = await apiFetch('/api/sync/devices/register', {
+    method: 'POST',
+    body: JSON.stringify({ deviceKey, deviceName }),
+  });
+  if (!resp.ok) throw await apiError(resp, 'Failed to register device');
+  return resp.json();
+}
+
+export async function fetchSyncDevices(): Promise<{ devices: SyncDevice[] }> {
+  const resp = await apiFetch('/api/sync/devices');
+  if (!resp.ok) throw new Error('Failed to fetch devices');
+  return resp.json();
+}
+
+export async function revokeSyncDevice(deviceId: string): Promise<void> {
+  const resp = await apiFetch(`/api/sync/devices/${deviceId}`, { method: 'DELETE' });
+  if (!resp.ok) throw await apiError(resp, 'Failed to revoke device');
+}
+
+export async function renameSyncDevice(deviceId: string, deviceName: string): Promise<void> {
+  const resp = await apiFetch(`/api/sync/devices/${deviceId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ deviceName }),
+  });
+  if (!resp.ok) throw await apiError(resp, 'Failed to rename device');
+}
+
+export async function generatePairingCode(): Promise<{ pairingCode: string; qrDataUrl: string; expiresAt: string }> {
+  const resp = await apiFetch('/api/sync/devices/pair/generate', { method: 'POST' });
+  if (!resp.ok) throw await apiError(resp, 'Failed to generate pairing code');
+  return resp.json();
+}
+
+export async function completePairing(pairingCode: string, deviceKey: string, deviceName: string): Promise<{ enrolled: boolean; deviceId: string }> {
+  const resp = await apiFetch('/api/sync/devices/pair/complete', {
+    method: 'POST',
+    body: JSON.stringify({ pairingCode, deviceKey, deviceName }),
+  });
+  if (!resp.ok) throw await apiError(resp, 'Pairing failed');
   return resp.json();
 }
 

@@ -17,6 +17,8 @@
   "general.displayNameHelp": "만든 노트, IOC, 기타 엔티티에 표시됩니다. 설정하지 않으면 기본값은 \"Analyst\"입니다.",
   "general.fromTeamServer": "팀 서버에서",
   "general.preferences": "표시 기본 설정",
+  "general.syncedDevices": "동기화된 기기",
+  "general.syncedDevicesDesc": "계정에 암호화된 데이터를 동기화할 수 있는 기기를 관리합니다. 새 기기가 동기화 데이터를 푸시 또는 풀하기 전에 기기 승인을 요청합니다.",
   "general.editorMode": "기본 편집기 모드",
   "general.editorMode.edit": "편집만",
   "general.editorMode.split": "분할 보기",

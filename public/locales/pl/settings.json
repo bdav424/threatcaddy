@@ -17,6 +17,8 @@
   "general.displayNameHelp": "Wyświetlana na notatkach, IOC i innych tworzonych przez Ciebie encjach. Domyślnie „Analityk\".",
   "general.fromTeamServer": "z serwera zespołu",
   "general.preferences": "Preferencje wyświetlania",
+  "general.syncedDevices": "Zsynchronizowane urządzenia",
+  "general.syncedDevicesDesc": "Zarządzaj urządzeniami, które mogą synchronizować zaszyfrowane dane z Twoim kontem. Wymagaj zatwierdzenia urządzenia, zanim nowe urządzenie będzie mogło wypychać lub pobierać dane synchronizacji.",
   "general.editorMode": "Domyślny tryb edytora",
   "general.editorMode.edit": "Tylko edycja",
   "general.editorMode.split": "Widok podzielony",

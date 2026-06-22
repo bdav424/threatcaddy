@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, and, count } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { createHash } from 'node:crypto';
 import { requireAuth } from '../middleware/auth.js';
 import { checkInvestigationAccess } from '../middleware/access.js';
 import { processPush, pullChanges, getSnapshot, bulkLookupEntityFolderIds } from '../services/sync-service.js';
@@ -8,9 +9,48 @@ import { logActivityBatch } from '../services/audit-service.js';
 import { logger } from '../lib/logger.js';
 import { broadcastToFolder } from '../ws/handler.js';
 import { db } from '../db/index.js';
-import { folders, investigationMembers, users } from '../db/schema.js';
+import { folders, investigationMembers, users, syncDevices } from '../db/schema.js';
 import type { AuthUser, SyncChange, SyncResult } from '../types.js';
 import { ErrorCodes } from '../types/error-codes.js';
+
+function sha256(input: string): string {
+  return createHash('sha256').update(input).digest('hex');
+}
+
+interface EnrollmentDenied {
+  error: string;
+  code: string;
+  enrollmentStatus: string;
+}
+
+async function checkEnrollment(userId: string, deviceKey: string | undefined): Promise<EnrollmentDenied | null> {
+  if (!deviceKey || deviceKey.length < 16) {
+    return { error: 'Device enrollment required', code: ErrorCodes.SYNC_ENROLLMENT_REQUIRED, enrollmentStatus: 'not_registered' };
+  }
+  const fingerprint = sha256(deviceKey);
+  const [device] = await db
+    .select({ id: syncDevices.id, status: syncDevices.status })
+    .from(syncDevices)
+    .where(and(eq(syncDevices.userId, userId), eq(syncDevices.deviceFingerprint, fingerprint)))
+    .limit(1);
+
+  if (!device) {
+    return { error: 'Device enrollment required', code: ErrorCodes.SYNC_ENROLLMENT_REQUIRED, enrollmentStatus: 'not_registered' };
+  }
+  if (device.status === 'pending') {
+    return { error: 'Device enrollment pending approval', code: ErrorCodes.SYNC_ENROLLMENT_REQUIRED, enrollmentStatus: 'pending' };
+  }
+  if (device.status === 'revoked') {
+    return { error: 'Device has been revoked', code: ErrorCodes.SYNC_ENROLLMENT_REQUIRED, enrollmentStatus: 'revoked' };
+  }
+
+  db.update(syncDevices)
+    .set({ lastSeenAt: new Date() })
+    .where(eq(syncDevices.id, device.id))
+    .catch(() => {});
+
+  return null;
+}
 
 // Tables that are global (not scoped to a folder)
 const TABLES_WITHOUT_FOLDER = new Set(['tags', 'timelines']);
@@ -22,6 +62,8 @@ app.use('*', requireAuth);
 // POST /api/sync/push
 app.post('/push', async (c) => {
   const user = c.get('user');
+  const denied = await checkEnrollment(user.id, c.req.header('X-Device-Key'));
+  if (denied) return c.json(denied, 403);
   const body = await c.req.json();
   const changes: SyncChange[] = body.changes || [];
 
@@ -239,6 +281,8 @@ app.post('/push', async (c) => {
 // GET /api/sync/pull
 app.get('/pull', async (c) => {
   const user = c.get('user');
+  const denied = await checkEnrollment(user.id, c.req.header('X-Device-Key'));
+  if (denied) return c.json(denied, 403);
   const since = c.req.query('since');
   if (!since) {
     return c.json({ error: 'Missing since parameter', code: ErrorCodes.MISSING_SINCE_PARAM }, 400);
@@ -272,6 +316,8 @@ app.get('/pull', async (c) => {
 // GET /api/sync/snapshot/:folderId
 app.get('/snapshot/:folderId', async (c) => {
   const user = c.get('user');
+  const denied = await checkEnrollment(user.id, c.req.header('X-Device-Key'));
+  if (denied) return c.json(denied, 403);
   const folderId = c.req.param('folderId');
 
   const hasAccess = await checkInvestigationAccess(user.id, folderId, 'viewer');
@@ -290,6 +336,8 @@ app.get('/snapshot/:folderId', async (c) => {
 // re-encrypting all data — a future, explicit operation).
 app.post('/key-setup', async (c) => {
   const user = c.get('user');
+  const denied = await checkEnrollment(user.id, c.req.header('X-Device-Key'));
+  if (denied) return c.json(denied, 403);
   const body = await c.req.json().catch(() => ({}));
   const salt = body?.salt;
   if (typeof salt !== 'string' || salt.length < 20) {

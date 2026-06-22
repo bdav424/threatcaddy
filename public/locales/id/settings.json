@@ -17,6 +17,8 @@
   "general.displayNameHelp": "Ditampilkan pada catatan, IOC, dan entitas lain yang Anda buat. Default ke \"Analis\" jika tidak diatur.",
   "general.fromTeamServer": "dari server tim",
   "general.preferences": "Preferensi Tampilan",
+  "general.syncedDevices": "Perangkat Tersinkronisasi",
+  "general.syncedDevicesDesc": "Kelola perangkat mana yang dapat menyinkronkan data terenkripsi ke akun Anda. Memerlukan persetujuan perangkat sebelum perangkat baru dapat mendorong atau menarik data sinkronisasi.",
   "general.editorMode": "Mode Editor Default",
   "general.editorMode.edit": "Edit Saja",
   "general.editorMode.split": "Tampilan Terpisah",

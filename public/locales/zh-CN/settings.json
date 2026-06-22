@@ -17,6 +17,8 @@
   "general.displayNameHelp": "显示在您创建的笔记、IOC 和其他实体上。如未设置，默认为\"分析师\"。",
   "general.fromTeamServer": "来自团队服务器",
   "general.preferences": "显示偏好设置",
+  "general.syncedDevices": "已同步设备",
+  "general.syncedDevicesDesc": "管理哪些设备可以将加密数据同步到您的账户。要求新设备推送或拉取同步数据前需获得设备批准。",
   "general.editorMode": "默认编辑器模式",
   "general.editorMode.edit": "仅编辑",
   "general.editorMode.split": "分屏视图",

@@ -17,6 +17,8 @@
   "general.displayNameHelp": "แสดงบนบันทึก IOC และเอนทิตีอื่นที่คุณสร้าง ค่าเริ่มต้นเป็น \"Analyst\" หากไม่ได้ตั้งค่า",
   "general.fromTeamServer": "จากเซิร์ฟเวอร์ทีม",
   "general.preferences": "การตั้งค่าการแสดงผล",
+  "general.syncedDevices": "อุปกรณ์ที่ซิงค์แล้ว",
+  "general.syncedDevicesDesc": "จัดการอุปกรณ์ที่สามารถซิงค์ข้อมูลที่เข้ารหัสไปยังบัญชีของคุณ ต้องการการอนุมัติอุปกรณ์ก่อนที่อุปกรณ์ใหม่จะสามารถพุชหรือพูลข้อมูลการซิงค์",
   "general.editorMode": "โหมดตัวแก้ไขเริ่มต้น",
   "general.editorMode.edit": "แก้ไขเท่านั้น",
   "general.editorMode.split": "มุมมองแบบแบ่ง",

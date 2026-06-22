@@ -7,5 +7,40 @@
   "passphraseApplying": "Stosowanie…",
   "passphraseLater": "Później",
   "passphraseError": "Nie udało się ustawić hasła synchronizacji. Spróbuj ponownie.",
-  "passphrasePrivacy": "Hasło nigdy nie opuszcza Twojego urządzenia. Twoje dane są szyfrowane lokalnie przed synchronizacją."
+  "passphrasePrivacy": "Hasło nigdy nie opuszcza Twojego urządzenia. Twoje dane są szyfrowane lokalnie przed synchronizacją.",
+  "devices": {
+    "thisDevice": "To urządzenie",
+    "pendingApproval": "Oczekuje na zatwierdzenie",
+    "revoked": "Wycofany",
+    "lastSeen": "Ostatnio widoczny {{time}}",
+    "addDevice": "Dodaj urządzenie",
+    "revoke": "Odwołaj urządzenie",
+    "confirmRevoke": "Potwierdź odwołanie",
+    "notConnected": "Połącz się z serwerem zespołu, aby zarządzać zsynchronizowanymi urządzeniami.",
+    "loading": "Ładowanie urządzeń…",
+    "empty": "Żadne urządzenia nie są jeszcze zarejestrowane."
+  },
+  "pairing": {
+    "title": "Dodaj urządzenie synchronizacji",
+    "chooseModeHint": "Wybierz, czy to zaufane urządzenie generujące kod, czy nowe urządzenie je przeznaczające.",
+    "showCode": "Pokaż kod parowania",
+    "showCodeDesc": "To jest zaufane urządzenie — wygeneruj kod, który nowe urządzenie może skanować lub wpisać.",
+    "enterCode": "Wpisz kod parowania",
+    "enterCodeDesc": "To jest nowe urządzenie — wpisz kod wyświetlany na zaufanym urządzeniu.",
+    "showCodeHint": "Zeskanuj kod QR lub wpisz kod na nowym urządzeniu. Wygasa za 10 minut.",
+    "qrAlt": "Kod QR parowania",
+    "expires": "Wygasa o {{time}}",
+    "enterCodeHint": "Wpisz 8-znakowy kod wyświetlany na Twoim zaufanym urządzeniu.",
+    "confirm": "Sparuj to urządzenie",
+    "invalidCode": "Kod parowania jest nieprawidłowy lub wygasł. Spróbuj ponownie.",
+    "back": "Wróć"
+  },
+  "enrollment": {
+    "pendingTitle": "Zatwierdzenie synchronizacji w oczekiwaniu",
+    "pendingDesc": "To urządzenie czeka na zatwierdzenie, zanim będzie mogło się synchronizować. Na zaufanym urządzeniu przejdź do Ustawienia → Urządzenia zsynchronizowane i wygeneruj kod parowania.",
+    "revokedTitle": "Dostęp do synchronizacji wycofany",
+    "revokedDesc": "To urządzenie zostało usunięte z grupy synchronizacji. Skontaktuj się z właścicielem konta lub sparuj ponownie z Ustawień.",
+    "notRegisteredTitle": "Synchronizacja nie jest skonfigurowana",
+    "notRegisteredDesc": "To urządzenie nie dołączyło jeszcze do zaszyfrowanej grupy synchronizacji."
+  }
 }

@@ -17,6 +17,8 @@
   "general.displayNameHelp": "नोट्स, IOCs, और अन्य एंटिटी पर दिखाया जाता है जो आप बनाते हैं। सेट न होने पर \"Analyst\" डिफ़ॉल्ट।",
   "general.fromTeamServer": "टीम सर्वर से",
   "general.preferences": "प्रदर्शन प्राथमिकताएं",
+  "general.syncedDevices": "सिंक किए गए डिवाइस",
+  "general.syncedDevicesDesc": "प्रबंधित करें कि कौन से डिवाइस आपके खाते में एन्क्रिप्टेड डेटा को सिंक कर सकते हैं। नए डिवाइस को समन्वय डेटा धक्का या खींचने से पहले डिवाइस अनुमोदन की आवश्यकता होती है।",
   "general.editorMode": "डिफ़ॉल्ट संपादक मोड",
   "general.editorMode.edit": "केवल संपादन",
   "general.editorMode.split": "विभाजित दृश्य",

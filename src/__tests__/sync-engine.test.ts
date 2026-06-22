@@ -8,11 +8,23 @@ const mockSyncPush = vi.fn<() => Promise<{ results: SyncResult[] }>>();
 const mockSyncPull = vi.fn<() => Promise<{ changes: Record<string, unknown>[]; serverTimestamp: string }>>();
 const mockSyncSnapshot = vi.fn<() => Promise<Record<string, unknown[]>>>();
 
-vi.mock('../lib/server-api', () => ({
-  syncPush: (...args: unknown[]) => mockSyncPush(...args as []),
-  syncPull: (...args: unknown[]) => mockSyncPull(...args as []),
-  syncSnapshot: (...args: unknown[]) => mockSyncSnapshot(...args as []),
-}));
+vi.mock('../lib/server-api', () => {
+  class MockSyncEnrollmentError extends Error {
+    readonly code = 'SYNC_ENROLLMENT_REQUIRED' as const;
+    readonly enrollmentStatus: string;
+    constructor(status = 'not_registered') {
+      super('SYNC_ENROLLMENT_REQUIRED');
+      this.name = 'SyncEnrollmentError';
+      this.enrollmentStatus = status;
+    }
+  }
+  return {
+    syncPush: (...args: unknown[]) => mockSyncPush(...args as []),
+    syncPull: (...args: unknown[]) => mockSyncPull(...args as []),
+    syncSnapshot: (...args: unknown[]) => mockSyncSnapshot(...args as []),
+    SyncEnrollmentError: MockSyncEnrollmentError,
+  };
+});
 
 // ─── Mock sync-middleware ───────────────────────────────────────────
 

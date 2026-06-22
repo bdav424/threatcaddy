@@ -7,5 +7,40 @@
   "passphraseApplying": "Aplicando…",
   "passphraseLater": "Más tarde",
   "passphraseError": "Error al establecer la frase de contraseña de sincronización. Intente de nuevo.",
-  "passphrasePrivacy": "La frase de contraseña nunca deja su dispositivo. Sus datos se encriptan localmente antes de sincronizarse."
+  "passphrasePrivacy": "La frase de contraseña nunca deja su dispositivo. Sus datos se encriptan localmente antes de sincronizarse.",
+  "devices": {
+    "thisDevice": "Este dispositivo",
+    "pendingApproval": "Aprobación pendiente",
+    "revoked": "Revocado",
+    "lastSeen": "Última vista {{time}}",
+    "addDevice": "Agregar dispositivo",
+    "revoke": "Revocar dispositivo",
+    "confirmRevoke": "Confirmar revocación",
+    "notConnected": "Conectar a un servidor de equipo para administrar los dispositivos sincronizados.",
+    "loading": "Cargando dispositivos…",
+    "empty": "Aún no hay dispositivos inscritos."
+  },
+  "pairing": {
+    "title": "Agregar un dispositivo de sincronización",
+    "chooseModeHint": "Elija si este es el dispositivo de confianza generando el código o el nuevo dispositivo redimiendo uno.",
+    "showCode": "Mostrar código de emparejamiento",
+    "showCodeDesc": "Este es un dispositivo de confianza — genere un código para que el nuevo dispositivo lo escanee o escriba.",
+    "enterCode": "Ingresar código de emparejamiento",
+    "enterCodeDesc": "Este es el nuevo dispositivo — ingrese el código mostrado en un dispositivo de confianza.",
+    "showCodeHint": "Escanee el código QR o escriba el código en el nuevo dispositivo. Expira en 10 minutos.",
+    "qrAlt": "Código QR de emparejamiento",
+    "expires": "Expira a las {{time}}",
+    "enterCodeHint": "Ingrese el código de 8 caracteres mostrado en su dispositivo de confianza.",
+    "confirm": "Emparejar este dispositivo",
+    "invalidCode": "Código de emparejamiento inválido u expirado. Intente de nuevo.",
+    "back": "Atrás"
+  },
+  "enrollment": {
+    "pendingTitle": "Aprobación de sincronización pendiente",
+    "pendingDesc": "Este dispositivo está esperando aprobación antes de poder sincronizarse. En un dispositivo de confianza, vaya a Configuración → Dispositivos sincronizados y genere un código de emparejamiento.",
+    "revokedTitle": "Acceso de sincronización revocado",
+    "revokedDesc": "Este dispositivo ha sido eliminado del grupo de sincronización. Póngase en contacto con el propietario de la cuenta o vuelva a emparejar desde Configuración.",
+    "notRegisteredTitle": "Sincronización no configurada",
+    "notRegisteredDesc": "Este dispositivo aún no se ha unido al grupo de sincronización encriptada."
+  }
 }

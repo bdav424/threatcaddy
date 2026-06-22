@@ -17,6 +17,8 @@
   "general.displayNameHelp": "Oluşturduğunuz notlarda, IOC'lerde ve diğer varlıklarda gösterilir. Ayarlanmazsa \"Analist\" varsayılanını kullanır.",
   "general.fromTeamServer": "ekip sunucusundan",
   "general.preferences": "Görüntüleme Tercihleri",
+  "general.syncedDevices": "Senkronize Edilen Cihazlar",
+  "general.syncedDevicesDesc": "Hesabınıza şifrelenmiş verileri senkronize edebilecek cihazları yönetin. Yeni bir cihazın senkronizasyon verilerini göndermeden veya alabilmeden önce cihaz onayı gerekli.",
   "general.editorMode": "Varsayılan Editör Modu",
   "general.editorMode.edit": "Yalnızca Düzenle",
   "general.editorMode.split": "Bölünmüş Görünüm",

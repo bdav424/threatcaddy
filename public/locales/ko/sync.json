@@ -7,5 +7,40 @@
   "passphraseApplying": "적용 중…",
   "passphraseLater": "나중에",
   "passphraseError": "동기화 암호를 설정하지 못했습니다. 다시 시도하세요.",
-  "passphrasePrivacy": "암호는 기기를 절대 떠나지 않습니다. 동기화 전에 데이터는 로컬에서 암호화됩니다."
+  "passphrasePrivacy": "암호는 기기를 절대 떠나지 않습니다. 동기화 전에 데이터는 로컬에서 암호화됩니다.",
+  "devices": {
+    "thisDevice": "이 기기",
+    "pendingApproval": "승인 대기 중",
+    "revoked": "취소됨",
+    "lastSeen": "마지막 표시 {{time}}",
+    "addDevice": "기기 추가",
+    "revoke": "기기 취소",
+    "confirmRevoke": "취소 확인",
+    "notConnected": "동기화된 기기를 관리하려면 팀 서버에 연결하세요.",
+    "loading": "기기 로드 중…",
+    "empty": "등록된 기기가 없습니다."
+  },
+  "pairing": {
+    "title": "동기화 기기 추가",
+    "chooseModeHint": "이것이 코드를 생성하는 신뢰할 수 있는 기기인지, 아니면 그것을 환전하는 새 기기인지 선택하세요.",
+    "showCode": "페어링 코드 표시",
+    "showCodeDesc": "이것은 신뢰할 수 있는 기기입니다 — 새 기기가 스캔하거나 입력할 수 있는 코드를 생성하세요.",
+    "enterCode": "페어링 코드 입력",
+    "enterCodeDesc": "이것은 새 기기입니다 — 신뢰할 수 있는 기기에 표시된 코드를 입력하세요.",
+    "showCodeHint": "QR 코드를 스캔하거나 새 기기에서 코드를 입력하세요. 10분 후 만료됩니다.",
+    "qrAlt": "페어링 QR 코드",
+    "expires": "만료 {{time}}",
+    "enterCodeHint": "신뢰할 수 있는 기기에 표시된 8자 코드를 입력하세요.",
+    "confirm": "이 기기 페어링",
+    "invalidCode": "페어링 코드가 유효하지 않거나 만료되었습니다. 다시 시도하세요.",
+    "back": "돌아가기"
+  },
+  "enrollment": {
+    "pendingTitle": "동기화 승인 대기 중",
+    "pendingDesc": "이 기기는 동기화하기 전에 승인을 기다리고 있습니다. 신뢰할 수 있는 기기에서 설정 → 동기화된 기기로 이동하여 페어링 코드를 생성하세요.",
+    "revokedTitle": "동기화 액세스 취소됨",
+    "revokedDesc": "이 기기가 동기화 그룹에서 제거되었습니다. 계정 소유자에게 문의하거나 설정에서 다시 페어링하세요.",
+    "notRegisteredTitle": "동기화 설정 안 됨",
+    "notRegisteredDesc": "이 기기는 아직 암호화된 동기화 그룹에 참여하지 않았습니다."
+  }
 }
