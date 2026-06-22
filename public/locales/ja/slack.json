@@ -1,0 +1,13 @@
+{
+  "desktopOnly": "Slack DM の読み込みは ThreatCaddy デスクトップアプリでのみ利用できます。",
+  "connectSlack": "Slack ワークスペースを接続",
+  "connecting": "接続中…",
+  "disconnect": "切断",
+  "connectHint": "Slack OAuth ウィンドウを開きます。im:read、im:history、users:read ユーザースコープが必要です。",
+  "alertsEnabled": "オーバーレイパネルで DM アラートを表示",
+  "snoozeDuration": "ミュート期間",
+  "snooze1h": "1 時間",
+  "snooze2h": "2 時間",
+  "snooze4h": "4 時間",
+  "snooze8h": "8 時間"
+}

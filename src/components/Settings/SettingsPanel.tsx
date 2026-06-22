@@ -28,6 +28,7 @@ import { ServerConnection } from './ServerConnection';
 import { TotpManagement } from './TotpManagement';
 import { PasskeyManagement } from './PasskeyManagement';
 import { SyncDevicesPanel } from './SyncDevicesPanel';
+import { SlackDmsPanel } from './SlackDmsPanel';
 import { IntegrationPanel } from '../Integrations/IntegrationPanel';
 import { IntegrationSourceDashboard } from '../Integrations/IntegrationSourceDashboard';
 import { AppearanceSettings } from './AppearanceSettings';
@@ -1434,6 +1435,13 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
                 </div>
               );
             })}
+          </div>
+
+          {/* Slack DM Alerts */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-300">{t('general.slackDms')}</h3>
+            <p className="text-xs text-gray-500">{t('general.slackDmsDesc')}</p>
+            <SlackDmsPanel settings={settings} onUpdateSettings={onUpdateSettings} />
           </div>
 
           {/* Meeting Alerts */}

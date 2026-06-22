@@ -19,6 +19,8 @@
   "general.preferences": "העדפות תצוגה",
   "general.syncedDevices": "התקנים מסונכרנים",
   "general.syncedDevicesDesc": "נהל אילו התקנים יכולים להסתנכרן נתונים מוצפנים לחשבונך. דרוש אישור התקן לפני שהתקן חדש יכול לדחוף או למשוך נתוני סנכרון.",
+  "general.slackDms": "הודעות ישירות של Slack",
+  "general.slackDmsDesc": "חבר את סביבת העבודה של Slack כדי להציג הודעות ישירות חדשות כהתראות לוח ההתראות. קורא רק את ההודעות הישירות האישיות שלך — לא שולח הודעות.",
   "general.editorMode": "מצב עורך ברירת מחדל",
   "general.editorMode.edit": "עריכה בלבד",
   "general.editorMode.split": "תצוגה מפוצלת",

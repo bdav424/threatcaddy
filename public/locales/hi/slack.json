@@ -1,0 +1,13 @@
+{
+  "desktopOnly": "Slack DM पढ़ना केवल ThreatCaddy डेस्कटॉप ऐप में उपलब्ध है।",
+  "connectSlack": "Slack कार्यक्षेत्र को कनेक्ट करें",
+  "connecting": "कनेक्ट किया जा रहा है…",
+  "disconnect": "डिस्कनेक्ट करें",
+  "connectHint": "Slack OAuth विंडो खोलता है। im:read, im:history और users:read उपयोगकर्ता स्कोप की आवश्यकता है।",
+  "alertsEnabled": "ओवरले पैनल में DM अलर्ट दिखाएं",
+  "snoozeDuration": "इसके लिए म्यूट करें",
+  "snooze1h": "1 घंटा",
+  "snooze2h": "2 घंटे",
+  "snooze4h": "4 घंटे",
+  "snooze8h": "8 घंटे"
+}

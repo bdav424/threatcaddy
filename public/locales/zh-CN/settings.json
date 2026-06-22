@@ -19,6 +19,8 @@
   "general.preferences": "显示偏好设置",
   "general.syncedDevices": "已同步设备",
   "general.syncedDevicesDesc": "管理哪些设备可以将加密数据同步到您的账户。要求新设备推送或拉取同步数据前需获得设备批准。",
+  "general.slackDms": "Slack 直接消息",
+  "general.slackDmsDesc": "连接 Slack 工作区以将新的 DM 显示为警报面板通知。仅读取您的个人 DM — 从不发送消息。",
   "general.editorMode": "默认编辑器模式",
   "general.editorMode.edit": "仅编辑",
   "general.editorMode.split": "分屏视图",

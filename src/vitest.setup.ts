@@ -29,6 +29,7 @@ import investigationsEn from '../public/locales/en/investigations.json';
 import toastEn from '../public/locales/en/toast.json';
 import syncEn from '../public/locales/en/sync.json';
 import alertsEn from '../public/locales/en/alerts.json';
+import slackEn from '../public/locales/en/slack.json';
 
 function createStorageMock(): Storage {
   const store = new Map<string, string>();
@@ -94,7 +95,7 @@ const namespaces: Record<string, Record<string, unknown>> = {
   search: searchEn, activity: activityEn, whiteboard: whiteboardEn,
   tour: tourEn, playbooks: playbooksEn, import: importEn, trash: trashEn,
   investigations: investigationsEn, toast: toastEn,
-  sync: syncEn, alerts: alertsEn,
+  sync: syncEn, alerts: alertsEn, slack: slackEn,
 };
 
 for (const [ns, data] of Object.entries(namespaces)) {

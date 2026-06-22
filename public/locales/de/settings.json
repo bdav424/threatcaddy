@@ -19,6 +19,8 @@
   "general.preferences": "Anzeigeeinstellungen",
   "general.syncedDevices": "Synchronisierte Geräte",
   "general.syncedDevicesDesc": "Verwalten Sie, welche Geräte verschlüsselte Daten mit Ihrem Konto synchronisieren können. Fordern Sie eine Gerätegenehmigung an, bevor ein neues Gerät Synchronisierungsdaten übertragen oder abrufen kann.",
+  "general.slackDms": "Slack Direktnachrichten",
+  "general.slackDmsDesc": "Verbinden Sie einen Slack-Arbeitsbereich, um neue Direktnachrichten als Benachrichtigungen im Benachrichtigungsfeld anzuzeigen. Liest nur Ihre persönlichen Direktnachrichten — sendet niemals Nachrichten.",
   "general.editorMode": "Standard-Editormodus",
   "general.editorMode.edit": "Nur Bearbeiten",
   "general.editorMode.split": "Geteilte Ansicht",

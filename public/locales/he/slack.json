@@ -1,0 +1,13 @@
+{
+  "desktopOnly": "קריאת הודעות ישירות של Slack זמינה רק באפליקציית שולחן העבודה של ThreatCaddy.",
+  "connectSlack": "חבור סביבת עבודה של Slack",
+  "connecting": "בהקשרת חיבור…",
+  "disconnect": "התנתק",
+  "connectHint": "פותח חלון OAuth של Slack. דורש הרשאות משתמש im:read, im:history ו-users:read.",
+  "alertsEnabled": "הצג התראות DM בלוח ההנחה",
+  "snoozeDuration": "השתקת עבור",
+  "snooze1h": "שעה 1",
+  "snooze2h": "2 שעות",
+  "snooze4h": "4 שעות",
+  "snooze8h": "8 שעות"
+}

@@ -19,6 +19,8 @@
   "general.preferences": "Weergavevoorkeuren",
   "general.syncedDevices": "Gesynchroniseerde apparaten",
   "general.syncedDevicesDesc": "Beheer welke apparaten versleutelde gegevens naar uw account kunnen synchroniseren. Vereisen goedkeuring van apparaten voordat een nieuw apparaat synchronisatiegegevens kan pushen of halen.",
+  "general.slackDms": "Slack Direct Messages",
+  "general.slackDmsDesc": "Verbind een Slack-werkruimte om nieuwe DM's weer te geven als meldingen in het meldingenpaneel. Leest alleen uw persoonlijke DM's — verzendt nooit berichten.",
   "general.editorMode": "Standaard editormodus",
   "general.editorMode.edit": "Alleen bewerken",
   "general.editorMode.split": "Gesplitste weergave",

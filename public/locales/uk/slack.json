@@ -1,0 +1,13 @@
+{
+  "desktopOnly": "Читання прямих повідомлень Slack доступно лише в програмі ThreatCaddy для робочого стола.",
+  "connectSlack": "Підключити робочий простір Slack",
+  "connecting": "Підключення…",
+  "disconnect": "Відключити",
+  "connectHint": "Відкриває вікно OAuth Slack. Вимагає областей користувача im:read, im:history та users:read.",
+  "alertsEnabled": "Показувати оповіщення DM на панелі накладення",
+  "snoozeDuration": "Беззвучна поточна версія",
+  "snooze1h": "1 година",
+  "snooze2h": "2 години",
+  "snooze4h": "4 години",
+  "snooze8h": "8 годин"
+}

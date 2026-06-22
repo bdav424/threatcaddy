@@ -20,6 +20,8 @@
   "general.preferences": "Display Preferences",
   "general.syncedDevices": "Synced Devices",
   "general.syncedDevicesDesc": "Manage which devices can sync encrypted data to your account. Require device approval before a new device can push or pull sync data.",
+  "general.slackDms": "Slack Direct Messages",
+  "general.slackDmsDesc": "Connect a Slack workspace to surface new DMs as alert panel notifications. Only reads your personal DMs — never sends messages.",
   "general.editorMode": "Default Editor Mode",
   "general.editorMode.edit": "Edit Only",
   "general.editorMode.split": "Split View",

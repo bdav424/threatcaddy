@@ -19,6 +19,8 @@
   "general.preferences": "การตั้งค่าการแสดงผล",
   "general.syncedDevices": "อุปกรณ์ที่ซิงค์แล้ว",
   "general.syncedDevicesDesc": "จัดการอุปกรณ์ที่สามารถซิงค์ข้อมูลที่เข้ารหัสไปยังบัญชีของคุณ ต้องการการอนุมัติอุปกรณ์ก่อนที่อุปกรณ์ใหม่จะสามารถพุชหรือพูลข้อมูลการซิงค์",
+  "general.slackDms": "ข้อความโดยตรง Slack",
+  "general.slackDmsDesc": "เชื่อมต่อพื้นที่ทำงาน Slack เพื่อแสดง DM ใหม่เป็นการแจ้งเตือนแผง Alert DM ส่วนตัวของคุณเท่านั้น — ไม่เคยส่งข้อความ",
   "general.editorMode": "โหมดตัวแก้ไขเริ่มต้น",
   "general.editorMode.edit": "แก้ไขเท่านั้น",
   "general.editorMode.split": "มุมมองแบบแบ่ง",

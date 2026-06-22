@@ -19,6 +19,8 @@
   "general.preferences": "表示設定",
   "general.syncedDevices": "同期されたデバイス",
   "general.syncedDevicesDesc": "アカウントに暗号化データを同期できるデバイスを管理します。新しいデバイスが同期データをプッシュまたはプルする前に、デバイスの承認を要求します。",
+  "general.slackDms": "Slack ダイレクトメッセージ",
+  "general.slackDmsDesc": "Slack ワークスペースを接続して、新しいダイレクトメッセージをアラートパネルの通知として表示します。個人的なダイレクトメッセージのみを読み込みます — メッセージは送信しません。",
   "general.editorMode": "デフォルトエディターモード",
   "general.editorMode.edit": "編集のみ",
   "general.editorMode.split": "分割表示",

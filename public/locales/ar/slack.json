@@ -1,0 +1,13 @@
+{
+  "desktopOnly": "قراءة رسائل Slack المباشرة متاحة فقط في تطبيق ThreatCaddy للسطح.",
+  "connectSlack": "اتصال مساحة عمل Slack",
+  "connecting": "جاري الاتصال…",
+  "disconnect": "قطع الاتصال",
+  "connectHint": "يفتح نافذة OAuth الخاصة بـ Slack. يتطلب نطاقات المستخدم im:read و im:history و users:read.",
+  "alertsEnabled": "عرض تنبيهات DM في لوحة الطبقة الشفافة",
+  "snoozeDuration": "إسكات لمدة",
+  "snooze1h": "ساعة واحدة",
+  "snooze2h": "ساعتان",
+  "snooze4h": "4 ساعات",
+  "snooze8h": "8 ساعات"
+}

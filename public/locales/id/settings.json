@@ -19,6 +19,8 @@
   "general.preferences": "Preferensi Tampilan",
   "general.syncedDevices": "Perangkat Tersinkronisasi",
   "general.syncedDevicesDesc": "Kelola perangkat mana yang dapat menyinkronkan data terenkripsi ke akun Anda. Memerlukan persetujuan perangkat sebelum perangkat baru dapat mendorong atau menarik data sinkronisasi.",
+  "general.slackDms": "Pesan Langsung Slack",
+  "general.slackDmsDesc": "Hubungkan ruang kerja Slack untuk menampilkan DM baru sebagai pemberitahuan panel peringatan. Hanya membaca DM pribadi Anda — tidak pernah mengirim pesan.",
   "general.editorMode": "Mode Editor Default",
   "general.editorMode.edit": "Edit Saja",
   "general.editorMode.split": "Tampilan Terpisah",

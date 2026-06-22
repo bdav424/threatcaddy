@@ -12,6 +12,33 @@ export interface SyncDevice {
   isCurrent?: boolean;
 }
 
+// ── Slack DM Types ────────────────────────────────────────────────────────────
+
+/** One IM thread returned by the Slack polling bridge. */
+export interface SlackDmThread {
+  channelId: string;
+  userId: string;
+  senderName: string;
+  senderAvatar?: string;
+  unreadCount: number;
+  lastMessageText: string;
+  lastMessageTs: string;
+  polledAt: string;
+  slackDeepLink?: string;
+}
+
+/** A Slack DM alert surfaced in the AlertGlowPanel. */
+export interface DmAlertItem {
+  id: string;
+  senderName: string;
+  senderAvatar?: string;
+  messagePreview: string;
+  unreadCount: number;
+  receivedAt: string;
+  slackDeepLink?: string;
+  urgency: number;
+}
+
 export type EventSource =
   | 'ThreatCaddy Work' | 'Research' | 'Family' | 'Zoom' | 'PTO'
   | 'Google Calendar' | 'Microsoft 365' | 'CalDAV';
@@ -413,6 +440,14 @@ export interface Settings {
   alertChime?: boolean;
   /** User has explicitly read the photosensitive warning and opted into strobe. */
   strobeExplicitOptIn?: boolean;
+
+  // ── Slack DM Alerts ────────────────────────────────────────────────────────
+  /** Show alert panel cards for new Slack DMs (default true when connected). */
+  slackDmAlertsEnabled?: boolean;
+  /** Hours to snooze a DM alert after dismissal (default 2). */
+  slackDmSnoozeDuration?: number;
+  /** Slack account connected via OAuth (credRefId + display metadata). */
+  slackAccount?: { credRefId: string; workspaceName: string; userName: string; userId: string } | null;
 }
 
 // ── Agent Host Types ─────────────────────────────────────────────────

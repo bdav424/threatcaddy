@@ -19,6 +19,8 @@
   "general.preferences": "Tùy chọn hiển thị",
   "general.syncedDevices": "Thiết bị được đồng bộ",
   "general.syncedDevicesDesc": "Quản lý thiết bị nào có thể đồng bộ dữ liệu được mã hóa với tài khoản của bạn. Yêu cầu phê duyệt thiết bị trước khi thiết bị mới có thể đẩy hoặc kéo dữ liệu đồng bộ.",
+  "general.slackDms": "Slack Tin nhắn trực tiếp",
+  "general.slackDmsDesc": "Kết nối không gian làm việc Slack để hiển thị DM mới dưới dạng thông báo bảng điều khiển cảnh báo. Chỉ đọc DM cá nhân của bạn — không bao giờ gửi tin nhắn.",
   "general.editorMode": "Chế độ soạn thảo mặc định",
   "general.editorMode.edit": "Chỉ sửa",
   "general.editorMode.split": "Chia đôi",

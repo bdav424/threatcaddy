@@ -19,6 +19,8 @@
   "general.preferences": "Görüntüleme Tercihleri",
   "general.syncedDevices": "Senkronize Edilen Cihazlar",
   "general.syncedDevicesDesc": "Hesabınıza şifrelenmiş verileri senkronize edebilecek cihazları yönetin. Yeni bir cihazın senkronizasyon verilerini göndermeden veya alabilmeden önce cihaz onayı gerekli.",
+  "general.slackDms": "Slack Doğrudan Mesajları",
+  "general.slackDmsDesc": "Yeni DM'leri uyarı paneli bildirimleri olarak göstermek için bir Slack çalışma alanını bağlayın. Yalnızca kişisel DM'lerinizi okur — hiçbir zaman ileti göndermez.",
   "general.editorMode": "Varsayılan Editör Modu",
   "general.editorMode.edit": "Yalnızca Düzenle",
   "general.editorMode.split": "Bölünmüş Görünüm",

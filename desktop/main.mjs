@@ -2,6 +2,8 @@ import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron';
 import { registerMailBridge } from './mail-bridge.mjs';
 import * as cal from './mail-calendar-sync.mjs';
 import { runCalendarOAuthPopout, refreshCalendarToken } from './cal-oauth.mjs';
+import { runSlackOAuthPopout } from './slack-oauth.mjs';
+import { pollSlackDMs } from './slack-sync.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -74,6 +76,32 @@ async function tokenFor(account) {
   throw new Error(`Calendar sync does not support provider: ${account.provider}`);
 }
 
+// ── Slack credential store ─────────────────────────────────────────────────
+// Mirrors calendar-credentials pattern. Renderer holds only credRefId.
+
+const SLACK_CRED_DIR = path.join(os.homedir(), '.threatcaddy', 'slack-credentials');
+
+function slackCredPath(ref) {
+  if (!/^[a-zA-Z0-9_-]{8,128}$/.test(ref)) throw new Error('bad slack credRefId');
+  return path.join(SLACK_CRED_DIR, `${ref}.bin`);
+}
+
+function saveSlackCredential(ref, cred) {
+  fs.mkdirSync(SLACK_CRED_DIR, { recursive: true, mode: 0o700 });
+  if (!safeStorage.isEncryptionAvailable()) throw new Error('OS keychain unavailable');
+  const enc = safeStorage.encryptString(JSON.stringify(cred));
+  fs.writeFileSync(slackCredPath(ref), enc, { mode: 0o600 });
+}
+
+function loadSlackCredential(ref) {
+  const enc = fs.readFileSync(slackCredPath(ref));
+  return JSON.parse(safeStorage.decryptString(enc));
+}
+
+function deleteSlackCredential(ref) {
+  try { fs.unlinkSync(slackCredPath(ref)); } catch { /* already gone */ }
+}
+
 // ── IPC handlers ───────────────────────────────────────────────────────────
 
 ipcMain.handle('calendar:save-credential', (_e, { ref, cred }) => {
@@ -134,6 +162,30 @@ ipcMain.handle('calendar:remove', async (_e, accountId, remoteId) => {
   return a.provider === 'google'
     ? cal.deleteGoogleEvent(t.google, remoteId)
     : cal.deleteMicrosoftEvent(t.graph, remoteId);
+});
+
+// ── Slack IPC handlers ─────────────────────────────────────────────────────
+
+ipcMain.handle('slack:start-oauth', async () => {
+  const result = await runSlackOAuthPopout();
+  const ref    = crypto.randomUUID();
+  saveSlackCredential(ref, result);
+  return {
+    credRefId:     ref,
+    workspaceName: result.workspaceName,
+    userName:      result.userName,
+    userId:        result.userId,
+  };
+});
+
+ipcMain.handle('slack:pull-dms', async (_e, credRefId, sinceTs) => {
+  const cred = loadSlackCredential(credRefId);
+  return pollSlackDMs(cred.userToken, sinceTs);
+});
+
+ipcMain.handle('slack:revoke', (_e, credRefId) => {
+  deleteSlackCredential(credRefId);
+  return { ok: true };
 });
 
 // ── Window ─────────────────────────────────────────────────────────────────

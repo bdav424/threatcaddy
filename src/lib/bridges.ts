@@ -5,7 +5,7 @@
 // future server-side adapter must satisfy these interfaces. The renderer holds only
 // credentialReferenceIds — raw secrets never cross this boundary.
 
-import type { CalendarEvent } from '../types';
+import type { CalendarEvent, SlackDmThread } from '../types';
 
 // ─── Mail Bridge ───────────────────────────────────────────────────────────────
 
@@ -40,6 +40,20 @@ export function getMailBridge(): MailBridge | null {
 
 export function getCalendarBridge(): DesktopCalendarBridge | null {
   return (globalThis as CalendarBridgeGlobal).threatcaddy?.calendar ?? null;
+}
+
+// ─── Slack Bridge ──────────────────────────────────────────────────────────────
+
+export interface SlackBridge {
+  startOAuth(): Promise<{ credRefId: string; workspaceName: string; userName: string; userId: string }>;
+  pullDMs(credRefId: string, sinceTs?: string): Promise<SlackDmThread[]>;
+  revoke(credRefId: string): Promise<{ ok: boolean }>;
+}
+
+type SlackBridgeGlobal = typeof globalThis & { threatcaddySlack?: SlackBridge };
+
+export function getSlackBridge(): SlackBridge | null {
+  return (globalThis as SlackBridgeGlobal).threatcaddySlack ?? null;
 }
 
 export function isDesktopBridge(): boolean {

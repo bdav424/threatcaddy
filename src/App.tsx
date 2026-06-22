@@ -134,6 +134,9 @@ import { usePushNotifications } from './hooks/usePushNotifications';
 import { useUpcomingMeetings } from './hooks/useUpcomingMeetings';
 import { useAlertSchedule } from './hooks/useAlertSchedule';
 import { AlertGlowPanel } from './components/Alerts/AlertGlowPanel';
+import { useSlackDMs } from './hooks/useSlackDMs';
+import { useSlackSync } from './hooks/useSlackSync';
+import { useDmAlerts } from './hooks/useDmAlerts';
 
 const VALID_RASTER_IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp', 'image/avif']);
 
@@ -471,6 +474,19 @@ const AppInner = memo(function AppInner({
     upcomingMeetings,
     settings.alertLeadMinutes ?? 15,
     settings.alertEnabled !== false,
+  );
+
+  const slackCredRefId = settings.slackAccount?.credRefId ?? null;
+  useSlackSync(slackCredRefId);
+  const slackDmThreads = useSlackDMs();
+  const {
+    visible: dmAlertItems,
+    dismissDm,
+    acknowledgeDm,
+  } = useDmAlerts(
+    slackDmThreads,
+    (settings.slackDmAlertsEnabled !== false) && Boolean(slackCredRefId),
+    settings.slackDmSnoozeDuration ?? 2,
   );
 
   useEffect(() => {
@@ -3186,12 +3202,15 @@ const AppInner = memo(function AppInner({
       /></Suspense>
     )}
 
-    {/* Meeting alert overlay */}
+    {/* Meeting + Slack DM alert overlay */}
     <AlertGlowPanel
       items={alertItems}
+      dmItems={dmAlertItems}
       settings={settings}
       onDismiss={dismissAlert}
       onAcknowledge={acknowledgeAlert}
+      onDismissDm={dismissDm}
+      onAcknowledgeDm={acknowledgeDm}
     />
 
     {/* Sync Passphrase Prompt — shown for passkey users who haven't yet set an encryption key */}

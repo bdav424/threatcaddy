@@ -19,6 +19,8 @@
   "general.preferences": "표시 기본 설정",
   "general.syncedDevices": "동기화된 기기",
   "general.syncedDevicesDesc": "계정에 암호화된 데이터를 동기화할 수 있는 기기를 관리합니다. 새 기기가 동기화 데이터를 푸시 또는 풀하기 전에 기기 승인을 요청합니다.",
+  "general.slackDms": "Slack 다이렉트 메시지",
+  "general.slackDmsDesc": "Slack 워크스페이스를 연결하여 새로운 DM을 알림 패널 알림으로 표시합니다. 개인 DM만 읽습니다 — 메시지를 보내지 않습니다.",
   "general.editorMode": "기본 편집기 모드",
   "general.editorMode.edit": "편집만",
   "general.editorMode.split": "분할 보기",

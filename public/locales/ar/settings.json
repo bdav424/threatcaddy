@@ -19,6 +19,8 @@
   "general.preferences": "تفضيلات العرض",
   "general.syncedDevices": "الأجهزة المتزامنة",
   "general.syncedDevicesDesc": "أدِر الأجهزة التي يمكنها مزامنة البيانات المشفرة إلى حسابك. اطلب موافقة الجهاز قبل أن يتمكن جهاز جديد من دفع أو سحب بيانات المزامنة.",
+  "general.slackDms": "رسائل Slack المباشرة",
+  "general.slackDmsDesc": "اتصل بمساحة عمل Slack لعرض رسائل مباشرة جديدة كإشعارات لوحة التنبيهات. تقرأ رسائلك المباشرة الشخصية فقط — لا تُرسل الرسائل أبدًا.",
   "general.editorMode": "وضع المحرر الافتراضي",
   "general.editorMode.edit": "تعديل فقط",
   "general.editorMode.split": "عرض مقسَّم",

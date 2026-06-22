@@ -19,6 +19,8 @@
   "general.preferences": "Preferencje wyświetlania",
   "general.syncedDevices": "Zsynchronizowane urządzenia",
   "general.syncedDevicesDesc": "Zarządzaj urządzeniami, które mogą synchronizować zaszyfrowane dane z Twoim kontem. Wymagaj zatwierdzenia urządzenia, zanim nowe urządzenie będzie mogło wypychać lub pobierać dane synchronizacji.",
+  "general.slackDms": "Wiadomości bezpośrednie Slack",
+  "general.slackDmsDesc": "Połącz obszar roboczy Slack, aby wyświetlać nowe wiadomości bezpośrednie jako powiadomienia panelu alertów. Odczytuje tylko twoje osobiste wiadomości bezpośrednie — nigdy nie wysyła wiadomości.",
   "general.editorMode": "Domyślny tryb edytora",
   "general.editorMode.edit": "Tylko edycja",
   "general.editorMode.split": "Widok podzielony",

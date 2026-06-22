@@ -35,6 +35,7 @@ import trashEn from '../public/locales/en/trash.json';
 import whiteboardEn from '../public/locales/en/whiteboard.json';
 import syncEn from '../public/locales/en/sync.json';
 import alertsEn from '../public/locales/en/alerts.json';
+import slackEn from '../public/locales/en/slack.json';
 
 export interface SupportedLanguage {
   code: string;
@@ -92,7 +93,7 @@ const ALL_NS = [
   'activity', 'agent', 'caddyshack', 'chat', 'dashboard',
   'exec', 'graph', 'import', 'integrations', 'investigations',
   'notes', 'playbooks', 'search', 'settings', 'tasks',
-  'timeline', 'toast', 'tour', 'trash', 'whiteboard', 'sync', 'alerts',
+  'timeline', 'toast', 'tour', 'trash', 'whiteboard', 'sync', 'alerts', 'slack',
 ] as const;
 
 const HOSTED_NS = ['common', 'labels', 'dates', 'analysis', 'encryption'] as const;
@@ -105,7 +106,7 @@ const enResources = isStandalone ? {
   investigations: investigationsEn, notes: notesEn, playbooks: playbooksEn,
   search: searchEn, settings: settingsEn, tasks: tasksEn, timeline: timelineEn,
   toast: toastEn, tour: tourEn, trash: trashEn, whiteboard: whiteboardEn,
-  sync: syncEn, alerts: alertsEn,
+  sync: syncEn, alerts: alertsEn, slack: slackEn,
 } : {
   common: commonEn, labels: labelsEn, dates: datesEn,
   analysis: analysisEn, encryption: encryptionEn,

@@ -1,0 +1,13 @@
+{
+  "desktopOnly": "Membaca DM Slack hanya tersedia di aplikasi desktop ThreatCaddy.",
+  "connectSlack": "Hubungkan Ruang Kerja Slack",
+  "connecting": "Menghubungkan…",
+  "disconnect": "Putuskan sambungan",
+  "connectHint": "Membuka jendela OAuth Slack. Memerlukan cakupan pengguna im:read, im:history, dan users:read.",
+  "alertsEnabled": "Tampilkan peringatan DM di panel overlay",
+  "snoozeDuration": "Bungkam untuk",
+  "snooze1h": "1 jam",
+  "snooze2h": "2 jam",
+  "snooze4h": "4 jam",
+  "snooze8h": "8 jam"
+}

@@ -38,6 +38,23 @@ contextBridge.exposeInMainWorld('threatcaddy', {
   },
 });
 
+// Slack DM bridge — pull recent DMs and OAuth connect.
+// Token stays in safeStorage in the main process; renderer receives only credRefId.
+contextBridge.exposeInMainWorld('threatcaddySlack', {
+  // Opens Slack OAuth consent popout. Returns { credRefId, workspaceName, userName, userId }.
+  startOAuth: () =>
+    ipcRenderer.invoke('slack:start-oauth'),
+
+  // Fetch DM threads with messages newer than sinceTs (Unix seconds string, optional).
+  // Returns SlackDmThread[].
+  pullDMs: (credRefId, sinceTs) =>
+    ipcRenderer.invoke('slack:pull-dms', credRefId, sinceTs),
+
+  // Remove stored credential (disconnect).
+  revoke: (credRefId) =>
+    ipcRenderer.invoke('slack:revoke', credRefId),
+});
+
 contextBridge.exposeInMainWorld('threatcaddyDesktop', {
   isDesktop: true,
   platform: process.platform,
