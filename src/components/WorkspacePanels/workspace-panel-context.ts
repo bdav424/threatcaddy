@@ -2,6 +2,7 @@ import { createContext } from 'react';
 import type { WorkspacePanelPlacementState } from './workspaceGrid';
 
 export type WorkspacePanelMode = 'docked' | 'floating' | 'minimized';
+export type SeamEdge = 'top' | 'right' | 'bottom' | 'left';
 
 export const freeWorkspacePanelPlacement: WorkspacePanelPlacementState = { kind: 'free' };
 
@@ -39,6 +40,9 @@ export interface WorkspacePanelContextValue {
   focusPanel: (id: string) => void;
   restorePanel: (id: string) => void;
   applyLayoutPanels: (panels: Array<Pick<WorkspacePanelState, 'id' | 'mode' | 'restoreMode' | 'geometry'>>) => void;
+  /** Active shared-seam edge for each panel as signalled by its neighbors. */
+  activeSeamEdges: ReadonlyMap<string, SeamEdge>;
+  notifySeamEdge: (panelId: string, edge: SeamEdge | null) => void;
 }
 
 export const WorkspacePanelContext = createContext<WorkspacePanelContextValue | null>(null);

@@ -1,12 +1,15 @@
 /* eslint-disable react-refresh/only-export-components -- geometry helpers + hooks are co-located with the provider by design */
 import {
+  useCallback,
   useMemo,
   useReducer,
+  useState,
   type ReactNode,
 } from 'react';
 import {
   WorkspacePanelContext,
   freeWorkspacePanelPlacement,
+  type SeamEdge,
   type WorkspacePanelContextValue,
   type WorkspacePanelGeometry,
   type WorkspacePanelMode,
@@ -192,6 +195,15 @@ export function WorkspacePanelProvider({
 }) {
   const [store, dispatch] = useReducer(workspacePanelReducer, initialPanels, createInitialStore);
   const panels = useMemo(() => Object.values(store.panels), [store.panels]);
+  const [activeSeamEdges, setActiveSeamEdges] = useState<ReadonlyMap<string, SeamEdge>>(new Map());
+  const notifySeamEdge = useCallback((panelId: string, edge: SeamEdge | null) => {
+    setActiveSeamEdges((prev) => {
+      const next = new Map(prev);
+      if (edge === null) next.delete(panelId);
+      else next.set(panelId, edge);
+      return next;
+    });
+  }, []);
   const allowedPanelIds = useMemo(
     () => new Set(initialPanels.map((panel) => panel.id)),
     [initialPanels],
@@ -200,6 +212,8 @@ export function WorkspacePanelProvider({
   const value = useMemo<WorkspacePanelContextValue>(() => ({
     panels,
     allowedPanelIds,
+    activeSeamEdges,
+    notifySeamEdge,
     getPanel: (id) => store.panels[id] ?? null,
     setMode: (id, mode) => dispatch({ type: 'set-mode', id, mode }),
     setGeometry: (id, geometry) => dispatch({ type: 'set-geometry', id, geometry }),
@@ -211,7 +225,7 @@ export function WorkspacePanelProvider({
       dispatch({ type: 'set-mode', id, mode: panel.restoreMode });
     },
     applyLayoutPanels: (layoutPanels) => dispatch({ type: 'apply-layout', panels: layoutPanels }),
-  }), [allowedPanelIds, panels, store.panels]);
+  }), [activeSeamEdges, allowedPanelIds, notifySeamEdge, panels, store.panels]);
 
   return (
     <WorkspacePanelContext.Provider value={value}>
@@ -221,6 +235,7 @@ export function WorkspacePanelProvider({
 }
 
 export type {
+  SeamEdge,
   WorkspacePanelGeometry,
   WorkspacePanelMode,
   WorkspacePanelRegistration,

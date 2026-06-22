@@ -17,6 +17,7 @@ import { cn } from '../../lib/utils';
 import {
   WorkspacePanelContext,
   freeWorkspacePanelPlacement,
+  type SeamEdge,
   type WorkspacePanelGeometry,
   type WorkspacePanelMode,
 } from './workspace-panel-context';
@@ -50,6 +51,8 @@ type ResizeEdge =
   | 'top-right'
   | 'bottom-left'
   | 'bottom-right';
+
+const OPPOSITE_SEAM_EDGE: Record<SeamEdge, SeamEdge> = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
 
 interface WorkspacePanelProps {
   id: string;
@@ -1022,7 +1025,8 @@ export function WorkspacePanel({
   const iconOnlyPrimaryAction = compact || snapped;
   const snapZoneName = panelPlacement.kind === 'affixed' ? panelPlacement.legacyZone ?? panelPlacement.id : null;
   const effectiveFloatingZIndex = snapped ? SNAPPED_PANEL_Z_INDEX : floatingZIndex;
-  const sharedSeamEdge = snapped ? activeSharedSeamEdge : null;
+  const contextSeamEdge = workspacePanelContext?.activeSeamEdges.get(id) ?? null;
+  const sharedSeamEdge = snapped ? (activeSharedSeamEdge ?? contextSeamEdge) : null;
   const mosaicAttachmentState = useMemo(
     () => snapped ? getWorkspaceMosaicAttachmentState(id, panelGeometry, occupiedGridPlacements) : null,
     [id, occupiedGridPlacements, panelGeometry, snapped],
@@ -1151,6 +1155,10 @@ export function WorkspacePanel({
       .filter((neighbor) => workspacePanelContext?.getPanel(neighbor.id));
     setActiveResizeEdge(edge);
     setActiveSharedSeamEdge(seamGroup || seamNeighbors.length > 0 ? edge : null);
+    if (seamNeighbors.length > 0 && !isCorner(edge)) {
+      const seamEdge = edge as SeamEdge;
+      seamNeighbors.forEach((n) => workspacePanelContext?.notifySeamEdge(n.id, OPPOSITE_SEAM_EDGE[seamEdge]));
+    }
 
     const updatePlacementRect = (panelId: string, nextGeometry: WorkspacePanelGeometry) => {
       const currentPlacement = workspacePanelContext?.getPanel(panelId)?.placement;
@@ -1203,6 +1211,9 @@ export function WorkspacePanel({
       window.removeEventListener('pointerup', handlePointerUp);
       setActiveResizeEdge(null);
       setActiveSharedSeamEdge(null);
+      if (seamNeighbors.length > 0 && !isCorner(edge)) {
+        seamNeighbors.forEach((n) => workspacePanelContext?.notifySeamEdge(n.id, null));
+      }
     };
 
     window.addEventListener('pointermove', handlePointerMove);
@@ -1211,16 +1222,25 @@ export function WorkspacePanel({
 
   const activateResizeEdge = (edge: ResizeEdge) => {
     setActiveResizeEdge(edge);
-    setActiveSharedSeamEdge(
-      sharedCornerResizeGroup(id, edge, panelGeometry) || sharedResizeNeighbors(id, edge, panelGeometry).length > 0
-        ? edge
-        : null,
-    );
+    const isSeam = !!(sharedCornerResizeGroup(id, edge, panelGeometry) || sharedResizeNeighbors(id, edge, panelGeometry).length > 0);
+    setActiveSharedSeamEdge(isSeam ? edge : null);
+    if (isSeam && !isCorner(edge)) {
+      const seamEdge = edge as SeamEdge;
+      sharedResizeNeighbors(id, seamEdge, panelGeometry).forEach((n) => {
+        workspacePanelContext?.notifySeamEdge(n.id, OPPOSITE_SEAM_EDGE[seamEdge]);
+      });
+    }
   };
 
   const clearResizeEdge = (edge: ResizeEdge) => {
     setActiveResizeEdge((current) => current === edge ? null : current);
     setActiveSharedSeamEdge((current) => current === edge ? null : current);
+    if (!isCorner(edge)) {
+      const seamEdge = edge as SeamEdge;
+      sharedResizeNeighbors(id, seamEdge, panelGeometry).forEach((n) => {
+        workspacePanelContext?.notifySeamEdge(n.id, null);
+      });
+    }
   };
 
   const handlePanelPointerDownCapture = (event: PointerEvent<HTMLElement>) => {
