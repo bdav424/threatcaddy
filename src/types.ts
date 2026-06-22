@@ -448,6 +448,8 @@ export interface Settings {
   slackDmSnoozeDuration?: number;
   /** Slack account connected via OAuth (credRefId + display metadata). */
   slackAccount?: { credRefId: string; workspaceName: string; userName: string; userId: string } | null;
+  /** Incoming webhook URL for agent-initiated outbound Slack posts. */
+  slackOutboundWebhookUrl?: string;
 }
 
 // ── Agent Host Types ─────────────────────────────────────────────────

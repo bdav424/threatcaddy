@@ -458,5 +458,8 @@
   "integrations.cacheDesc": "成功的IOC富化结果在本地存储，避免重复查询再次触达有速率限制的API。",
   "integrations.cacheTtl": "缓存TTL",
   "integrations.cacheTtlValue": "{{hours}}小时",
-  "integrations.cacheDisabled": "已禁用"
+  "integrations.cacheDisabled": "已禁用",
+  "general.slackOutbound": "Slack 智能体通知",
+  "general.slackOutboundDesc": "用于智能体向 Slack 频道发布通知的传入 Webhook URL。在您的 Slack 工作区的应用 → Incoming Webhooks 下创建。",
+  "general.slackOutboundPlaceholder": "https://hooks.slack.com/services/..."
 }

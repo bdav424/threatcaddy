@@ -458,5 +458,8 @@
   "integrations.cacheDesc": "نتایج موفق غنی‌سازی IOC به صورت محلی ذخیره می‌شوند تا جستجوهای تکراری به APIهای محدود شده نرخ دوباره دسترسی نداشته باشند.",
   "integrations.cacheTtl": "مدت اعتبار کش",
   "integrations.cacheTtlValue": "{{hours}}ساعت",
-  "integrations.cacheDisabled": "غیرفعال"
+  "integrations.cacheDisabled": "غیرفعال",
+  "general.slackOutbound": "هشدارهای نماینده Slack",
+  "general.slackOutboundDesc": "آدرس Webhook ورودی برای ارسال هشدارها توسط عوامل به کانال Slack. یکی را در فضای کاری Slack خود زیر Apps → Incoming Webhooks ایجاد کنید.",
+  "general.slackOutboundPlaceholder": "https://hooks.slack.com/services/..."
 }

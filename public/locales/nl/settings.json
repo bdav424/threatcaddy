@@ -458,5 +458,8 @@
   "integrations.cacheDesc": "Succesvolle IOC-verrijkingsresultaten worden lokaal opgeslagen zodat herhaalde opzoekingen geen snelheidsbegrensde API's opnieuw hoeven te benaderen.",
   "integrations.cacheTtl": "Cache-TTL",
   "integrations.cacheTtlValue": "{{hours}}u",
-  "integrations.cacheDisabled": "Uitgeschakeld"
+  "integrations.cacheDisabled": "Uitgeschakeld",
+  "general.slackOutbound": "Slack-agentmeldingen",
+  "general.slackOutboundDesc": "Inkomende webhook-URL voor agenten om meldingen te plaatsen in een Slack-kanaal. Maak er een aan in uw Slack-werkruimte onder Apps → Incoming Webhooks.",
+  "general.slackOutboundPlaceholder": "https://hooks.slack.com/services/..."
 }

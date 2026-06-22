@@ -1444,6 +1444,19 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
             <SlackDmsPanel settings={settings} onUpdateSettings={onUpdateSettings} />
           </div>
 
+          {/* Slack Agent Alerts (outbound webhook) */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-300">{t('general.slackOutbound')}</h3>
+            <p className="text-xs text-gray-500">{t('general.slackOutboundDesc')}</p>
+            <input
+              type="text"
+              value={settings.slackOutboundWebhookUrl ?? ''}
+              onChange={(e) => onUpdateSettings({ slackOutboundWebhookUrl: e.target.value || undefined })}
+              placeholder={t('general.slackOutboundPlaceholder')}
+              className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent"
+            />
+          </div>
+
           {/* Meeting Alerts */}
           <MeetingAlertsSection settings={settings} onUpdateSettings={onUpdateSettings} />
 

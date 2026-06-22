@@ -652,7 +652,7 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
   const [loading, setLoading] = useState(false);
   const [editingTheme, setEditingTheme] = useState(false);
   const [draft, setDraft] = useState<ThemeDraft>(() => toDraft(COLOR_SCHEMES[0]));
-  const [draftMode, setDraftMode] = useState<'dark' | 'light'>('dark');
+  const [draftMode, setDraftMode] = useState<'dark' | 'light'>(settings.theme ?? 'dark');
   const [paletteEditor, setPaletteEditor] = useState<PaletteEditorState | null>(null);
   const [dragStart, setDragStart] = useState<{ pointerId: number; x: number; y: number; originX: number; originY: number } | null>(null);
   const [wheelPointerId, setWheelPointerId] = useState<number | null>(null);

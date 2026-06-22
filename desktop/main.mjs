@@ -4,6 +4,7 @@ import * as cal from './mail-calendar-sync.mjs';
 import { runCalendarOAuthPopout, refreshCalendarToken } from './cal-oauth.mjs';
 import { runSlackOAuthPopout } from './slack-oauth.mjs';
 import { pollSlackDMs } from './slack-sync.mjs';
+import { postSlackWebhook } from './slack-outbound.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -213,6 +214,10 @@ ipcMain.handle('slack:pull-dms', async (_e, credRefId, sinceTs) => {
 ipcMain.handle('slack:revoke', (_e, credRefId) => {
   deleteSlackCredential(credRefId);
   return { ok: true };
+});
+
+ipcMain.handle('slack:post-webhook', async (_e, webhookUrl, payload) => {
+  return postSlackWebhook(webhookUrl, payload);
 });
 
 // ── Window ─────────────────────────────────────────────────────────────────

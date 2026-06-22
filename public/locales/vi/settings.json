@@ -458,5 +458,8 @@
   "integrations.cacheDesc": "Kết quả làm phong phú IOC thành công được lưu trữ cục bộ để các tra cứu lặp lại không cần truy cập lại API bị giới hạn tốc độ.",
   "integrations.cacheTtl": "TTL bộ nhớ đệm",
   "integrations.cacheTtlValue": "{{hours}}giờ",
-  "integrations.cacheDisabled": "Vô hiệu hóa"
+  "integrations.cacheDisabled": "Vô hiệu hóa",
+  "general.slackOutbound": "Cảnh báo tác nhân Slack",
+  "general.slackOutboundDesc": "URL webhook đến để tác nhân đăng cảnh báo lên kênh Slack. Tạo một URL trong không gian làm việc Slack của bạn trong Apps → Incoming Webhooks.",
+  "general.slackOutboundPlaceholder": "https://hooks.slack.com/services/..."
 }

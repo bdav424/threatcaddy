@@ -458,5 +458,8 @@
   "integrations.cacheDesc": "يتم تخزين نتائج إثراء IOC الناجحة محليًا حتى لا تصل عمليات البحث المتكررة إلى واجهات برمجة التطبيقات ذات معدل الاستخدام المحدود.",
   "integrations.cacheTtl": "مدة الصلاحية",
   "integrations.cacheTtlValue": "{{hours}}س",
-  "integrations.cacheDisabled": "معطّل"
+  "integrations.cacheDisabled": "معطّل",
+  "general.slackOutbound": "تنبيهات وكيل Slack",
+  "general.slackOutboundDesc": "رابط Webhook الوارد للوكلاء لنشر التنبيهات إلى قناة Slack. أنشئ واحدًا في مساحة عمل Slack الخاصة بك ضمن التطبيقات ← Incoming Webhooks.",
+  "general.slackOutboundPlaceholder": "https://hooks.slack.com/services/..."
 }

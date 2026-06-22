@@ -458,5 +458,8 @@
   "integrations.cacheDesc": "Hasil pengayaan IOC yang berhasil disimpan secara lokal sehingga pencarian berulang tidak perlu mengakses API yang dibatasi kecepatan lagi.",
   "integrations.cacheTtl": "TTL cache",
   "integrations.cacheTtlValue": "{{hours}}j",
-  "integrations.cacheDisabled": "Dinonaktifkan"
+  "integrations.cacheDisabled": "Dinonaktifkan",
+  "general.slackOutbound": "Peringatan Agen Slack",
+  "general.slackOutboundDesc": "URL webhook masuk bagi agen untuk memposting peringatan ke saluran Slack. Buat satu di ruang kerja Slack Anda di bawah Apps → Incoming Webhooks.",
+  "general.slackOutboundPlaceholder": "https://hooks.slack.com/services/..."
 }

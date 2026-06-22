@@ -458,5 +458,8 @@
   "integrations.cacheDesc": "Успешные результаты обогащения IOC хранятся локально, чтобы повторные запросы не обращались к API с ограничением частоты.",
   "integrations.cacheTtl": "TTL кэша",
   "integrations.cacheTtlValue": "{{hours}}ч",
-  "integrations.cacheDisabled": "Отключено"
+  "integrations.cacheDisabled": "Отключено",
+  "general.slackOutbound": "Оповещения агента Slack",
+  "general.slackOutboundDesc": "URL входящего веб-хука для публикации оповещений агентами в канале Slack. Создайте его в рабочем пространстве Slack в разделе Приложения → Входящие веб-хуки.",
+  "general.slackOutboundPlaceholder": "https://hooks.slack.com/services/..."
 }

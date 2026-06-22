@@ -458,5 +458,8 @@
   "integrations.cacheDesc": "성공적인 IOC 강화 결과는 로컬에 저장되어 반복 조회 시 속도 제한된 API에 다시 접근하지 않습니다.",
   "integrations.cacheTtl": "캐시 TTL",
   "integrations.cacheTtlValue": "{{hours}}시간",
-  "integrations.cacheDisabled": "비활성화됨"
+  "integrations.cacheDisabled": "비활성화됨",
+  "general.slackOutbound": "Slack 에이전트 알림",
+  "general.slackOutboundDesc": "에이전트가 Slack 채널에 알림을 게시하기 위한 수신 Webhook URL. Slack 작업 공간의 앱 → Incoming Webhooks에서 생성하세요.",
+  "general.slackOutboundPlaceholder": "https://hooks.slack.com/services/..."
 }

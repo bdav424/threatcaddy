@@ -458,5 +458,8 @@
   "integrations.cacheDesc": "IOC エンリッチメントの成功結果はローカルに保存されるため、繰り返し検索でもレート制限された API に再度アクセスする必要がありません。",
   "integrations.cacheTtl": "キャッシュTTL",
   "integrations.cacheTtlValue": "{{hours}}時間",
-  "integrations.cacheDisabled": "無効"
+  "integrations.cacheDisabled": "無効",
+  "general.slackOutbound": "Slackエージェントアラート",
+  "general.slackOutboundDesc": "エージェントがSlackチャンネルにアラートを投稿するための受信Webhook URL。SlackワークスペースのApps → Incoming Webhooksで作成してください。",
+  "general.slackOutboundPlaceholder": "https://hooks.slack.com/services/..."
 }

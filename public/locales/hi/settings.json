@@ -458,5 +458,8 @@
   "integrations.cacheDesc": "सफल IOC एनरिचमेंट परिणाम स्थानीय रूप से संग्रहीत किए जाते हैं ताकि बार-बार की जाने वाली खोजें दर-सीमित API को फिर से न चलाएं।",
   "integrations.cacheTtl": "कैश TTL",
   "integrations.cacheTtlValue": "{{hours}}घं",
-  "integrations.cacheDisabled": "अक्षम"
+  "integrations.cacheDisabled": "अक्षम",
+  "general.slackOutbound": "Slack एजेंट अलर्ट",
+  "general.slackOutboundDesc": "एजेंट के लिए Slack चैनल पर अलर्ट पोस्ट करने हेतु इनकमिंग Webhook URL। अपने Slack कार्यक्षेत्र में Apps → Incoming Webhooks के अंतर्गत एक बनाएं।",
+  "general.slackOutboundPlaceholder": "https://hooks.slack.com/services/..."
 }

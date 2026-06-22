@@ -458,5 +458,8 @@
   "integrations.cacheDesc": "תוצאות הסמכה מוצלחות מאוחסנות מקומית כדי שחיפושים חוזרים לא יגיעו לממשקי API עם הגבלת קצב.",
   "integrations.cacheTtl": "TTL מטמון",
   "integrations.cacheTtlValue": "{{hours}}ש",
-  "integrations.cacheDisabled": "מושבת"
+  "integrations.cacheDisabled": "מושבת",
+  "general.slackOutbound": "התראות סוכן Slack",
+  "general.slackOutboundDesc": "כתובת URL של Webhook נכנס לסוכנים לפרסום התראות בערוץ Slack. צור אחד במרחב העבודה שלך ב-Slack תחת אפליקציות ← Incoming Webhooks.",
+  "general.slackOutboundPlaceholder": "https://hooks.slack.com/services/..."
 }

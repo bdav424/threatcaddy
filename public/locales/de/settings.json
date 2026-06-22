@@ -458,5 +458,8 @@
   "integrations.cacheDesc": "Erfolgreiche IOC-Anreicherungsergebnisse werden lokal gespeichert, damit wiederholte Abfragen nicht auf ratenbegrenzte APIs treffen.",
   "integrations.cacheTtl": "Cache-TTL",
   "integrations.cacheTtlValue": "{{hours}}Std.",
-  "integrations.cacheDisabled": "Deaktiviert"
+  "integrations.cacheDisabled": "Deaktiviert",
+  "general.slackOutbound": "Slack-Agent-Benachrichtigungen",
+  "general.slackOutboundDesc": "Eingehende Webhook-URL für Agenten zum Posten von Warnungen in einem Slack-Kanal. Erstellen Sie eine in Ihrem Slack-Arbeitsbereich unter Apps → Incoming Webhooks.",
+  "general.slackOutboundPlaceholder": "https://hooks.slack.com/services/..."
 }

@@ -458,5 +458,8 @@
   "integrations.cacheDesc": "Başarılı IOC zenginleştirme sonuçları yerel olarak depolanır, böylece tekrarlanan aramalar hız sınırlı API'lere tekrar ulaşmaz.",
   "integrations.cacheTtl": "Önbellek TTL",
   "integrations.cacheTtlValue": "{{hours}}sa",
-  "integrations.cacheDisabled": "Devre dışı"
+  "integrations.cacheDisabled": "Devre dışı",
+  "general.slackOutbound": "Slack Ajan Uyarıları",
+  "general.slackOutboundDesc": "Ajanların Slack kanalına uyarı göndermesi için gelen webhook URL'si. Slack çalışma alanınızda Uygulamalar → Incoming Webhooks altında bir tane oluşturun.",
+  "general.slackOutboundPlaceholder": "https://hooks.slack.com/services/..."
 }

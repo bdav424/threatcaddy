@@ -53,6 +53,11 @@ contextBridge.exposeInMainWorld('threatcaddySlack', {
   // Remove stored credential (disconnect).
   revoke: (credRefId) =>
     ipcRenderer.invoke('slack:revoke', credRefId),
+
+  // Post a Block Kit payload to a Slack incoming webhook URL.
+  // webhookUrl must be a hooks.slack.com URL (validated in main process).
+  postWebhook: (webhookUrl, payload) =>
+    ipcRenderer.invoke('slack:post-webhook', webhookUrl, payload),
 });
 
 contextBridge.exposeInMainWorld('threatcaddyDesktop', {

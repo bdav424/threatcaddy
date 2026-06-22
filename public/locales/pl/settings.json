@@ -458,5 +458,8 @@
   "integrations.cacheDesc": "Pomyślne wyniki wzbogacania IOC są przechowywane lokalnie, aby ponowne wyszukiwania nie musiały ponownie uderzać w API z ograniczeniem szybkości.",
   "integrations.cacheTtl": "TTL pamięci podręcznej",
   "integrations.cacheTtlValue": "{{hours}}g",
-  "integrations.cacheDisabled": "Wyłączone"
+  "integrations.cacheDisabled": "Wyłączone",
+  "general.slackOutbound": "Alerty agenta Slack",
+  "general.slackOutboundDesc": "Przychodzący adres URL webhooka dla agentów do publikowania alertów w kanale Slack. Utwórz go w obszarze roboczym Slack w sekcji Aplikacje → Przychodzące webhooki.",
+  "general.slackOutboundPlaceholder": "https://hooks.slack.com/services/..."
 }

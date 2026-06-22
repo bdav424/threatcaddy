@@ -458,5 +458,8 @@
   "integrations.cacheDesc": "ผลลัพธ์การเสริมข้อมูล IOC ที่สำเร็จจะถูกเก็บไว้ในเครื่อง เพื่อไม่ให้การค้นหาซ้ำๆ เข้าถึง API ที่มีการจำกัดอัตราอีกครั้ง",
   "integrations.cacheTtl": "TTL ของแคช",
   "integrations.cacheTtlValue": "{{hours}}ชม.",
-  "integrations.cacheDisabled": "ปิดใช้งาน"
+  "integrations.cacheDisabled": "ปิดใช้งาน",
+  "general.slackOutbound": "การแจ้งเตือนตัวแทน Slack",
+  "general.slackOutboundDesc": "URL webhook ขาเข้าสำหรับตัวแทนในการโพสต์การแจ้งเตือนไปยังช่อง Slack สร้างอันหนึ่งในพื้นที่ทำงาน Slack ของคุณภายใต้ Apps → Incoming Webhooks",
+  "general.slackOutboundPlaceholder": "https://hooks.slack.com/services/..."
 }

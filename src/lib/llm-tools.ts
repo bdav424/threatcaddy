@@ -351,6 +351,7 @@ export async function executeTool(
       case 'reflect_on_performance':         result = await executeReflectOnPerformance(inp, agentContext?.profileId); break;
       case 'read_soul':                      result = await executeReadSoul(inp, agentContext?.profileId, agentRole); break;
       case 'forensicate_scan':              result = await executeForensicateScan({ text: String(inp.text || ''), threshold: inp.threshold ? Number(inp.threshold) : undefined }); break;
+      case 'post_slack_notification':        result = await executePostSlackNotification(inp, _settings); break;
       default: {
         // Dynamic skill tools: local:<skill>, host:<name>:<skill>, or LLM-safe aliases.
         const { executeHostSkill, isHostOrLocalToolName } = await import('./agent-hosts');
@@ -1430,6 +1431,44 @@ async function executeIngestAlert(inp: Record<string, unknown>, folderId?: strin
     noteId,
     message: `Alert ingested as pinned note. Source: ${source}, Severity: ${severity}. Use extract_iocs on the note content to pull IOCs.`,
   });
+}
+
+// ── Outbound Notifications ───────────────────────────────────────────
+
+async function executePostSlackNotification(inp: Record<string, unknown>, settings: Settings): Promise<string> {
+  const message = String(inp.message || '');
+  const title = inp.title ? String(inp.title) : 'ThreatCaddy Agent Alert';
+  const severity = ['info', 'warning', 'critical'].includes(String(inp.severity)) ? String(inp.severity) : 'info';
+
+  if (!message) return JSON.stringify({ error: 'message is required' });
+
+  const webhookUrl = settings.slackOutboundWebhookUrl;
+  if (!webhookUrl) {
+    return JSON.stringify({ error: 'No Slack webhook URL configured. Add one in Settings → Alerts → Slack Outbound.' });
+  }
+
+  const slackBridge = (window as Record<string, unknown>).threatcaddySlack as {
+    postWebhook?: (url: string, payload: unknown) => Promise<{ ok: boolean }>;
+  } | undefined;
+  if (!slackBridge?.postWebhook) {
+    return JSON.stringify({ error: 'Slack outbound notifications require the ThreatCaddy desktop app.' });
+  }
+
+  const emoji = severity === 'critical' ? '🚨' : severity === 'warning' ? '⚠️' : 'ℹ️';
+  const payload = {
+    blocks: [
+      { type: 'header', text: { type: 'plain_text', text: `${emoji} ${title}`, emoji: true } },
+      { type: 'section', text: { type: 'mrkdwn', text: message.substring(0, 2000) } },
+      { type: 'context', elements: [{ type: 'mrkdwn', text: 'Sent from *ThreatCaddy* AgentCaddy' }] },
+    ],
+  };
+
+  try {
+    await slackBridge.postWebhook(webhookUrl, payload);
+    return JSON.stringify({ success: true, message: 'Slack notification sent.' });
+  } catch (e) {
+    return JSON.stringify({ error: `Slack post failed: ${e instanceof Error ? e.message : String(e)}` });
+  }
 }
 
 // ── Folder Management ────────────────────────────────────────────────

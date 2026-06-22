@@ -740,6 +740,20 @@ export const TOOL_DEFINITIONS = [
       required: [],
     },
   },
+  // ── Outbound Notifications ──────────────────────────────────────
+  {
+    name: 'post_slack_notification',
+    description: 'Post an alert or status update to a configured Slack channel via incoming webhook. Use for significant findings, escalations, or executive briefings that warrant immediate human attention outside the app. Requires a webhook URL in Settings → Alerts → Slack Outbound.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        message: { type: 'string', description: 'The notification body (markdown supported). Keep under 500 characters.' },
+        title: { type: 'string', description: 'Short header line shown in bold at the top of the Slack message (optional, defaults to "ThreatCaddy Agent Alert").' },
+        severity: { type: 'string', enum: ['info', 'warning', 'critical'], description: 'Alert severity level — controls emoji prefix (ℹ️/⚠️/🚨). Default: info.' },
+      },
+      required: ['message'],
+    },
+  },
 ];
 
 // ── Delegation tools (Lead agent only) ─────────────────────────────────
@@ -946,6 +960,7 @@ const WRITE_TOOLS = new Set([
   'deploy_agent',
   'stop_agent',
   'run_agent_cycle',
+  'post_slack_notification',
 ]);
 
 export function isWriteTool(name: string): boolean {

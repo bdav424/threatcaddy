@@ -97,6 +97,9 @@ const TOOL_ACTION_CLASS: Record<string, AgentActionClass> = {
   list_agent_activity: 'read',
   reflect_on_performance: 'delegate',
   read_soul: 'read',
+  // Outbound notifications — external side effect, gated under fetch
+  post_slack_notification: 'fetch',
+
   // Executive tools remain gated under the user's create/modify toggles
   // because they change team composition (spawn/dismiss) or define new profiles.
   spawn_agent: 'create',
