@@ -167,6 +167,33 @@ ipcMain.handle('calendar:remove', async (_e, accountId, remoteId) => {
 // ── Slack IPC handlers ─────────────────────────────────────────────────────
 
 ipcMain.handle('slack:start-oauth', async () => {
+  // If a direct token is configured via env var, skip the full OAuth flow.
+  // TC_SLACK_TOKEN accepts any user token (xoxp-...) obtained from the Slack app's
+  // OAuth & Permissions page → "OAuth Tokens for Your Workspace" → User OAuth Token.
+  const directToken = process.env.TC_SLACK_TOKEN;
+  if (directToken) {
+    // Resolve display info from the token itself
+    let workspaceName = 'Slack Workspace';
+    let userName = 'You';
+    let userId = '';
+    try {
+      const r = await fetch('https://slack.com/api/auth.test', {
+        headers: { Authorization: `Bearer ${directToken}` },
+      });
+      const d = await r.json();
+      if (d.ok) {
+        workspaceName = d.team ?? workspaceName;
+        userName = d.user ?? userName;
+        userId = d.user_id ?? '';
+      }
+    } catch { /* best-effort */ }
+
+    const ref = crypto.randomUUID();
+    saveSlackCredential(ref, { userToken: directToken, workspaceName, userName, userId });
+    return { credRefId: ref, workspaceName, userName, userId };
+  }
+
+  // Full OAuth flow (requires TC_SLACK_CLIENT_ID + TC_SLACK_CLIENT_SECRET)
   const result = await runSlackOAuthPopout();
   const ref    = crypto.randomUUID();
   saveSlackCredential(ref, result);
