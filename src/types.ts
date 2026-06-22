@@ -16,6 +16,7 @@ export interface CalendarEvent {
   detail: string;
   location: string;
   conferenceApp?: string;
+  conferenceUrl?: string;
   remoteId?: string;
   syncAccountId?: string;
   etag?: string;
@@ -386,6 +387,22 @@ export interface Settings {
   supervisorNoteRetention?: number;
   /** How long enrichment API results are cached locally in hours. 0 = disabled. Default 24. */
   enrichmentCacheTtlHours?: number;
+
+  // ── Alert Glow Panel ──────────────────────────────────────────────────────
+  /** Show escalating meeting alerts (default true). */
+  alertEnabled?: boolean;
+  /** Minutes before a meeting to start showing the alert (default 15). */
+  alertLeadMinutes?: number;
+  /** Animation style for the alert panel. */
+  alertAnimation?: 'pulse' | 'color-cycle' | 'chasing-light' | 'gradient-sweep' | 'wiggle' | 'strobe';
+  /** Color mode for the alert glow. */
+  alertColorMode?: 'theme' | 'monochrome' | 'custom' | 'severity-tier';
+  /** Hex color used when alertColorMode === 'custom'. */
+  alertCustomColor?: string;
+  /** Play a chime when an alert escalates to a new phase (default false). */
+  alertChime?: boolean;
+  /** User has explicitly read the photosensitive warning and opted into strobe. */
+  strobeExplicitOptIn?: boolean;
 }
 
 // ── Agent Host Types ─────────────────────────────────────────────────

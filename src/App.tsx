@@ -131,6 +131,9 @@ import { useServerSync } from './hooks/useServerSync';
 import { useRemoteInvestigations } from './hooks/useRemoteInvestigations';
 import { SyncPassphrasePrompt } from './components/Sync/SyncPassphrasePrompt';
 import { usePushNotifications } from './hooks/usePushNotifications';
+import { useUpcomingMeetings } from './hooks/useUpcomingMeetings';
+import { useAlertSchedule } from './hooks/useAlertSchedule';
+import { AlertGlowPanel } from './components/Alerts/AlertGlowPanel';
 
 const VALID_RASTER_IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp', 'image/avif']);
 
@@ -462,6 +465,13 @@ const AppInner = memo(function AppInner({
     connected: auth.connected,
     getAccessToken: auth.getAccessToken,
   });
+
+  const upcomingMeetings = useUpcomingMeetings(settings.alertLeadMinutes ?? 15);
+  const { visible: alertItems, dismiss: dismissAlert, acknowledge: acknowledgeAlert } = useAlertSchedule(
+    upcomingMeetings,
+    settings.alertLeadMinutes ?? 15,
+    settings.alertEnabled !== false,
+  );
 
   useEffect(() => {
     const timer = window.setTimeout(() => setStartupGraceExpired(true), 6000);
@@ -3175,6 +3185,14 @@ const AppInner = memo(function AppInner({
         onClose={() => setSyncConflicts([])}
       /></Suspense>
     )}
+
+    {/* Meeting alert overlay */}
+    <AlertGlowPanel
+      items={alertItems}
+      settings={settings}
+      onDismiss={dismissAlert}
+      onAcknowledge={acknowledgeAlert}
+    />
 
     {/* Sync Passphrase Prompt — shown for passkey users who haven't yet set an encryption key */}
     {auth.connected && startupGraceExpired && auth.getSyncKey() === null && !syncPassphraseDismissed && (

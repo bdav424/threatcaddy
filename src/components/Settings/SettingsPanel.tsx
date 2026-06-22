@@ -1087,6 +1087,175 @@ function AssistantCaddyAISetup({
   );
 }
 
+// ─── Meeting Alerts Settings Section ─────────────────────────────────────────
+
+const ANIMATION_OPTIONS: { value: NonNullable<Settings['alertAnimation']>; labelKey: string }[] = [
+  { value: 'pulse', labelKey: 'animPulse' },
+  { value: 'color-cycle', labelKey: 'animColorCycle' },
+  { value: 'chasing-light', labelKey: 'animChasingLight' },
+  { value: 'gradient-sweep', labelKey: 'animGradientSweep' },
+  { value: 'wiggle', labelKey: 'animWiggle' },
+  { value: 'strobe', labelKey: 'animStrobe' },
+];
+
+const COLOR_MODE_OPTIONS: { value: NonNullable<Settings['alertColorMode']>; labelKey: string }[] = [
+  { value: 'theme', labelKey: 'colorTheme' },
+  { value: 'monochrome', labelKey: 'colorMonochrome' },
+  { value: 'custom', labelKey: 'colorCustom' },
+  { value: 'severity-tier', labelKey: 'colorSeverityTier' },
+];
+
+function MeetingAlertsSection({
+  settings,
+  onUpdateSettings,
+}: {
+  settings: Settings;
+  onUpdateSettings: (patch: Partial<Settings>) => void;
+}) {
+  const { t: tA } = useTranslation('alerts');
+  const [strobeExpanded, setStrobeExpanded] = useState(false);
+  const selectClass = 'bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent';
+
+  const enabled = settings.alertEnabled !== false;
+  const animation = settings.alertAnimation ?? 'pulse';
+  const colorMode = settings.alertColorMode ?? 'theme';
+  const chime = settings.alertChime ?? false;
+  const strobeOptIn = settings.strobeExplicitOptIn ?? false;
+
+  return (
+    <div className="space-y-3">
+      <h3 className="text-sm font-semibold text-gray-300">{tA('settingsTitle')}</h3>
+
+      {/* Enabled toggle */}
+      <div className="flex items-center justify-between">
+        <div>
+          <span className="text-sm text-gray-300">{tA('settingsEnabled')}</span>
+          <p className="text-xs text-gray-500">{tA('settingsEnabledDesc')}</p>
+        </div>
+        <button
+          onClick={() => onUpdateSettings({ alertEnabled: !enabled })}
+          className={`relative w-9 h-5 rounded-full transition-colors ${enabled ? 'bg-accent' : 'bg-gray-700'}`}
+          aria-pressed={enabled}
+        >
+          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${enabled ? 'translate-x-4' : ''}`} />
+        </button>
+      </div>
+
+      {enabled && (
+        <div className="space-y-3 pl-1">
+          {/* Lead time */}
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <span className="text-sm text-gray-300">{tA('settingsLeadTime')}</span>
+              <p className="text-xs text-gray-500">{tA('settingsLeadTimeDesc')}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={2}
+                max={60}
+                value={settings.alertLeadMinutes ?? 15}
+                onChange={(e) => onUpdateSettings({ alertLeadMinutes: Math.max(2, Math.min(60, Number(e.target.value))) })}
+                className="w-16 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-sm text-gray-200 text-center focus:outline-none focus:border-accent"
+              />
+              <span className="text-xs text-gray-500">min</span>
+            </div>
+          </div>
+
+          {/* Animation */}
+          <div className="space-y-1.5">
+            <label className="text-sm text-gray-300">{tA('settingsAnimation')}</label>
+            <select
+              value={animation}
+              onChange={(e) => onUpdateSettings({ alertAnimation: e.target.value as Settings['alertAnimation'] })}
+              className={selectClass}
+            >
+              {ANIMATION_OPTIONS.filter((o) => o.value !== 'strobe').map((o) => (
+                <option key={o.value} value={o.value}>{tA(o.labelKey)}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Color mode */}
+          <div className="space-y-1.5">
+            <label className="text-sm text-gray-300">{tA('settingsColorMode')}</label>
+            <select
+              value={colorMode}
+              onChange={(e) => onUpdateSettings({ alertColorMode: e.target.value as Settings['alertColorMode'] })}
+              className={selectClass}
+            >
+              {COLOR_MODE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{tA(o.labelKey)}</option>
+              ))}
+            </select>
+          </div>
+
+          {colorMode === 'custom' && (
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-gray-300 shrink-0">{tA('settingsCustomColor')}</label>
+              <input
+                type="color"
+                value={settings.alertCustomColor ?? '#6366f1'}
+                onChange={(e) => onUpdateSettings({ alertCustomColor: e.target.value })}
+                className="w-10 h-8 rounded cursor-pointer border border-gray-700 bg-transparent"
+              />
+              <span className="text-xs text-gray-500 font-mono">{settings.alertCustomColor ?? '#6366f1'}</span>
+            </div>
+          )}
+
+          {/* Chime */}
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm text-gray-300">{tA('settingsChime')}</span>
+              <p className="text-xs text-gray-500">{tA('settingsChimeDesc')}</p>
+            </div>
+            <button
+              onClick={() => onUpdateSettings({ alertChime: !chime })}
+              className={`relative w-9 h-5 rounded-full transition-colors ${chime ? 'bg-accent' : 'bg-gray-700'}`}
+              aria-pressed={chime}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${chime ? 'translate-x-4' : ''}`} />
+            </button>
+          </div>
+
+          {/* Strobe — gated behind explicit opt-in */}
+          <div className="rounded-lg border border-amber-800/40 bg-amber-900/10 p-3 space-y-2">
+            <button
+              className="flex items-center gap-2 text-sm text-amber-400 font-medium w-full text-left"
+              onClick={() => setStrobeExpanded((v) => !v)}
+              aria-expanded={strobeExpanded}
+            >
+              <span>{tA('settingsStrobeSection')}</span>
+              <span className="ml-auto text-xs">{strobeExpanded ? '▲' : '▼'}</span>
+            </button>
+            {strobeExpanded && (
+              <div className="space-y-2">
+                <p className="text-xs text-amber-300/80">{tA('settingsStrobeWarning')}</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-300">{tA('settingsStrobeOptIn')}</span>
+                  <button
+                    onClick={() => {
+                      const newVal = !strobeOptIn;
+                      onUpdateSettings({
+                        strobeExplicitOptIn: newVal,
+                        alertAnimation: newVal ? 'strobe' : (animation === 'strobe' ? 'pulse' : animation),
+                      });
+                    }}
+                    className={`relative w-9 h-5 rounded-full transition-colors ${strobeOptIn ? 'bg-amber-500' : 'bg-gray-700'}`}
+                    aria-pressed={strobeOptIn}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${strobeOptIn ? 'translate-x-4' : ''}`} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function SettingsPanel({ settings, onUpdateSettings, notes, onImportComplete, sampleLoaded, onLoadSample, onDeleteSample, onClose, initialTab, templateProps, playbookProps }: SettingsPanelProps) {
   const { t } = useTranslation('settings');
   const { addToast } = useToast();
@@ -1258,6 +1427,9 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
               );
             })}
           </div>
+
+          {/* Meeting Alerts */}
+          <MeetingAlertsSection settings={settings} onUpdateSettings={onUpdateSettings} />
 
           {/* Sample Data */}
           {(onLoadSample || onDeleteSample) && (
