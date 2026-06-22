@@ -130,6 +130,7 @@ import { useLoggedActions } from './hooks/useLoggedActions';
 import { useServerSync } from './hooks/useServerSync';
 import { useRemoteInvestigations } from './hooks/useRemoteInvestigations';
 import { SyncPassphrasePrompt } from './components/Sync/SyncPassphrasePrompt';
+import { usePushNotifications } from './hooks/usePushNotifications';
 
 const VALID_RASTER_IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp', 'image/avif']);
 
@@ -455,6 +456,12 @@ const AppInner = memo(function AppInner({
   const [showNoteTemplateCreator, setShowNoteTemplateCreator] = useState(false);
   const [fortuneIntMode, setFortuneIntMode] = useState(false);
   const [fortuneIntOpenRequest, setFortuneIntOpenRequest] = useState(0);
+
+  usePushNotifications({
+    serverUrl: auth.serverUrl,
+    connected: auth.connected,
+    getAccessToken: auth.getAccessToken,
+  });
 
   useEffect(() => {
     const timer = window.setTimeout(() => setStartupGraceExpired(true), 6000);

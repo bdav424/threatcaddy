@@ -605,6 +605,20 @@ export const agentHeartbeats = pgTable('agent_heartbeats', {
 });
 
 /** Server-side agent actions (approval queue) — mirrors client's agentActions Dexie table */
+// ─── Device Push Tokens (mobile push notifications) ────────────────────────
+
+export const devicePushTokens = pgTable('device_push_tokens', {
+  id:        text('id').primaryKey(),
+  userId:    text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  token:     text('token').notNull(),
+  platform:  text('platform', { enum: ['android', 'ios', 'web'] }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  idxPushTokensUser: index('idx_push_tokens_user').on(t.userId),
+  uniqPushToken:     unique('uq_push_token').on(t.userId, t.token),
+}));
+
 export const agentActions = pgTable('agent_actions', {
   id: text('id').primaryKey(),
   investigationId: text('investigation_id').notNull(),
