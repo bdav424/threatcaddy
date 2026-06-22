@@ -145,9 +145,14 @@ export function useSettings() {
     const root = document.documentElement;
     const transparency = Math.max(0, Math.min(100, settings.windowGlassTransparency ?? 0));
     const blur = Math.max(0, Math.min(40, settings.windowGlassBlur ?? 0));
-    const ratio = 1 - transparency / 100;
+    const frostedPanels = settings.frostedPanels ?? false;
+    // frostedPanels: when enabled with no sliders set, apply a visible frosted preset
+    const slidersActive = transparency > 0 || blur > 0;
+    const effectiveTransparency = !slidersActive && frostedPanels ? 35 : transparency;
+    const effectiveBlur = !slidersActive && frostedPanels ? 14 : blur;
+    const ratio = 1 - effectiveTransparency / 100;
     const panelOpacity = (base: number) => Math.max(0, base * ratio).toFixed(1);
-    const enabled = transparency > 0 || blur > 0;
+    const enabled = effectiveTransparency > 0 || effectiveBlur > 0;
 
     root.classList.toggle('has-panel-glass', enabled);
     root.classList.remove('has-window-glass', 'has-window-blur');
@@ -164,8 +169,8 @@ export function useSettings() {
     root.style.setProperty('--tc-panel-glass-active-50', `color-mix(in srgb, var(--color-bg-active) ${panelOpacity(50)}%, transparent)`);
     root.style.setProperty('--tc-panel-glass-active-30', `color-mix(in srgb, var(--color-bg-active) ${panelOpacity(30)}%, transparent)`);
     root.style.setProperty('--tc-panel-glass-sidebar', `color-mix(in srgb, var(--color-bg-surface) ${panelOpacity(100)}%, transparent)`);
-    root.style.setProperty('--tc-panel-glass-border', `color-mix(in srgb, var(--color-border-medium) ${Math.max(22, 100 - transparency * 0.45).toFixed(1)}%, transparent)`);
-    root.style.setProperty('--tc-panel-glass-blur', `${blur}px`);
+    root.style.setProperty('--tc-panel-glass-border', `color-mix(in srgb, var(--color-border-medium) ${Math.max(22, 100 - effectiveTransparency * 0.45).toFixed(1)}%, transparent)`);
+    root.style.setProperty('--tc-panel-glass-blur', `${effectiveBlur}px`);
     root.style.setProperty('--tc-window-ambient-opacity', '0');
     root.style.setProperty('--tc-window-frost-strength', '0');
     root.style.setProperty('--tc-window-blur', '0px');
@@ -175,7 +180,7 @@ export function useSettings() {
         // The desktop wrapper may still be starting up; keep the web UI responsive regardless.
       });
     }
-  }, [isDesktopShell, settings.windowGlassTransparency, settings.windowGlassBlur]);
+  }, [isDesktopShell, settings.windowGlassTransparency, settings.windowGlassBlur, settings.frostedPanels]);
 
   const updateSettings = useCallback((updates: Partial<Settings>) => {
     setSettingsState((prev) => {

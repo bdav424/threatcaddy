@@ -695,7 +695,6 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
   const bgEffectSize = clamp(settings.bgEffectSize ?? 100, 40, 180);
   const themeEffectColor = getPaletteEffectColor(bgEffectPattern, runtimeModeColors) ?? runtimeModeColors['--color-accent'];
   const bgEffectHsl = hexToHsl(bgEffectColor);
-  const frostedPanels = settings.frostedPanels ?? false;
   const fontFamily = settings.appearanceFontFamily || selectedCustom?.fontFamily || FONT_OPTIONS[0].value;
   const fontTargets = settings.appearanceFontTargets ?? selectedCustom?.fontTargets ?? {};
   const fontScale = settings.appearanceFontScale ?? 100;
@@ -793,7 +792,6 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
     bgEffectColor: undefined,
     bgEffectIntensity: 60,
     bgEffectSize: 100,
-    frostedPanels: false,
   });
 
   const startCreateTheme = () => {
@@ -2032,6 +2030,30 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
               </div>
               <input type="range" min={0} max={40} value={panelBlur} onChange={(e) => onUpdateSettings({ windowGlassBlur: Number(e.target.value) })} className="h-1.5 w-full accent-accent" />
             </div>
+
+            <div className="flex items-center justify-between rounded-lg border border-gray-700/60 bg-black/10 px-3 py-2.5">
+              <div>
+                <div className="text-xs font-medium text-gray-300">Frosted panels</div>
+                <div className="mt-0.5 text-[11px] text-gray-500">Lift panels off the animated background. Requires Panel transparency &gt; 0.</div>
+              </div>
+              <div className="flex items-center gap-2">
+                {panelTransparency === 0 && panelBlur === 0 && (
+                  <button
+                    onClick={() => onUpdateSettings({ windowGlassTransparency: 35, windowGlassBlur: 14 })}
+                    className="rounded border border-gray-600 px-2 py-1 text-[10px] text-gray-400 hover:border-accent/50 hover:text-accent transition-colors"
+                  >
+                    Quick preset
+                  </button>
+                )}
+                <button
+                  onClick={() => onUpdateSettings({ windowGlassTransparency: 0, windowGlassBlur: 0 })}
+                  disabled={panelTransparency === 0 && panelBlur === 0}
+                  className="rounded border border-gray-700 px-2 py-1 text-[10px] text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -2044,7 +2066,7 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
               Pull the Odysseus-style animated background into ThreatCaddy without breaking the existing master theme.
             </p>
           </div>
-          {(bgEffectPattern !== 'none' || frostedPanels) && (
+          {bgEffectPattern !== 'none' && (
             <button onClick={resetAmbientMotion} className="flex items-center gap-1 rounded-md border border-gray-700 px-2.5 py-1.5 text-xs text-gray-300 hover:bg-gray-800">
               <RotateCcw size={13} /> Reset motion
             </button>
@@ -2249,18 +2271,9 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
               </div>
             </div>
 
-            <label className="flex items-center justify-between rounded-lg border border-gray-800 bg-black/10 px-3 py-3">
-              <div>
-                <div className="text-xs font-medium text-gray-200">Frosted panels</div>
-                <div className="mt-1 text-[11px] text-gray-500">Lift the shell and settings surfaces off the animated background.</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={frostedPanels}
-                onChange={(event) => onUpdateSettings({ frostedPanels: event.target.checked })}
-                className="rounded border-gray-600"
-              />
-            </label>
+            <div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-black/10 px-3 py-3 text-[11px] text-gray-500">
+              <span>Raise <strong className="text-gray-400">Panel transparency</strong> in the Bordered Panels section above to see this animation through panels.</span>
+            </div>
           </div>
         </div>
       </div>

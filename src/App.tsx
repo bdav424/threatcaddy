@@ -2616,7 +2616,6 @@ const AppInner = memo(function AppInner({
         bgEffectColor={settings.bgEffectColor}
         bgEffectIntensity={settings.bgEffectIntensity}
         bgEffectSize={settings.bgEffectSize}
-        frostedPanels={settings.frostedPanels}
         theme={settings.theme}
         header={
           <ErrorBoundary region="header">

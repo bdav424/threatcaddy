@@ -18,7 +18,6 @@ interface AppLayoutProps {
   bgEffectColor?: string;
   bgEffectIntensity?: number;
   bgEffectSize?: number;
-  frostedPanels?: boolean;
   theme?: 'dark' | 'light';
 }
 
@@ -36,21 +35,11 @@ export function AppLayout({
   bgEffectColor,
   bgEffectIntensity,
   bgEffectSize,
-  frostedPanels,
   theme,
 }: AppLayoutProps) {
   const { t } = useTranslation('common');
   const resolvedTheme = theme ?? 'dark';
   const hasBgEffect = (bgEffectPattern ?? 'none') !== 'none';
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('theme-frosted', !!frostedPanels);
-    document.body.classList.toggle('theme-frosted', !!frostedPanels);
-    return () => {
-      document.documentElement.classList.remove('theme-frosted');
-      document.body.classList.remove('theme-frosted');
-    };
-  }, [frostedPanels]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('has-bg-effect', hasBgEffect);

@@ -743,17 +743,6 @@ body.tc-desktop-shell-body {
   background-color: transparent !important;
 }
 
-.theme-frosted .bg-gray-900,
-.theme-frosted .bg-gray-900\/50,
-.theme-frosted .bg-gray-900\/40,
-.theme-frosted .bg-gray-800\/50,
-.theme-frosted .bg-gray-800\/40,
-.theme-frosted .sidebar-glass {
-  backdrop-filter: blur(16px) saturate(145%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(145%) !important;
-  border-color: color-mix(in srgb, var(--color-border-medium) 76%, transparent) !important;
-}
-
 /* ─── Panel glass: scoped to bordered surfaces only ─── */
 .has-panel-glass .bg-gray-900 {
   background-color: var(--tc-panel-glass-surface) !important;
