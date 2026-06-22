@@ -52,3 +52,12 @@ playwright-report/
 test-results/
 desktop/.env.desktop
 *.env.desktop
+
+# Capacitor native build outputs (scaffold is committed; build artifacts are not)
+android/.gradle
+android/app/build
+android/build
+android/local.properties
+ios/App/Pods
+ios/App/build
+ios/.xcode.env.local
