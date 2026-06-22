@@ -1,0 +1,11 @@
+{
+  "passphraseTitle": "Verschlüsselte Synchronisierung aktivieren",
+  "passphraseSubtitle": "Geben Sie Ihre Synchronisierungspassphrase ein, um Daten zu verschlüsseln, bevor sie den Server erreichen",
+  "passphraseHint": "Sie haben sich mit einem Passkey angemeldet. Geben Sie die Synchronisierungspassphrase ein, die Sie auf Ihrem ersten Gerät festgelegt haben. Wenn dies Ihr erstes Gerät ist, wählen Sie eine beliebige Passphrase – Sie benötigen sie auf zukünftigen Geräten.",
+  "passphrasePlaceholder": "Synchronisierungspassphrase",
+  "passphraseSubmit": "Verschlüsselung aktivieren",
+  "passphraseApplying": "Wird angewendet…",
+  "passphraseLater": "Später",
+  "passphraseError": "Fehler beim Festlegen der Synchronisierungspassphrase. Bitte versuchen Sie es erneut.",
+  "passphrasePrivacy": "Die Passphrase verlässt Ihr Gerät nie. Ihre Daten werden lokal verschlüsselt, bevor sie synchronisiert werden."
+}

@@ -1,0 +1,11 @@
+{
+  "passphraseTitle": "Włącz szyfrowaną synchronizację",
+  "passphraseSubtitle": "Wpisz hasło synchronizacji, aby zaszyfrować dane przed dotarciem do serwera",
+  "passphraseHint": "Zalogowałeś się za pomocą klucza dostępu. Wpisz hasło synchronizacji ustawione na pierwszym urządzeniu. Jeśli to Twoje pierwsze urządzenie, wybierz dowolne hasło — będziesz go potrzebować na przyszłych urządzeniach.",
+  "passphrasePlaceholder": "Hasło synchronizacji",
+  "passphraseSubmit": "Włącz szyfrowanie",
+  "passphraseApplying": "Stosowanie…",
+  "passphraseLater": "Później",
+  "passphraseError": "Nie udało się ustawić hasła synchronizacji. Spróbuj ponownie.",
+  "passphrasePrivacy": "Hasło nigdy nie opuszcza Twojego urządzenia. Twoje dane są szyfrowane lokalnie przed synchronizacją."
+}

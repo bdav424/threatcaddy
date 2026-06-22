@@ -1,0 +1,11 @@
+{
+  "passphraseTitle": "Bật Đồng bộ được Mã hóa",
+  "passphraseSubtitle": "Nhập cụm mật khẩu đồng bộ của bạn để mã hóa dữ liệu trước khi đến máy chủ",
+  "passphraseHint": "Bạn đã đăng nhập bằng khóa truy cập. Nhập cụm mật khẩu đồng bộ mà bạn đã đặt trên thiết bị đầu tiên của mình. Nếu đây là thiết bị đầu tiên của bạn, hãy chọn bất kỳ cụm mật khẩu nào — bạn sẽ cần nó trên các thiết bị trong tương lai.",
+  "passphrasePlaceholder": "Cụm mật khẩu đồng bộ",
+  "passphraseSubmit": "Bật Mã hóa",
+  "passphraseApplying": "Đang Áp dụng…",
+  "passphraseLater": "Để sau",
+  "passphraseError": "Không thể đặt cụm mật khẩu đồng bộ. Vui lòng thử lại.",
+  "passphrasePrivacy": "Cụm mật khẩu không bao giờ rời khỏi thiết bị của bạn. Dữ liệu của bạn được mã hóa cục bộ trước khi đồng bộ."
+}

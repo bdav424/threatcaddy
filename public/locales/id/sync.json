@@ -1,0 +1,11 @@
+{
+  "passphraseTitle": "Aktifkan Sinkronisasi Terenkripsi",
+  "passphraseSubtitle": "Masukkan frasa sandi sinkronisasi Anda untuk mengenkripsi data sebelum mencapai server",
+  "passphraseHint": "Anda telah masuk dengan kunci akses. Masukkan frasa sandi sinkronisasi yang Anda tetapkan di perangkat pertama Anda. Jika ini perangkat pertama Anda, pilih frasa sandi apa saja — Anda akan membutuhkannya di perangkat di masa depan.",
+  "passphrasePlaceholder": "Frasa sandi sinkronisasi",
+  "passphraseSubmit": "Aktifkan enkripsi",
+  "passphraseApplying": "Menerapkan…",
+  "passphraseLater": "Nanti",
+  "passphraseError": "Gagal menetapkan frasa sandi sinkronisasi. Silakan coba lagi.",
+  "passphrasePrivacy": "Frasa sandi tidak pernah meninggalkan perangkat Anda. Data Anda dienkripsi secara lokal sebelum disinkronkan."
+}

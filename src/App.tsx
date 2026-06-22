@@ -129,6 +129,7 @@ initLocalOnlyFlags();
 import { useLoggedActions } from './hooks/useLoggedActions';
 import { useServerSync } from './hooks/useServerSync';
 import { useRemoteInvestigations } from './hooks/useRemoteInvestigations';
+import { SyncPassphrasePrompt } from './components/Sync/SyncPassphrasePrompt';
 
 const VALID_RASTER_IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp', 'image/avif']);
 
@@ -443,6 +444,7 @@ const AppInner = memo(function AppInner({
   const ui = useUIModals();
   const { t: tExec } = useTranslation('exec');
   const [startupGraceExpired, setStartupGraceExpired] = useState(false);
+  const [syncPassphraseDismissed, setSyncPassphraseDismissed] = useState(false);
   const [pendingChatDraft, setPendingChatDraft] = useState<{
     id: string;
     threadId: string;
@@ -3165,6 +3167,17 @@ const AppInner = memo(function AppInner({
         onResolveAll={handleResolveAllConflicts}
         onClose={() => setSyncConflicts([])}
       /></Suspense>
+    )}
+
+    {/* Sync Passphrase Prompt — shown for passkey users who haven't yet set an encryption key */}
+    {auth.connected && startupGraceExpired && auth.getSyncKey() === null && !syncPassphraseDismissed && (
+      <SyncPassphrasePrompt
+        onSubmit={async (passphrase) => {
+          await auth.setSyncPassphrase(passphrase);
+          setSyncPassphraseDismissed(true);
+        }}
+        onDismiss={() => setSyncPassphraseDismissed(true)}
+      />
     )}
     </ScreenshareContext.Provider>
   );

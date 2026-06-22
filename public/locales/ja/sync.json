@@ -1,0 +1,11 @@
+{
+  "passphraseTitle": "暗号化同期を有効化",
+  "passphraseSubtitle": "同期パスフレーズを入力して、データがサーバーに到達する前に暗号化します",
+  "passphraseHint": "パスキーでサインインしました。最初のデバイスで設定した同期パスフレーズを入力してください。これが最初のデバイスの場合は、任意のパスフレーズを選択してください。今後のデバイスで必要になります。",
+  "passphrasePlaceholder": "同期パスフレーズ",
+  "passphraseSubmit": "暗号化を有効化",
+  "passphraseApplying": "適用中…",
+  "passphraseLater": "後で",
+  "passphraseError": "同期パスフレーズの設定に失敗しました。もう一度お試しください。",
+  "passphrasePrivacy": "パスフレーズはデバイスから離れることはありません。データは同期前にローカルで暗号化されます。"
+}

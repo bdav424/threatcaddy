@@ -1,0 +1,11 @@
+{
+  "passphraseTitle": "Abilita sincronizzazione crittografata",
+  "passphraseSubtitle": "Inserisci la tua passphrase di sincronizzazione per crittografare i dati prima che raggiungano il server",
+  "passphraseHint": "Hai effettuato l'accesso con una passkey. Inserisci la passphrase di sincronizzazione che hai impostato sul tuo primo dispositivo. Se questo è il tuo primo dispositivo, scegli qualsiasi passphrase — ne avrai bisogno sui dispositivi futuri.",
+  "passphrasePlaceholder": "Passphrase di sincronizzazione",
+  "passphraseSubmit": "Abilita crittografia",
+  "passphraseApplying": "Applicazione in corso…",
+  "passphraseLater": "Più tardi",
+  "passphraseError": "Impossibile impostare la passphrase di sincronizzazione. Riprova.",
+  "passphrasePrivacy": "La passphrase non lascia mai il tuo dispositivo. I tuoi dati vengono crittografati localmente prima della sincronizzazione."
+}

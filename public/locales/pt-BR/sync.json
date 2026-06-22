@@ -1,0 +1,11 @@
+{
+  "passphraseTitle": "Ativar sincronização criptografada",
+  "passphraseSubtitle": "Digite sua frase-senha de sincronização para criptografar dados antes de chegarem ao servidor",
+  "passphraseHint": "Você se conectou com uma chave de acesso. Digite a frase-senha de sincronização que você definiu em seu primeiro dispositivo. Se este for seu primeiro dispositivo, escolha qualquer frase-senha — você precisará dela em dispositivos futuros.",
+  "passphrasePlaceholder": "Frase-senha de sincronização",
+  "passphraseSubmit": "Ativar criptografia",
+  "passphraseApplying": "Aplicando…",
+  "passphraseLater": "Mais tarde",
+  "passphraseError": "Falha ao definir a frase-senha de sincronização. Tente novamente.",
+  "passphrasePrivacy": "A frase-senha nunca sai do seu dispositivo. Seus dados são criptografados localmente antes de serem sincronizados."
+}

@@ -1,0 +1,11 @@
+{
+  "passphraseTitle": "Habilitar sincronización encriptada",
+  "passphraseSubtitle": "Ingrese su frase de contraseña de sincronización para encriptar los datos antes de que lleguen al servidor",
+  "passphraseHint": "Ha iniciado sesión con una contraseña de acceso. Ingrese la frase de contraseña de sincronización que configuró en su primer dispositivo. Si este es su primer dispositivo, elija cualquier frase de contraseña: la necesitará en dispositivos futuros.",
+  "passphrasePlaceholder": "Frase de contraseña de sincronización",
+  "passphraseSubmit": "Habilitar encriptación",
+  "passphraseApplying": "Aplicando…",
+  "passphraseLater": "Más tarde",
+  "passphraseError": "Error al establecer la frase de contraseña de sincronización. Intente de nuevo.",
+  "passphrasePrivacy": "La frase de contraseña nunca deja su dispositivo. Sus datos se encriptan localmente antes de sincronizarse."
+}

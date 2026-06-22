@@ -20,6 +20,7 @@ interface AuthState {
   logout(): Promise<void>;
   getAccessToken(): Promise<string | null>;
   getSyncKey(): CryptoKey | null;
+  setSyncPassphrase(passphrase: string): Promise<void>;
   invalidateAccessToken(): void;
   setServerUrl(url: string | null): void;
   setReachable(reachable: boolean): void;
@@ -36,6 +37,7 @@ const AuthContext = createContext<AuthState>({
   logout: async () => {},
   getAccessToken: async () => null,
   getSyncKey: () => null,
+  setSyncPassphrase: async () => {},
   invalidateAccessToken: () => {},
   setServerUrl: () => {},
   setReachable: () => {},
@@ -240,6 +242,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(teamUser);
     setConnected(true);
     persist(url, data.accessToken, data.refreshToken, teamUser);
+    // syncKey is not derived here — the SyncPassphrasePrompt fires when connected
+    // without a key and lets the user enter their passphrase once per session.
   }, [serverUrl, persist]);
 
   const register = useCallback(async (email: string, displayName: string, password: string) => {
@@ -358,6 +362,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return refreshPromise;
   }, [serverUrl, user, persist]);
 
+  const setSyncPassphrase = useCallback(async (passphrase: string): Promise<void> => {
+    const url = serverUrl;
+    if (!url) return;
+    const token = await getAccessToken();
+    if (!token) return;
+    await deriveSyncKeyForPassword(passphrase, null, url, token);
+  }, [serverUrl, getAccessToken, deriveSyncKeyForPassword]);
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -370,6 +382,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       getAccessToken,
       getSyncKey,
+      setSyncPassphrase,
       invalidateAccessToken,
       setServerUrl,
       setReachable,

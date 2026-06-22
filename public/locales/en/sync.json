@@ -1,0 +1,11 @@
+{
+  "passphraseTitle": "Enable Encrypted Sync",
+  "passphraseSubtitle": "Enter your sync passphrase to encrypt data before it reaches the server",
+  "passphraseHint": "You signed in with a passkey. Enter the sync passphrase you set on your first device. If this is your first device, choose any passphrase — you'll need it on future devices.",
+  "passphrasePlaceholder": "Sync passphrase",
+  "passphraseSubmit": "Enable encryption",
+  "passphraseApplying": "Applying…",
+  "passphraseLater": "Later",
+  "passphraseError": "Failed to set sync passphrase. Please try again.",
+  "passphrasePrivacy": "The passphrase never leaves your device. Your data is encrypted locally before syncing."
+}

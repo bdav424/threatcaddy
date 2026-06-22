@@ -1,0 +1,11 @@
+{
+  "passphraseTitle": "Activer la synchronisation chiffrée",
+  "passphraseSubtitle": "Entrez votre phrase de passe de synchronisation pour chiffrer les données avant qu'elles n'atteignent le serveur",
+  "passphraseHint": "Vous vous êtes connecté avec une clé d'accès. Entrez la phrase de passe de synchronisation que vous avez définie sur votre premier appareil. Si c'est votre premier appareil, choisissez n'importe quelle phrase de passe — vous en aurez besoin sur les appareils futurs.",
+  "passphrasePlaceholder": "Phrase de passe de synchronisation",
+  "passphraseSubmit": "Activer le chiffrement",
+  "passphraseApplying": "Application en cours…",
+  "passphraseLater": "Plus tard",
+  "passphraseError": "Échec de la définition de la phrase de passe de synchronisation. Veuillez réessayer.",
+  "passphrasePrivacy": "La phrase de passe ne quitte jamais votre appareil. Vos données sont chiffrées localement avant la synchronisation."
+}

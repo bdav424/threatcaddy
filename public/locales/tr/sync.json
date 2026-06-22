@@ -1,0 +1,11 @@
+{
+  "passphraseTitle": "Şifrelenmiş Senkronizasyonu Etkinleştir",
+  "passphraseSubtitle": "Verileri sunucuya ulaşmadan önce şifrelemek için senkronizasyon parolanızı girin",
+  "passphraseHint": "Bir erişim anahtarı ile oturum açtınız. İlk cihazınızda ayarladığınız senkronizasyon parolasını girin. Bu ilk cihazınızsa, herhangi bir parola seçin — gelecek cihazlarda buna ihtiyacınız olacak.",
+  "passphrasePlaceholder": "Senkronizasyon parolası",
+  "passphraseSubmit": "Şifrelemeyi Etkinleştir",
+  "passphraseApplying": "Uygulanıyor…",
+  "passphraseLater": "Daha Sonra",
+  "passphraseError": "Senkronizasyon parolası ayarlanamadı. Lütfen yeniden deneyin.",
+  "passphrasePrivacy": "Parola cihazınızı asla terk etmez. Verileriniz senkronizasyondan önce yerel olarak şifrelenir."
+}
