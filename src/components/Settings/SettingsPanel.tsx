@@ -30,7 +30,6 @@ import { PasskeyManagement } from './PasskeyManagement';
 import { SyncDevicesPanel } from './SyncDevicesPanel';
 import { SlackDmsPanel } from './SlackDmsPanel';
 import { IntegrationPanel } from '../Integrations/IntegrationPanel';
-import { IntegrationSourceDashboard } from '../Integrations/IntegrationSourceDashboard';
 import { AppearanceSettings } from './AppearanceSettings';
 import { AgentHostsConfig } from './AgentHostsConfig';
 import { SystemHygienePanel } from './SystemHygienePanel';
@@ -1628,7 +1627,6 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
       {/* Integrations Tab */}
       {activeTab === 'integrations' && (
         <div className="space-y-6" role="tabpanel" id="settings-panel-integrations" aria-labelledby="settings-tab-integrations">
-          <IntegrationSourceDashboard />
           <IntegrationPanel />
           {/* Enrichment Cache TTL */}
           <div className="space-y-2 rounded-xl border border-border-subtle/40 bg-bg-primary/40 p-4">

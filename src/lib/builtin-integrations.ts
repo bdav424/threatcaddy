@@ -1,6 +1,7 @@
 import type { IntegrationTemplate } from '../types/integration-types';
 import i18n from '../i18n';
 import { ADDITIONAL_BUILTIN_INTEGRATIONS } from './builtin-integrations.additions';
+import { STUB_INTEGRATIONS } from './builtin-integrations.stubs';
 
 export const BUILTIN_INTEGRATIONS: IntegrationTemplate[] = [
   // ── 1. VirusTotal IP Lookup ──────────────────────────────────────────
@@ -1441,4 +1442,5 @@ export const BUILTIN_INTEGRATIONS: IntegrationTemplate[] = [
     requiredDomains: ['api.flashpoint.io'],
   },
   ...ADDITIONAL_BUILTIN_INTEGRATIONS,
+  ...STUB_INTEGRATIONS,
 ];

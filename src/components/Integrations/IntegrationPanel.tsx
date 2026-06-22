@@ -309,11 +309,21 @@ function InstalledTab({
 }) {
   const { t } = useTranslation('integrations');
   const [configuringId, setConfiguringId] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<IntegrationCategory | 'all'>('all');
+  const [availableSearch, setAvailableSearch] = useState('');
 
   const installedTemplateIds = new Set(installations.map((i) => i.templateId));
-  const availableTemplates = sortTemplatesByName(
+  const allAvailableTemplates = sortTemplatesByName(
     templates.filter((t) => !installedTemplateIds.has(t.id)),
   );
+  const availableTemplates = allAvailableTemplates.filter((tmpl) => {
+    if (categoryFilter !== 'all' && tmpl.category !== categoryFilter) return false;
+    if (availableSearch) {
+      const q = availableSearch.toLowerCase();
+      return tmpl.name.toLowerCase().includes(q) || tmpl.description.toLowerCase().includes(q) || tmpl.tags.some((tag) => tag.toLowerCase().includes(q));
+    }
+    return true;
+  });
   const sortedInstallations = [...installations].sort((a, b) => {
     const aTemplate = templates.find((t) => t.id === a.templateId);
     const bTemplate = templates.find((t) => t.id === b.templateId);
@@ -321,6 +331,17 @@ function InstalledTab({
     const bName = bTemplate?.name || b.name;
     return aName.localeCompare(bName, undefined, { sensitivity: 'base' });
   });
+
+  const availableCategories = Array.from(new Set(allAvailableTemplates.map((t) => t.category)));
+  const CATEGORY_GROUP_LABELS: Partial<Record<IntegrationCategory, string>> = {
+    enrichment: 'Enrichment',
+    'threat-feed': 'Threat Intel',
+    'siem-soar': 'SIEM / SOAR',
+    notification: 'Messaging',
+    export: 'Export',
+    pipeline: 'Pipeline',
+    utility: 'Utility',
+  };
 
   return (
     <div className="space-y-6">
@@ -445,38 +466,80 @@ function InstalledTab({
       )}
 
       {/* Available integrations */}
-      {availableTemplates.length > 0 && (
+      {allAvailableTemplates.length > 0 && (
         <div className="space-y-3">
           <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
             {t('panel.availableIntegrations')}
           </h4>
+
+          {/* Search + category filter */}
           <div className="space-y-2">
-            {availableTemplates.map((template) => (
-              <div
-                key={template.id}
-                className="bg-gray-800 border border-gray-700 rounded-lg p-3 flex items-center gap-3"
+            <div className="relative">
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input
+                type="text"
+                value={availableSearch}
+                onChange={(e) => setAvailableSearch(e.target.value)}
+                placeholder="Search providers…"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-7 pr-3 py-1.5 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent"
+              />
+            </div>
+            <div className="flex flex-wrap gap-1">
+              <button
+                onClick={() => setCategoryFilter('all')}
+                className={`px-2.5 py-1 rounded text-[10px] font-medium border transition-colors ${categoryFilter === 'all' ? 'bg-accent/20 border-accent/40 text-accent' : 'border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-600'}`}
               >
-                <TemplateIcon name={template.name} color={template.color} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-200 truncate">
-                      {template.name}
-                    </span>
-                    <CategoryBadge category={template.category} />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
-                    {template.description}
-                  </p>
-                </div>
+                All
+              </button>
+              {availableCategories.map((cat) => (
                 <button
-                  onClick={() => onInstall(template.id)}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-medium hover:bg-accent/90 transition-colors shrink-0"
+                  key={cat}
+                  onClick={() => setCategoryFilter(categoryFilter === cat ? 'all' : cat)}
+                  className={`px-2.5 py-1 rounded text-[10px] font-medium border transition-colors ${categoryFilter === cat ? 'bg-accent/20 border-accent/40 text-accent' : 'border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-600'}`}
                 >
-                  <Plus size={12} />
-                  Install
+                  {CATEGORY_GROUP_LABELS[cat] ?? cat}
                 </button>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {availableTemplates.length === 0 ? (
+              <p className="text-xs text-gray-500 text-center py-4">No providers match your filter.</p>
+            ) : availableTemplates.map((template) => {
+              const isStub = template.steps.length === 0 && template.outputs.length === 0;
+              return (
+                <div
+                  key={template.id}
+                  className="bg-gray-800 border border-gray-700 rounded-lg p-3 flex items-center gap-3"
+                >
+                  <TemplateIcon name={template.name} color={template.color} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-200 truncate">
+                        {template.name}
+                      </span>
+                      <CategoryBadge category={template.category} />
+                      {isStub && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border border-gray-600 text-gray-500">
+                          Credential store
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+                      {template.description}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => onInstall(template.id)}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-medium hover:bg-accent/90 transition-colors shrink-0"
+                  >
+                    <Plus size={12} />
+                    Install
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
