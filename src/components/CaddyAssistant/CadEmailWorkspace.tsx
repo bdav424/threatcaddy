@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
+﻿import { memo, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
 import {
   Check,
   CornerUpLeft,
@@ -51,16 +51,6 @@ type DraftAudienceDepth = 'quick' | 'leadership' | 'analyst';
 interface EmailAccount {
   id: string;
   label: string;
-}
-
-type EmailAccountSetupStatus = 'idle' | 'reviewed' | 'saved' | 'proofed';
-
-interface EmailProviderOption {
-  id: EmailProviderId;
-  label: string;
-  shortLabel: string;
-  summary: string;
-  steps: string[];
 }
 
 interface ConfiguredEmailAccount {
@@ -128,65 +118,7 @@ const accounts: EmailAccount[] = [
   { id: 'proton', label: 'Proton Mail' },
 ];
 
-const emailProviderUiText: Record<EmailProviderId, Pick<EmailProviderOption, 'label' | 'shortLabel' | 'summary' | 'steps'>> = {
-  'google-gmail': {
-    label: 'Gmail / Google',
-    shortLabel: 'Google',
-    summary: 'Use the Slice 1 Google/Gmail contract with a future OAuth connector or local bridge. EmailCaddy will not start OAuth itself.',
-    steps: [
-      'Create or select a Google mail connector in the provider bridge when it is available.',
-      'Keep OAuth tokens in the connector boundary, not in EmailCaddy account metadata.',
-      'Return here to run a safe local status check before enabling sync.',
-    ],
-  },
-  'microsoft-outlook': {
-    label: 'Outlook / Microsoft / Hotmail',
-    shortLabel: 'Microsoft',
-    summary: 'Use the Slice 1 Microsoft Outlook/Hotmail contract with Microsoft Graph later; EmailCaddy will not start OAuth itself.',
-    steps: [
-      'Prepare the Microsoft or Hotmail account in the connector bridge.',
-      'Confirm tenant/account consent outside the EmailCaddy UI.',
-      'Use the safe status check here to mark the account as locally staged.',
-    ],
-  },
-  'proton-bridge': {
-    label: 'Proton',
-    shortLabel: 'Proton',
-    summary: 'Use the Slice 1 Proton Bridge contract; do not paste Proton credentials into ThreatCaddy.',
-    steps: [
-      'Configure Proton Bridge or an approved local proxy outside the browser.',
-      'Expose only a local mailbox status endpoint when that bridge is implemented.',
-      'Keep this EmailCaddy setup as a local readiness checklist until then.',
-    ],
-  },
-  'generic-imap-smtp': {
-    label: 'Generic IMAP / SMTP',
-    shortLabel: 'IMAP',
-    summary: 'Use the Slice 1 generic IMAP/SMTP contract through a manual proxy or local connector. This UI does not collect passwords.',
-    steps: [
-      'Store IMAP and SMTP host, port, TLS, and credential material in a trusted local bridge.',
-      'Do not enter passwords, app passwords, or tokens into EmailCaddy.',
-      'Keep sending disabled until a provider send path is explicitly implemented and verified.',
-    ],
-  },
-  'manual-local-bridge': {
-    label: 'Local mail bridge / manual proxy',
-    shortLabel: 'Bridge',
-    summary: 'Use the Slice 1 manual local bridge/proxy contract for mailbox mirroring and future send review handoff.',
-    steps: [
-      'Run an approved local mail bridge on the workstation when one exists.',
-      'Expose account health without returning credentials or message secrets in status logs.',
-      'Treat mirrored messages as local/imported until live sync is explicitly verified.',
-    ],
-  },
-};
-
-const emailProviderOptions: EmailProviderOption[] = EMAIL_PROVIDER_LIST.map((provider) => ({
-  id: provider.id,
-  ...emailProviderUiText[provider.id],
-}));
-
-// --- Live inbox mapping (mail-bridge.mjs → EmailThread) ---
+// --- Live inbox mapping (mail-bridge.mjs â†’ EmailThread) ---
 // The bridge returns plain message records over IPC; map them onto the UI's EmailThread
 // shape. Bodies are fetched lazily when a thread is opened (see the reader effect).
 interface LiveListMessage { uid: number; subject?: string; from?: string[]; date?: string | null; seen?: boolean }
@@ -292,7 +224,7 @@ const threads: EmailThread[] = [
     unread: true,
     tone: 'rose',
     body: [
-      'Need a cleaner version of the threat brief before tomorrow’s external sync.',
+      'Need a cleaner version of the threat brief before tomorrowâ€™s external sync.',
       'Please tighten the summary, confirm what still needs sanitization, and give me the three points leadership should lead with.',
       'If there is anything that should remain internal, say that directly instead of assuming context.',
     ],
@@ -350,7 +282,7 @@ const threads: EmailThread[] = [
     tone: 'purple',
     body: [
       'A new sign-in challenge was triggered for the Proton mailbox.',
-      'The alert looks informational, but it should still be reviewed against the day’s other account notices.',
+      'The alert looks informational, but it should still be reviewed against the dayâ€™s other account notices.',
       'If the pattern repeats, convert it into a tracked follow-up rather than letting it live only in the inbox.',
     ],
     asks: [
@@ -707,9 +639,7 @@ export const EmailCaddyWorkspaceContent = memo(function EmailCaddyWorkspaceConte
   const [contextRequested, setContextRequested] = useState(false);
   const [rowMenu, setRowMenu] = useState<EmailRowMenuState | null>(null);
   const [accountSetupOpen, setAccountSetupOpen] = useState(false);
-  const [selectedProviderId, setSelectedProviderId] = useState<EmailProviderId>('google-gmail');
-  const [accountSetupStatus, setAccountSetupStatus] = useState<EmailAccountSetupStatus>('idle');
-  const [configuredAccounts, setConfiguredAccounts] = useState<ConfiguredEmailAccount[]>([]);
+const [configuredAccounts] = useState<ConfiguredEmailAccount[]>([]);
 const [addAccountOpen, setAddAccountOpen] = useState(false);
   const [addAccountProviderId, setAddAccountProviderId] = useState<EmailProviderId>('google-gmail');
   const [addAccountImapHost, setAddAccountImapHost] = useState('');
@@ -908,14 +838,7 @@ const [addAccountOpen, setAddAccountOpen] = useState(false);
     () => rowMenu ? threadItems.find((thread) => thread.id === rowMenu.threadId) ?? null : null,
     [rowMenu, threadItems],
   );
-  const selectedProvider = useMemo(
-    () => emailProviderOptions.find((provider) => provider.id === selectedProviderId) ?? emailProviderOptions[0],
-    [selectedProviderId],
-  );
-  const providerSetupOptions = useMemo<Array<ToolbarSelectOption<EmailProviderId>>>(
-    () => emailProviderOptions.map((provider) => ({ value: provider.id, label: provider.label })),
-    [],
-  );
+
 const hasConfiguredAccount = configuredAccounts.length > 0;
   const proofedAccountCount = configuredAccounts.filter((account) => account.status === 'local-test-transport-proofed').length;
   const accountConnectionSummary = hasConfiguredAccount
@@ -1219,35 +1142,6 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
     setDraftNotice('Staged for provider send review. CaddyAI did not send this email; no provider send connector is active.');
   };
 
-  const handleProviderChange = (providerId: EmailProviderId) => {
-    setSelectedProviderId(providerId);
-    setAccountSetupStatus('idle');
-  };
-
-  const handleOpenAccountSetup = () => {
-    setAccountSetupOpen(true);
-    setDraftNotice(null);
-  };
-
-  const handleReviewLocalSetupChecklist = () => {
-    setAccountSetupStatus('reviewed');
-  };
-
-  const handleSaveLocalAccountSetup = () => {
-    const nextAccount: ConfiguredEmailAccount = {
-      id: selectedProvider.id,
-      providerId: selectedProvider.id,
-      label: selectedProvider.label,
-      status: 'local-checklist-reviewed',
-    };
-
-    setConfiguredAccounts((current) => {
-      const withoutProvider = current.filter((account) => account.providerId !== selectedProvider.id);
-      return [...withoutProvider, nextAccount];
-    });
-    setAccountSetupStatus('saved');
-  };
-
   const handleCloseTransientUi = () => {
     setAssistantPreview(null);
     setDraftNotice(null);
@@ -1407,128 +1301,6 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
     </div>
   );
 
-  const accountSetupPanel = (
-    <section
-      className={cn(
-        'shrink-0 border-b border-accent/15 bg-accent/5',
-        compactPanel ? 'px-2 py-2' : 'px-3 py-3',
-      )}
-      data-email-account-setup-panel="true"
-      aria-label="Email account setup"
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-[220px] flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-accent/20 bg-accent/10 px-2.5 text-[10px] font-semibold uppercase text-accent">
-              <ShieldCheck size={12} />
-              Account setup
-            </span>
-            <span className="text-[11px] font-medium text-text-secondary" role="status">
-              {accountConnectionSummary}
-            </span>
-          </div>
-          <p className="mt-2 max-w-3xl text-[12px] leading-5 text-text-secondary">
-            EmailCaddy can stage provider setup metadata here, but it will not store passwords or tokens, start OAuth, call provider APIs, sync mail, or send messages from this UI.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setAccountSetupOpen(false)}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-subtle bg-bg-primary/70 text-text-secondary transition-colors hover:border-border-medium hover:bg-bg-hover hover:text-text-primary"
-          aria-label="Close email account setup"
-          title="Close email account setup"
-        >
-          <X size={12} />
-        </button>
-      </div>
-
-      <div className={cn('mt-3 grid gap-3', compactPanel ? 'grid-cols-1' : 'lg:grid-cols-[240px_minmax(0,1fr)]')}>
-        <div className="space-y-2">
-          <ToolbarSelect
-            value={selectedProviderId}
-            options={providerSetupOptions}
-            onChange={handleProviderChange}
-            ariaLabel="Select email setup provider"
-            className="w-full"
-          />
-          <div className="grid gap-1.5">
-            {emailProviderOptions.map((provider) => (
-              <button
-                key={provider.id}
-                type="button"
-                onClick={() => handleProviderChange(provider.id)}
-                aria-pressed={provider.id === selectedProviderId}
-                className={cn(
-                  'min-h-8 rounded-[9px] border px-2.5 text-left text-[11px] font-semibold transition-colors',
-                  provider.id === selectedProviderId
-                    ? 'border-accent/30 bg-accent/10 text-accent'
-                    : 'border-border-subtle bg-bg-primary/70 text-text-secondary hover:border-border-medium hover:bg-bg-hover hover:text-text-primary',
-                )}
-              >
-                {provider.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="min-w-0 rounded-[12px] border border-border-subtle/35 bg-bg-primary/60 p-3">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
-                {selectedProvider.shortLabel} setup path
-              </div>
-              <h3 className="mt-1 text-[14px] font-semibold text-text-primary">
-                {selectedProvider.label}
-              </h3>
-            </div>
-            <span className="rounded-full border border-border-subtle bg-bg-primary/70 px-2 py-1 text-[10px] font-semibold uppercase text-text-muted">
-              Local only
-            </span>
-          </div>
-          <p className="mt-2 text-[12px] leading-5 text-text-secondary">
-            {selectedProvider.summary}
-          </p>
-          <ol className="mt-3 space-y-2 text-[12px] leading-5 text-text-secondary">
-            {selectedProvider.steps.map((step, index) => (
-              <li key={step} className="flex gap-2">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-accent/20 bg-accent/8 text-[10px] font-semibold text-accent">
-                  {index + 1}
-                </span>
-                <span>{step}</span>
-              </li>
-            ))}
-          </ol>
-
-          <div className="mt-3 rounded-[10px] border border-border-subtle bg-bg-primary/70 px-3 py-2 text-[11px] leading-5 text-text-secondary">
-            {accountSetupStatus === 'idle' && `Complete the checklist above to enable ${selectedProvider.label} in ThreatCaddy.`}
-            {accountSetupStatus === 'reviewed' && `${selectedProvider.label} setup reviewed. Save below to add this account.`}
-            {accountSetupStatus === 'saved' && `${selectedProvider.label} account saved. Live send and sync activate once connected.`}
-            {accountSetupStatus === 'proofed' && `${selectedProvider.label} connection verified locally. Live sync and send will be available after full connection.`}
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              onClick={handleReviewLocalSetupChecklist}
-              className="inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-accent/25 bg-accent/10 px-3 text-[11px] font-semibold text-accent transition-colors hover:bg-accent/15"
-            >
-              <RefreshCw size={13} />
-              Review local setup checklist
-            </button>
-            <button
-              type="button"
-              onClick={handleSaveLocalAccountSetup}
-              disabled={accountSetupStatus === 'idle'}
-              className="inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-border-subtle bg-bg-primary/80 px-3 text-[11px] font-semibold text-text-primary transition-colors hover:border-border-medium hover:bg-bg-hover disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              <Check size={13} />
-              Save checklist state
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
 
   const addAccountPanel = (
     <section
@@ -1548,7 +1320,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
             </span>
           </div>
           <p className="mt-2 max-w-3xl text-[12px] leading-5 text-text-secondary">
-            Connect an email account. Credentials are stored in the OS keychain — no secrets are saved in the app or browser.
+            Connect an email account. Credentials are stored in the OS keychain â€” no secrets are saved in the app or browser.
           </p>
         </div>
         <button
@@ -1639,7 +1411,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
                   className="inline-flex h-8 items-center gap-2 rounded-[10px] border border-accent/25 bg-accent/10 px-3 text-[11px] font-semibold text-accent transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {addAccountConnecting ? <RefreshCw size={13} className="animate-spin" /> : <Mail size={13} />}
-                  {addAccountConnecting ? 'Signing in…' : addAccountProviderId === 'google-gmail' ? 'Sign in with Google' : 'Sign in with Microsoft'}
+                  {addAccountConnecting ? 'Signing inâ€¦' : addAccountProviderId === 'google-gmail' ? 'Sign in with Google' : 'Sign in with Microsoft'}
                 </button>
               </div>
             ) : (
@@ -1654,12 +1426,12 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
             <div className="space-y-3">
               {addAccountProviderId === 'proton-bridge' && (
                 <p className="text-[12px] leading-5 text-text-secondary">
-                  Proton Bridge must be running locally on port 1143. Use the bridge-provided username and password — not your Proton login credentials.
+                  Proton Bridge must be running locally on port 1143. Use the bridge-provided username and password â€” not your Proton login credentials.
                 </p>
               )}
               {addAccountProviderId === 'generic-imap-smtp' && (
                 <p className="text-[12px] leading-5 text-text-secondary">
-                  Enter your IMAP server details. Credentials are encrypted and stored in the OS keychain — they are never saved in the app.
+                  Enter your IMAP server details. Credentials are encrypted and stored in the OS keychain â€” they are never saved in the app.
                 </p>
               )}
               {addAccountProviderId === 'generic-imap-smtp' && (
@@ -1706,7 +1478,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
                     type="password"
                     value={addAccountPass}
                     onChange={(e) => setAddAccountPass(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                     autoComplete="current-password"
                     className="h-8 w-full rounded-[9px] border border-border-subtle bg-bg-primary/80 px-2.5 text-[12px] text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-accent/50"
                   />
@@ -1734,7 +1506,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
                 className="inline-flex h-8 items-center gap-2 rounded-[10px] border border-accent/25 bg-accent/10 px-3 text-[11px] font-semibold text-accent transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {addAccountConnecting ? <RefreshCw size={13} className="animate-spin" /> : <Check size={13} />}
-                {addAccountConnecting ? 'Connecting…' : 'Connect account'}
+                {addAccountConnecting ? 'Connectingâ€¦' : 'Connect account'}
               </button>
             </div>
           )}
@@ -1802,7 +1574,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
         <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
-            onClick={handleOpenAccountSetup}
+            onClick={handleOpenAddAccount}
             className="inline-flex h-6 items-center gap-1 rounded-[8px] border border-accent/25 bg-accent/8 px-2 text-[10px] font-semibold text-accent transition-colors hover:bg-accent/14"
             aria-label="Set up EmailCaddy account"
             title={accountConnectionSummary}
@@ -1844,7 +1616,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
         </div>
       </div>
     );
-  }, [accountConnectionSummary, compactPanel, contextThread, draft, handleAssistantPreviewRequest, handleOpenAccountSetup, handleOpenAddAccount, handleOpenContext, handleQueryKeyDown, handleStartDraft, hasConfiguredAccount, proofedAccountCount, query, visibleUnreadCount]);
+  }, [accountConnectionSummary, compactPanel, contextThread, draft, handleAssistantPreviewRequest, handleOpenAddAccount, handleOpenContext, handleQueryKeyDown, handleStartDraft, hasConfiguredAccount, proofedAccountCount, query, visibleUnreadCount]);
   const compactTitlebarAccessory = useMemo(
     () => compactTitlebarControls ? { content: compactTitlebarControls, replaceTitle: true } : null,
     [compactTitlebarControls],
@@ -1942,7 +1714,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
           <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={handleOpenAccountSetup}
+              onClick={handleOpenAddAccount}
               className="flex h-8 items-center gap-2 rounded-[10px] border border-accent/25 bg-accent/10 px-2.5 text-[11px] font-semibold text-accent transition-colors hover:bg-accent/15"
               aria-label={hasConfiguredAccount ? 'Manage EmailCaddy accounts' : 'Set up EmailCaddy account'}
               title={accountConnectionSummary}
@@ -2038,7 +1810,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
 
                 <button
                   type="button"
-                  onClick={handleOpenAccountSetup}
+                  onClick={handleOpenAddAccount}
                   className="inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-accent/20 bg-accent/8 px-2.5 text-[11px] font-semibold text-accent transition-colors hover:bg-accent/14"
                   aria-label="Manage EmailCaddy account setup"
                   title={accountConnectionSummary}
@@ -2085,7 +1857,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
               </button>
 
               <span className="ml-auto inline-flex h-8 items-center rounded-full border border-border-subtle bg-bg-primary/70 px-3 text-[11px] font-medium text-text-secondary">
-                {selectedCount} selected · Delete outside draft removes
+                {selectedCount} selected Â· Delete outside draft removes
               </span>
             </div>
           </div>
@@ -2142,7 +1914,6 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
           </div>
         )}
 
-        {accountSetupOpen && accountSetupPanel}
         {addAccountOpen && addAccountPanel}
 
         {assistantPreview && (
@@ -2532,7 +2303,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
                             EmailCaddy draft
                           </div>
                           <p className="mt-1 text-[12px] leading-5 text-text-secondary">
-                            {`${draftModeLabel(draft.mode)} · editable before any platform send.`}
+                            {`${draftModeLabel(draft.mode)} Â· editable before any platform send.`}
                           </p>
                         </div>
                         <div className="flex items-center gap-1.5">
@@ -2940,7 +2711,7 @@ const hasConfiguredAccount = configuredAccounts.length > 0;
                       {draft.subject || 'New EmailCaddy message'}
                     </h3>
                     <p className="mt-1 text-[11px] leading-4 text-text-secondary">
-                      {`${draftModeLabel(draft.mode)} · editable before any platform send.`}
+                      {`${draftModeLabel(draft.mode)} Â· editable before any platform send.`}
                     </p>
                   </div>
 

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+﻿import { useState, useCallback } from 'react';
 import DOMPurify from 'dompurify';
 import { Github, Download, FlaskConical, Trash2, Bot, X, Shield, RefreshCw, RotateCcw, Plus, Pencil, Wrench, Loader2, CheckCircle2, AlertTriangle, LayoutGrid, Palette, Database, FileText, Link, Keyboard, Zap } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -35,22 +35,6 @@ import { AppearanceSettings } from './AppearanceSettings';
 import { AgentHostsConfig } from './AgentHostsConfig';
 import { SystemHygienePanel } from './SystemHygienePanel';
 import { getLocalLlmHealthUrl, normalizeLocalLlmEndpoint } from '../../lib/local-llm-endpoint';
-import {
-  evaluateAssistantProviderExecutionGate,
-  type AssistantProviderAction,
-  type AssistantProviderExecutionBlockReason,
-  type AssistantProviderExecutionDecision,
-} from '../../lib/assistant-provider-execution-gate';
-import { classifyAssistantProviderReadiness } from '../../lib/assistant-provider-readiness';
-import {
-  createConnectorRuntimeUiWiringPlan,
-  type ConnectorRuntimeUiWiringStatusRow,
-} from '../../lib/connector-runtime-ui-wiring-plan';
-import {
-  createRuntimeTrustedContractObject,
-  isRuntimeTrustedContractObject,
-  type RuntimeTrustedContractValue,
-} from '../../lib/runtime-trusted-contract-object';
 
 function SystemPromptEditor({ value, onChange }: { value?: string; onChange: (v: string | undefined) => void }) {
   const { t } = useTranslation('settings');
@@ -65,7 +49,7 @@ function SystemPromptEditor({ value, onChange }: { value?: string; onChange: (v:
           onClick={() => setExpanded(!expanded)}
           className="text-sm text-gray-300 font-medium hover:text-gray-100 transition-colors text-start"
         >
-          {t('ai.systemPrompt')} {expanded ? '▾' : '▸'}
+          {t('ai.systemPrompt')} {expanded ? 'â–¾' : 'â–¸'}
         </button>
         <div className="flex items-center gap-2">
           {isCustom && (
@@ -133,7 +117,7 @@ interface SettingsPanelProps {
 
 type SettingsTab = 'general' | 'appearance' | 'ai' | 'agents' | 'data' | 'templates' | 'intel' | 'integrations' | 'shortcuts' | 'system';
 
-// ── Custom Slash Commands Editor ────────────────────────────────────
+// â”€â”€ Custom Slash Commands Editor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function AgentProfileSection() {
   const { profiles, userProfiles, builtinProfiles, createProfile, updateProfile, deleteProfile, duplicateBuiltin } = useAgentProfiles();
@@ -429,7 +413,7 @@ function CtiSourceTemplatesEditor({ settings, onUpdateSettings }: { settings: Se
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm text-gray-200 font-medium">{DEFAULT_CTI_SOURCE_TEMPLATES[source].label}</div>
-                  <div className="text-[10px] text-gray-500">{isCustom ? 'Custom template' : 'Default template'} · {template.active ? 'Active' : 'Inactive'}</div>
+                  <div className="text-[10px] text-gray-500">{isCustom ? 'Custom template' : 'Default template'} Â· {template.active ? 'Active' : 'Inactive'}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => startEdit(source)} className="text-xs px-2 py-1 rounded bg-gray-700 text-gray-200 hover:bg-gray-600">
@@ -507,29 +491,8 @@ const assistantAIStatusMeta: Record<AssistantAISetupStatus, { label: string; cla
   'not-configured': { label: 'Not configured', className: 'border-gray-700 bg-gray-800/70 text-gray-400' },
 };
 
-const assistantExecutionActions: Array<{
-  action: AssistantProviderAction;
-  label: string;
-  description: string;
-}> = [
-  {
-    action: 'test_provider',
-    label: 'Test provider',
-    description: 'Future manual provider-test readiness.',
-  },
-  {
-    action: 'list_models',
-    label: 'List models',
-    description: 'Future manual model-list readiness.',
-  },
-  {
-    action: 'send_prompt',
-    label: 'Send prompt',
-    description: 'Future manual prompt-dispatch readiness.',
-  },
-];
 
-type AssistantModelPreset = 'codex-high' | 'chatgpt-medium' | 'chatgpt-low' | 'ollama-low';
+type AssistantModelPreset = 'codex-high' | 'chatgpt-medium' | 'chatgpt-low' | 'ollama-low' | 'caddyai';
 
 const ASSISTANT_MODEL_PRESETS: Array<{
   id: AssistantModelPreset;
@@ -568,103 +531,7 @@ const ASSISTANT_MODEL_PRESETS: Array<{
   },
 ];
 
-const assistantExecutionBlockCopy: Record<AssistantProviderExecutionBlockReason, string> = {
-  unknown_action: 'Requested action is not recognized.',
-  readiness_missing: 'Assistant provider readiness facts are missing.',
-  caddyai_baseline_only: 'CaddyAI baseline alone is not executable AssistantCaddy provider readiness.',
-  provider_not_configured: 'Provider is not configured for executable AssistantCaddy actions.',
-  provider_not_openai_compatible: 'This action requires an OpenAI-compatible or local route.',
-  local_endpoint_not_allowed: 'Local endpoint remains plan-only; no local probe was run.',
-  readiness_provider_unbound: 'Readiness is not bound to a provider.',
-  readiness_provider_mismatch: 'Readiness provider does not match the requested provider.',
-  readiness_model_mismatch: 'Readiness model does not match the requested model.',
-  readiness_credential_unbound: 'Readiness is not bound to an opaque credential reference.',
-  readiness_credential_mismatch: 'Credential reference does not match readiness ownership.',
-  readiness_local_endpoint_unbound: 'Local endpoint provenance is not bound to allowed local readiness.',
-  credential_reference_missing: 'No opaque credential reference exists; raw API-key settings are not used by this gate.',
-  credential_reference_invalid: 'Credential reference metadata is invalid or secret-like.',
-  credential_reference_mismatch: 'Credential reference does not match the selected route.',
-  explicit_user_action_missing: 'No explicit user action is granted for this preview.',
-  prompt_missing: 'No prompt payload is present for this preview.',
-  prompt_too_large: 'Prompt payload would exceed the local prompt budget.',
-  no_auto_call_default: 'Default is no auto-call, no provider call, and no local probe.',
-};
 
-const ASSISTANT_RUNTIME_UI_WIRING_PLAN = createConnectorRuntimeUiWiringPlan({
-  expectedOwnerSurface: 'assistantcaddy',
-});
-const ASSISTANT_RUNTIME_UI_WIRING_ROWS = ASSISTANT_RUNTIME_UI_WIRING_PLAN.rows.filter((row) => (
-  row.id === 'provider-auth-session-plan'
-    || row.id === 'local-bridge-manual-probe'
-    || row.id === 'connector-runtime-persistence'
-));
-
-function assistantExecutionStatusMeta(decision: AssistantProviderExecutionDecision) {
-  return decision.status === 'allow'
-    ? { label: 'Plan-only', className: 'border-blue-500/30 bg-blue-500/10 text-blue-300' }
-    : { label: 'Blocked', className: 'border-amber-500/30 bg-amber-500/10 text-amber-300' };
-}
-
-function assistantRuntimeUiWiringStatusMeta(row: ConnectorRuntimeUiWiringStatusRow) {
-  return row.status === 'ready'
-    ? { label: 'Ready', className: 'border-blue-500/30 bg-blue-500/10 text-blue-300' }
-    : { label: 'Blocked', className: 'border-gray-700 bg-gray-900 text-gray-400' };
-}
-
-function assistantExecutionReasonCopy(decision: AssistantProviderExecutionDecision) {
-  if (decision.status === 'allow') {
-    if (decision.allowReason === 'explicit_provider_test_plan_only') return ['Manual provider-test plan only; no provider call is attached.'];
-    if (decision.allowReason === 'explicit_model_list_plan_only') return ['Manual model-list plan only; no provider call is attached.'];
-    if (decision.allowReason === 'explicit_prompt_dispatch_ready') return ['Manual prompt dispatch is ready as a plan only; no LLM call is attached.'];
-    return ['Local metadata-only disable plan; no provider call is attached.'];
-  }
-
-  const priority: AssistantProviderExecutionBlockReason[] = [
-    'no_auto_call_default',
-    'local_endpoint_not_allowed',
-    'credential_reference_missing',
-    'provider_not_configured',
-    'readiness_local_endpoint_unbound',
-    'explicit_user_action_missing',
-    'prompt_missing',
-  ];
-  const orderedReasons = [
-    ...priority.filter((reason) => decision.blockReasons.includes(reason)),
-    ...decision.blockReasons.filter((reason) => !priority.includes(reason)),
-  ];
-  return orderedReasons.map((reason) => assistantExecutionBlockCopy[reason]).slice(0, 4);
-}
-
-function trustedContractValue(value: unknown): RuntimeTrustedContractValue {
-  if (
-    value === null
-    || value === undefined
-    || typeof value === 'string'
-    || typeof value === 'number'
-    || typeof value === 'boolean'
-  ) {
-    return value;
-  }
-
-  if (Array.isArray(value)) return value.map((item) => trustedContractValue(item));
-  if (isRuntimeTrustedContractObject(value)) return value;
-  if (typeof value === 'object') {
-    return createRuntimeTrustedContractObject(
-      Object.entries(value as Record<string, unknown>).map(([key, nested]) => [
-        key,
-        trustedContractValue(nested),
-      ] as const),
-    );
-  }
-
-  throw new TypeError('Assistant provider preview inputs cannot include callable values.');
-}
-
-function trustedAssistantExecutionGateInput(input: Record<string, unknown>) {
-  return createRuntimeTrustedContractObject(
-    Object.entries(input).map(([key, value]) => [key, trustedContractValue(value)] as const),
-  ) as Parameters<typeof evaluateAssistantProviderExecutionGate>[0];
-}
 
 function hasConfiguredLLMRoute(settings: Settings) {
   return Boolean(
@@ -698,10 +565,9 @@ function getAssistantModel(s: Settings): string {
 }
 
 function getAssistantModelPreset(settings: Settings): AssistantModelPreset {
+  if (!settings.assistantLlmSeparate) return 'caddyai';
   const provider = getAssistantProvider(settings);
-  const model = settings.assistantLlmSeparate
-    ? (settings.assistantLlmDefaultModel || '')
-    : (settings.llmDefaultModel || '');
+  const model = settings.assistantLlmDefaultModel || '';
   if (provider === 'local') return 'ollama-low';
   if (model === 'gpt-5.4-pro') return 'codex-high';
   if (model === 'gpt-4.1-mini') return 'chatgpt-low';
@@ -750,23 +616,6 @@ function AssistantCaddyAISetup({
       : currentProvider === 'local'
         ? 'local'
         : 'openai';
-  const assistantReadiness = classifyAssistantProviderReadiness({
-    provider: hasAnyRoute ? currentProvider : undefined,
-    model: hasAnyRoute ? currentModel : undefined,
-    localEndpointCandidates: currentProvider === 'local' && settings.llmLocalEndpoint?.trim()
-      ? [settings.llmLocalEndpoint]
-      : undefined,
-    explicitUserTestConsent: false,
-    caddyAiBaselineConfigured: hasAnyRoute,
-  });
-  const assistantExecutionDecisions = assistantExecutionActions.map((item) => ({
-    ...item,
-    decision: evaluateAssistantProviderExecutionGate(trustedAssistantExecutionGateInput({
-      action: item.action,
-      readiness: assistantReadiness,
-      caddyAiBaselineConfigured: hasAnyRoute,
-    })),
-  }));
 
   const selectCurrentCaddyAI = () => {
     // AssistantCaddy follows the ThreatCaddy AI (CaddyAI) baseline.
@@ -933,7 +782,7 @@ function AssistantCaddyAISetup({
             </p>
           </div>
           <span className="rounded-full border border-gray-700 bg-black/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-400">
-            {activePreset}
+            {activePreset === 'caddyai' ? (currentModel || currentProvider || 'caddyai') : activePreset}
           </span>
         </div>
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
@@ -965,115 +814,6 @@ function AssistantCaddyAISetup({
           })}
         </div>
       </section>
-      <section
-        className="space-y-3 rounded-lg border border-gray-800 bg-gray-900/25 p-3"
-        aria-label="Assistant provider execution gate"
-        data-assistant-provider-execution-gate="inert-preview"
-      >
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-300">Execution gate preview</h5>
-            <p className="mt-1 max-w-3xl text-[11px] leading-5 text-gray-500">
-              Local decision guidance from the AssistantCaddy provider execution gate. These descriptors do not test providers, list models, send prompts, fetch provider APIs, probe local endpoints, or store API keys. The Test Connection and Fetch Models controls below are explicit Local LLM runtime controls outside this gate.
-            </p>
-          </div>
-          <span className="rounded-full border border-gray-700 bg-black/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-400">
-            {assistantReadiness.status}
-          </span>
-        </div>
-        <div className="grid gap-2">
-          {assistantExecutionDecisions.map(({ action, label, description, decision }) => {
-            const meta = assistantExecutionStatusMeta(decision);
-            const reasons = assistantExecutionReasonCopy(decision);
-            return (
-              <div
-                key={action}
-                data-assistant-provider-gate-action={action}
-                className="grid gap-3 rounded-md border border-gray-800 bg-black/15 p-3 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.7fr)] sm:items-start"
-              >
-                <div className="space-y-2">
-                  <button
-                    type="button"
-                    disabled
-                    aria-disabled="true"
-                    className="inline-flex cursor-not-allowed items-center rounded-md border border-gray-700 bg-gray-900 px-2.5 py-1.5 text-[11px] font-semibold text-gray-400 opacity-80"
-                  >
-                    {label} (inert)
-                  </button>
-                  <p className="text-[11px] leading-4 text-gray-500">{description}</p>
-                  <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${meta.className}`}>
-                    {meta.label}
-                  </span>
-                </div>
-                <div className="space-y-1 text-[11px] leading-5 text-gray-500">
-                  <p>
-                    Route fact: <span className="text-gray-300">{decision.provider ?? 'unconfigured'}</span>
-                    {' '}· Model fact: <span className="text-gray-300">{decision.model ?? 'unconfigured'}</span>
-                  </p>
-                  <p>
-                    Boundary: <span className="text-gray-300">{decision.sideEffectBoundary}</span>
-                  </p>
-                  <ul className="list-disc space-y-1 pl-4">
-                    {reasons.map((reason) => (
-                      <li key={reason}>{reason}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-      <section
-        className="space-y-3 rounded-md border border-gray-800 bg-gray-950/40 p-3"
-        aria-label="AssistantCaddy runtime UI wiring preview"
-        data-connector-runtime-ui-wiring="assistantcaddy"
-        data-connector-runtime-ui-contract={ASSISTANT_RUNTIME_UI_WIRING_PLAN.contract}
-        data-connector-runtime-ui-executable={String(ASSISTANT_RUNTIME_UI_WIRING_PLAN.executable)}
-        data-connector-runtime-ui-side-effects={ASSISTANT_RUNTIME_UI_WIRING_PLAN.sideEffects}
-      >
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-300">Runtime wiring preview</h5>
-            <p className="mt-1 max-w-3xl text-[11px] leading-5 text-gray-500">
-              Dry-run/readiness rows from the connector runtime UI wiring contract. AssistantCaddy shows missing runtime prerequisites only; it does not test providers, list models, send prompts, probe local endpoints, persist state, or store credentials.
-            </p>
-          </div>
-          <span className="rounded-full border border-gray-700 bg-black/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-400">
-            Preview only
-          </span>
-        </div>
-        <div className="grid gap-2">
-          {ASSISTANT_RUNTIME_UI_WIRING_ROWS.map((row) => {
-            const meta = assistantRuntimeUiWiringStatusMeta(row);
-            return (
-              <div
-                key={row.id}
-                className="rounded-md border border-gray-800 bg-black/15 p-3"
-                data-connector-runtime-ui-row={row.id}
-                data-connector-runtime-ui-status={row.status}
-                data-connector-runtime-ui-owner-surface={row.ownerSurface}
-                data-connector-runtime-ui-executable={String(row.executable)}
-                data-connector-runtime-ui-side-effects={row.sideEffects}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <div className="text-[11px] font-semibold text-gray-200">{row.label}</div>
-                    <div className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-gray-600">{row.kind}</div>
-                  </div>
-                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${meta.className}`}>
-                    {meta.label}
-                  </span>
-                </div>
-                <p className="mt-2 text-[11px] leading-5 text-gray-500">{row.reason}</p>
-              </div>
-            );
-          })}
-        </div>
-        <p className="text-[10px] font-medium text-gray-600">
-          Boundary: {ASSISTANT_RUNTIME_UI_WIRING_PLAN.sideEffectBoundary}
-        </p>
-      </section>
       <div className="flex flex-col gap-2 rounded-lg border border-gray-800 bg-gray-900/25 p-3 text-[11px] leading-5 text-gray-500 sm:flex-row sm:items-center sm:justify-between">
         <span>Email and calendar setup live under Integrations/route-specific setup, not AssistantCaddy AI.</span>
         <button
@@ -1089,7 +829,7 @@ function AssistantCaddyAISetup({
   );
 }
 
-// ─── Meeting Alerts Settings Section ─────────────────────────────────────────
+// â”€â”€â”€ Meeting Alerts Settings Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const ANIMATION_OPTIONS: { value: NonNullable<Settings['alertAnimation']>; labelKey: string }[] = [
   { value: 'pulse', labelKey: 'animPulse' },
@@ -1220,7 +960,7 @@ function MeetingAlertsSection({
             </button>
           </div>
 
-          {/* Strobe — gated behind explicit opt-in */}
+          {/* Strobe â€” gated behind explicit opt-in */}
           <div className="rounded-lg border border-amber-800/40 bg-amber-900/10 p-3 space-y-2">
             <button
               className="flex items-center gap-2 text-sm text-amber-400 font-medium w-full text-left"
@@ -1228,7 +968,7 @@ function MeetingAlertsSection({
               aria-expanded={strobeExpanded}
             >
               <span>{tA('settingsStrobeSection')}</span>
-              <span className="ml-auto text-xs">{strobeExpanded ? '▲' : '▼'}</span>
+              <span className="ml-auto text-xs">{strobeExpanded ? 'â–²' : 'â–¼'}</span>
             </button>
             {strobeExpanded && (
               <div className="space-y-2">
@@ -1318,13 +1058,13 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
             onUpdateSettings={onUpdateSettings}
           />
 
-          {/* Security — TOTP / 2FA */}
+          {/* Security â€” TOTP / 2FA */}
           <TotpManagement />
 
-          {/* Security — Passkeys */}
+          {/* Security â€” Passkeys */}
           <PasskeyManagement />
 
-          {/* Security — Synced Devices */}
+          {/* Security â€” Synced Devices */}
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-gray-300">{t('general.syncedDevices')}</h3>
             <p className="text-xs text-gray-500">{t('general.syncedDevicesDesc')}</p>
@@ -1406,7 +1146,7 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
                 >
                   {SUPPORTED_LANGUAGES.map(lang => (
                     <option key={lang.code} value={lang.code}>
-                      {lang.nativeName}{lang.name !== lang.nativeName ? ` — ${lang.name}` : ''}
+                      {lang.nativeName}{lang.name !== lang.nativeName ? ` â€” ${lang.name}` : ''}
                     </option>
                   ))}
                 </select>
@@ -1568,7 +1308,7 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
       {/* Appearance Tab */}
       {activeTab === 'appearance' && (
         <div className="space-y-6" role="tabpanel" id="settings-panel-appearance" aria-labelledby="settings-tab-appearance">
-          {/* Theme toggle — moved from General */}
+          {/* Theme toggle â€” moved from General */}
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-gray-300">{t('appearance.theme')}</h3>
             <div className="flex items-center justify-between">
@@ -1943,7 +1683,7 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
   );
 }
 
-// ── Local LLM Configuration ─────────────────────────────────────────────
+// â”€â”€ Local LLM Configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface LocalLLMConfigProps {
   settings: Settings;
@@ -2149,7 +1889,7 @@ function LocalLLMConfig({ settings, onUpdateSettings, onTestStatusChange }: Loca
                 setDiscovering(true);
                 const { uniqueEndpoints, probeEndpoint } = await import('../../lib/local-endpoint-discovery');
                 const endpoints = uniqueEndpoints(settings.llmLocalEndpoint);
-                setDiscoverProbes(endpoints.map((ep) => ({ endpoint: ep, status: 'probing', message: 'Scanning…', models: [] })));
+                setDiscoverProbes(endpoints.map((ep) => ({ endpoint: ep, status: 'probing', message: 'Scanningâ€¦', models: [] })));
                 const results = await Promise.all(endpoints.map(probeEndpoint));
                 setDiscoverProbes(results);
                 setDiscovering(false);
@@ -2170,8 +1910,8 @@ function LocalLLMConfig({ settings, onUpdateSettings, onTestStatusChange }: Loca
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-mono text-gray-300">{probe.endpoint}</div>
                   <div className="text-[10px] text-gray-500 truncate">
-                    {discovering && probe.status === 'probing' ? 'Scanning…' : probe.message}
-                    {probe.durationMs != null ? ` · ${probe.durationMs}ms` : ''}
+                    {discovering && probe.status === 'probing' ? 'Scanningâ€¦' : probe.message}
+                    {probe.durationMs != null ? ` Â· ${probe.durationMs}ms` : ''}
                   </div>
                 </div>
                 <button
@@ -2190,7 +1930,7 @@ function LocalLLMConfig({ settings, onUpdateSettings, onTestStatusChange }: Loca
                   }}
                   className="shrink-0 rounded border border-gray-700 bg-gray-800 px-2 py-0.5 text-[10px] font-semibold text-gray-300 hover:border-accent-blue hover:text-accent-blue disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
                 >
-                  {probe.status === 'ok' ? 'Use' : probe.status === 'probing' ? '…' : '✗'}
+                  {probe.status === 'ok' ? 'Use' : probe.status === 'probing' ? 'â€¦' : 'âœ—'}
                 </button>
               </div>
             ))}
@@ -2300,7 +2040,7 @@ function LocalLLMConfig({ settings, onUpdateSettings, onTestStatusChange }: Loca
               onClick={() => setShowSkills(!showSkills)}
               className="text-[10px] text-green-400/70 hover:text-green-400"
             >
-              {t('ai.skillsAvailable', { count: settings.llmLocalSkills!.length })} {showSkills ? '▾' : '▸'}
+              {t('ai.skillsAvailable', { count: settings.llmLocalSkills!.length })} {showSkills ? 'â–¾' : 'â–¸'}
             </button>
             {showSkills && (
               <div className="mt-1.5 space-y-1">

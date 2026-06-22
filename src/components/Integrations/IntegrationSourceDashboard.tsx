@@ -1,23 +1,16 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+﻿import { useId, useMemo, useState } from 'react';
 import {
-  ArrowRight,
-  BadgeCheck,
   ChevronDown,
   ChevronRight,
   Filter,
   FlaskConical,
-  GitBranch,
   Mail,
   MessageSquare,
-  Play,
   Search,
   Server,
   Shield,
-  Sparkles,
   Settings2,
-  Workflow,
 } from 'lucide-react';
-import { Modal } from '../Common/Modal';
 import { ToolbarSelect } from '../Common/ToolbarSelect';
 import {
   resolveConnectorActivationActionPlan,
@@ -185,225 +178,13 @@ function actionGateLabel(actionPlan: ConnectorActivationActionPlan): string {
   return 'Activation facts present, descriptor remains inert';
 }
 
-function SlackConnectorWorkflowModal({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  const [workspace, setWorkspace] = useState('team-incident-response');
-  const [targetKind, setTargetKind] = useState<'channel' | 'dm' | 'thread'>('channel');
-  const [action, setAction] = useState('start with notifications');
-  const [stage, setStage] = useState<'discover' | 'prepare' | 'handoff'>('discover');
-
-  useEffect(() => {
-    if (!open) return;
-    setWorkspace('team-incident-response');
-    setTargetKind('channel');
-    setAction('start with notifications');
-    setStage('discover');
-  }, [open]);
-
-  const scopeLabel =
-    targetKind === 'channel' ? 'Slack channel' : targetKind === 'dm' ? 'direct message' : 'thread reply';
-  const currentStep = stage === 'discover' ? 1 : stage === 'prepare' ? 2 : 3;
-  const readinessState = workspace.trim() ? 'Ready to stage' : 'Select a workspace to continue';
-
-  return (
-    <Modal open={open} onClose={onClose} title="Slack workflow starter" wide extraWide>
-      <div className="space-y-5 text-sm text-text-primary">
-        <div className="grid gap-3 md:grid-cols-3">
-          {[
-            { step: 1, title: 'Start', detail: 'Open from the Slack catalog card or menu.' },
-            { step: 2, title: 'Prepare', detail: 'Choose workspace, target, and action scope.' },
-            { step: 3, title: 'Hand off', detail: 'Pass the staged plan into the existing Slack readiness path.' },
-          ].map((item) => (
-            <div
-              key={item.step}
-              className={`rounded-xl border p-3 transition-colors ${
-                currentStep >= item.step
-                  ? 'border-accent/40 bg-bg-active/50'
-                  : 'border-border-subtle bg-bg-primary/50'
-              }`}
-            >
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-text-tertiary">
-                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-current/20 text-[11px]">
-                  {item.step}
-                </span>
-                {item.title}
-              </div>
-              <p className="mt-2 text-xs leading-5 text-text-secondary">{item.detail}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="space-y-4 rounded-xl border border-border-subtle bg-bg-primary/70 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h4 className="text-sm font-semibold text-text-primary">Slack startup workflow</h4>
-                <p className="mt-1 text-xs leading-5 text-text-tertiary">
-                  Reuse the existing Slack foundations to start a staged workflow from menus without executing any live connector action.
-                </p>
-              </div>
-              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-[11px] font-medium text-emerald-300">
-                <BadgeCheck size={12} />
-                Inert by default
-              </span>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="space-y-1.5">
-                <span className="text-xs font-medium text-text-secondary">Workspace</span>
-                <input
-                  value={workspace}
-                  onChange={(event) => setWorkspace(event.target.value)}
-                  className="h-9 w-full rounded-[10px] border border-border-subtle bg-bg-primary/80 px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent/50"
-                  placeholder="team-incident-response"
-                />
-              </label>
-              <label className="space-y-1.5">
-                <span className="text-xs font-medium text-text-secondary">Action</span>
-                <input
-                  value={action}
-                  onChange={(event) => setAction(event.target.value)}
-                  className="h-9 w-full rounded-[10px] border border-border-subtle bg-bg-primary/80 px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent/50"
-                  placeholder="start with notifications"
-                />
-              </label>
-            </div>
-
-            <div className="grid gap-2 md:grid-cols-3">
-              {[
-                { value: 'channel', label: 'Channel' },
-                { value: 'dm', label: 'DM' },
-                { value: 'thread', label: 'Thread' },
-              ].map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setTargetKind(option.value as typeof targetKind)}
-                  className={`rounded-xl border px-3 py-2 text-left transition-colors ${
-                    targetKind === option.value
-                      ? 'border-accent/50 bg-bg-active text-text-primary'
-                      : 'border-border-subtle bg-bg-primary/60 text-text-secondary hover:border-border-medium hover:text-text-primary'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <MessageSquare size={14} className="text-accent" />
-                    {option.label}
-                  </div>
-                  <p className="mt-1 text-xs leading-5 text-text-tertiary">
-                    Stage a {option.label.toLowerCase()} delivery path.
-                  </p>
-                </button>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setStage('discover')}
-                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                  stage === 'discover'
-                    ? 'border-accent/50 bg-bg-active text-text-primary'
-                    : 'border-border-subtle bg-bg-primary/60 text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                <Sparkles size={12} />
-                Discover
-              </button>
-              <button
-                type="button"
-                onClick={() => setStage('prepare')}
-                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                  stage === 'prepare'
-                    ? 'border-accent/50 bg-bg-active text-text-primary'
-                    : 'border-border-subtle bg-bg-primary/60 text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                <Play size={12} />
-                Prepare
-              </button>
-              <button
-                type="button"
-                onClick={() => setStage('handoff')}
-                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                  stage === 'handoff'
-                    ? 'border-accent/50 bg-bg-active text-text-primary'
-                    : 'border-border-subtle bg-bg-primary/60 text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                <ArrowRight size={12} />
-                Hand off
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-4 rounded-xl border border-border-subtle bg-bg-primary/70 p-4">
-            <div className="rounded-xl border border-border-subtle bg-bg-raised/70 p-3">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-text-tertiary">
-                <GitBranch size={13} className="text-accent" />
-                GitHub reference shape
-              </div>
-              <ul className="mt-3 space-y-2 text-xs leading-5 text-text-secondary">
-                <li>Login or connect entry point</li>
-                <li>Account or workspace selection</li>
-                <li>Scope and consent staging</li>
-                <li>Error and reconnect affordances</li>
-              </ul>
-            </div>
-
-            <div className="rounded-xl border border-border-subtle bg-bg-raised/70 p-3">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-text-tertiary">
-                <Workflow size={13} className="text-accent" />
-                Staged plan
-              </div>
-              <dl className="mt-3 space-y-2 text-xs leading-5">
-                <div className="flex items-start justify-between gap-3">
-                  <dt className="text-text-tertiary">Workspace</dt>
-                  <dd className="text-right text-text-primary">{workspace || 'Not selected'}</dd>
-                </div>
-                <div className="flex items-start justify-between gap-3">
-                  <dt className="text-text-tertiary">Target</dt>
-                  <dd className="text-right text-text-primary">{scopeLabel}</dd>
-                </div>
-                <div className="flex items-start justify-between gap-3">
-                  <dt className="text-text-tertiary">Action</dt>
-                  <dd className="text-right text-text-primary">{action}</dd>
-                </div>
-                <div className="flex items-start justify-between gap-3">
-                  <dt className="text-text-tertiary">Readiness</dt>
-                  <dd className="text-right text-emerald-300">{readinessState}</dd>
-                </div>
-              </dl>
-            </div>
-
-            <div className="rounded-xl border border-border-subtle bg-bg-primary/80 p-3 text-xs leading-5 text-text-secondary">
-              <div className="flex items-center gap-2 font-semibold text-text-primary">
-                <BadgeCheck size={13} className="text-emerald-300" />
-                Handoff path
-              </div>
-              <p className="mt-2">
-                The workflow does not execute a live Slack action. It prepares the workspace, target family, and intent so the existing Slack readiness and activation layers can take over.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Modal>
-  );
-}
 
 function ProviderCard({
   provider,
   onOpenSettings,
-  onOpenSlackWorkflow,
 }: {
   provider: IntegrationSourceProvider;
   onOpenSettings?: () => void;
-  onOpenSlackWorkflow?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const cardTitleId = useId();
@@ -442,16 +223,6 @@ function ProviderCard({
           <p id={summaryId} className="sr-only">{provider.summary}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {provider.id === 'slack' && onOpenSlackWorkflow && (
-            <button
-              type="button"
-              onClick={onOpenSlackWorkflow}
-              className="rounded-md p-1.5 text-text-tertiary transition-colors hover:bg-bg-hover hover:text-text-primary"
-              aria-label="Start Slack workflow"
-            >
-              <Play size={12} />
-            </button>
-          )}
           {onOpenSettings && (
             <button
               type="button"
@@ -489,21 +260,6 @@ function ProviderCard({
           className="mt-2 border-t border-border-subtle pt-2 text-xs leading-5 text-text-secondary"
         >
           <p>{provider.details}</p>
-          {provider.id === 'slack' && onOpenSlackWorkflow && (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={onOpenSlackWorkflow}
-                className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold text-emerald-200 transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/15"
-              >
-                <Play size={12} />
-                Start Slack workflow
-              </button>
-              <span className="text-[11px] text-text-tertiary">
-                Opens the staged Slack startup modal with workspace, target, and handoff steps.
-              </span>
-            </div>
-          )}
           {visibleCapabilities.length > 0 && (
             <ul className="mt-2 grid gap-1 text-[11px] leading-4 text-text-tertiary" aria-label={`${provider.name} capabilities`}>
               {visibleCapabilities.map((capability) => (
@@ -529,7 +285,6 @@ export function IntegrationSourceDashboard({ onOpenLegacyTools }: IntegrationSou
   const [statusFilter, setStatusFilter] = useState<ProviderStatus | 'all'>('all');
   const [query, setQuery] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<SourceGroupId>>(() => new Set());
-  const [showSlackWorkflow, setShowSlackWorkflow] = useState(false);
   const passiveNoticeId = useId();
   const summaryId = useId();
   const sourceGroups = useMemo(() => buildIntegrationSourceGroups(), []);
@@ -616,36 +371,6 @@ export function IntegrationSourceDashboard({ onOpenLegacyTools }: IntegrationSou
           <h3 className="text-sm font-semibold text-text-primary">Integrations</h3>
         </div>
       </div>
-
-      <section
-        className="rounded-lg border border-border-subtle bg-bg-raised/40 p-4"
-        aria-label="Slack workflow starter"
-      >
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-3xl">
-            <h4 className="text-sm font-semibold text-text-primary">Slack workflow starter</h4>
-            <p className="mt-1 text-xs leading-5 text-text-secondary">
-              Slack workflow startup lives in Integrations. Start here, stage workspace and target selection, then hand off into the existing readiness path without sending anything automatically.
-            </p>
-            <p className="mt-2 text-[11px] leading-5 text-text-muted">
-              Path: Messaging &gt; Slack. Targets: channel, DM, thread. Mode: staged only.
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setGroupFilter('messaging');
-                setShowSlackWorkflow(true);
-              }}
-              className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold text-emerald-200 transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/15"
-            >
-              <Play size={12} />
-              Open Slack workflow
-            </button>
-          </div>
-        </div>
-      </section>
 
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_210px_190px]">
         <label className="relative block">
@@ -742,7 +467,6 @@ export function IntegrationSourceDashboard({ onOpenLegacyTools }: IntegrationSou
                         key={provider.id}
                         provider={provider}
                         onOpenSettings={onOpenLegacyTools}
-                        onOpenSlackWorkflow={provider.id === 'slack' ? () => setShowSlackWorkflow(true) : undefined}
                       />
                     ))
                   )}
@@ -752,8 +476,6 @@ export function IntegrationSourceDashboard({ onOpenLegacyTools }: IntegrationSou
           );
         })}
       </div>
-
-      <SlackConnectorWorkflowModal open={showSlackWorkflow} onClose={() => setShowSlackWorkflow(false)} />
     </section>
   );
 }

@@ -1447,7 +1447,7 @@ async function executePostSlackNotification(inp: Record<string, unknown>, settin
     return JSON.stringify({ error: 'No Slack webhook URL configured. Add one in Settings → Alerts → Slack Outbound.' });
   }
 
-  const slackBridge = (window as Record<string, unknown>).threatcaddySlack as {
+  const slackBridge = (window as unknown as Record<string, unknown>).threatcaddySlack as {
     postWebhook?: (url: string, payload: unknown) => Promise<{ ok: boolean }>;
   } | undefined;
   if (!slackBridge?.postWebhook) {

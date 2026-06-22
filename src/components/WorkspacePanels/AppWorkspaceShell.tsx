@@ -1262,7 +1262,7 @@ function workspaceTlpGlow(level?: string) {
 }
 
 function getWorkspaceLayoutTemplateAllowedPanelIds(allowedPanelIds: ReadonlySet<string>) {
-  const blockedPanelIds = new Set([chatWorkspacePanelId, agentCaddyWorkspacePanelId]);
+  const blockedPanelIds = new Set([agentCaddyWorkspacePanelId]);
   return new Set(Array.from(allowedPanelIds).filter((panelId) => !blockedPanelIds.has(panelId)));
 }
 
