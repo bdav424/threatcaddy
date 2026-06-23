@@ -160,7 +160,7 @@ export function TaskListView({
   useWorkspacePanelHeaderAccessory(taskTitlebarAccessory);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden" data-task-list="true">
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden" data-task-list="true">
       {/* Toolbar */}
       <div
         className={cn('flex items-center gap-1.5 px-3 py-2 border-b border-gray-800 shrink-0', compactTitlebarMode && 'hidden')}

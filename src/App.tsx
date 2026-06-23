@@ -2215,7 +2215,7 @@ const AppInner = memo(function AppInner({
       data-notes-workspace="true"
       data-notes-has-selection={selectedNote ? 'true' : 'false'}
       ref={notesContainerRef}
-      className="flex flex-1 overflow-hidden"
+      className="flex min-h-0 flex-1 overflow-hidden"
     >
       <div
         data-notes-list-pane="true"
