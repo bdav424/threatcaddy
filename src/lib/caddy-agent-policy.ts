@@ -22,6 +22,7 @@ const TOOL_ACTION_CLASS: Record<string, AgentActionClass> = {
   list_iocs: 'read',
   list_timeline_events: 'read',
   get_investigation_summary: 'read',
+  get_investigation_context: 'read',
   analyze_graph: 'read',
   list_investigations: 'read',
   get_investigation_details: 'read',
@@ -37,6 +38,11 @@ const TOOL_ACTION_CLASS: Record<string, AgentActionClass> = {
   // Create tools — produce new entities
   create_note: 'create',
   create_task: 'create',
+  add_subtask: 'create',
+  add_sub_subtask: 'create',
+  add_timeline_event: 'create',
+  add_pivot_graph_node: 'create',
+  push_to_caddyshack: 'create',
   create_ioc: 'create',
   bulk_create_iocs: 'create',
   create_timeline_event: 'create',
@@ -49,6 +55,8 @@ const TOOL_ACTION_CLASS: Record<string, AgentActionClass> = {
   // Modify tools — change existing entities
   update_note: 'modify',
   update_task: 'modify',
+  update_task_status: 'modify',
+  add_pivot_graph_edge: 'modify',
   update_ioc: 'modify',
   update_timeline_event: 'modify',
 

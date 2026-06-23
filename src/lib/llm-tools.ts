@@ -22,6 +22,7 @@ import {
   executeListProductBaselines,
   executeListInvestigations, executeGetInvestigationDetails,
   executeSearchAcrossInvestigations, executeCompareInvestigations,
+  executeGetInvestigationContext,
 } from './llm-tools-read';
 
 // Write tools
@@ -31,6 +32,9 @@ import {
   executeCreateTimelineEvent, executeUpdateTimelineEvent,
   executeLinkEntities, executeGenerateReport, executeCreateInInvestigation,
   executeCreateProductBaseline, executeRenderProductBaseline,
+  executeAddSubtask, executeAddSubSubtask, executeUpdateTaskStatus,
+  executeAddTimelineEvent, executeAddPivotGraphNode, executeAddPivotGraphEdge,
+  executePushToCaddyShack,
 } from './llm-tools-write';
 
 // Analysis tools
@@ -85,9 +89,9 @@ Understand the IR lifecycle (NIST SP 800-61): Preparation, Detection & Analysis,
 
 You have tools organized into these categories:
 
-**Search & Read** (15): search_notes, search_all, read_note, list_evidence, search_evidence, read_evidence, list_product_baselines, read_task, read_ioc, read_timeline_event, list_tasks, list_iocs, list_timeline_events, get_investigation_summary, list_folders.
+**Search & Read** (16): search_notes, search_all, read_note, list_evidence, search_evidence, read_evidence, list_product_baselines, read_task, read_ioc, read_timeline_event, list_tasks, list_iocs, list_timeline_events, get_investigation_summary, get_investigation_context, list_folders.
 
-**Create & Update** (16): create_note, update_note, create_task, update_task, create_ioc, update_ioc, bulk_create_iocs, create_timeline_event, update_timeline_event, link_entities, generate_report, create_product_baseline, render_product_baseline, create_in_investigation, create_note_folder, ingest_alert.
+**Create & Update** (23): create_note, update_note, create_task, update_task, add_subtask, add_sub_subtask, update_task_status, create_ioc, update_ioc, bulk_create_iocs, create_timeline_event, update_timeline_event, add_timeline_event, link_entities, generate_report, create_product_baseline, render_product_baseline, push_to_caddyshack, create_in_investigation, create_note_folder, ingest_alert, add_pivot_graph_node, add_pivot_graph_edge.
 
 **Modify** (3): delete_note_folder, move_to_folder, update_timeline_event.
 
@@ -119,6 +123,11 @@ You have tools organized into these categories:
 - Use compare_investigations to identify overlapping TTPs and shared infrastructure between investigations.
 - Use create_in_investigation when you need to add entities to a specific investigation that isn't currently selected.
 - For quick reputation checks, call enrich_ioc with value/provider instead of creating a temporary IOC. Create an IOC only after the analyst decides the observable belongs in the case.
+- Use get_investigation_context before writing multiple entities so you know what already exists and avoid duplicating work.
+- Use add_subtask / add_sub_subtask to decompose task steps; use update_task_status for targeted status changes without updating other fields.
+- Use add_timeline_event for simple event creation when ATT&CK mapping is not needed; use create_timeline_event when you need full event detail.
+- Use add_pivot_graph_node then add_pivot_graph_edge to build IOC relationship graphs and pivot maps directly from the chat.
+- Use push_to_caddyshack to render a product baseline template and push the result into the investigation as a pinned note; always call list_product_baselines first to confirm the template name.
 
 ## Entity Linking Format
 
@@ -299,21 +308,29 @@ export async function executeTool(
       case 'list_tasks':              result = await executeListTasks(inp, folderId); break;
       case 'list_iocs':               result = await executeListIOCs(inp, folderId); break;
       case 'list_timeline_events':    result = await executeListTimelineEvents(inp, folderId); break;
-      case 'get_investigation_summary': result = await executeGetInvestigationSummary(inp, folderId); break;
-      case 'analyze_graph':           result = await executeAnalyzeGraph(inp, folderId); break;
+      case 'get_investigation_summary':  result = await executeGetInvestigationSummary(inp, folderId); break;
+      case 'get_investigation_context':  result = await executeGetInvestigationContext(inp, folderId); break;
+      case 'analyze_graph':              result = await executeAnalyzeGraph(inp, folderId); break;
       case 'create_note':             result = await executeCreateNote(inp, folderId); break;
       case 'update_note':             result = await executeUpdateNote(inp); break;
       case 'create_task':             result = await executeCreateTask(inp, folderId); break;
       case 'update_task':             result = await executeUpdateTask(inp); break;
+      case 'add_subtask':             result = await executeAddSubtask(inp); break;
+      case 'add_sub_subtask':         result = await executeAddSubSubtask(inp); break;
+      case 'update_task_status':      result = await executeUpdateTaskStatus(inp); break;
       case 'create_ioc':              result = await executeCreateIOC(inp, folderId); break;
       case 'update_ioc':              result = await executeUpdateIOC(inp); break;
       case 'bulk_create_iocs':        result = await executeBulkCreateIOCs(inp, folderId); break;
       case 'create_timeline_event':   result = await executeCreateTimelineEvent(inp, folderId); break;
       case 'update_timeline_event':   result = await executeUpdateTimelineEvent(inp); break;
+      case 'add_timeline_event':      result = await executeAddTimelineEvent(inp, folderId); break;
       case 'link_entities':           result = await executeLinkEntities(inp); break;
       case 'generate_report':         result = await executeGenerateReport(inp, folderId); break;
       case 'create_product_baseline': result = await executeCreateProductBaseline(inp); break;
       case 'render_product_baseline': result = await executeRenderProductBaseline(inp, folderId); break;
+      case 'push_to_caddyshack':      result = await executePushToCaddyShack(inp, folderId); break;
+      case 'add_pivot_graph_node':    result = await executeAddPivotGraphNode(inp, folderId); break;
+      case 'add_pivot_graph_edge':    result = await executeAddPivotGraphEdge(inp); break;
       case 'extract_iocs':            result = executeExtractIOCs(inp); break;
       case 'fetch_url':               result = await executeFetchUrl(inp); break;
       case 'list_investigations':           result = await executeListInvestigations(inp); break;

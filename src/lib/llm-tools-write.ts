@@ -4,6 +4,7 @@ import { db } from '../db';
 import type {
   IOCType, ConfidenceLevel, TimelineEventType, Priority, TaskStatus,
   Note, Task, StandaloneIOC, TimelineEvent, ProductBaselineMetadata,
+  ChecklistItem, SubtaskItem, IOCRelationship,
 } from '../types';
 import {
   buildProductRenderContext,
@@ -83,6 +84,7 @@ export async function executeCreateTask(input: Record<string, unknown>, folderId
     trashed: false,
     archived: false,
     assigneeId: input.assigneeId ? String(input.assigneeId) : undefined,
+    dueDate: input.dueDate ? String(input.dueDate) : undefined,
     createdAt: now,
     updatedAt: now,
   };
@@ -533,4 +535,263 @@ export async function executeCreateInInvestigation(input: Record<string, unknown
     default:
       return JSON.stringify({ error: `Unknown entity type: ${entityType}. Use: note, task, ioc, timeline-event` });
   }
+}
+
+// ── GROUP 9 — Investigation Write Tools ───────────────────────────────────
+
+export async function executeAddSubtask(input: Record<string, unknown>): Promise<string> {
+  const taskId = String(input.taskId || '');
+  const title = String(input.title || '').trim();
+  if (!taskId) return JSON.stringify({ error: 'taskId is required' });
+  if (!title) return JSON.stringify({ error: 'title is required' });
+
+  const task = await db.tasks.get(taskId);
+  if (!task) return JSON.stringify({ error: `Task not found: ${taskId}` });
+
+  const subtask: ChecklistItem = {
+    id: nanoid(),
+    text: sanitizeText(title),
+    done: false,
+    order: task.checklist?.length ?? 0,
+  };
+  await db.tasks.update(taskId, {
+    checklist: [...(task.checklist ?? []), subtask],
+    updatedAt: Date.now(),
+  });
+  return JSON.stringify({ success: true, subtaskId: subtask.id, taskId });
+}
+
+export async function executeAddSubSubtask(input: Record<string, unknown>): Promise<string> {
+  const taskId = String(input.taskId || '');
+  const subtaskId = String(input.subtaskId || '');
+  const title = String(input.title || '').trim();
+  if (!taskId || !subtaskId) return JSON.stringify({ error: 'taskId and subtaskId are required' });
+  if (!title) return JSON.stringify({ error: 'title is required' });
+
+  const task = await db.tasks.get(taskId);
+  if (!task) return JSON.stringify({ error: `Task not found: ${taskId}` });
+
+  const checklist = task.checklist ?? [];
+  if (!checklist.find(c => c.id === subtaskId)) {
+    return JSON.stringify({ error: `Subtask not found: ${subtaskId}` });
+  }
+  const subItem: SubtaskItem = { id: nanoid(), text: sanitizeText(title), done: false, order: 0 };
+  const updated = checklist.map(c =>
+    c.id === subtaskId
+      ? { ...c, children: [...(c.children ?? []), { ...subItem, order: c.children?.length ?? 0 }] }
+      : c
+  );
+  await db.tasks.update(taskId, { checklist: updated, updatedAt: Date.now() });
+  return JSON.stringify({ success: true, subSubtaskId: subItem.id, subtaskId, taskId });
+}
+
+const TASK_STATUS_MAP: Record<string, TaskStatus> = {
+  pending: 'todo', todo: 'todo',
+  in_progress: 'in-progress', 'in-progress': 'in-progress',
+  complete: 'done', done: 'done',
+};
+
+export async function executeUpdateTaskStatus(input: Record<string, unknown>): Promise<string> {
+  const taskId = String(input.taskId || '');
+  const status = String(input.status || '');
+  const subtaskId = input.subtaskId ? String(input.subtaskId) : undefined;
+  if (!taskId) return JSON.stringify({ error: 'taskId is required' });
+  if (!status) return JSON.stringify({ error: 'status is required' });
+
+  const task = await db.tasks.get(taskId);
+  if (!task) return JSON.stringify({ error: `Task not found: ${taskId}` });
+
+  if (subtaskId) {
+    const checklist = task.checklist ?? [];
+    if (!checklist.find(c => c.id === subtaskId)) {
+      return JSON.stringify({ error: `Subtask not found: ${subtaskId}` });
+    }
+    const done = status === 'complete' || status === 'done';
+    await db.tasks.update(taskId, {
+      checklist: checklist.map(c => c.id === subtaskId ? { ...c, done } : c),
+      updatedAt: Date.now(),
+    });
+    return JSON.stringify({ success: true, taskId, subtaskId, done });
+  }
+
+  const dbStatus: TaskStatus = TASK_STATUS_MAP[status] ?? 'todo';
+  await db.tasks.update(taskId, {
+    status: dbStatus,
+    completed: dbStatus === 'done',
+    ...(dbStatus === 'done' ? { completedAt: Date.now() } : {}),
+    updatedAt: Date.now(),
+  });
+  return JSON.stringify({ success: true, taskId, status: dbStatus });
+}
+
+export async function executeAddTimelineEvent(input: Record<string, unknown>, folderId?: string): Promise<string> {
+  const now = Date.now();
+  let timestamp = now;
+  if (input.timestamp) {
+    const parsed = new Date(String(input.timestamp)).getTime();
+    if (!isNaN(parsed)) timestamp = parsed;
+  }
+
+  let timelineId = '';
+  if (folderId) {
+    const folder = await db.folders.get(folderId);
+    if (folder?.timelineId) timelineId = folder.timelineId;
+  }
+  if (!timelineId) {
+    const first = await db.timelines.orderBy('order').first();
+    if (first) timelineId = first.id;
+  }
+
+  const event = {
+    id: nanoid(),
+    timestamp,
+    title: String(input.title || 'Untitled Event'),
+    description: input.description ? sanitizeText(String(input.description)) : undefined,
+    eventType: 'other' as TimelineEventType,
+    source: 'CaddyAI',
+    confidence: 'medium' as const,
+    linkedIOCIds: [] as string[],
+    linkedNoteIds: [] as string[],
+    linkedTaskIds: [] as string[],
+    mitreAttackIds: [] as string[],
+    assets: [] as string[],
+    tags: [] as string[],
+    starred: false,
+    folderId: folderId || undefined,
+    timelineId,
+    clsLevel: input.classification ? String(input.classification) : undefined,
+    trashed: false,
+    archived: false,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.timelineEvents.add(event);
+  return JSON.stringify({ success: true, id: event.id, title: event.title, timestamp: new Date(timestamp).toISOString() });
+}
+
+// Maps user-friendly type names to canonical IOCType values
+const PIVOT_NODE_TYPE_MAP: Record<string, IOCType> = {
+  ip: 'ipv4', ipv4: 'ipv4', ipv6: 'ipv6',
+  domain: 'domain', url: 'url', email: 'email',
+  hash: 'sha256', sha256: 'sha256', sha1: 'sha1', md5: 'md5',
+  cve: 'cve', 'mitre-attack': 'mitre-attack', mitre: 'mitre-attack',
+  actor: 'domain',  // nearest storable IOC type; iocSubtype = "Threat Actor"
+  infra: 'domain',  // iocSubtype = "Infrastructure"
+  'file-path': 'file-path', filepath: 'file-path',
+};
+
+export async function executeAddPivotGraphNode(input: Record<string, unknown>, folderId?: string): Promise<string> {
+  const label = String(input.label || input.value || '');
+  const typeStr = String(input.type || 'domain').toLowerCase();
+  const value = String(input.value || label);
+  const metadata = (input.metadata && typeof input.metadata === 'object' && !Array.isArray(input.metadata))
+    ? input.metadata as Record<string, string>
+    : {};
+
+  if (!value) return JSON.stringify({ error: 'value is required' });
+
+  const iocType: IOCType = PIVOT_NODE_TYPE_MAP[typeStr] || 'domain';
+  const iocSubtype = typeStr === 'actor' ? 'Threat Actor'
+    : typeStr === 'infra' ? 'Infrastructure'
+    : metadata.subtype || undefined;
+
+  const metaNotes = Object.keys(metadata).filter(k => k !== 'subtype').length > 0
+    ? Object.entries(metadata).filter(([k]) => k !== 'subtype').map(([k, v]) => `${k}: ${v}`).join('\n')
+    : undefined;
+
+  const analystNotes = metaNotes
+    ? sanitizeText(label !== value ? `${label}\n${metaNotes}` : metaNotes)
+    : (label !== value ? sanitizeText(label) : undefined);
+
+  const now = Date.now();
+  const node: StandaloneIOC = {
+    id: nanoid(),
+    type: iocType,
+    value: sanitizeText(value),
+    confidence: 'medium',
+    analystNotes,
+    iocSubtype,
+    folderId: folderId || undefined,
+    tags: typeStr === 'actor' ? ['threat-actor'] : typeStr === 'infra' ? ['infrastructure'] : ['pivot-node'],
+    trashed: false,
+    archived: false,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.standaloneIOCs.add(node);
+  return JSON.stringify({ success: true, nodeId: node.id, type: iocType, value: node.value, label });
+}
+
+export async function executeAddPivotGraphEdge(input: Record<string, unknown>): Promise<string> {
+  const sourceNodeId = String(input.sourceNodeId || '');
+  const targetNodeId = String(input.targetNodeId || '');
+  const relationship = String(input.relationship || 'related-to');
+  if (!sourceNodeId || !targetNodeId) {
+    return JSON.stringify({ error: 'sourceNodeId and targetNodeId are required' });
+  }
+
+  const [source, target] = await Promise.all([
+    db.standaloneIOCs.get(sourceNodeId),
+    db.standaloneIOCs.get(targetNodeId),
+  ]);
+  if (!source) return JSON.stringify({ error: `Source node not found: ${sourceNodeId}` });
+  if (!target) return JSON.stringify({ error: `Target node not found: ${targetNodeId}` });
+
+  const existing: IOCRelationship[] = source.relationships ?? [];
+  if (existing.some(r => r.targetIOCId === targetNodeId && r.relationshipType === relationship)) {
+    return JSON.stringify({ success: true, message: 'Edge already exists', sourceNodeId, targetNodeId, relationship });
+  }
+  await db.standaloneIOCs.update(sourceNodeId, {
+    relationships: [...existing, { targetIOCId: targetNodeId, relationshipType: relationship }],
+    updatedAt: Date.now(),
+  });
+  return JSON.stringify({ success: true, sourceNodeId, targetNodeId, relationship });
+}
+
+export async function executePushToCaddyShack(input: Record<string, unknown>, folderId?: string): Promise<string> {
+  if (!folderId) return JSON.stringify({ error: 'No investigation selected.' });
+
+  const templateName = String(input.templateName || '');
+  if (!templateName) return JSON.stringify({ error: 'templateName is required' });
+
+  const variables = (input.variables && typeof input.variables === 'object' && !Array.isArray(input.variables))
+    ? input.variables as Record<string, unknown>
+    : {};
+
+  const folder = await db.folders.get(folderId);
+  if (!folder) return JSON.stringify({ error: 'Investigation not found' });
+
+  const baseline = await getProductBaseline({ name: templateName });
+  if (!baseline) {
+    return JSON.stringify({ error: `Template "${templateName}" not found. Use list_product_baselines to see available templates.` });
+  }
+
+  const outputTitle = input.outputTitle
+    ? sanitizeText(String(input.outputTitle))
+    : sanitizeText(`${folder.name} — ${templateName}`);
+  const context = await buildProductRenderContext(folder, baseline, { ...variables, title: outputTitle });
+  const rendered = sanitizeText(renderJinjaTemplate(baseline.content, context));
+
+  const now = Date.now();
+  const note = {
+    id: nanoid(),
+    title: outputTitle,
+    content: rendered,
+    folderId,
+    tags: [PRODUCT_NOTE_TAG, PRODUCT_DRAFT_TAG, 'caddyshack'],
+    pinned: true,
+    archived: false,
+    trashed: false,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.notes.add(note);
+  return JSON.stringify({
+    success: true,
+    id: note.id,
+    title: note.title,
+    baselineName: baseline.name,
+    contentLength: rendered.length,
+    message: 'Document created and pinned in the investigation. Review in Notes > Products before release.',
+  });
 }

@@ -424,6 +424,109 @@ export const TOOL_DEFINITIONS = [
     },
   },
 
+  // ── GROUP 9 — Investigation write tools ───────────────────────
+  {
+    name: 'add_subtask',
+    description: 'Add a subtask (checklist item) to an existing task. Use this when the user asks to break a task into steps or track granular progress.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        taskId: { type: 'string', description: 'ID of the parent task' },
+        title: { type: 'string', description: 'Subtask title' },
+      },
+      required: ['taskId', 'title'],
+    },
+  },
+  {
+    name: 'add_sub_subtask',
+    description: 'Add a sub-subtask under an existing subtask (third level of the task hierarchy). Use for very granular step tracking.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        taskId: { type: 'string', description: 'ID of the parent task' },
+        subtaskId: { type: 'string', description: 'ID of the parent subtask' },
+        title: { type: 'string', description: 'Sub-subtask title' },
+      },
+      required: ['taskId', 'subtaskId', 'title'],
+    },
+  },
+  {
+    name: 'update_task_status',
+    description: 'Update the status of a task or mark a subtask as complete/incomplete. Simpler than update_task when only status needs to change.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        taskId: { type: 'string', description: 'Task ID to update' },
+        status: { type: 'string', enum: ['pending', 'in_progress', 'complete', 'todo', 'in-progress', 'done'], description: 'New status for the task (or done/pending for the subtask)' },
+        subtaskId: { type: 'string', description: 'Subtask ID — if provided, marks that subtask done/not-done instead of the parent task' },
+      },
+      required: ['taskId', 'status'],
+    },
+  },
+  {
+    name: 'add_timeline_event',
+    description: 'Add an event to the investigation timeline with optional TLP classification. Simpler alternative to create_timeline_event when you do not need to specify ATT&CK mappings.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        title: { type: 'string', description: 'Event title' },
+        description: { type: 'string', description: 'Event description (optional)' },
+        timestamp: { type: 'string', description: 'ISO 8601 datetime (e.g. 2025-04-15T09:00:00Z). Defaults to now.' },
+        classification: { type: 'string', enum: ['TLP:CLEAR', 'TLP:GREEN', 'TLP:AMBER', 'TLP:AMBER+STRICT', 'TLP:RED'], description: 'TLP classification (optional)' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'add_pivot_graph_node',
+    description: 'Add a standalone node to the investigation pivot graph. Creates a StandaloneIOC that appears as a graph node, enabling CaddyAI to build pivot graphs and relationship maps.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        label: { type: 'string', description: 'Human-readable label for the node' },
+        type: { type: 'string', description: 'Node type: ip, ipv4, ipv6, domain, url, email, hash, sha256, md5, sha1, cve, mitre, actor, infra, file-path' },
+        value: { type: 'string', description: 'Canonical value (IP address, domain, hash, actor name, etc.)' },
+        metadata: { type: 'object', description: 'Optional key-value metadata to store as analyst notes (e.g. { "country": "RU", "asn": "AS12345" })' },
+      },
+      required: ['label', 'type', 'value'],
+    },
+  },
+  {
+    name: 'add_pivot_graph_edge',
+    description: 'Add a directed relationship edge between two pivot graph nodes created by add_pivot_graph_node. Use sourceNodeId and targetNodeId values returned by add_pivot_graph_node.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        sourceNodeId: { type: 'string', description: 'Source node ID (returned by add_pivot_graph_node)' },
+        targetNodeId: { type: 'string', description: 'Target node ID (returned by add_pivot_graph_node)' },
+        relationship: { type: 'string', description: 'Relationship type: resolves-to, communicates-with, drops, hosts, attributed-to, exploits, uses-technique, detected-by, related-to, or any custom label' },
+      },
+      required: ['sourceNodeId', 'targetNodeId', 'relationship'],
+    },
+  },
+  {
+    name: 'push_to_caddyshack',
+    description: 'Render a product baseline template (Nunjucks/Jinja) with the provided variables and push the result as a pinned CaddyShack document in the current investigation. Use list_product_baselines to find available template names.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        templateName: { type: 'string', description: 'Product baseline name (partial match). Use list_product_baselines to find names.' },
+        variables: { type: 'object', description: 'Template variables to merge into the render context (e.g. { "executiveSummary": "...", "findings": "..." })' },
+        outputTitle: { type: 'string', description: 'Title for the output document (optional — defaults to "<investigation> — <template>")' },
+      },
+      required: ['templateName', 'variables'],
+    },
+  },
+  {
+    name: 'get_investigation_context',
+    description: 'Read-only. Return a rich summary of the current investigation — tasks, timeline events, IOCs, and note titles — so CaddyAI can reason about what already exists before writing new entities. More detailed than get_investigation_summary.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+
   // ── Web tools ────────────────────────────────────────────────
   {
     name: 'fetch_url',
@@ -931,13 +1034,16 @@ export const EXECUTIVE_TOOL_DEFINITIONS = [
 const WRITE_TOOLS = new Set([
   'create_note', 'update_note',
   'create_task', 'update_task',
+  'add_subtask', 'add_sub_subtask', 'update_task_status',
   'create_ioc', 'update_ioc', 'bulk_create_iocs',
-  'create_timeline_event', 'update_timeline_event',
+  'create_timeline_event', 'update_timeline_event', 'add_timeline_event',
   'link_entities',
   'generate_report',
   'create_product_baseline',
   'render_product_baseline',
+  'push_to_caddyshack',
   'create_in_investigation',
+  'add_pivot_graph_node', 'add_pivot_graph_edge',
   'delegate_task',
   'review_completed_task',
   'call_meeting',

@@ -648,3 +648,81 @@ export async function executeCompareInvestigations(input: Record<string, unknown
     },
   });
 }
+
+/**
+ * Rich investigation snapshot used by get_investigation_context.
+ * Returns entity summaries (not raw rows) so CaddyAI can reason about
+ * existing work before writing new entities.
+ */
+export async function executeGetInvestigationContext(_input: Record<string, unknown>, folderId?: string): Promise<string> {
+  if (!folderId) {
+    return JSON.stringify({ error: 'No investigation selected. Select an investigation folder first.' });
+  }
+
+  const folder = await db.folders.get(folderId);
+  if (!folder) return JSON.stringify({ error: 'Investigation not found' });
+
+  const [notes, tasks, iocs, events, evidenceCount] = await Promise.all([
+    db.notes.where('folderId').equals(folderId).and(n => !n.trashed).toArray(),
+    db.tasks.where('folderId').equals(folderId).and(t => !t.trashed).toArray(),
+    db.standaloneIOCs.where('folderId').equals(folderId).and(i => !i.trashed).toArray(),
+    db.timelineEvents.where('folderId').equals(folderId).and(e => !e.trashed).toArray(),
+    db.evidenceItems.where('folderId').equals(folderId).and(ev => !ev.trashed).count(),
+  ]);
+
+  const tasksByStatus: Record<TaskStatus, number> = { todo: 0, 'in-progress': 0, done: 0 };
+  tasks.forEach(t => { tasksByStatus[t.status] = (tasksByStatus[t.status] ?? 0) + 1; });
+
+  const iocsByType: Record<string, number> = {};
+  iocs.forEach(i => { iocsByType[i.type] = (iocsByType[i.type] ?? 0) + 1; });
+
+  const sortedEvents = [...events].sort((a, b) => a.timestamp - b.timestamp);
+
+  return JSON.stringify({
+    investigation: {
+      id: folder.id,
+      name: folder.name,
+      description: folder.description || '',
+      status: folder.status || 'active',
+      classification: folder.clsLevel || null,
+      pap: folder.papLevel || null,
+      createdAt: new Date(folder.createdAt).toISOString(),
+    },
+    counts: {
+      notes: notes.length,
+      tasks: tasks.length,
+      iocs: iocs.length,
+      timelineEvents: events.length,
+      evidence: evidenceCount,
+    },
+    tasksByStatus,
+    tasks: tasks.slice(0, 25).map(t => ({
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      priority: t.priority,
+      dueDate: t.dueDate || null,
+      subtaskCount: t.checklist?.length ?? 0,
+      completedSubtasks: t.checklist?.filter(c => c.done).length ?? 0,
+    })),
+    recentTimelineEvents: sortedEvents.slice(-10).map(e => ({
+      id: e.id,
+      title: e.title,
+      timestamp: new Date(e.timestamp).toISOString(),
+      eventType: e.eventType,
+      actor: e.actor || null,
+    })),
+    topIOCs: iocs.slice(0, 15).map(i => ({
+      id: i.id,
+      type: i.type,
+      value: i.value,
+      confidence: i.confidence,
+    })),
+    iocsByType,
+    recentNotes: [...notes].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8).map(n => ({
+      id: n.id,
+      title: n.title,
+      updatedAt: new Date(n.updatedAt).toISOString(),
+    })),
+  });
+}

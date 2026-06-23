@@ -103,7 +103,7 @@ docker compose up -d   # Starts Hono server + PostgreSQL
 Human-driven conversational AI assistant with a deep toolset for threat investigation.
 
 - **Multi-provider** — Anthropic (Claude Opus 4, Sonnet 4, Haiku 3.5), OpenAI (GPT-5.4, GPT-5.4 Pro, GPT-5.2, GPT-5 Mini, o3, o4-mini, GPT-4.1, GPT-4.1 Mini, GPT-4o), Google Gemini (2.5 Pro, 2.5 Flash), Mistral (Large, Small, Codestral), and local OpenAI-compatible models (Ollama / LM Studio / vLLM / Codex via `everybody_llmbo`)
-- **58 tools** — 46 core tools to search, read, create, and update all entities; 7 delegation tools for Lead Analyst coordination; 5 executive tools for CISO/Chief of Staff. Covers IOC extraction, URL fetching, report generation, and cross-investigation analysis
+- **66 tools** — 54 core tools to search, read, create, and update all investigation subpanels (notes, tasks, timeline, pivot graph, IOCs, evidence, product notes); 7 delegation tools for Lead Analyst coordination; 5 executive tools for CISO/Chief of Staff. Includes IOC extraction, URL fetching, report generation, product baseline rendering, CaddyShack push, pivot graph construction, and cross-investigation analysis
 - **Slash commands** — `/fetch`, `/search`, `/note`, `/task`, `/iocs`, `/summary`, `/timeline`, `/report`, `/triage`, `/graph`, `/link`
 - **Customizable system prompt** — Editable in Settings with CTI/IR tradecraft baked into the default (MITRE ATT&CK, Diamond Model, Kill Chain, Pyramid of Pain, estimative language, TLP/PAP)
 - **Persistent threads** with auto-generated titles
