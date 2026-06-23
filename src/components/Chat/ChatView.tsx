@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Virtuoso } from 'react-virtuoso';
 import { Plus, Trash2, MessageSquare, Share2, Pencil, FileText, Key, Puzzle, Shield, ArrowLeft, Square, RefreshCw, Eye, Play, Check, X, FolderPlus, ChevronRight, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -1867,6 +1868,49 @@ export function ChatView({
         secondaryAction={handleRejectCtiTemplate}
         secondaryLabel="Discard"
       />
+
+      {/* Global approval overlay — rendered via portal so it surfaces even when chat panel is hidden */}
+      {pendingApproval && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="approval-overlay-title"
+        >
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleReject} />
+          <div className="relative w-full max-w-md rounded-xl border border-amber-500/40 bg-gray-900 shadow-2xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-amber-500/20 flex items-center gap-2">
+              <Shield size={16} className="text-amber-400 shrink-0" />
+              <span id="approval-overlay-title" className="text-sm font-semibold text-amber-400 flex-1">{t('view.approvalTitle')}</span>
+            </div>
+            <div className="px-4 py-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-text-muted">Tool:</span>
+                <span className="font-mono text-xs font-medium text-purple">{pendingApproval.toolName}</span>
+              </div>
+              <pre className="text-[10px] font-mono text-text-secondary bg-bg-deep rounded-lg p-3 max-h-40 overflow-y-auto whitespace-pre-wrap border border-border-subtle">
+                {JSON.stringify(pendingApproval.input, null, 2)}
+              </pre>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  onClick={handleApprove}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500/20 text-emerald-400 text-sm font-medium hover:bg-emerald-500/30 transition-colors"
+                  autoFocus
+                >
+                  <Check size={14} /> {t('view.approve')}
+                </button>
+                <button
+                  onClick={handleReject}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/30 transition-colors"
+                >
+                  <X size={14} /> {t('view.reject')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
 
       {/* First-use onboarding overlay */}
       {showOnboarding && (
