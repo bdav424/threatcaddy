@@ -56,13 +56,6 @@ export function AppLayout({
       >
         {t('skipToMainContent')}
       </a>
-      <BgEffectLayer
-        pattern={bgEffectPattern ?? 'none'}
-        color={bgEffectColor}
-        intensity={bgEffectIntensity ?? 60}
-        size={bgEffectSize ?? 100}
-        theme={resolvedTheme}
-      />
       <BgImageLayer
         enabled={bgImageEnabled ?? false}
         opacity={bgImageOpacity ?? 85}
@@ -70,6 +63,13 @@ export function AppLayout({
         posY={bgImagePosY ?? 50}
         zoom={bgImageZoom ?? 100}
         blur={bgImageBlur ?? 0}
+        theme={resolvedTheme}
+      />
+      <BgEffectLayer
+        pattern={bgEffectPattern ?? 'none'}
+        color={bgEffectColor}
+        intensity={bgEffectIntensity ?? 60}
+        size={bgEffectSize ?? 100}
         theme={resolvedTheme}
       />
       <div className="app-window-ambient pointer-events-none absolute inset-0 z-0" />

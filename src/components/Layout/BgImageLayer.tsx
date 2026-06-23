@@ -57,7 +57,7 @@ export function BgImageLayer({ enabled, opacity, theme, posX, posY, zoom, blur }
   if (!enabled || !url) return null;
 
   return (
-    <div className="fixed inset-0 -z-10 pointer-events-none" aria-hidden>
+    <div className="absolute inset-0 z-0 pointer-events-none" aria-hidden>
       <div
         role="img"
         aria-hidden
