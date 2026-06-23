@@ -1,4 +1,3 @@
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // Electron main-process only. Do NOT import from renderer or src/lib.
 import { autoUpdater } from 'electron-updater';
 import { ipcMain, app } from 'electron';
