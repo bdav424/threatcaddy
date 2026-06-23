@@ -369,6 +369,8 @@ export async function executeTool(
       case 'read_soul':                      result = await executeReadSoul(inp, agentContext?.profileId, agentRole); break;
       case 'forensicate_scan':              result = await executeForensicateScan({ text: String(inp.text || ''), threshold: inp.threshold ? Number(inp.threshold) : undefined }); break;
       case 'post_slack_notification':        result = await executePostSlackNotification(inp, _settings); break;
+      case 'submit_virtual_analysis':        result = await executeSubmitVirtualAnalysis(inp, folderId); break;
+      case 'get_virtual_jobs':               result = await executeGetVirtualJobs(inp, folderId); break;
       default: {
         // Dynamic skill tools: local:<skill>, host:<name>:<skill>, or LLM-safe aliases.
         const { executeHostSkill, isHostOrLocalToolName } = await import('./agent-hosts');
@@ -2158,5 +2160,50 @@ async function executeReadSoul(
       metrics: profile.soul.lifetimeMetrics,
     },
     totalLessons: profile.soul.lessons.length,
+  });
+}
+
+async function executeSubmitVirtualAnalysis(inp: Record<string, unknown>, folderId?: string): Promise<string> {
+  const filePath = typeof inp.filePath === 'string' ? inp.filePath.trim() : '';
+  const investigationId = typeof inp.investigationId === 'string' ? inp.investigationId : (folderId ?? '');
+  if (!filePath) return JSON.stringify({ error: 'filePath is required' });
+  if (!investigationId) return JSON.stringify({ error: 'No active investigation — open an investigation first' });
+
+  // Check if we're in the desktop app with the VirtualCaddy bridge available
+  const win = window as unknown as Record<string, unknown>;
+  if (!win.threatcaddyVirtualCaddy || typeof (win.threatcaddyVirtualCaddy as Record<string, unknown>).submitJob !== 'function') {
+    return JSON.stringify({ error: 'VirtualCaddy requires the desktop app' });
+  }
+  try {
+    const result = await (win.threatcaddyVirtualCaddy as { submitJob: (args: { investigationId: string; filePath: string }) => Promise<{ ok: boolean; jobId?: string; error?: string }> }).submitJob({ investigationId, filePath });
+    if (!result.ok) return JSON.stringify({ error: result.error ?? 'Failed to submit analysis job' });
+    return JSON.stringify({ success: true, jobId: result.jobId, message: `VirtualCaddy analysis queued for ${filePath.split(/[\\/]/).pop()}` });
+  } catch (err) {
+    return JSON.stringify({ error: String(err) });
+  }
+}
+
+async function executeGetVirtualJobs(inp: Record<string, unknown>, folderId?: string): Promise<string> {
+  const investigationId = typeof inp.investigationId === 'string' ? inp.investigationId : (folderId ?? '');
+  if (!investigationId) return JSON.stringify({ error: 'No active investigation' });
+  const statusFilter = typeof inp.status === 'string' ? inp.status : undefined;
+
+  const query = db.virtualCaddyJobs.where('investigationId').equals(investigationId);
+  const jobs = await query.toArray();
+  const filtered = statusFilter ? jobs.filter(j => j.status === statusFilter) : jobs;
+  const sorted = filtered.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+
+  return JSON.stringify({
+    investigationId,
+    totalJobs: sorted.length,
+    jobs: sorted.map(j => ({
+      id: j.id,
+      filename: j.filename,
+      status: j.status,
+      submittedAt: j.submittedAt,
+      completedAt: j.completedAt,
+      extractedIocCount: j.extractedIocCount,
+      errorMessage: j.errorMessage,
+    })),
   });
 }

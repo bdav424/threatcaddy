@@ -113,6 +113,10 @@ const TOOL_ACTION_CLASS: Record<string, AgentActionClass> = {
   spawn_agent: 'create',
   define_specialist: 'create',
   dismiss_agent: 'modify',
+
+  // VirtualCaddy — air-gapped sandboxed file analysis
+  submit_virtual_analysis: 'create',
+  get_virtual_jobs: 'read',
 };
 
 /** Get the action class for a tool name. Defaults to 'modify' for unknown tools. */

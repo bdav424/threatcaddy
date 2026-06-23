@@ -105,6 +105,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 const CaddyShackView = lazy(() => import('./components/CaddyShack/CaddyShackView').then(m => ({ default: m.CaddyShackView })));
 const AppWorkspaceShell = lazy(() => import('./components/WorkspacePanels/AppWorkspaceShell').then(m => ({ default: m.AppWorkspaceShell })));
 const VirtualCaddyWorkspace = lazy(() => import('./components/VirtualCaddy/VirtualCaddyWorkspace').then(m => ({ default: m.VirtualCaddyWorkspace })));
+const VirtualCaddyPanel = lazy(() => import('./components/VirtualCaddy/VirtualCaddyPanel').then(m => ({ default: m.VirtualCaddyPanel })));
 
 type WorkspacePanelLaunchRequest = {
   view: WorkspacePanelLaunchView;
@@ -141,6 +142,39 @@ import { useSlackSync } from './hooks/useSlackSync';
 import { useDmAlerts } from './hooks/useDmAlerts';
 
 const VALID_RASTER_IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp', 'image/avif']);
+
+// ─── VirtualCaddy tabbed view ─────────────────────────────────────────────────
+// Combines the file-watcher workspace (VirtualCaddyWorkspace) and the static
+// analysis job panel (VirtualCaddyPanel) in a two-tab layout under one nav entry.
+
+function VirtualCaddyTabView() {
+  const [tab, setTab] = useState<'watch' | 'analyze'>('analyze');
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Tab bar */}
+      <div className="shrink-0 flex border-b border-border-subtle/50 bg-bg-primary/80">
+        {(['analyze', 'watch'] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className={`px-4 py-2 text-[12px] font-semibold transition-colors border-b-2 ${
+              tab === t
+                ? 'border-accent text-accent'
+                : 'border-transparent text-text-muted hover:text-text-secondary'
+            }`}
+          >
+            {t === 'analyze' ? 'Static Analysis' : 'File Watch'}
+          </button>
+        ))}
+      </div>
+      {/* Panel content */}
+      <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent" /></div>}>
+        {tab === 'analyze' ? <VirtualCaddyPanel /> : <VirtualCaddyWorkspace />}
+      </Suspense>
+    </div>
+  );
+}
 
 export default function App() {
   return (
@@ -2764,7 +2798,7 @@ const AppInner = memo(function AppInner({
         ) : activeView === 'chat' ? (
           null
         ) : activeView === 'virtualcaddy' ? (
-          <VirtualCaddyWorkspace />
+          <VirtualCaddyTabView />
         ) : activeView === 'investigations' ? (
           <InvestigationsHub
             localFolders={folders}

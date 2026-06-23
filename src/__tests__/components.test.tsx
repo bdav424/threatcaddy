@@ -31,6 +31,10 @@ vi.mock('../contexts/UIModalContext', () => ({
   }),
 }));
 
+vi.mock('../contexts/ChatStreamContext', () => ({
+  useChatStream: () => ({ isStreaming: false, streamingThreadId: null, streamingContent: '', abort: null }),
+}));
+
 vi.mock('../contexts/InvestigationContext', () => ({
   useInvestigation: () => ({
     selectedFolder: undefined,

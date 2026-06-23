@@ -276,3 +276,12 @@ registry.register({
   description: 'Read Slack messages, mentions, and extract commitments.',
   tools: [],
 });
+
+registry.register({
+  id: 'virtualcaddy',
+  name: 'VirtualCaddy',
+  scope: 'operational',
+  contextRequirements: ['active-investigation', 'desktop-only'],
+  description: 'Submit files for air-gapped static analysis and retrieve job results.',
+  tools: pick('submit_virtual_analysis', 'get_virtual_jobs'),
+});

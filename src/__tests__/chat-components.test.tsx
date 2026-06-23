@@ -54,7 +54,17 @@ vi.mock('../contexts/InvestigationContext', () => ({
   useInvestigation: () => ({
     selectedFolderId: undefined,
     selectedFolder: undefined,
+    folders: [],
   }),
+}));
+
+vi.mock('../contexts/ChatStreamContext', () => ({
+  useChatStreamSetter: () => vi.fn(),
+  ChatStreamProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({ connected: false, user: null, serverUrl: null }),
 }));
 
 vi.mock('../lib/utils', () => ({
