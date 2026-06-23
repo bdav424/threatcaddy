@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron';
 import { registerMailBridge } from './mail-bridge.mjs';
 import { registerVirtualBridge } from './virtual-bridge.mjs';
+import { registerVmIngest } from './vm-ingest.mjs';
 import { registerNetworkScanBridge } from './network-scan.mjs';
 import { registerUpdaterBridge } from './updater.mjs';
 import * as cal from './mail-calendar-sync.mjs';
@@ -289,6 +290,7 @@ app.whenReady().then(() => {
   const win = createWindow();
   registerMailBridge();
   registerVirtualBridge();
+  registerVmIngest();
   registerNetworkScanBridge();
   registerUpdaterBridge(win);
 
