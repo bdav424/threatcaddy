@@ -81,6 +81,14 @@ contextBridge.exposeInMainWorld('threatcaddyVirtual', {
   },
 });
 
+// Network map bridge — subnet ARP/ping scan. Only available in desktop app.
+// Scans local /24 subnets only; no internet-routable probes.
+contextBridge.exposeInMainWorld('threatcaddyNetmap', {
+  scan: () => ipcRenderer.invoke('netmap:scan'),
+  arpOnly: () => ipcRenderer.invoke('netmap:arp-only'),
+  ping: (ip) => ipcRenderer.invoke('netmap:ping', { ip }),
+});
+
 contextBridge.exposeInMainWorld('threatcaddyDesktop', {
   isDesktop: true,
   platform: process.platform,
@@ -91,4 +99,28 @@ contextBridge.exposeInMainWorld('threatcaddyDesktop', {
       console.warn('ThreatCaddy desktop glass update failed:', error);
     }
   },
+});
+
+// Auto-updater bridge — renderer receives status events and can trigger actions.
+// Never exposes raw GitHub tokens or download URLs to the renderer.
+contextBridge.exposeInMainWorld('threatcaddyUpdater', {
+  // Subscribe to update lifecycle events. Returns an unsubscribe function.
+  onStatus: (callback) => {
+    const channels = [
+      'updater:checking',
+      'updater:available',
+      'updater:not-available',
+      'updater:progress',
+      'updater:downloaded',
+      'updater:error',
+    ];
+    const listeners = channels.map((ch) => {
+      const fn = (_event, payload) => callback(ch, payload);
+      ipcRenderer.on(ch, fn);
+      return { ch, fn };
+    });
+    return () => listeners.forEach(({ ch, fn }) => ipcRenderer.removeListener(ch, fn));
+  },
+  checkForUpdates: () => ipcRenderer.send('updater:check'),
+  installAndQuit: () => ipcRenderer.send('updater:install-and-quit'),
 });

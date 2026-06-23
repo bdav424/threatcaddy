@@ -12,6 +12,7 @@ import type { PresenceUser } from '../../types';
 import { useUIModals } from '../../contexts/UIModalContext';
 import { useInvestigation } from '../../contexts/InvestigationContext';
 import { useChatStream } from '../../contexts/ChatStreamContext';
+import { useAutoUpdater } from '../../hooks/useAutoUpdater';
 // Relative path (not the leading-slash public-dir URL) so Vite 7.3.2's
 // tightened FS sandbox resolves this through the filesystem plugin in
 // both build and test. `?raw` inlines the SVG string either way.
@@ -69,6 +70,7 @@ export function Header({
   const { screenshareMaxLevel, setScreenshareMaxLevel, setSearchOverlayOpen } = useUIModals();
   const { selectedFolder } = useInvestigation();
   const { isStreaming: caddyAiStreaming } = useChatStream();
+  const { status: updaterStatus, installAndQuit } = useAutoUpdater();
   const selectedFolderName = selectedFolder?.name;
   const selectedFolderColor = selectedFolder?.color;
   const onOpenSearch = useCallback(() => setSearchOverlayOpen(true), [setSearchOverlayOpen]);
@@ -333,6 +335,16 @@ export function Header({
         />
         {presenceUsers && presenceUsers.length > 0 && (
           <PresenceIndicator users={presenceUsers} />
+        )}
+        {updaterStatus.state === 'downloaded' && (
+          <button
+            onClick={installAndQuit}
+            className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-500/10 border border-green-500/30 text-green-600 dark:text-green-400 shrink-0 hover:bg-green-500/20 transition-colors"
+            title={`Update to v${updaterStatus.version} ready — click to restart and install`}
+          >
+            <Download className="w-3 h-3 shrink-0" />
+            Update ready
+          </button>
         )}
         {caddyAiStreaming && (
           <span

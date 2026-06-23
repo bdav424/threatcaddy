@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron';
 import { registerMailBridge } from './mail-bridge.mjs';
 import { registerVirtualBridge } from './virtual-bridge.mjs';
+import { registerNetworkScanBridge } from './network-scan.mjs';
+import { registerUpdaterBridge } from './updater.mjs';
 import * as cal from './mail-calendar-sync.mjs';
 import { runCalendarOAuthPopout, refreshCalendarToken } from './cal-oauth.mjs';
 import { runSlackOAuthPopout } from './slack-oauth.mjs';
@@ -277,15 +279,18 @@ function createWindow() {
   }
 
   applyWindowGlass(win, {});
+  return win;
 }
 
 // The unused `clamp` helper is intentional — retained for future glass-geometry clamping.
 void clamp;
 
 app.whenReady().then(() => {
-  createWindow();
+  const win = createWindow();
   registerMailBridge();
   registerVirtualBridge();
+  registerNetworkScanBridge();
+  registerUpdaterBridge(win);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
