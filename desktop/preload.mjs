@@ -81,6 +81,58 @@ contextBridge.exposeInMainWorld('threatcaddyVirtual', {
   },
 });
 
+// VirtualCaddy IOC-ingest bridge — submits files for air-gapped static analysis.
+// The desktop process (vm-ingest.mjs) owns the analysis; the renderer receives
+// structured IOC results and creates investigation artifacts.
+contextBridge.exposeInMainWorld('threatcaddyVirtualCaddy', {
+  // Submit a file for analysis. Returns { ok, jobId? } — analysis runs async.
+  submitJob: (params) => ipcRenderer.invoke('virtualcaddy:submit', params),
+
+  // Get the default ingest directory path.
+  getIngestDir: () => ipcRenderer.invoke('virtualcaddy:get-ingest-dir'),
+
+  // Change the watched ingest directory.
+  setIngestDir: (dirPath) => ipcRenderer.invoke('virtualcaddy:set-ingest-dir', { dirPath }),
+
+  // Get currently-running job IDs.
+  getJobsStatus: () => ipcRenderer.invoke('virtualcaddy:get-jobs-status'),
+
+  // Desktop → renderer: analysis complete with extracted IOCs
+  onJobComplete: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('virtualcaddy:job-complete', listener);
+    return () => ipcRenderer.removeListener('virtualcaddy:job-complete', listener);
+  },
+
+  // Desktop → renderer: job entered running state
+  onJobStatus: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('virtualcaddy:job-status', listener);
+    return () => ipcRenderer.removeListener('virtualcaddy:job-status', listener);
+  },
+
+  // Desktop → renderer: analysis failed
+  onJobError: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('virtualcaddy:job-error', listener);
+    return () => ipcRenderer.removeListener('virtualcaddy:job-error', listener);
+  },
+
+  // Desktop → renderer: new file dropped in the ingest dir
+  onFileDetected: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('virtualcaddy:file-detected', listener);
+    return () => ipcRenderer.removeListener('virtualcaddy:file-detected', listener);
+  },
+
+  // Desktop → renderer: watcher error
+  onWatchError: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('virtualcaddy:watch-error', listener);
+    return () => ipcRenderer.removeListener('virtualcaddy:watch-error', listener);
+  },
+});
+
 // Network map bridge — subnet ARP/ping scan. Only available in desktop app.
 // Scans local /24 subnets only; no internet-routable probes.
 contextBridge.exposeInMainWorld('threatcaddyNetmap', {
