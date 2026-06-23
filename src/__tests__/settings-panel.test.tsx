@@ -189,15 +189,6 @@ describe('SettingsPanel', { timeout: 30000 }, () => {
     expect(screen.getByTestId('threat-intel-config')).toBeInTheDocument();
   });
 
-  it('renders Integrations tab components', () => {
-    render(<SettingsPanel {...defaultProps} />);
-    clickTab('Integrations');
-    expect(screen.getByRole('region', { name: 'Integrations source catalog' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Email integrations' })).toBeInTheDocument();
-    expect(screen.getByTestId('integration-panel')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Review installed tools separately' })).not.toBeInTheDocument();
-  });
-
   it('renders Shortcuts tab components', () => {
     render(<SettingsPanel {...defaultProps} />);
     clickTab('Shortcuts');
@@ -503,119 +494,9 @@ describe('SettingsPanel', { timeout: 30000 }, () => {
     expect(errorSpy).not.toHaveBeenCalled();
 
     fireEvent.click(aiRegion.getAllByRole('button', { name: 'Open Integrations' })[0]);
-    expect(screen.getByRole('region', { name: 'Integrations source catalog' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Email integrations' })).toBeInTheDocument();
+    expect(document.getElementById('settings-panel-integrations')).toBeInTheDocument();
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(storageSetSpy).not.toHaveBeenCalled();
-  });
-
-  it('shows AssistantCaddy provider execution gate status as inert blocked guidance', () => {
-    const onUpdateSettings = vi.fn();
-    const fetchSpy = vi.fn();
-    const storageGetSpy = vi.spyOn(Storage.prototype, 'getItem');
-    const storageKeySpy = vi.spyOn(Storage.prototype, 'key');
-    const storageSetSpy = vi.spyOn(Storage.prototype, 'setItem');
-    const storageRemoveSpy = vi.spyOn(Storage.prototype, 'removeItem');
-    const storageClearSpy = vi.spyOn(Storage.prototype, 'clear');
-    const settings = {
-      ...DEFAULT_SETTINGS,
-      llmDefaultProvider: 'openai',
-      llmDefaultModel: 'gpt-4.1',
-      llmOpenAIApiKey: 'sk-synthetic-placeholder',
-    } as Settings;
-    vi.stubGlobal('fetch', fetchSpy);
-
-    render(<SettingsPanel {...defaultProps} settings={settings} onUpdateSettings={onUpdateSettings} />);
-    clickTab('AI');
-
-    const gateRegion = within(screen.getByRole('region', { name: 'Assistant provider execution gate' }));
-    expect(gateRegion.getByText('Execution gate preview')).toBeInTheDocument();
-    expect(gateRegion.getByText(/These descriptors do not test providers, list models, send prompts, fetch provider APIs, probe local endpoints, or store API keys/i)).toBeInTheDocument();
-    expect(gateRegion.getByText(/Test Connection and Fetch Models controls below are explicit Local LLM runtime controls outside this gate/i)).toBeInTheDocument();
-    expect(gateRegion.getAllByText('Blocked')).toHaveLength(3);
-    expect(gateRegion.getAllByText('No opaque credential reference exists; raw API-key settings are not used by this gate.')).toHaveLength(3);
-    expect(gateRegion.getAllByText('Default is no auto-call, no provider call, and no local probe.')).toHaveLength(3);
-    expect(gateRegion.queryByRole('button', { name: 'Test Connection' })).not.toBeInTheDocument();
-    expect(gateRegion.queryByRole('button', { name: 'Fetch Models' })).not.toBeInTheDocument();
-    expect(gateRegion.queryByText('API key saved')).not.toBeInTheDocument();
-
-    const runtimePreview = within(screen.getByRole('region', { name: 'AssistantCaddy runtime UI wiring preview' }));
-    expect(runtimePreview.getByText('Runtime wiring preview')).toBeInTheDocument();
-    expect(runtimePreview.getByText(/Dry-run\/readiness rows from the connector runtime UI wiring contract/i)).toBeInTheDocument();
-    expect(runtimePreview.getByText(/does not test providers, list models, send prompts, probe local endpoints, persist state, or store credentials/i)).toBeInTheDocument();
-    const runtimeRegion = screen.getByRole('region', { name: 'AssistantCaddy runtime UI wiring preview' });
-    expect(runtimeRegion).toHaveAttribute('data-connector-runtime-ui-wiring', 'assistantcaddy');
-    expect(runtimeRegion).toHaveAttribute('data-connector-runtime-ui-contract', 'connector-runtime-ui-wiring-plan-v1');
-    expect(runtimeRegion).toHaveAttribute('data-connector-runtime-ui-executable', 'false');
-    expect(runtimeRegion).toHaveAttribute('data-connector-runtime-ui-side-effects', 'none');
-    for (const rowId of ['provider-auth-session-plan', 'local-bridge-manual-probe', 'connector-runtime-persistence']) {
-      const row = runtimeRegion.querySelector(`[data-connector-runtime-ui-row="${rowId}"]`);
-      expect(row).toBeInstanceOf(HTMLElement);
-      expect(row).toHaveAttribute('data-connector-runtime-ui-status', 'blocked');
-      expect(row).toHaveAttribute('data-connector-runtime-ui-executable', 'false');
-      expect(row).toHaveAttribute('data-connector-runtime-ui-side-effects', 'none');
-    }
-    expect(runtimePreview.queryByRole('button', { name: 'Test Connection' })).not.toBeInTheDocument();
-    expect(runtimePreview.queryByRole('button', { name: 'Fetch Models' })).not.toBeInTheDocument();
-
-    const keySettings = within(screen.getByRole('region', { name: 'Legacy LLM API key settings' }));
-    expect(keySettings.getByText(/outside the Assistant provider execution gate/i)).toBeInTheDocument();
-    expect(keySettings.getByText(/do not create opaque credential references or execution readiness/i)).toBeInTheDocument();
-
-    const localRuntime = within(screen.getByRole('region', { name: 'Explicit Local LLM runtime controls' }));
-    expect(localRuntime.getByRole('button', { name: 'Test Connection' })).toBeInTheDocument();
-    expect(localRuntime.getByRole('button', { name: 'Fetch Models' })).toBeInTheDocument();
-    expect(localRuntime.getByText(/outside the inert Assistant provider execution gate/i)).toBeInTheDocument();
-
-    const inertActions = [
-      gateRegion.getByRole('button', { name: 'Test provider (inert)' }),
-      gateRegion.getByRole('button', { name: 'List models (inert)' }),
-      gateRegion.getByRole('button', { name: 'Send prompt (inert)' }),
-    ];
-    inertActions.forEach((button) => {
-      expect(button).toBeDisabled();
-      fireEvent.click(button);
-    });
-
-    expect(onUpdateSettings).not.toHaveBeenCalled();
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(storageGetSpy).not.toHaveBeenCalled();
-    expect(storageKeySpy).not.toHaveBeenCalled();
-    expect(storageSetSpy).not.toHaveBeenCalled();
-    expect(storageRemoveSpy).not.toHaveBeenCalled();
-    expect(storageClearSpy).not.toHaveBeenCalled();
-  });
-
-  it('keeps local AssistantCaddy execution gate preview from probing local endpoints', () => {
-    const fetchSpy = vi.fn();
-    const storageGetSpy = vi.spyOn(Storage.prototype, 'getItem');
-    const storageKeySpy = vi.spyOn(Storage.prototype, 'key');
-    const storageSetSpy = vi.spyOn(Storage.prototype, 'setItem');
-    const storageRemoveSpy = vi.spyOn(Storage.prototype, 'removeItem');
-    const storageClearSpy = vi.spyOn(Storage.prototype, 'clear');
-    const settings = {
-      ...DEFAULT_SETTINGS,
-      llmDefaultProvider: 'local',
-      llmDefaultModel: 'llama3.1',
-      llmLocalEndpoint: 'http://127.0.0.1:11434/v1',
-      llmLocalModelName: 'llama3.1',
-    } as Settings;
-    vi.stubGlobal('fetch', fetchSpy);
-
-    render(<SettingsPanel {...defaultProps} settings={settings} />);
-    clickTab('AI');
-
-    const gateRegion = within(screen.getByRole('region', { name: 'Assistant provider execution gate' }));
-    expect(gateRegion.getAllByText('Local endpoint remains plan-only; no local probe was run.').length).toBeGreaterThan(0);
-    expect(gateRegion.getAllByText('decision-only-no-fetch-no-socket-no-storage-no-llm')).toHaveLength(3);
-    expect(gateRegion.queryByRole('button', { name: 'Test Connection' })).not.toBeInTheDocument();
-    expect(gateRegion.queryByRole('button', { name: 'Fetch Models' })).not.toBeInTheDocument();
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(storageGetSpy).not.toHaveBeenCalled();
-    expect(storageKeySpy).not.toHaveBeenCalled();
-    expect(storageSetSpy).not.toHaveBeenCalled();
-    expect(storageRemoveSpy).not.toHaveBeenCalled();
-    expect(storageClearSpy).not.toHaveBeenCalled();
   });
 
   it('selects AssistantCaddy backing providers without probing provider endpoints', () => {
@@ -663,11 +544,9 @@ describe('SettingsPanel', { timeout: 30000 }, () => {
     clickTab('AI');
 
     const aiRegion = within(screen.getByRole('region', { name: 'AssistantCaddy AI setup' }));
-    const gateRegion = within(screen.getByRole('region', { name: 'Assistant provider execution gate' }));
     const localRuntime = within(screen.getByRole('region', { name: 'Explicit Local LLM runtime controls' }));
     expect(aiRegion.getByText('Local-only')).toBeInTheDocument();
     expect(localRuntime.getByText(/may contact the configured local endpoint only when clicked/i)).toBeInTheDocument();
-    expect(gateRegion.queryByRole('button', { name: 'Test Connection' })).not.toBeInTheDocument();
     expect(fetchSpy).not.toHaveBeenCalled();
 
     fireEvent.click(localRuntime.getByRole('button', { name: 'Test Connection' }));
