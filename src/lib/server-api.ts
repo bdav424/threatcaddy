@@ -1,4 +1,5 @@
-import type { Notification, InvestigationMember, SyncDevice } from '../types';
+import type { Post, Notification, InvestigationMember, SyncDevice } from '../types';
+import type { ActivityEntry } from '../components/CaddyShack/ActivityCard';
 
 // ─── Sync Device Key ─────────────────────────────────────────────
 
@@ -52,7 +53,7 @@ export function initDeviceKey() {
   _deviceKey = getOrCreateDeviceKey();
 }
 
-export interface ActivityEntry {
+export interface AuditLogEntry {
   id: string;
   type: string;
   actor?: { id: string; displayName: string; avatarUrl?: string };
@@ -410,6 +411,59 @@ export async function updateMemberRole(folderId: string, userId: string, role: s
   if (!resp.ok) throw await apiError(resp, 'Failed to update role');
 }
 
+// ─── CaddyShack Posts ────────────────────────────────────────────
+
+export async function createPost(data: {
+  content: string;
+  attachments?: Array<{ id: string; url: string; type: string; mimeType: string; filename: string; size?: number; thumbnailUrl?: string; alt?: string }>;
+  mentions?: string[];
+  folderId?: string | null;
+  parentId?: string | null;
+  replyToId?: string | null;
+  clsLevel?: string | null;
+}): Promise<Post> {
+  const resp = await apiFetch('/api/caddyshack/posts', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  if (!resp.ok) throw await apiError(resp, 'Failed to create post');
+  return resp.json();
+}
+
+export async function fetchPost(postId: string): Promise<Post> {
+  const resp = await apiFetch(`/api/caddyshack/posts/${postId}`);
+  if (!resp.ok) throw new Error('Failed to fetch post');
+  return resp.json();
+}
+
+export async function editPost(postId: string, updates: { content?: string; pinned?: boolean }) {
+  const resp = await apiFetch(`/api/caddyshack/posts/${postId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+  if (!resp.ok) throw await apiError(resp, 'Failed to edit post');
+}
+
+export async function deletePost(postId: string) {
+  const resp = await apiFetch(`/api/caddyshack/posts/${postId}`, { method: 'DELETE' });
+  if (!resp.ok) throw await apiError(resp, 'Failed to delete post');
+}
+
+export async function addReaction(postId: string, emoji: string) {
+  const resp = await apiFetch(`/api/caddyshack/posts/${postId}/reactions`, {
+    method: 'POST',
+    body: JSON.stringify({ emoji }),
+  });
+  if (!resp.ok) throw new Error('Failed to add reaction');
+}
+
+export async function removeReaction(postId: string, emoji: string) {
+  const resp = await apiFetch(`/api/caddyshack/posts/${postId}/reactions/${encodeURIComponent(emoji)}`, {
+    method: 'DELETE',
+  });
+  if (!resp.ok) throw new Error('Failed to remove reaction');
+}
+
 // ─── Files ──────────────────────────────────────────────────────
 
 export async function uploadFile(file: File, folderId?: string): Promise<{
@@ -499,7 +553,7 @@ export async function streamLLMChat(
 
 // ─── Audit ──────────────────────────────────────────────────────
 
-export async function fetchAuditLog(opts: { folderId?: string; userId?: string; since?: string; category?: string; limit?: number }): Promise<ActivityEntry[]> {
+export async function fetchAuditLog(opts: { folderId?: string; userId?: string; since?: string; category?: string; limit?: number }): Promise<AuditLogEntry[]> {
   const params = new URLSearchParams();
   if (opts.folderId) params.set('folderId', opts.folderId);
   if (opts.userId) params.set('userId', opts.userId);
@@ -552,7 +606,23 @@ export async function fetchUserProfile(userId: string): Promise<UserProfile> {
   return resp.json();
 }
 
+export async function fetchUserFeed(userId: string): Promise<Post[]> {
+  const resp = await apiFetch(`/api/users/${userId}/feed`);
+  if (!resp.ok) throw new Error('Failed to fetch user feed');
+  return resp.json();
+}
 
+export async function fetchUserLikes(userId: string): Promise<Post[]> {
+  const resp = await apiFetch(`/api/users/${userId}/likes`);
+  if (!resp.ok) throw new Error('Failed to fetch user likes');
+  return resp.json();
+}
+
+export async function fetchUserActivity(userId: string): Promise<ActivityEntry[]> {
+  const resp = await apiFetch(`/api/users/${userId}/activity`);
+  if (!resp.ok) throw new Error('Failed to fetch user activity');
+  return resp.json();
+}
 
 // ─── Backups ─────────────────────────────────────────────────────
 

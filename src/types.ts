@@ -291,7 +291,7 @@ export type SidebarAccentStyle = 'default' | 'color-chips';
 export type BackgroundEffectPattern = 'none' | 'dots' | 'synapse' | 'rain' | 'constellations' | 'perlin-flow' | 'petals' | 'sparkles' | 'embers' | 'swirls';
 
 /** Top-level view/page the user can navigate to. */
-export type ViewMode = 'dashboard' | 'workspace' | 'notes' | 'tasks' | 'evidence' | 'products' | 'experimental' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat' | 'caddyassistant' | 'cademail' | 'calendarcaddy' | 'caddyshack' | 'agent' | 'investigations' | 'reports' | 'virtualcaddy';
+export type ViewMode = 'dashboard' | 'workspace' | 'notes' | 'tasks' | 'evidence' | 'products' | 'experimental' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat' | 'caddyassistant' | 'cademail' | 'calendarcaddy' | 'caddyshack' | 'agent' | 'investigations' | 'reports' | 'virtualcaddy' | 'netmap';
 export type EditorMode = 'edit' | 'preview' | 'split';
 export type TaskViewMode = 'list' | 'kanban';
 
@@ -471,6 +471,17 @@ export interface VirtualFileEvent {
   filename: string | null;
   dirPath: string;
   timestamp: number;
+}
+
+// ── Network Map Types ────────────────────────────────────────────────
+
+export interface NetworkHost {
+  ip: string;
+  mac: string | null;
+  hostname: string | null;
+  alive: boolean | null;
+  source: 'arp' | 'ping' | 'arp+ping';
+  scannedAt: number;
 }
 
 // ── Agent Host Types ─────────────────────────────────────────────────
@@ -1342,6 +1353,41 @@ export const ACTIVITY_CATEGORY_LABELS: Record<ActivityCategory, { label: string;
   'activityCategory', ACTIVITY_CATEGORY_COLORS,
 );
 
+
+// ─── Social / Team Types ─────────────────────────────────────────────────────
+
+export interface PostAttachment {
+  id: string;
+  url: string;
+  type: 'image' | 'video' | 'audio' | 'document';
+  mimeType: string;
+  filename: string;
+  size?: number;
+  thumbnailUrl?: string;
+  alt?: string;
+}
+
+export interface Post {
+  id: string;
+  authorId: string;
+  content: string;
+  attachments: PostAttachment[];
+  folderId?: string | null;
+  parentId?: string | null;
+  replyToId?: string | null;
+  replyToAuthorName?: string;
+  mentions: string[];
+  clsLevel?: string | null;
+  pinned: boolean;
+  deleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+  authorDisplayName?: string;
+  authorAvatarUrl?: string | null;
+  reactions?: Record<string, { count: number; userIds: string[] }>;
+  replyCount?: number;
+  replies?: Post[];
+}
 
 export type NotificationType = 'mention' | 'reply' | 'reaction' | 'invite' | 'entity-update';
 
