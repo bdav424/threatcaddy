@@ -16,7 +16,7 @@ import type { AgentAction, AgentCycleOutcome, AgentCycleSummary, AgentEntityRef,
 import { DEFAULT_AGENT_POLICY } from '../types';
 import { TOOL_DEFINITIONS, DELEGATION_TOOL_DEFINITIONS, EXECUTIVE_TOOL_DEFINITIONS, isWriteTool } from './llm-tool-defs';
 import { executeTool } from './llm-tools';
-import { getToolDefinitionsForScope } from './tool-scopes';
+import { registry } from './capability-registry';
 import { shouldAutoApprove, getToolActionClass } from './caddy-agent-policy';
 import { resolveRoutingMode, sendViaExtension, sendViaServer, sendDirectToLocal } from './llm-router';
 import { DEFAULT_MODEL_PER_PROVIDER, MODEL_PROVIDER_MAP } from './models';
@@ -683,7 +683,7 @@ async function _runAgentCycleInner(
   const hostTools = getHostToolDefinitions(settings, { llmSafeNames: true });
   const { availableTools: availableToolsRaw, effectiveAllowedTools } = buildAgentToolset({
     profile,
-    baseTools: getToolDefinitionsForScope('investigation', TOOL_DEFINITIONS),
+    baseTools: registry.getToolsFor('operational', { hasActiveInvestigation: true, isDesktop: false }),
     delegationTools: DELEGATION_TOOL_DEFINITIONS,
     executiveTools: EXECUTIVE_TOOL_DEFINITIONS,
     hostTools,

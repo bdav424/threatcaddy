@@ -16,8 +16,8 @@ import { useChatStreamSetter } from '../../contexts/ChatStreamContext';
 import { DEFAULT_MODEL_PER_PROVIDER } from '../../lib/models';
 import { cn, formatDate } from '../../lib/utils';
 import { nanoid } from 'nanoid';
-import { TOOL_DEFINITIONS, buildSystemPrompt, executeTool, isWriteTool, fetchViaExtensionBridge } from '../../lib/llm-tools';
-import { getToolDefinitionsForScope } from '../../lib/tool-scopes';
+import { buildSystemPrompt, executeTool, isWriteTool, fetchViaExtensionBridge } from '../../lib/llm-tools';
+import { registry } from '../../lib/capability-registry';
 import { executeHostSkill, fetchHostSkills, getHostToolDefinitions } from '../../lib/agent-hosts';
 import {
   CTI_CENSYS_TOOL,
@@ -941,7 +941,7 @@ export function ChatView({
 
     // In plan mode, filter out write tools so the LLM can only read/analyze
     const currentMode = activeThread.mode || 'act';
-    const investigationTools = getToolDefinitionsForScope('investigation', TOOL_DEFINITIONS);
+    const investigationTools = registry.getToolsFor('operational', { hasActiveInvestigation: !!effectiveFolderId, isDesktop: false });
     const allTools = llmHostTools.length > 0 ? [...investigationTools, ...llmHostTools] : investigationTools;
     const tools = currentMode === 'plan'
       ? allTools.filter(t => !isWriteTool(t.name))
