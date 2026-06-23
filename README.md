@@ -10,12 +10,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/peterhanily/threatcaddy/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
+  <a href="https://github.com/bdav424/threatcaddy/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
   <img src="https://img.shields.io/badge/version-1.0.0-green.svg" alt="Version 1.0.0" />
   <img src="https://img.shields.io/badge/TypeScript-5.9-blue.svg?logo=typescript&logoColor=white" alt="TypeScript 5.9" />
   <img src="https://img.shields.io/badge/React-19-61dafb.svg?logo=react&logoColor=white" alt="React 19" />
   <img src="https://img.shields.io/badge/Vite-7-646cff.svg?logo=vite&logoColor=white" alt="Vite 7" />
   <img src="https://img.shields.io/badge/PWA-ready-5a0fc8.svg?logo=pwa&logoColor=white" alt="PWA Ready" />
+  <img src="https://img.shields.io/badge/Desktop-Electron-47848f.svg?logo=electron&logoColor=white" alt="Electron Desktop" />
   <a href="https://chromewebstore.google.com/detail/threatcaddy-%E2%80%94-quick-captu/lakelgngpkkaeinfdlnmifookbeeffbh"><img src="https://img.shields.io/badge/Chrome_Web_Store-Extension-4285F4.svg?logo=googlechrome&logoColor=white" alt="Chrome Web Store" /></a>
 </p>
 
@@ -90,6 +91,9 @@ docker compose up -d   # Starts Hono server + PostgreSQL
 ### Task Management
 
 - Priorities, due dates, and statuses with list and kanban views
+- **3-level subtask hierarchy** — Tasks contain subtasks; each subtask can have sub-subtasks. All levels persist in IndexedDB without a schema migration
+- **Drag-to-reorder** — HTML5 drag-and-drop reorders subtasks and sub-subtasks within their parent
+- **Inline edit** — Double-click any subtask or sub-subtask to edit in-place with an auto-growing textarea (Enter saves, Shift+Enter inserts a newline, Escape cancels)
 - Threaded comments on tasks
 
 ---
@@ -102,7 +106,9 @@ Human-driven conversational AI assistant with a deep toolset for threat investig
 - **58 tools** — 46 core tools to search, read, create, and update all entities; 7 delegation tools for Lead Analyst coordination; 5 executive tools for CISO/Chief of Staff. Covers IOC extraction, URL fetching, report generation, and cross-investigation analysis
 - **Slash commands** — `/fetch`, `/search`, `/note`, `/task`, `/iocs`, `/summary`, `/timeline`, `/report`, `/triage`, `/graph`, `/link`
 - **Customizable system prompt** — Editable in Settings with CTI/IR tradecraft baked into the default (MITRE ATT&CK, Diamond Model, Kill Chain, Pyramid of Pain, estimative language, TLP/PAP)
-- **Persistent threads** with auto-generated titles; stays active in the background when switching tabs
+- **Persistent threads** with auto-generated titles
+- **Background continuity** — CaddyAI keeps streaming even when you switch to another panel. A live indicator in the header pulses purple while the model is thinking so you never lose context mid-response
+- **Safe / YOLO mode** — Toggle between requiring confirmation for tool calls (Safe) and fully autonomous execution (YOLO). Mode persists across reloads via localStorage
 
 ---
 
@@ -145,6 +151,7 @@ Deploy a team of AI analysts that run autonomously in the background, enriching 
 - **Agent Souls** — Executives can reflect on performance and accumulate persistent cross-investigation memory via `reflect_on_performance` and `read_soul`
 - **War Bridges** — Emergency all-hands meetings triggered by critical findings (`declare_war_bridge`); escalates to CISO immediately
 - **Agent Metrics** — Each deployment tracks cycles, tool calls, and token usage
+- **Global tool-approval overlay** — When AgentCaddy needs a human decision, a full-screen portal overlay (z-index 9999) appears regardless of which panel is currently visible. You never miss an approval request even when the Chat panel is hidden
 
 #### Agent Hosts — External Skills
 
@@ -164,7 +171,7 @@ Connect any REST API as an agent skill source:
 - **IOC relationships** — Many-to-many links with typed, directional relationships (e.g. domain "resolves-to" IP, hash "exploits" CVE)
 - **Entity graph** — Interactive force-directed graph of IOCs, notes, tasks, and timeline events with drag-to-link, filtering, and multiple layouts
 - **IOC dashboard** — Aggregate stats: type/confidence distribution, top actors, timeline, frequency tables
-- **TLP/PAP classification** — Traffic Light Protocol and Permissible Actions Protocol levels on entities and investigations
+- **TLP/PAP classification** — Traffic Light Protocol and Permissible Actions Protocol levels on entities and investigations. New entities automatically inherit the strictest TLP/PAP level from their parent investigation, removing the need to manually set classification on every IOC, note, and timeline event
 - **Export** — JSON, CSV (grouped or flat), STIX 2.1 bundles; push to External Backup object storage
 
 ### Timeline & Whiteboard
@@ -253,6 +260,42 @@ To send clips to an offline `file://` build, enable **"Allow access to file URLs
 - **Standalone HTML** — Offline version (`pnpm build:single`) with the app and locale packs bundled for `file://` use. The standard standalone PR copy is `/Users/brdavies/workspace/threatcaddy-standalone.html`; run `pnpm standard:standalone` to refresh it from the current repo state
 - **Keyboard shortcuts** — `Ctrl+N` (new note), `Ctrl+O` (open file), `Ctrl+K` (search), `Ctrl+S` (backup), `Ctrl+Shift+T` (new task), `Ctrl+E` (toggle editor mode), `` Ctrl+` `` (toggle preview), `Ctrl+1-4` (switch view), `Ctrl+/` (show shortcuts), `Ctrl+B/I` (bold/italic)
 - **PWA** — Installable progressive web app with offline support via service worker; registers as an OS-level file handler for `.md` and `.txt` files
+- **Accessible UI** — All icon-only buttons carry `title` attributes (and `aria-label` where needed) so screen readers and hover users always know what a control does
+
+---
+
+### Desktop App (Electron)
+
+A native desktop build is available alongside the PWA via `electron-builder`.
+
+```bash
+pnpm desktop:dist:win   # → dist-desktop/ (NSIS installer + portable)
+pnpm desktop:dist:mac   # → dist-desktop/ (DMG + zip)
+pnpm desktop:dist:linux # → dist-desktop/ (AppImage + deb)
+```
+
+**Feature highlights unique to the desktop build:**
+
+| Feature | Details |
+|---------|---------|
+| **Auto-update** | electron-updater polls GitHub Releases on startup (30 s delay). A green "Update ready" badge appears in the header when a new version has downloaded — click to restart and install |
+| **OS keychain** | Mail, calendar, and Slack OAuth tokens are encrypted via Electron `safeStorage` (OS keychain) and never touch the renderer |
+| **Glass / vibrancy** | macOS vibrancy and Windows Acrylic backgrounds via `win.setVibrancy` |
+| **Network map** | ARP/ping subnet scanner — available only in the desktop app |
+| **Virtual bridge** | Watch a VM-shared directory for files and ingest them automatically |
+| **Native window controls** | Min/max, transparent titlebar, and platform-native window chrome |
+
+**Dev workflow:**
+
+```bash
+# Terminal 1 — Vite renderer dev server
+pnpm desktop:dev:renderer
+
+# Terminal 2 — Electron main process (picks up renderer at 127.0.0.1:4173)
+pnpm desktop:dev:main
+```
+
+Updates publish to `github.com/bdav424/threatcaddy` GitHub Releases. Set `GH_TOKEN` when building a release with `pnpm desktop:dist`.
 
 ---
 
@@ -273,6 +316,8 @@ To send clips to an offline `file://` build, enable **"Allow access to file URLs
 | marked + highlight.js + DOMPurify | Markdown rendering |
 | react-i18next | Internationalization |
 | lucide-react | Icons |
+| electron + electron-builder | Desktop app packaging |
+| electron-updater | GitHub Releases auto-update |
 
 ### Server
 
