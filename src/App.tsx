@@ -92,6 +92,7 @@ function normalizeInvestigationName(name?: string): string {
   return (name || '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
 import { ToastProvider, useToast } from './contexts/ToastContext';
+import { ChatStreamProvider } from './contexts/ChatStreamContext';
 import { useTranslation } from 'react-i18next';
 import { ToastContainer } from './components/Common/Toast';
 import { generateInvestigationReport, printReport } from './lib/report';
@@ -145,7 +146,9 @@ export default function App() {
   return (
     <AuthProvider>
       <ToastProvider>
-        <AppDataLayer />
+        <ChatStreamProvider>
+          <AppDataLayer />
+        </ChatStreamProvider>
       </ToastProvider>
     </AuthProvider>
   );

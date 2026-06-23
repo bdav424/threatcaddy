@@ -11,6 +11,7 @@ import { AgentCycleSummaryCard } from '../Agent/AgentCycleSummaryCard';
 import { ChatInput } from './ChatInput';
 import { FortuneIntBar } from './FortuneIntBar';
 import { useLLM } from '../../hooks/useLLM';
+import { useChatStreamSetter } from '../../contexts/ChatStreamContext';
 import { DEFAULT_MODEL_PER_PROVIDER } from '../../lib/models';
 import { cn, formatDate } from '../../lib/utils';
 import { nanoid } from 'nanoid';
@@ -286,6 +287,7 @@ export function ChatView({
   const { selectedChatThreadId: selectedThreadId, setSelectedChatThreadId: onSelectThread } = useNavigation();
   const { selectedFolderId, folders } = useInvestigation();
   const { extensionAvailable, streamingContent, isStreaming, error, toolActivity, sendAgentRequest, abort } = useLLM();
+  const setChatStream = useChatStreamSetter();
   const { t } = useTranslation('chat');
   const { addToast } = useToast();
   const { serverUrl } = useAuth();
@@ -358,6 +360,16 @@ export function ChatView({
   const streamingThreadRef = useRef<string | undefined>(undefined);
   const yoloModeRef = useRef(false);
   useEffect(() => { yoloModeRef.current = yoloMode; }, [yoloMode]);
+
+  // Mirror streaming state into the global ChatStreamContext so other panels can observe it
+  useEffect(() => {
+    setChatStream({
+      isStreaming,
+      streamingThreadId: isStreaming ? (streamingThreadRef.current ?? null) : null,
+      streamingContent: isStreaming ? streamingContent : '',
+      abort: isStreaming ? abort : null,
+    });
+  }, [isStreaming, streamingContent, abort, setChatStream]);
 
   // ── Write tool approval flow (state declared early so handleSend can reference it)
   const [pendingApproval, setPendingApproval] = useState<{
