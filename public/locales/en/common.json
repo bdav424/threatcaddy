@@ -110,6 +110,7 @@
   "sidebar.graph": "Graph",
   "sidebar.reports": "Reports",
   "sidebar.activity": "Activity",
+  "sidebar.virtualCaddy": "VirtualCaddy",
   "sidebar.caddyAI": "CaddyAI",
   "sidebar.caddyAssistant": "AssistantCaddy",
   "sidebar.cadEmail": "EmailCaddy",

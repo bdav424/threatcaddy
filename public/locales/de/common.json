@@ -1,4 +1,4 @@
-{
+﻿{
   "appName": "ThreatCaddy",
   "save": "Speichern",
   "cancel": "Abbrechen",
@@ -104,6 +104,7 @@
   "sidebar.graph": "Graph",
   "sidebar.reports": "Berichte",
   "sidebar.activity": "Aktivität",
+  "sidebar.virtualCaddy": "VirtualCaddy",
   "sidebar.caddyAI": "CaddyAI",
   "sidebar.caddyShack": "Team-Feed",
   "sidebar.agentCaddy": "AgentCaddy",

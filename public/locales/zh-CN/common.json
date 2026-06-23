@@ -104,6 +104,7 @@
   "sidebar.graph": "图谱",,
   "sidebar.reports": "报告",
   "sidebar.activity": "活动",
+  "sidebar.virtualCaddy": "VirtualCaddy",
   "sidebar.caddyAI": "CaddyAI",
   "sidebar.caddyShack": "团队动态",
   "sidebar.agentCaddy": "AgentCaddy",

@@ -291,7 +291,7 @@ export type SidebarAccentStyle = 'default' | 'color-chips';
 export type BackgroundEffectPattern = 'none' | 'dots' | 'synapse' | 'rain' | 'constellations' | 'perlin-flow' | 'petals' | 'sparkles' | 'embers' | 'swirls';
 
 /** Top-level view/page the user can navigate to. */
-export type ViewMode = 'dashboard' | 'workspace' | 'notes' | 'tasks' | 'evidence' | 'products' | 'experimental' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat' | 'caddyassistant' | 'cademail' | 'calendarcaddy' | 'caddyshack' | 'agent' | 'investigations' | 'reports';
+export type ViewMode = 'dashboard' | 'workspace' | 'notes' | 'tasks' | 'evidence' | 'products' | 'experimental' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat' | 'caddyassistant' | 'cademail' | 'calendarcaddy' | 'caddyshack' | 'agent' | 'investigations' | 'reports' | 'virtualcaddy';
 export type EditorMode = 'edit' | 'preview' | 'split';
 export type TaskViewMode = 'list' | 'kanban';
 
@@ -450,6 +450,27 @@ export interface Settings {
   slackAccount?: { credRefId: string; workspaceName: string; userName: string; userId: string } | null;
   /** Incoming webhook URL for agent-initiated outbound Slack posts. */
   slackOutboundWebhookUrl?: string;
+
+  // ── VirtualCaddy ─────────────────────────────────────────────────────────────
+  /** Local directory path watched for VM file ingest. Air-gapped: no network access during reads. */
+  virtualCaddyWatchDir?: string;
+}
+
+// ── VirtualCaddy Types ────────────────────────────────────────────────────────
+
+export interface VirtualFile {
+  name: string;
+  relativePath: string;
+  size: number;
+  mtimeMs: number;
+  ctimeMs: number;
+}
+
+export interface VirtualFileEvent {
+  eventType: 'rename' | 'change';
+  filename: string | null;
+  dirPath: string;
+  timestamp: number;
 }
 
 // ── Agent Host Types ─────────────────────────────────────────────────

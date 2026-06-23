@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron';
 import { registerMailBridge } from './mail-bridge.mjs';
+import { registerVirtualBridge } from './virtual-bridge.mjs';
 import * as cal from './mail-calendar-sync.mjs';
 import { runCalendarOAuthPopout, refreshCalendarToken } from './cal-oauth.mjs';
 import { runSlackOAuthPopout } from './slack-oauth.mjs';
@@ -284,6 +285,7 @@ void clamp;
 app.whenReady().then(() => {
   createWindow();
   registerMailBridge();
+  registerVirtualBridge();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

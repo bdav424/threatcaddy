@@ -104,6 +104,7 @@
   "sidebar.graph": "Граф",,
   "sidebar.reports": "Звіти",
   "sidebar.activity": "Активність",
+  "sidebar.virtualCaddy": "VirtualCaddy",
   "sidebar.caddyAI": "CaddyAI",
   "sidebar.caddyShack": "Стрічка команди",
   "sidebar.agentCaddy": "AgentCaddy",

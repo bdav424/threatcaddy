@@ -60,6 +60,27 @@ contextBridge.exposeInMainWorld('threatcaddySlack', {
     ipcRenderer.invoke('slack:post-webhook', webhookUrl, payload),
 });
 
+// Virtual file-watch bridge — read-only ingest from a VM-shared directory.
+// No network calls cross this boundary; the renderer holds only file snapshots.
+contextBridge.exposeInMainWorld('threatcaddyVirtual', {
+  setWatchDir: (dirPath) => ipcRenderer.invoke('virtual:set-watch-dir', { dirPath }),
+  getWatchDir: () => ipcRenderer.invoke('virtual:get-watch-dir'),
+  listFiles: () => ipcRenderer.invoke('virtual:list-files'),
+  readFile: (relativePath) => ipcRenderer.invoke('virtual:read-file', { relativePath }),
+  stopWatch: () => ipcRenderer.invoke('virtual:stop-watch'),
+  getStatus: () => ipcRenderer.invoke('virtual:get-status'),
+  onFileChanged: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('virtual:file-changed', listener);
+    return () => ipcRenderer.removeListener('virtual:file-changed', listener);
+  },
+  onWatchError: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('virtual:watch-error', listener);
+    return () => ipcRenderer.removeListener('virtual:watch-error', listener);
+  },
+});
+
 contextBridge.exposeInMainWorld('threatcaddyDesktop', {
   isDesktop: true,
   platform: process.platform,

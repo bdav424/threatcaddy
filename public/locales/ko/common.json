@@ -93,6 +93,7 @@
   "sidebar.graph": "그래프",,
   "sidebar.reports": "보고서",
   "sidebar.activity": "활동",
+  "sidebar.virtualCaddy": "VirtualCaddy",
   "sidebar.caddyAI": "CaddyAI",
   "sidebar.caddyShack": "팀 피드",
   "sidebar.agentCaddy": "AgentCaddy",

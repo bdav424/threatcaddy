@@ -5,7 +5,7 @@ import {
   Archive, Settings as SettingsIcon,
   PanelLeftClose, PanelLeft, Github, Download, Chrome, PenTool, Activity, Network, Search, Shield,
   LayoutDashboard, PanelsTopLeft, MessageSquare, LayoutTemplate, ChevronLeft, ChevronDown, ChevronRight,
-  Bot, FileOutput, FlaskConical, Sparkles, Mail, CalendarDays,
+  Bot, FileOutput, FlaskConical, Sparkles, Mail, CalendarDays, Monitor,
 } from 'lucide-react';
 import type { Timeline, Whiteboard, ViewMode } from '../../types';
 import { cn } from '../../lib/utils';
@@ -54,6 +54,7 @@ const NAV_ACCENT_COLORS: Record<string, string> = {
   chat: 'var(--color-purple)',
   caddyshack: 'var(--color-purple)',
   agent: 'var(--color-accent-amber)',
+  virtualcaddy: 'var(--color-accent-green)',
   fortuneint: 'var(--color-accent-blue)',
   settings: 'var(--color-accent-blue)',
   archive: 'var(--color-accent-amber)',
@@ -74,6 +75,7 @@ const INVESTIGATION_GROUP_VIEWS: ViewMode[] = [
   'graph',
   'reports',
   'activity',
+  'virtualcaddy',
 ];
 
 const ASSISTANT_GROUP_VIEWS: ViewMode[] = [
@@ -451,6 +453,14 @@ export function Sidebar({
       onDragStart: (event) => handleWorkspacePanelDragStart(event, 'activity'),
       dataTour: 'activity',
       accentKey: 'activity',
+    },
+    {
+      key: 'virtualcaddy',
+      icon: Monitor,
+      label: t('sidebar.virtualCaddy', { defaultValue: 'VirtualCaddy' }),
+      active: activeView === 'virtualcaddy' && !showTrash && !showArchive,
+      onClick: () => nav(() => navToView('virtualcaddy')),
+      accentKey: 'virtualcaddy',
     },
   ];
 

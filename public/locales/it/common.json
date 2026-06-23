@@ -104,6 +104,7 @@
   "sidebar.graph": "Grafo",,
   "sidebar.reports": "Rapporti",
   "sidebar.activity": "Attività",
+  "sidebar.virtualCaddy": "VirtualCaddy",
   "sidebar.caddyAI": "CaddyAI",
   "sidebar.caddyShack": "Feed del team",
   "sidebar.agentCaddy": "AgentCaddy",

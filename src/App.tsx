@@ -103,6 +103,7 @@ import type { SharePayload, InvestigationBundle } from './lib/share';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 const CaddyShackView = lazy(() => import('./components/CaddyShack/CaddyShackView').then(m => ({ default: m.CaddyShackView })));
 const AppWorkspaceShell = lazy(() => import('./components/WorkspacePanels/AppWorkspaceShell').then(m => ({ default: m.AppWorkspaceShell })));
+const VirtualCaddyWorkspace = lazy(() => import('./components/VirtualCaddy/VirtualCaddyWorkspace').then(m => ({ default: m.VirtualCaddyWorkspace })));
 
 type WorkspacePanelLaunchRequest = {
   view: WorkspacePanelLaunchView;
@@ -235,7 +236,7 @@ function AppDataLayer() {
   const isMobile = useIsMobile();
 
   // Compute safe default view from settings for NavigationProvider
-  const safeDefaultView = settings.defaultView === 'dashboard' || settings.defaultView === 'workspace' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'evidence' || settings.defaultView === 'products' || settings.defaultView === 'experimental' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' || settings.defaultView === 'chat' || settings.defaultView === 'caddyassistant' || settings.defaultView === 'cademail' || settings.defaultView === 'calendarcaddy' || settings.defaultView === 'caddyshack' || settings.defaultView === 'agent' || settings.defaultView === 'investigations' || settings.defaultView === 'reports' ? settings.defaultView : 'notes';
+  const safeDefaultView = settings.defaultView === 'dashboard' || settings.defaultView === 'workspace' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'evidence' || settings.defaultView === 'products' || settings.defaultView === 'experimental' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' || settings.defaultView === 'chat' || settings.defaultView === 'caddyassistant' || settings.defaultView === 'cademail' || settings.defaultView === 'calendarcaddy' || settings.defaultView === 'caddyshack' || settings.defaultView === 'agent' || settings.defaultView === 'investigations' || settings.defaultView === 'reports' || settings.defaultView === 'virtualcaddy' ? settings.defaultView : 'notes';
 
   return (
     <InvestigationProvider
@@ -2759,6 +2760,8 @@ const AppInner = memo(function AppInner({
           null /* WhiteboardView is always-mounted below for workspace panel persistence */
         ) : activeView === 'chat' ? (
           null
+        ) : activeView === 'virtualcaddy' ? (
+          <VirtualCaddyWorkspace />
         ) : activeView === 'investigations' ? (
           <InvestigationsHub
             localFolders={folders}

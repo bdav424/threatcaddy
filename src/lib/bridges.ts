@@ -5,7 +5,7 @@
 // future server-side adapter must satisfy these interfaces. The renderer holds only
 // credentialReferenceIds — raw secrets never cross this boundary.
 
-import type { CalendarEvent, SlackDmThread } from '../types';
+import type { CalendarEvent, SlackDmThread, VirtualFile, VirtualFileEvent } from '../types';
 
 // ─── Mail Bridge ───────────────────────────────────────────────────────────────
 
@@ -58,4 +58,25 @@ export function getSlackBridge(): SlackBridge | null {
 
 export function isDesktopBridge(): boolean {
   return Boolean((globalThis as { threatcaddyDesktop?: { isDesktop?: boolean } }).threatcaddyDesktop?.isDesktop);
+}
+
+// ─── Virtual Bridge ────────────────────────────────────────────────────────────
+// One-way ingest: renderer reads files from a desktop-watched directory.
+// No network calls are ever made during file operations (air-gap constraint).
+
+export interface VirtualBridge {
+  setWatchDir(dirPath: string): Promise<{ ok: boolean; error?: string }>;
+  getWatchDir(): Promise<{ dirPath: string | null }>;
+  listFiles(): Promise<{ files: VirtualFile[]; error?: string }>;
+  readFile(relativePath: string): Promise<{ ok: boolean; content?: string; encoding?: 'utf8' | 'base64'; error?: string }>;
+  stopWatch(): Promise<{ ok: boolean }>;
+  getStatus(): Promise<{ watching: boolean; dirPath: string | null; error: string | null }>;
+  onFileChanged(callback: (event: VirtualFileEvent) => void): () => void;
+  onWatchError(callback: (event: { error: string }) => void): () => void;
+}
+
+type VirtualBridgeGlobal = typeof globalThis & { threatcaddyVirtual?: VirtualBridge };
+
+export function getVirtualBridge(): VirtualBridge | null {
+  return (globalThis as VirtualBridgeGlobal).threatcaddyVirtual ?? null;
 }
