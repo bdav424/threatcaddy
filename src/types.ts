@@ -134,10 +134,19 @@ export type Priority = 'none' | 'low' | 'medium' | 'high';
 /** Kanban-style task status. */
 export type TaskStatus = 'todo' | 'in-progress' | 'done';
 
+export interface SubtaskItem {
+  id: string;
+  text: string;
+  done: boolean;
+  order?: number;
+}
+
 export interface ChecklistItem {
   id: string;
   text: string;
   done: boolean;
+  order?: number;
+  children?: SubtaskItem[];
 }
 
 /** A recorded rejection when a lead agent sends a task back for redo. */

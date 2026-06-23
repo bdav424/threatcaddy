@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { nanoid } from 'nanoid';
 import { X, MessageSquare, Trash2, Search, Plus, CheckSquare, Square } from 'lucide-react';
-import type { Task, Note, TimelineEvent, Priority, TaskStatus, Tag, Folder, IOCTarget, IOCAnalysis, IOCType, TaskComment, ChecklistItem, InvestigationMember } from '../../types';
+import type { Task, Note, TimelineEvent, Priority, TaskStatus, Tag, Folder, IOCTarget, IOCAnalysis, IOCType, TaskComment, ChecklistItem, SubtaskItem, InvestigationMember } from '../../types';
 import { TagInput } from '../Common/TagInput';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { IOCPanel } from '../Analysis/IOCPanel';
@@ -57,8 +57,45 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
   const [titleError, setTitleError] = useState('');
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>(task?.checklist || []);
   const [newChecklistText, setNewChecklistText] = useState('');
+  const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
+  const [editingSubtaskText, setEditingSubtaskText] = useState('');
+  const [editingSubSubtaskKey, setEditingSubSubtaskKey] = useState<string | null>(null);
+  const [editingSubSubtaskText, setEditingSubSubtaskText] = useState('');
+  const [newSubSubtaskText, setNewSubSubtaskText] = useState<Record<string, string>>({});
+  const dragFromRef = useRef<{ type: 'subtask'; idx: number } | { type: 'subsubtask'; parentId: string; idx: number } | null>(null);
 
+  // Declared early so persistChecklist can close over it
   const isEditMode = !!task;
+
+  const persistChecklist = useCallback((updated: ChecklistItem[]) => {
+    setChecklistItems(updated);
+    if (isEditMode && task && onUpdateTask) onUpdateTask(task.id, { checklist: updated.length > 0 ? updated : undefined });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.id, isEditMode, onUpdateTask]);
+
+  const saveEditingSubtask = useCallback(() => {
+    if (!editingSubtaskId) return;
+    const trimmed = editingSubtaskText.trim();
+    if (trimmed) {
+      persistChecklist(checklistItems.map(c => c.id === editingSubtaskId ? { ...c, text: trimmed } : c));
+    }
+    setEditingSubtaskId(null);
+  }, [editingSubtaskId, editingSubtaskText, checklistItems, persistChecklist]);
+
+  const saveEditingSubSubtask = useCallback(() => {
+    if (!editingSubSubtaskKey) return;
+    const [parentId, childId] = editingSubSubtaskKey.split('::');
+    const trimmed = editingSubSubtaskText.trim();
+    if (trimmed) {
+      persistChecklist(checklistItems.map(c =>
+        c.id === parentId
+          ? { ...c, children: (c.children ?? []).map(s => s.id === childId ? { ...s, text: trimmed } : s) }
+          : c
+      ));
+    }
+    setEditingSubSubtaskKey(null);
+  }, [editingSubSubtaskKey, editingSubSubtaskText, checklistItems, persistChecklist]);
+
   const iocCount = task?.iocAnalysis?.iocs.filter((i) => !i.dismissed).length ?? 0;
   const comments = task?.comments ?? [];
 
@@ -278,47 +315,176 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
           />
         </div>
 
-        {/* Checklist */}
+        {/* Subtasks (3-level hierarchy: Task → Subtask → Sub-subtask) */}
         <div>
           <label className="flex items-center gap-1.5 text-xs font-medium text-gray-400 mb-2">
             <CheckSquare size={12} />
-            {t('form.checklistLabel')} {checklistItems.length > 0 && t('form.checklistProgress', { done: checklistItems.filter(c => c.done).length, total: checklistItems.length })}
+            {t('form.checklistLabel')}{checklistItems.length > 0 && ` ${t('form.checklistProgress', { done: checklistItems.reduce((n, c) => n + (c.done ? 1 : 0), 0), total: checklistItems.length })}`}
           </label>
 
           {checklistItems.length > 0 && (
             <div className="space-y-1 mb-2">
-              {checklistItems.map((item) => (
-                <div key={item.id} className="flex items-center gap-2 bg-gray-800/50 rounded-lg px-3 py-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const updated = checklistItems.map(c => c.id === item.id ? { ...c, done: !c.done } : c);
-                      setChecklistItems(updated);
-                      if (isEditMode && task && onUpdateTask) onUpdateTask(task.id, { checklist: updated });
-                    }}
-                    className={cn('shrink-0', item.done ? 'text-green-400' : 'text-gray-500 hover:text-gray-300')}
-                  >
-                    {item.done ? <CheckSquare size={14} /> : <Square size={14} />}
-                  </button>
-                  <span className={cn('text-xs flex-1', item.done && 'line-through text-gray-500')}>{item.text}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const updated = checklistItems.filter(c => c.id !== item.id);
-                      setChecklistItems(updated);
-                      if (isEditMode && task && onUpdateTask) onUpdateTask(task.id, { checklist: updated.length > 0 ? updated : undefined });
-                    }}
-                    className="p-0.5 rounded text-gray-600 hover:text-red-400 shrink-0"
-                    title={t('form.removeItem')}
-                    aria-label={t('form.removeChecklistItem')}
-                  >
-                    <X size={12} />
-                  </button>
+              {checklistItems.map((item, idx) => (
+                <div
+                  key={item.id}
+                  draggable
+                  onDragStart={() => { dragFromRef.current = { type: 'subtask', idx }; }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const from = dragFromRef.current;
+                    if (!from || from.type !== 'subtask' || from.idx === idx) return;
+                    const reordered = [...checklistItems];
+                    const [moved] = reordered.splice(from.idx, 1);
+                    reordered.splice(idx, 0, moved);
+                    persistChecklist(reordered);
+                    dragFromRef.current = null;
+                  }}
+                  className="rounded-lg border border-gray-700/50 bg-gray-800/50 overflow-hidden"
+                >
+                  {/* Subtask row */}
+                  <div className="flex items-center gap-2 px-2 py-1.5">
+                    <span className="text-gray-600 cursor-grab active:cursor-grabbing shrink-0" title={t('form.dragSubtask')}>⠿</span>
+                    <button
+                      type="button"
+                      onClick={() => persistChecklist(checklistItems.map(c => c.id === item.id ? { ...c, done: !c.done } : c))}
+                      className={cn('shrink-0', item.done ? 'text-green-400' : 'text-gray-500 hover:text-gray-300')}
+                    >
+                      {item.done ? <CheckSquare size={13} /> : <Square size={13} />}
+                    </button>
+                    {editingSubtaskId === item.id ? (
+                      <textarea
+                        autoFocus
+                        value={editingSubtaskText}
+                        onChange={(e) => setEditingSubtaskText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEditingSubtask(); }
+                          if (e.key === 'Escape') setEditingSubtaskId(null);
+                        }}
+                        onBlur={saveEditingSubtask}
+                        rows={1}
+                        className="flex-1 bg-gray-900 border border-accent rounded px-2 py-0.5 text-xs text-gray-200 focus:outline-none resize-none overflow-hidden"
+                        style={{ fieldSizing: 'content' } as React.CSSProperties}
+                        maxLength={500}
+                      />
+                    ) : (
+                      <span
+                        className={cn('text-xs flex-1 cursor-text select-text', item.done && 'line-through text-gray-500')}
+                        title={t('form.editSubtask')}
+                        onDoubleClick={() => { setEditingSubtaskId(item.id); setEditingSubtaskText(item.text); }}
+                      >
+                        {item.text}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => persistChecklist(checklistItems.filter(c => c.id !== item.id))}
+                      className="p-0.5 rounded text-gray-600 hover:text-red-400 shrink-0"
+                      title={t('form.removeItem')}
+                      aria-label={t('form.removeChecklistItem')}
+                    >
+                      <X size={11} />
+                    </button>
+                  </div>
+
+                  {/* Sub-subtasks */}
+                  {(item.children ?? []).length > 0 && (
+                    <div className="ps-8 pe-2 pb-1 space-y-0.5">
+                      {(item.children ?? []).map((child, cIdx) => (
+                        <div
+                          key={child.id}
+                          draggable
+                          onDragStart={() => { dragFromRef.current = { type: 'subsubtask', parentId: item.id, idx: cIdx }; }}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            const from = dragFromRef.current;
+                            if (!from || from.type !== 'subsubtask' || from.parentId !== item.id || from.idx === cIdx) return;
+                            const reordered = [...(item.children ?? [])];
+                            const [moved] = reordered.splice(from.idx, 1);
+                            reordered.splice(cIdx, 0, moved);
+                            persistChecklist(checklistItems.map(c => c.id === item.id ? { ...c, children: reordered } : c));
+                            dragFromRef.current = null;
+                          }}
+                          className="flex items-center gap-1.5 py-0.5"
+                        >
+                          <span className="text-gray-700 cursor-grab active:cursor-grabbing text-[10px] shrink-0">⠿</span>
+                          <button
+                            type="button"
+                            onClick={() => persistChecklist(checklistItems.map(c =>
+                              c.id === item.id
+                                ? { ...c, children: (c.children ?? []).map(s => s.id === child.id ? { ...s, done: !s.done } : s) }
+                                : c
+                            ))}
+                            className={cn('shrink-0', child.done ? 'text-green-400' : 'text-gray-600 hover:text-gray-400')}
+                          >
+                            {child.done ? <CheckSquare size={11} /> : <Square size={11} />}
+                          </button>
+                          {editingSubSubtaskKey === `${item.id}::${child.id}` ? (
+                            <textarea
+                              autoFocus
+                              value={editingSubSubtaskText}
+                              onChange={(e) => setEditingSubSubtaskText(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEditingSubSubtask(); }
+                                if (e.key === 'Escape') setEditingSubSubtaskKey(null);
+                              }}
+                              onBlur={saveEditingSubSubtask}
+                              rows={1}
+                              className="flex-1 bg-gray-900 border border-accent rounded px-2 py-0.5 text-[11px] text-gray-200 focus:outline-none resize-none overflow-hidden"
+                              style={{ fieldSizing: 'content' } as React.CSSProperties}
+                              maxLength={500}
+                            />
+                          ) : (
+                            <span
+                              className={cn('text-[11px] flex-1 cursor-text select-text text-gray-400', child.done && 'line-through text-gray-600')}
+                              title={t('form.editSubtask')}
+                              onDoubleClick={() => { setEditingSubSubtaskKey(`${item.id}::${child.id}`); setEditingSubSubtaskText(child.text); }}
+                            >
+                              {child.text}
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => persistChecklist(checklistItems.map(c =>
+                              c.id === item.id ? { ...c, children: (c.children ?? []).filter(s => s.id !== child.id) } : c
+                            ))}
+                            className="p-0.5 rounded text-gray-700 hover:text-red-400 shrink-0"
+                            aria-label={t('form.removeSubtaskItem')}
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add sub-subtask input */}
+                  <div className="ps-8 pe-2 pb-1.5 flex gap-1">
+                    <input
+                      type="text"
+                      maxLength={500}
+                      value={newSubSubtaskText[item.id] ?? ''}
+                      onChange={(e) => setNewSubSubtaskText(prev => ({ ...prev, [item.id]: e.target.value }))}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey && (newSubSubtaskText[item.id] ?? '').trim()) {
+                          e.preventDefault();
+                          const txt = newSubSubtaskText[item.id].trim();
+                          const newChild: SubtaskItem = { id: nanoid(), text: txt, done: false };
+                          persistChecklist(checklistItems.map(c => c.id === item.id ? { ...c, children: [...(c.children ?? []), newChild] } : c));
+                          setNewSubSubtaskText(prev => ({ ...prev, [item.id]: '' }));
+                        }
+                      }}
+                      className="flex-1 bg-transparent border-b border-gray-700 text-[11px] text-gray-400 placeholder-gray-600 focus:outline-none focus:border-accent py-0.5"
+                      placeholder={t('form.addSubSubtaskPlaceholder')}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
           )}
 
+          {/* Add subtask */}
           <div className="flex gap-2">
             <input
               type="text"
@@ -328,11 +494,9 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey && newChecklistText.trim()) {
                   e.preventDefault();
-                  const newItem: ChecklistItem = { id: nanoid(), text: newChecklistText.trim(), done: false };
-                  const updated = [...checklistItems, newItem];
-                  setChecklistItems(updated);
+                  const newItem: ChecklistItem = { id: nanoid(), text: newChecklistText.trim(), done: false, order: checklistItems.length };
+                  persistChecklist([...checklistItems, newItem]);
                   setNewChecklistText('');
-                  if (isEditMode && task && onUpdateTask) onUpdateTask(task.id, { checklist: updated });
                 }
               }}
               className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-accent"
@@ -342,14 +506,13 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
               type="button"
               onClick={() => {
                 if (!newChecklistText.trim()) return;
-                const newItem: ChecklistItem = { id: nanoid(), text: newChecklistText.trim(), done: false };
-                const updated = [...checklistItems, newItem];
-                setChecklistItems(updated);
+                const newItem: ChecklistItem = { id: nanoid(), text: newChecklistText.trim(), done: false, order: checklistItems.length };
+                persistChecklist([...checklistItems, newItem]);
                 setNewChecklistText('');
-                if (isEditMode && task && onUpdateTask) onUpdateTask(task.id, { checklist: updated });
               }}
               disabled={!newChecklistText.trim()}
               className="px-2 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-200 transition-colors"
+              title="Add subtask"
             >
               <Plus size={14} />
             </button>
