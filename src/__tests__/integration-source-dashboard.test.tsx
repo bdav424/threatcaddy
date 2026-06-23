@@ -54,38 +54,35 @@ describe('IntegrationSourceDashboard', { timeout: 20000 }, () => {
       expect(row).toHaveAttribute('data-connector-runtime-ui-side-effects', 'none');
     }
     expect(within(dashboard).getByText(/does not run setup, provider tests, webhooks, local probes, storage, import, or export/i)).toBeInTheDocument();
-    for (const group of ['Email', 'Messaging', 'Threat Intelligence', 'Malware Analysis / Sandbox', 'SIEM / SOAR']) {
+    for (const group of ['Threat Intelligence', 'Malware Analysis / Sandbox', 'SIEM / SOAR']) {
       expect(screen.getByRole('region', { name: `${group} integrations` })).toBeInTheDocument();
     }
+    expect(screen.queryByRole('region', { name: 'Email integrations' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Messaging integrations' })).not.toBeInTheDocument();
     expect(screen.getByText('AbuseIPDB')).toBeInTheDocument();
     expect(screen.getByText('ServiceNow SecOps')).toBeInTheDocument();
     expect(screen.getByText(/^\d+ visible providers out of \d+ total\.$/)).toBeInTheDocument();
 
-    const gmailCard = providerCard('Gmail / Google Workspace');
-    const card = within(gmailCard);
-    expect(gmailCard).toHaveAttribute('data-provider-passive-mode', 'catalog-reference-only');
-    expect(gmailCard).toHaveAttribute('data-provider-source-status', 'design-only');
-    expect(gmailCard).toHaveAttribute('data-provider-configuration-status', 'not-configured');
-    expect(gmailCard).toHaveAttribute('data-provider-action-kind', 'route-descriptor');
-    expect(gmailCard).toHaveAttribute('data-provider-action-status', 'gated');
-    expect(gmailCard).toHaveAttribute('data-provider-action-enabled', 'false');
-    expect(gmailCard).toHaveAttribute('data-provider-action-executable', 'false');
-    expect(gmailCard).toHaveAttribute('data-provider-action-side-effects', 'none');
-    expect(gmailCard).toHaveAttribute('data-provider-action-target-surface', 'assistantcaddy-route');
-    expect(gmailCard).toHaveAttribute('data-provider-action-target-id', 'assistantcaddy-email-setup');
-    expect(gmailCard).toHaveAttribute('data-provider-activation-blocked', 'true');
-    expect(card.queryByText('Design only')).not.toBeInTheDocument();
+    const abuseipdbCard = providerCard('AbuseIPDB');
+    const card = within(abuseipdbCard);
+    expect(abuseipdbCard).toHaveAttribute('data-provider-passive-mode', 'catalog-reference-only');
+    expect(abuseipdbCard).toHaveAttribute('data-provider-source-status', 'builtin-template');
+    expect(abuseipdbCard).toHaveAttribute('data-provider-configuration-status', 'not-configured');
+    expect(abuseipdbCard).toHaveAttribute('data-provider-action-kind', 'disabled-descriptor');
+    expect(abuseipdbCard).toHaveAttribute('data-provider-action-status', 'disabled');
+    expect(abuseipdbCard).toHaveAttribute('data-provider-action-enabled', 'false');
+    expect(abuseipdbCard).toHaveAttribute('data-provider-action-executable', 'false');
+    expect(abuseipdbCard).toHaveAttribute('data-provider-action-side-effects', 'none');
+    expect(abuseipdbCard).toHaveAttribute('data-provider-action-target-surface', 'integration-template');
+    expect(abuseipdbCard).toHaveAttribute('data-provider-action-target-id', 'abuseipdb');
+    expect(abuseipdbCard).toHaveAttribute('data-provider-activation-blocked', 'true');
+    expect(card.queryByText('Built-in template')).not.toBeInTheDocument();
     expect(card.queryByText('Not configured')).not.toBeInTheDocument();
-    expect(card.queryByText('Gated')).not.toBeInTheDocument();
-    expect(card.queryByText('Provider selection card')).not.toBeInTheDocument();
-    expect(card.queryByText('Future OAuth onboarding placeholder')).not.toBeInTheDocument();
-    expect(card.queryByText(/Passive catalog card/i)).not.toBeInTheDocument();
+    expect(card.queryByText('Disabled')).not.toBeInTheDocument();
 
-    fireEvent.click(card.getByRole('button', { name: 'Show Gmail / Google Workspace details' }));
-    expect(card.getByText('Provider selection card')).toBeInTheDocument();
-    expect(card.queryByText('Future OAuth onboarding placeholder')).not.toBeInTheDocument();
-    expect(card.getByText(/Setup opens from its dedicated route/)).toBeInTheDocument();
-    expect(card.getByText(/Dedicated setup route\./)).toBeInTheDocument();
+    fireEvent.click(card.getByRole('button', { name: 'Show AbuseIPDB details' }));
+    expect(card.getByText(/Templates: abuseipdb-check/)).toBeInTheDocument();
+    expect(card.getByText(/Built-in template metadata\./)).toBeInTheDocument();
 
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(getItemSpy).not.toHaveBeenCalled();
@@ -98,40 +95,40 @@ describe('IntegrationSourceDashboard', { timeout: 20000 }, () => {
   it('distinguishes built-in catalog and future-connector descriptors without executable actions', () => {
     render(<IntegrationSourceDashboard />);
 
-    const slackCard = providerCard('Slack');
-    const slack = within(slackCard);
-    expect(slackCard).toHaveAttribute('data-provider-action-kind', 'disabled-descriptor');
-    expect(slackCard).toHaveAttribute('data-provider-action-status', 'disabled');
-    expect(slackCard).toHaveAttribute('data-provider-action-enabled', 'false');
-    expect(slackCard).toHaveAttribute('data-provider-action-executable', 'false');
-    expect(slackCard).toHaveAttribute('data-provider-action-target-surface', 'integration-template');
-    expect(slackCard).toHaveAttribute('data-provider-action-target-id', 'slack');
-    expect(slackCard).toHaveAttribute('data-provider-activation-blocked', 'true');
-    expect(slack.queryByText('Disabled')).not.toBeInTheDocument();
-    fireEvent.click(slack.getByRole('button', { name: 'Show Slack details' }));
-    expect(slack.getByText(/Templates: slack-webhook-notify/)).toBeInTheDocument();
-    expect(slack.getByText(/Built-in template metadata\./)).toBeInTheDocument();
+    const abuseipdbCard2 = providerCard('AbuseIPDB');
+    const abuseipdb2 = within(abuseipdbCard2);
+    expect(abuseipdbCard2).toHaveAttribute('data-provider-action-kind', 'disabled-descriptor');
+    expect(abuseipdbCard2).toHaveAttribute('data-provider-action-status', 'disabled');
+    expect(abuseipdbCard2).toHaveAttribute('data-provider-action-enabled', 'false');
+    expect(abuseipdbCard2).toHaveAttribute('data-provider-action-executable', 'false');
+    expect(abuseipdbCard2).toHaveAttribute('data-provider-action-target-surface', 'integration-template');
+    expect(abuseipdbCard2).toHaveAttribute('data-provider-action-target-id', 'abuseipdb');
+    expect(abuseipdbCard2).toHaveAttribute('data-provider-activation-blocked', 'true');
+    expect(abuseipdb2.queryByText('Disabled')).not.toBeInTheDocument();
+    fireEvent.click(abuseipdb2.getByRole('button', { name: 'Show AbuseIPDB details' }));
+    expect(abuseipdb2.getByText(/Templates: abuseipdb-check/)).toBeInTheDocument();
+    expect(abuseipdb2.getByText(/Built-in template metadata\./)).toBeInTheDocument();
 
-    const teamsCard = providerCard('Microsoft Teams');
-    const teams = within(teamsCard);
-    expect(teamsCard).toHaveAttribute('data-provider-action-kind', 'disabled-descriptor');
-    expect(teamsCard).toHaveAttribute('data-provider-action-status', 'disabled');
-    expect(teamsCard).toHaveAttribute('data-provider-action-enabled', 'false');
-    expect(teamsCard).toHaveAttribute('data-provider-action-executable', 'false');
-    expect(teamsCard).toHaveAttribute('data-provider-action-target-surface', 'provider-catalog');
-    expect(teamsCard).toHaveAttribute('data-provider-action-target-id', 'microsoft-teams');
-    expect(teamsCard).toHaveAttribute('data-provider-activation-blocked', 'true');
-    fireEvent.click(teams.getByRole('button', { name: 'Show Microsoft Teams details' }));
-    expect(teams.getByText(/No setup action is available yet/)).toBeInTheDocument();
-    expect(teams.getByText(/No setup action\./)).toBeInTheDocument();
+    const mispCard = providerCard('MISP');
+    const misp = within(mispCard);
+    expect(mispCard).toHaveAttribute('data-provider-action-kind', 'disabled-descriptor');
+    expect(mispCard).toHaveAttribute('data-provider-action-status', 'disabled');
+    expect(mispCard).toHaveAttribute('data-provider-action-enabled', 'false');
+    expect(mispCard).toHaveAttribute('data-provider-action-executable', 'false');
+    expect(mispCard).toHaveAttribute('data-provider-action-target-surface', 'provider-catalog');
+    expect(mispCard).toHaveAttribute('data-provider-action-target-id', 'misp');
+    expect(mispCard).toHaveAttribute('data-provider-activation-blocked', 'true');
+    fireEvent.click(misp.getByRole('button', { name: 'Show MISP details' }));
+    expect(misp.getByText(/No setup action is available yet/)).toBeInTheDocument();
+    expect(misp.getByText(/No setup action\./)).toBeInTheDocument();
   });
 
   it('opens the legacy integration settings window from compact provider rows', () => {
     const openLegacyTools = vi.fn();
     render(<IntegrationSourceDashboard onOpenLegacyTools={openLegacyTools} />);
 
-    fireEvent.click(within(providerCard('Gmail / Google Workspace')).getByRole('button', {
-      name: 'Open Gmail / Google Workspace integration settings',
+    fireEvent.click(within(providerCard('AbuseIPDB')).getByRole('button', {
+      name: 'Open AbuseIPDB integration settings',
     }));
 
     expect(openLegacyTools).toHaveBeenCalledTimes(1);
@@ -147,40 +144,41 @@ describe('IntegrationSourceDashboard', { timeout: 20000 }, () => {
   it('collapses and expands source groups without removing other groups', () => {
     render(<IntegrationSourceDashboard />);
 
-    const emailRegion = screen.getByRole('region', { name: 'Email integrations' });
-    expect(within(emailRegion).getByText('Gmail / Google Workspace')).toBeInTheDocument();
+    const threatIntelRegion = screen.getByRole('region', { name: 'Threat Intelligence integrations' });
+    expect(within(threatIntelRegion).getByText('AbuseIPDB')).toBeInTheDocument();
 
-    fireEvent.click(within(emailRegion).getByRole('button', { name: 'Collapse Email integrations' }));
-    expect(emailRegion).toHaveAttribute('data-integration-group-collapsed', 'true');
-    expect(within(emailRegion).queryByText('Gmail / Google Workspace')).not.toBeInTheDocument();
-    expect(screen.getByText('Slack')).toBeInTheDocument();
+    fireEvent.click(within(threatIntelRegion).getByRole('button', { name: 'Collapse Threat Intelligence integrations' }));
+    expect(threatIntelRegion).toHaveAttribute('data-integration-group-collapsed', 'true');
+    expect(within(threatIntelRegion).queryByText('AbuseIPDB')).not.toBeInTheDocument();
+    expect(screen.getByText('ServiceNow SecOps')).toBeInTheDocument();
 
-    fireEvent.click(within(emailRegion).getByRole('button', { name: 'Expand Email integrations' }));
-    expect(emailRegion).toHaveAttribute('data-integration-group-collapsed', 'false');
-    expect(within(emailRegion).getByText('Gmail / Google Workspace')).toBeInTheDocument();
+    fireEvent.click(within(threatIntelRegion).getByRole('button', { name: 'Expand Threat Intelligence integrations' }));
+    expect(threatIntelRegion).toHaveAttribute('data-integration-group-collapsed', 'false');
+    expect(within(threatIntelRegion).getByText('AbuseIPDB')).toBeInTheDocument();
   });
 
   it('uses ToolbarSelect-style filters and expands provider details', () => {
     render(<IntegrationSourceDashboard />);
 
     fireEvent.click(screen.getByRole('combobox', { name: 'Filter integration source type' }));
-    fireEvent.click(screen.getByRole('option', { name: 'Messaging' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Threat Intelligence' }));
 
     expect(screen.queryByRole('region', { name: 'Email integrations' })).not.toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Messaging integrations' })).toBeInTheDocument();
-    expect(screen.getByText('Slack')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Messaging integrations' })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Threat Intelligence integrations' })).toBeInTheDocument();
+    expect(screen.getByText('AbuseIPDB')).toBeInTheDocument();
     expect(screen.getByText(/^\d+ visible providers out of \d+ total\.$/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('combobox', { name: 'Filter integration status' }));
     fireEvent.click(screen.getByRole('option', { name: 'Built-in template' }));
-    expect(screen.getByText('Slack')).toBeInTheDocument();
-    expect(screen.queryByText('Microsoft Teams')).not.toBeInTheDocument();
-    expect(screen.getByText(/^1 visible provider out of \d+ total\.$/)).toBeInTheDocument();
+    expect(screen.getByText('AbuseIPDB')).toBeInTheDocument();
+    expect(screen.queryByText('MISP')).not.toBeInTheDocument();
+    expect(screen.getByText(/^\d+ visible providers out of \d+ total\.$/)).toBeInTheDocument();
 
-    const detailsButton = screen.getByRole('button', { name: 'Show Slack details' });
+    const detailsButton = screen.getByRole('button', { name: 'Show AbuseIPDB details' });
     fireEvent.click(detailsButton);
 
-    const details = screen.getByText(/Templates: slack-webhook-notify/);
+    const details = screen.getByText(/Templates: abuseipdb-check/);
     const detailsPanel = details.closest('div');
     expect(detailsPanel).toBeInstanceOf(HTMLElement);
     expect(detailsButton).toHaveAttribute('aria-controls', (detailsPanel as HTMLElement).id);
