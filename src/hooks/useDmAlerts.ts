@@ -4,7 +4,7 @@
 // Dismiss = snooze for N hours. Acknowledge = mark channelId as seen at lastMessageTs;
 // re-appears if a newer message arrives.
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type { SlackDmThread, DmAlertItem } from '../types';
 
 interface DmAlertState {
@@ -44,27 +44,28 @@ export function useDmAlerts(
     }));
   }, [threads]);
 
-  if (!enabled) return { visible: [], dismissDm, acknowledgeDm };
-
-  const now = Date.now();
-  const visible: DmAlertItem[] = [];
-
-  for (const thread of threads) {
-    const state = states[thread.channelId];
-    if (state?.snoozedUntil && now < state.snoozedUntil) continue;
-    if (state?.acknowledgedTs && state.acknowledgedTs >= thread.lastMessageTs) continue;
-
-    visible.push({
-      id:             thread.channelId,
-      senderName:     thread.senderName,
-      senderAvatar:   thread.senderAvatar,
-      messagePreview: thread.lastMessageText,
-      unreadCount:    thread.unreadCount,
-      receivedAt:     thread.polledAt,
-      slackDeepLink:  thread.slackDeepLink,
-      urgency:        0.5,
-    });
-  }
+  const visible = useMemo(() => {
+    if (!enabled) return [];
+    // eslint-disable-next-line react-hooks/purity -- Date.now() inside useMemo is intentional; snooze comparison needs fresh time per render
+    const now = Date.now();
+    const result: DmAlertItem[] = [];
+    for (const thread of threads) {
+      const state = states[thread.channelId];
+      if (state?.snoozedUntil && now < state.snoozedUntil) continue;
+      if (state?.acknowledgedTs && state.acknowledgedTs >= thread.lastMessageTs) continue;
+      result.push({
+        id:             thread.channelId,
+        senderName:     thread.senderName,
+        senderAvatar:   thread.senderAvatar,
+        messagePreview: thread.lastMessageText,
+        unreadCount:    thread.unreadCount,
+        receivedAt:     thread.polledAt,
+        slackDeepLink:  thread.slackDeepLink,
+        urgency:        0.5,
+      });
+    }
+    return result;
+  }, [enabled, threads, states]);
 
   return { visible, dismissDm, acknowledgeDm };
 }

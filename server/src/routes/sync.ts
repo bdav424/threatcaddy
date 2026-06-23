@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { eq, inArray, and, count } from 'drizzle-orm';
+import { eq, inArray, and } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { createHash } from 'node:crypto';
 import { requireAuth } from '../middleware/auth.js';
