@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Zap, Loader2 } from 'lucide-react';
 import { nanoid } from 'nanoid';
@@ -32,19 +33,37 @@ export function RunIntegrationMenu({ ioc, investigation, folderId, source, match
   const [running, setRunning] = useState(false);
   const [resultRun, setResultRun] = useState<IntegrationRun | null>(null);
   const [showResults, setShowResults] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuRect, setMenuRect] = useState<{ left: number; top: number } | null>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close menu on outside click
+  const updateMenuRect = useCallback(() => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setMenuRect({ left: rect.right - 224, top: rect.bottom + 4 });
+  }, []);
+
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+    updateMenuRect();
+    const closeOnOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (!triggerRef.current?.contains(target) && !dropdownRef.current?.contains(target)) {
         setOpen(false);
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
+    const closeOnEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    window.addEventListener('mousedown', closeOnOutside);
+    window.addEventListener('keydown', closeOnEscape);
+    window.addEventListener('resize', updateMenuRect);
+    window.addEventListener('scroll', updateMenuRect, true);
+    return () => {
+      window.removeEventListener('mousedown', closeOnOutside);
+      window.removeEventListener('keydown', closeOnEscape);
+      window.removeEventListener('resize', updateMenuRect);
+      window.removeEventListener('scroll', updateMenuRect, true);
+    };
+  }, [open, updateMenuRect]);
 
   const handleRun = async (installationId: string, templateId: string) => {
     setOpen(false);
@@ -231,7 +250,7 @@ export function RunIntegrationMenu({ ioc, investigation, folderId, source, match
   };
 
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="relative" ref={triggerRef}>
       <button
         onClick={() => setOpen((v) => !v)}
         disabled={running}
@@ -249,8 +268,12 @@ export function RunIntegrationMenu({ ioc, investigation, folderId, source, match
         )}
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1">
+      {open && menuRect && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={dropdownRef}
+          className="fixed z-[260] w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1"
+          style={{ left: menuRect.left, top: menuRect.top }}
+        >
           <div className="px-3 py-1.5 text-[10px] text-gray-500 uppercase tracking-wider font-semibold border-b border-gray-700">
             {t('run.runIntegration')}
           </div>
@@ -282,7 +305,8 @@ export function RunIntegrationMenu({ ioc, investigation, folderId, source, match
               </button>
             ))
           )}
-        </div>
+        </div>,
+        document.body,
       )}
 
       <IntegrationResultModal

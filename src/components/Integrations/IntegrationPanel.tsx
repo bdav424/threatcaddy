@@ -358,7 +358,7 @@ function InstalledTab({
             const isUserCreated = template?.source === 'user' || template?.source === 'community' || template?.source === 'team';
 
             return (
-              <div key={inst.id} className="bg-gray-800 border border-gray-700 rounded-lg p-3">
+              <div key={inst.id} className={`bg-gray-800 border border-gray-700 rounded-lg p-3 isolate${isConfiguring ? ' relative z-10' : ''}`}>
                 <div className="flex items-center gap-3">
                   <TemplateIcon
                     name={template?.name || inst.name}
