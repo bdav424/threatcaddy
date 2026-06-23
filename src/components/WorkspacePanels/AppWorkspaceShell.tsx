@@ -1514,10 +1514,12 @@ function AppWorkspacePane({
 function RoutePanelPopOutSurface({
   title,
   onPopOut,
+  popOutLabel = 'Pop out',
   children,
 }: {
   title: string;
   onPopOut: () => void;
+  popOutLabel?: string;
   children: ReactNode;
 }) {
   return (
@@ -1528,13 +1530,13 @@ function RoutePanelPopOutSurface({
       >
         <button
           type="button"
-          aria-label={`Pop out ${title}`}
-          title={`Pop out ${title}`}
+          aria-label={`${popOutLabel} ${title}`}
+          title={`${popOutLabel} ${title}`}
           onClick={onPopOut}
           className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border-subtle bg-bg-primary/75 px-2.5 text-[10px] font-semibold text-text-secondary shadow-sm transition-colors hover:border-border-medium hover:bg-bg-hover hover:text-text-primary"
         >
           <Maximize2 size={12} aria-hidden="true" />
-          <span>Pop out</span>
+          <span>{popOutLabel}</span>
         </button>
       </div>
       <div className="flex min-h-0 flex-1 flex-col">
@@ -1547,8 +1549,9 @@ function RoutePanelPopOutSurface({
 function DashboardWorkspacePanel({ routeActive, workspacePanelActive, children }: { routeActive: boolean; workspacePanelActive: boolean; children: ReactNode }) {
   const { panel, setMode, setGeometry, focus, restore, close } = useWorkspaceOwnedPanel(dashboardWorkspacePanelId);
 
-  if (routeActive && panel.mode === 'docked') {
-    return <RoutePanelPopOutSurface title={panel.title} onPopOut={() => { setMode('floating'); focus(); }}>{children}</RoutePanelPopOutSurface>;
+  if (routeActive) {
+    const isDocked = panel.mode === 'docked';
+    return <RoutePanelPopOutSurface title={panel.title} popOutLabel={isDocked ? 'Pop out' : 'Dock'} onPopOut={isDocked ? () => { setMode('floating'); focus(); } : () => setMode('docked')}>{children}</RoutePanelPopOutSurface>;
   }
 
   return (
@@ -1588,8 +1591,9 @@ function DashboardWorkspacePanel({ routeActive, workspacePanelActive, children }
 function ActivityWorkspacePanel({ routeActive, workspacePanelActive, children }: { routeActive: boolean; workspacePanelActive: boolean; children: ReactNode }) {
   const { panel, setMode, setGeometry, focus, restore, close } = useWorkspaceOwnedPanel(activityWorkspacePanelId);
 
-  if (routeActive && panel.mode === 'docked') {
-    return <RoutePanelPopOutSurface title={panel.title} onPopOut={() => { setMode('floating'); focus(); }}>{children}</RoutePanelPopOutSurface>;
+  if (routeActive) {
+    const isDocked = panel.mode === 'docked';
+    return <RoutePanelPopOutSurface title={panel.title} popOutLabel={isDocked ? 'Pop out' : 'Dock'} onPopOut={isDocked ? () => { setMode('floating'); focus(); } : () => setMode('docked')}>{children}</RoutePanelPopOutSurface>;
   }
 
   return (
@@ -1629,8 +1633,9 @@ function ActivityWorkspacePanel({ routeActive, workspacePanelActive, children }:
 function ProductsWorkspacePanel({ routeActive, workspacePanelActive, children }: { routeActive: boolean; workspacePanelActive: boolean; children: ReactNode }) {
   const { panel, setMode, setGeometry, focus, restore, close } = useWorkspaceOwnedPanel(productsWorkspacePanelId);
 
-  if (routeActive && panel.mode === 'docked') {
-    return <RoutePanelPopOutSurface title={panel.title} onPopOut={() => { setMode('floating'); focus(); }}>{children}</RoutePanelPopOutSurface>;
+  if (routeActive) {
+    const isDocked = panel.mode === 'docked';
+    return <RoutePanelPopOutSurface title={panel.title} popOutLabel={isDocked ? 'Pop out' : 'Dock'} onPopOut={isDocked ? () => { setMode('floating'); focus(); } : () => setMode('docked')}>{children}</RoutePanelPopOutSurface>;
   }
 
   return (
@@ -1670,8 +1675,9 @@ function ProductsWorkspacePanel({ routeActive, workspacePanelActive, children }:
 function NotesWorkspacePanel({ routeActive, workspacePanelActive, children }: { routeActive: boolean; workspacePanelActive: boolean; children: ReactNode }) {
   const { panel, setMode, setGeometry, focus, restore, close } = useWorkspaceOwnedPanel(notesWorkspacePanelId);
 
-  if (routeActive && panel.mode === 'docked') {
-    return <RoutePanelPopOutSurface title={panel.title} onPopOut={() => { setMode('floating'); focus(); }}>{children}</RoutePanelPopOutSurface>;
+  if (routeActive) {
+    const isDocked = panel.mode === 'docked';
+    return <RoutePanelPopOutSurface title={panel.title} popOutLabel={isDocked ? 'Pop out' : 'Dock'} onPopOut={isDocked ? () => { setMode('floating'); focus(); } : () => setMode('docked')}>{children}</RoutePanelPopOutSurface>;
   }
 
   return (
@@ -1712,8 +1718,9 @@ function NotesWorkspacePanel({ routeActive, workspacePanelActive, children }: { 
 function TasksWorkspacePanel({ routeActive, workspacePanelActive, children }: { routeActive: boolean; workspacePanelActive: boolean; children: ReactNode }) {
   const { panel, setMode, setGeometry, focus, restore, close } = useWorkspaceOwnedPanel(tasksWorkspacePanelId);
 
-  if (routeActive && panel.mode === 'docked') {
-    return <RoutePanelPopOutSurface title={panel.title} onPopOut={() => { setMode('floating'); focus(); }}>{children}</RoutePanelPopOutSurface>;
+  if (routeActive) {
+    const isDocked = panel.mode === 'docked';
+    return <RoutePanelPopOutSurface title={panel.title} popOutLabel={isDocked ? 'Pop out' : 'Dock'} onPopOut={isDocked ? () => { setMode('floating'); focus(); } : () => setMode('docked')}>{children}</RoutePanelPopOutSurface>;
   }
 
   return (

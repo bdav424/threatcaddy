@@ -183,6 +183,7 @@ function EmailCaddyWorkspacePanel({
       onRestore={restore}
       onClose={handleClose}
       active={workspacePanelActive}
+      showFloatingPlaceholder={false}
       preserveChildrenAcrossModes
       deferMount
       minWidth={680}
@@ -202,7 +203,7 @@ function EmailCaddyWorkspacePanel({
       placeholderClassName="m-3"
       bodyClassName="flex min-h-0 flex-1 overflow-hidden p-0"
     >
-      {typeof children === 'function' ? children(compact) : children}
+      {typeof children === 'function' ? children(compact, handleSurfaceDragStart) : children}
     </WorkspacePanel>
   );
 }
@@ -253,6 +254,7 @@ function CalendarCaddyWorkspacePanel({
       onRestore={restore}
       onClose={handleClose}
       active={workspacePanelActive}
+      showFloatingPlaceholder={false}
       preserveChildrenAcrossModes
       deferMount
       minWidth={520}
@@ -271,7 +273,7 @@ function CalendarCaddyWorkspacePanel({
       placeholderClassName="m-1.5 p-2 [&>div]:min-h-[56px]"
       bodyClassName="flex min-h-0 flex-1 overflow-hidden p-0"
     >
-      {typeof children === 'function' ? children(compact, panel.geometry.width) : children}
+      {typeof children === 'function' ? children(compact, panel.geometry.width, handleSurfaceDragStart) : children}
     </WorkspacePanel>
   );
 }

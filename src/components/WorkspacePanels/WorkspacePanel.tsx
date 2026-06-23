@@ -77,6 +77,8 @@ interface WorkspacePanelProps {
   preserveChildrenAcrossModes?: boolean;
   /** Skip rendering bodyChildren until the panel is first activated, then keep them mounted. */
   deferMount?: boolean;
+  /** When false, suppresses the FloatingSourcePlaceholder pill shown in the source slot while the panel is floating. */
+  showFloatingPlaceholder?: boolean;
   active?: boolean;
   minWidth?: number;
   minHeight?: number;
@@ -952,6 +954,7 @@ export function WorkspacePanel({
   preserveChildrenWhenMinimized = false,
   preserveChildrenAcrossModes = false,
   deferMount = false,
+  showFloatingPlaceholder = true,
   active = true,
   minWidth = 300,
   minHeight = 220,
@@ -1377,7 +1380,7 @@ export function WorkspacePanel({
             onRestore={restoreMinimizedPanel}
           />
         )}
-        {mode === 'floating' && active && (
+        {mode === 'floating' && active && showFloatingPlaceholder && (
           <FloatingSourcePlaceholder
             id={id}
             title={title}
@@ -1501,7 +1504,7 @@ export function WorkspacePanel({
         <FloatingSourcePlaceholder
           id={id}
           title={title}
-          hidden={!active || snapped}
+          hidden={!showFloatingPlaceholder || !active || snapped}
           sourceHidden={snapped}
           placeholderClassName={placeholderClassName}
           dockLabel={resolvedReturnLabel}
