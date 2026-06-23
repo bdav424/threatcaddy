@@ -349,8 +349,11 @@ export function ChatView({
     setPendingImages(prev => [...prev, ...attachments]);
   }, []);
 
-  // ── YOLO mode — auto-approve all write tools without prompting
-  const [yoloMode, setYoloMode] = useState(false);
+  // ── YOLO mode — auto-approve all write tools without prompting (persisted in settings)
+  const yoloMode = settings.caddyAiYoloMode ?? false;
+  const setYoloMode = useCallback((val: boolean) => {
+    onUpdateSettings({ caddyAiYoloMode: val });
+  }, [onUpdateSettings]);
   // Track which thread is streaming so we don't show stale content on thread switch
   const streamingThreadRef = useRef<string | undefined>(undefined);
   const yoloModeRef = useRef(false);
@@ -1753,6 +1756,23 @@ export function ChatView({
               />
               )}
             </div>
+
+            {/* YOLO mode persistent warning */}
+            {yoloMode && (
+              <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-red-500/10 border-t border-red-500/20 text-red-400 text-[11px]">
+                <span className="flex items-center gap-1.5">
+                  <Shield size={11} className="shrink-0" />
+                  {t('view.yoloWarning')}
+                </span>
+                <button
+                  onClick={() => setYoloMode(false)}
+                  className="text-red-400/60 hover:text-red-400 transition-colors shrink-0"
+                  title={t('view.yoloOffTitle')}
+                >
+                  <X size={11} />
+                </button>
+              </div>
+            )}
 
             {/* Input */}
           <ChatInput

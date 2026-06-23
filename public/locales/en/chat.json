@@ -27,6 +27,7 @@
     "safeLabel": "Safe",
     "yoloOnTitle": "YOLO mode ON — all tool calls auto-approved",
     "yoloOffTitle": "Click to enable YOLO mode (auto-approve all actions)",
+    "yoloWarning": "⚠️ YOLO mode active — confirmations bypassed",
     "tokSuffix": "tok",
     "tokenTotal": "Total tokens: {{total}}",
     "tokenTotalBudget": "Total tokens: {{total}} / {{budget}} budget",

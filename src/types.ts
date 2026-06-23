@@ -454,6 +454,10 @@ export interface Settings {
   // ── VirtualCaddy ─────────────────────────────────────────────────────────────
   /** Local directory path watched for VM file ingest. Air-gapped: no network access during reads. */
   virtualCaddyWatchDir?: string;
+
+  // ── CaddyAI Behaviour ─────────────────────────────────────────────────────
+  /** When true, CaddyAI auto-approves all write-tool confirmations without prompting. */
+  caddyAiYoloMode?: boolean;
 }
 
 // ── VirtualCaddy Types ────────────────────────────────────────────────────────
