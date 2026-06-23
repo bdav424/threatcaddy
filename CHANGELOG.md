@@ -4,6 +4,16 @@
 
 ### Features
 
+- **S-Virtual / VirtualCaddy static analysis pipeline** — Air-gapped VM-based malware sandbox → IOC ingest system:
+  - **Desktop process** (`desktop/vm-ingest.mjs`): watches `~/ThreatCaddy/VirtualCaddy/ingest/` for dropped files, computes SHA-256, extracts printable strings (min 6 chars) from binary buffers, and runs IOC regex patterns (IPv4, domain, URL, email, MD5/SHA-1/SHA-256, CVE). Results written to `~/ThreatCaddy/VirtualCaddy/results/` as JSON. Zero outbound network calls — air-gap enforced (fs/path/crypto/os only).
+  - **IPC bridge** (`desktop/preload.mjs`): exposes `window.threatcaddyVirtualCaddy` with `submitJob`, `getIngestDir`, `setIngestDir`, `getJobsStatus`, and five event listeners (`onJobComplete`, `onJobStatus`, `onJobError`, `onFileDetected`, `onWatchError`).
+  - **Renderer handler** (`src/lib/virtual-bridge.ts`): on `virtualcaddy:job-complete` — updates the VirtualCaddyJob Dexie record, bulk-adds `StandaloneIOC` entries tagged with `virtualCaddyJobId`, creates a markdown `Note` summarising the job, creates a `TimelineEvent`, and dispatches a `virtualcaddy:enrich-iocs` CustomEvent that prompts CaddyAI enrichment (no direct AI API calls).
+  - **VirtualCaddyPanel** (`src/components/VirtualCaddy/VirtualCaddyPanel.tsx`): drop zone for file submission, reactive Dexie job list via `useLiveQuery`, status badges (queued/running/complete/error). Integrated into the existing `virtualcaddy` nav view as a tabbed layout alongside the file-watcher workspace.
+  - **Dexie schema** (version 36): `virtualCaddyJobs` table with composite index `[investigationId+status]`. Optional `virtualCaddyJobId` field on `Note`, `StandaloneIOC`, and `TimelineEvent`.
+  - **CaddyAI tools**: `submit_virtual_analysis` and `get_virtual_jobs` added to tool definitions, capability registry, and executor.
+  - **Backup/export/cascade** pipeline extended to cover `virtualCaddyJobs`.
+
+
 - Added server-side local OpenAI-compatible LLM routing. The team server now exposes a `local` provider when `LOCAL_LLM_ENDPOINT` or `CODEX_API_ENDPOINT` is configured, allowing `everybody_llmbo` to serve Codex through ThreatCaddy's `/api/llm/chat` route.
 - **Open markdown files as notes** — Open `.md` and `.txt` files directly in the browser via `Ctrl+O` / `Cmd+O` file picker, drag-and-drop anywhere on the app, or the "Open File" item in the New dropdown menu. File name, size, and creation date are captured in the note title. IOCs are auto-extracted on import. Also registers as a PWA file handler for OS-level "Open with" support when installed.
 - **AgentCaddy hardening pass (April 2026)** — six-phase architectural sweep grounded in 2025-2026 multi-agent failure research:
