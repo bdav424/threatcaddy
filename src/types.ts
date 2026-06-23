@@ -88,6 +88,8 @@ export interface Note {
   isFolder?: boolean;
   /** Set true when an observer-role agent created this note — analyst should review before it's trusted as investigation output. */
   reviewRequired?: boolean;
+  /** Links this note to the VirtualCaddy job that created it, if any. */
+  virtualCaddyJobId?: string;
   createdBy?: string;
   updatedBy?: string;
   createdAt: number;
@@ -486,6 +488,21 @@ export interface VirtualFileEvent {
   timestamp: number;
 }
 
+export type VirtualCaddyJobStatus = 'queued' | 'running' | 'complete' | 'error';
+
+export interface VirtualCaddyJob {
+  id: string;
+  investigationId: string;
+  filename: string;
+  fileHash: string;
+  status: VirtualCaddyJobStatus;
+  submittedAt: string;
+  completedAt?: string;
+  errorMessage?: string;
+  extractedIocCount: number;
+  rawResultPath?: string;
+}
+
 // ── Network Map Types ────────────────────────────────────────────────
 
 export interface NetworkHost {
@@ -749,6 +766,8 @@ export interface TimelineEvent {
   latitude?: number;   // WGS84 (-90 to 90)
   longitude?: number;  // WGS84 (-180 to 180)
   comments?: EntityComment[];
+  /** Links this event to the VirtualCaddy job that created it, if any. */
+  virtualCaddyJobId?: string;
   trashed: boolean;
   trashedAt?: number;
   archived: boolean;
@@ -809,6 +828,8 @@ export interface StandaloneIOC {
   linkedEvidenceIds?: string[];
   comments?: EntityComment[];
   enrichment?: Record<string, Array<Record<string, unknown>>>;
+  /** Links this IOC to the VirtualCaddy job that ingested it, if any. */
+  virtualCaddyJobId?: string;
   firstSeen?: number;
   lastSeen?: number;
   assigneeId?: string;
@@ -1322,6 +1343,7 @@ export interface ExportData {
   playbookTemplates?: PlaybookTemplate[];
   reportTemplates?: ReportTemplate[];
   graphSnapshots?: GraphSnapshot[];
+  virtualCaddyJobs?: VirtualCaddyJob[];
 }
 
 export const TAG_COLORS = [

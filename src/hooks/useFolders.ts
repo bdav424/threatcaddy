@@ -75,7 +75,7 @@ export function useFolders() {
   }, []);
 
   const deleteFolderWithContents = useCallback(async (id: string) => {
-    await db.transaction('rw', [db.folders, db.notes, db.tasks, db.timelineEvents, db.whiteboards, db.standaloneIOCs, db.evidenceItems, db.chatThreads, db.agentActions, db.agentDeployments, db.agentMeetings, db.graphSnapshots], async () => {
+    await db.transaction('rw', [db.folders, db.notes, db.tasks, db.timelineEvents, db.whiteboards, db.standaloneIOCs, db.evidenceItems, db.chatThreads, db.agentActions, db.agentDeployments, db.agentMeetings, db.graphSnapshots, db.virtualCaddyJobs], async () => {
       // Collect IDs of entities in this folder (needed for orphan link cleanup)
       const [notesInFolder, tasksInFolder, eventsInFolder] = await Promise.all([
         db.notes.where('folderId').equals(id).primaryKeys(),
@@ -100,6 +100,7 @@ export function useFolders() {
         db.agentDeployments.where('investigationId').equals(id).delete(),
         db.agentMeetings.where('investigationId').equals(id).delete(),
         db.graphSnapshots.where('folderId').equals(id).delete(),
+        db.virtualCaddyJobs.where('investigationId').equals(id).delete(),
       ]);
 
       // Clean orphaned cross-entity links in parallel batches

@@ -1,5 +1,5 @@
 import { db } from '../db';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, StandaloneIOC, EvidenceItem, ChatThread, ChatMessage, NoteTemplate, PlaybookTemplate, PlaybookStep, ReportTemplate, ReportSection, GraphSnapshot, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel, IOCAnalysis, IOCEntry, IOCRelationship, TaskComment, NoteAnnotation, QuickLink, LLMProvider, IOCType, TemplateSource, PlaybookStepEntity, AgentAction, EvidenceExtractionStatus, EvidenceKind, ProductBaselineMetadata } from '../types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, StandaloneIOC, EvidenceItem, ChatThread, ChatMessage, NoteTemplate, PlaybookTemplate, PlaybookStep, ReportTemplate, ReportSection, GraphSnapshot, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel, IOCAnalysis, IOCEntry, IOCRelationship, TaskComment, NoteAnnotation, QuickLink, LLMProvider, IOCType, TemplateSource, PlaybookStepEntity, AgentAction, EvidenceExtractionStatus, EvidenceKind, ProductBaselineMetadata, VirtualCaddyJob } from '../types';
 import { TIMELINE_EVENT_TYPE_LABELS, CONFIDENCE_LEVELS, IOC_TYPE_LABELS } from '../types';
 import { nanoid } from 'nanoid';
 import { normalizeIOCEnrichment } from './ioc-enrichment-persistence';
@@ -27,6 +27,7 @@ export async function exportJSON(): Promise<string> {
   const agentProfiles = await db.agentProfiles.toArray();
   const agentDeployments = await db.agentDeployments.toArray();
   const agentMeetings = await db.agentMeetings.toArray();
+  const virtualCaddyJobs = await db.virtualCaddyJobs.toArray();
 
   // Include quick links from settings if user has customized them
   let quickLinks: QuickLink[] | undefined;
@@ -60,6 +61,7 @@ export async function exportJSON(): Promise<string> {
     playbookTemplates: playbookTemplates.length > 0 ? playbookTemplates : undefined,
     reportTemplates: reportTemplates.length > 0 ? reportTemplates : undefined,
     graphSnapshots: graphSnapshots.length > 0 ? graphSnapshots : undefined,
+    virtualCaddyJobs: virtualCaddyJobs.length > 0 ? virtualCaddyJobs : undefined,
   };
 
   return JSON.stringify(data, null, 2);
@@ -1070,7 +1072,31 @@ function sanitizeQuickLink(raw: unknown): QuickLink | null {
   };
 }
 
-export async function importJSON(json: string): Promise<{ notes: number; tasks: number; folders: number; tags: number; timelineEvents: number; timelines: number; whiteboards: number; standaloneIOCs: number; evidenceItems: number; chatThreads: number; noteTemplates: number; playbookTemplates: number; reportTemplates: number; graphSnapshots: number; agentActions: number; agentProfiles: number; agentDeployments: number; agentMeetings: number }> {
+const VALID_VIRTUAL_CADDY_JOB_STATUSES = ['queued', 'running', 'complete', 'error'];
+
+function sanitizeVirtualCaddyJob(raw: unknown): VirtualCaddyJob | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const id = str(r.id);
+  const investigationId = str(r.investigationId);
+  const filename = str(r.filename);
+  if (!id || !investigationId || !filename) return null;
+  const status = str(r.status, 'complete');
+  return {
+    id,
+    investigationId,
+    filename,
+    fileHash: str(r.fileHash),
+    status: (VALID_VIRTUAL_CADDY_JOB_STATUSES.includes(status) ? status : 'complete') as VirtualCaddyJob['status'],
+    submittedAt: str(r.submittedAt, new Date(0).toISOString()),
+    completedAt: r.completedAt != null ? str(r.completedAt) : undefined,
+    errorMessage: r.errorMessage != null ? str(r.errorMessage) : undefined,
+    extractedIocCount: num(r.extractedIocCount, 0),
+    rawResultPath: r.rawResultPath != null ? str(r.rawResultPath) : undefined,
+  };
+}
+
+export async function importJSON(json: string): Promise<{ notes: number; tasks: number; folders: number; tags: number; timelineEvents: number; timelines: number; whiteboards: number; standaloneIOCs: number; evidenceItems: number; chatThreads: number; noteTemplates: number; playbookTemplates: number; reportTemplates: number; graphSnapshots: number; agentActions: number; agentProfiles: number; agentDeployments: number; agentMeetings: number; virtualCaddyJobs: number }> {
   if (json.length > MAX_IMPORT_SIZE) {
     throw new Error(`Backup file too large (max ${MAX_IMPORT_SIZE / 1024 / 1024} MB)`);
   }
@@ -1156,7 +1182,11 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
   const importedDeployments = (Array.isArray(data.agentDeployments) ? data.agentDeployments : []).map(sanitizeAgentDeployment).filter(Boolean);
   const importedMeetings = (Array.isArray(data.agentMeetings) ? data.agentMeetings : []).map(sanitizeAgentMeeting).filter(Boolean);
 
-  await db.transaction('rw', [db.notes, db.tasks, db.folders, db.tags, db.timelineEvents, db.timelines, db.whiteboards, db.standaloneIOCs, db.evidenceItems, db.chatThreads, db.noteTemplates, db.playbookTemplates, db.reportTemplates, db.graphSnapshots, db.agentActions, db.agentProfiles, db.agentDeployments, db.agentMeetings], async () => {
+  const importedVirtualCaddyJobs = (Array.isArray(data.virtualCaddyJobs) ? data.virtualCaddyJobs : [])
+    .map(sanitizeVirtualCaddyJob)
+    .filter((j: VirtualCaddyJob | null): j is VirtualCaddyJob => j !== null && !!j.id);
+
+  await db.transaction('rw', [db.notes, db.tasks, db.folders, db.tags, db.timelineEvents, db.timelines, db.whiteboards, db.standaloneIOCs, db.evidenceItems, db.chatThreads, db.noteTemplates, db.playbookTemplates, db.reportTemplates, db.graphSnapshots, db.agentActions, db.agentProfiles, db.agentDeployments, db.agentMeetings, db.virtualCaddyJobs], async () => {
     await db.notes.clear();
     await db.tasks.clear();
     await db.folders.clear();
@@ -1192,6 +1222,8 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     if (importedProfiles.length > 0) await db.agentProfiles.bulkAdd(importedProfiles);
     if (importedDeployments.length > 0) await db.agentDeployments.bulkAdd(importedDeployments);
     if (importedMeetings.length > 0) await db.agentMeetings.bulkAdd(importedMeetings);
+    await db.virtualCaddyJobs.clear();
+    if (importedVirtualCaddyJobs.length > 0) await db.virtualCaddyJobs.bulkAdd(importedVirtualCaddyJobs);
   });
 
   // Restore quick links to settings if present in backup
@@ -1223,6 +1255,7 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     agentProfiles: importedProfiles.length,
     agentDeployments: importedDeployments.length,
     agentMeetings: importedMeetings.length,
+    virtualCaddyJobs: importedVirtualCaddyJobs.length,
   };
 }
 

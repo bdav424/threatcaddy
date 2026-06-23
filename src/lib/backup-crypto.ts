@@ -45,6 +45,7 @@ export interface BackupPayload {
     customSlashCommands?: unknown[];
     reportTemplates?: unknown[];
     graphSnapshots?: unknown[];
+    virtualCaddyJobs?: unknown[];
   };
   deletedIds?: Record<string, string[]>;
 }

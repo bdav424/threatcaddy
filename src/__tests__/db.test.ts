@@ -48,7 +48,7 @@ function makeTimelineEvent(overrides: Partial<Parameters<typeof db.timelineEvent
 // ── Schema: all tables exist ────────────────────────────────────────
 
 describe('Database schema', () => {
-  it('exposes all 14 tables', () => {
+  it('exposes all 15 tables', () => {
     expect(db.notes).toBeDefined();
     expect(db.tasks).toBeDefined();
     expect(db.folders).toBeDefined();
@@ -63,10 +63,11 @@ describe('Database schema', () => {
     expect(db.integrationTemplates).toBeDefined();
     expect(db.installedIntegrations).toBeDefined();
     expect(db.integrationRuns).toBeDefined();
+    expect(db.virtualCaddyJobs).toBeDefined();
   });
 
-  it('is at version 35', () => {
-    expect(db.verno).toBe(35);
+  it('is at version 36', () => {
+    expect(db.verno).toBe(36);
   });
 });
 
