@@ -1,4 +1,4 @@
-import { DEFAULT_CLS_LEVELS } from '../types';
+import { DEFAULT_CLS_LEVELS, DEFAULT_PAP_LEVELS } from '../types';
 
 /** Tailwind-compatible style classes for a classification level badge. */
 export interface ClsBadgeStyle {
@@ -49,6 +49,44 @@ export function isAboveClsThreshold(itemLevel: string | undefined, maxLevel: str
 /** Cascade: IOC-level > entity-level > global default > empty string. */
 export function resolveIOCClsLevel(iocLevel?: string, entityLevel?: string, defaultLevel?: string): string {
   return iocLevel || entityLevel || defaultLevel || '';
+}
+
+/** Combined TLP+PAP priority order (highest sensitivity last). */
+const COMBINED_LEVEL_ORDER = [
+  ...DEFAULT_CLS_LEVELS, // TLP:CLEAR ... TLP:RED
+  ...DEFAULT_PAP_LEVELS,  // PAP:WHITE ... PAP:RED
+];
+
+/**
+ * Given a list of entities with optional `clsLevel`, returns the highest-sensitivity
+ * TLP or PAP level found across all items for the given folderId.
+ * Returns undefined when no classified content exists.
+ */
+export function getInheritedClsLevel(
+  folderId: string,
+  entities: { folderId?: string; clsLevel?: string }[],
+): string | undefined {
+  let bestIdx = -1;
+  let bestLevel: string | undefined;
+  for (const e of entities) {
+    if (e.folderId !== folderId || !e.clsLevel) continue;
+    const idx = COMBINED_LEVEL_ORDER.indexOf(e.clsLevel);
+    if (idx > bestIdx) {
+      bestIdx = idx;
+      bestLevel = e.clsLevel;
+    }
+  }
+  return bestLevel;
+}
+
+/** Hex color for a TLP/PAP bottom-border indicator. Returns undefined for CLEAR/WHITE/unknown. */
+export function getTlpBorderColor(level: string | undefined): string | undefined {
+  if (!level) return undefined;
+  const upper = level.toUpperCase();
+  if (upper.includes('RED')) return '#ef4444';
+  if (upper.includes('AMBER')) return '#f97316';
+  if (upper.includes('GREEN')) return '#22c55e';
+  return undefined;
 }
 
 /**

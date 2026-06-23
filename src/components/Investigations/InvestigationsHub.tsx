@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Plus, WifiOff, Briefcase, Search } from 'lucide-react';
 import type { Folder, InvestigationSummary, InvestigationDataMode, Note, Task, TimelineEvent, Whiteboard, StandaloneIOC, ChatThread } from '../../types';
 import { cn } from '../../lib/utils';
+import { getInheritedClsLevel } from '../../lib/classification';
 import { InvestigationCard } from './InvestigationCard';
 import { SupervisorSummary } from '../Agent/SupervisorSummary';
 
@@ -146,6 +147,21 @@ export function InvestigationsHub({
     return map;
   }, [localFolders, allNotes, allTasks, allEvents, allWhiteboards, allIOCs, allChats]);
 
+  // Compute inherited TLP/PAP classification for each local folder
+  const localInheritedClsMap = useMemo(() => {
+    const allEntities = [
+      ...(allNotes ?? []).filter((n) => !n.trashed && !n.archived),
+      ...(allTasks ?? []).filter((t) => !t.trashed && !t.archived),
+      ...(allEvents ?? []).filter((e) => !e.trashed && !e.archived),
+      ...(allIOCs ?? []).filter((i) => !i.trashed && !i.archived),
+    ];
+    const map = new Map<string, string | undefined>();
+    for (const f of localFolders) {
+      map.set(f.id, getInheritedClsLevel(f.id, allEntities) ?? f.clsLevel);
+    }
+    return map;
+  }, [localFolders, allNotes, allTasks, allEvents, allIOCs]);
+
   // Remote-only investigations (not synced locally)
   const remoteOnlyInvestigations = remoteInvestigations.filter((r) => !syncedFolderIds.has(r.folderId) && matchesSearch(r.folder.name) && matchesStatus(r.folder.status));
 
@@ -223,6 +239,7 @@ export function InvestigationsHub({
                   icon={f.icon}
                   description={f.description}
                   clsLevel={f.clsLevel}
+                  inheritedClsLevel={localInheritedClsMap.get(f.id)}
                   entityCounts={localCountsMap.get(f.id) ?? ZERO_COUNTS}
                   dataMode="local"
                   updatedAt={f.updatedAt ?? f.createdAt}
@@ -258,6 +275,7 @@ export function InvestigationsHub({
                   icon={f.icon}
                   description={f.description}
                   clsLevel={f.clsLevel}
+                  inheritedClsLevel={localInheritedClsMap.get(f.id)}
                   entityCounts={localCountsMap.get(f.id) ?? ZERO_COUNTS}
                   dataMode="local"
                   updatedAt={f.updatedAt ?? f.createdAt}
@@ -292,6 +310,7 @@ export function InvestigationsHub({
                     icon={f.icon}
                     description={f.description}
                     clsLevel={f.clsLevel}
+                    inheritedClsLevel={localInheritedClsMap.get(f.id)}
                     entityCounts={remote?.entityCounts ?? localCountsMap.get(f.id) ?? ZERO_COUNTS}
                     memberCount={remote?.memberCount}
                     role={remote?.role}

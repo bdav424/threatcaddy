@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import type { InvestigationDataMode } from '../../types';
 import { formatDate, cn } from '../../lib/utils';
+import { getClsBadgeStyle, getTlpBorderColor } from '../../lib/classification';
 
 export interface InvestigationCardProps {
   folderId: string;
@@ -15,6 +16,7 @@ export interface InvestigationCardProps {
   icon?: string;
   description?: string;
   clsLevel?: string;
+  inheritedClsLevel?: string;
   entityCounts: {
     notes: number;
     tasks: number;
@@ -67,6 +69,7 @@ export function InvestigationCard({
   icon,
   description,
   clsLevel,
+  inheritedClsLevel,
   entityCounts,
   memberCount,
   role,
@@ -87,6 +90,10 @@ export function InvestigationCard({
   const statusLabel = t(`card.status.${status}`);
   const dataModeLabel = t(`card.dataMode.${dataMode}`);
   const dataModeClasses = DATA_MODE_CLASSES[dataMode];
+
+  const effectiveClsLevel = inheritedClsLevel ?? clsLevel;
+  const clsBadgeStyle = effectiveClsLevel ? getClsBadgeStyle(effectiveClsLevel) : null;
+  const tlpBorderColor = getTlpBorderColor(effectiveClsLevel);
 
   const formattedUpdate = updatedAt
     ? typeof updatedAt === 'number'
@@ -143,6 +150,14 @@ export function InvestigationCard({
           style={{ backgroundColor: color }}
         />
       )}
+      {/* TLP border at top when no color strip */}
+      {!color && tlpBorderColor && (
+        <div
+          className="h-[3px] rounded-t-lg"
+          style={{ backgroundColor: tlpBorderColor }}
+          title={`Classification: ${effectiveClsLevel}`}
+        />
+      )}
 
       <div className="p-3">
         {/* Header: name + status badge */}
@@ -159,6 +174,17 @@ export function InvestigationCard({
           <span className="text-sm font-semibold text-text-primary truncate flex-1">
             {name}
           </span>
+          {clsBadgeStyle && effectiveClsLevel && (
+            <span
+              className={cn(
+                'text-[9px] font-mono font-bold px-1 py-0.5 rounded border shrink-0',
+                clsBadgeStyle.bg, clsBadgeStyle.text, clsBadgeStyle.border,
+              )}
+              title={`${inheritedClsLevel ? 'Inherited' : 'Investigation'} classification: ${effectiveClsLevel}`}
+            >
+              {effectiveClsLevel}
+            </span>
+          )}
           <span className={cn('text-[10px] font-medium uppercase tracking-wide shrink-0', sty.text)}>
             {statusLabel}
           </span>
@@ -228,8 +254,8 @@ export function InvestigationCard({
           </p>
         )}
 
-        {/* CLS level */}
-        {clsLevel && (
+        {/* CLS level (folder-level override, shown only when different from inherited) */}
+        {clsLevel && clsLevel !== effectiveClsLevel && (
           <span className="inline-block mt-1.5 text-[10px] font-mono px-1.5 py-0.5 rounded bg-red-500/10 text-red-400">
             {clsLevel}
           </span>
@@ -330,6 +356,14 @@ export function InvestigationCard({
           )}
         </div>
       </div>
+
+      {/* TLP/PAP colored bottom border */}
+      {tlpBorderColor && (
+        <div
+          className="h-[3px] rounded-b-lg"
+          style={{ backgroundColor: tlpBorderColor }}
+        />
+      )}
     </button>
   );
 }
