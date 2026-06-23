@@ -4,8 +4,6 @@ import {
   ChevronRight,
   Filter,
   FlaskConical,
-  Mail,
-  MessageSquare,
   Search,
   Server,
   Shield,
@@ -49,7 +47,7 @@ export interface IntegrationSourceGroup {
   id: SourceGroupId;
   title: string;
   description: string;
-  icon: typeof Mail;
+  icon: typeof Shield | undefined;
   providers: IntegrationSourceProvider[];
 }
 
@@ -63,16 +61,12 @@ const STATUS_OPTIONS: Array<{ value: ProviderStatus | 'all'; label: string }> = 
 
 const GROUP_OPTIONS: Array<{ value: SourceGroupId | 'all'; label: string }> = [
   { value: 'all', label: 'All source types' },
-  { value: 'email', label: 'Email' },
-  { value: 'messaging', label: 'Messaging' },
   { value: 'threat-intelligence', label: 'Threat Intelligence' },
   { value: 'malware-analysis-sandbox', label: 'Malware Analysis / Sandbox' },
   { value: 'siem-soar', label: 'SIEM / SOAR' },
 ];
 
-const GROUP_ICON_BY_ID: Record<SourceGroupId, typeof Mail> = {
-  email: Mail,
-  messaging: MessageSquare,
+const GROUP_ICON_BY_ID: Partial<Record<SourceGroupId, typeof Shield>> = {
   'threat-intelligence': Shield,
   'malware-analysis-sandbox': FlaskConical,
   'siem-soar': Server,
@@ -287,7 +281,10 @@ export function IntegrationSourceDashboard({ onOpenLegacyTools }: IntegrationSou
   const [collapsedGroups, setCollapsedGroups] = useState<Set<SourceGroupId>>(() => new Set());
   const passiveNoticeId = useId();
   const summaryId = useId();
-  const sourceGroups = useMemo(() => buildIntegrationSourceGroups(), []);
+  const sourceGroups = useMemo(
+    () => buildIntegrationSourceGroups().filter((g) => g.id !== 'email' && g.id !== 'messaging'),
+    [],
+  );
 
   const visibleGroups = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -437,7 +434,7 @@ export function IntegrationSourceDashboard({ onOpenLegacyTools }: IntegrationSou
               data-integration-group-collapsed={collapsed ? 'true' : 'false'}
             >
               <div className="flex items-start gap-3">
-                <Icon size={16} className="mt-0.5 shrink-0 text-text-tertiary" />
+                {Icon && <Icon size={16} className="mt-0.5 shrink-0 text-text-tertiary" />}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="text-sm font-semibold text-text-primary">{group.title}</h3>

@@ -1,6 +1,6 @@
 ﻿import { useState, useCallback } from 'react';
 import DOMPurify from 'dompurify';
-import { Github, Download, FlaskConical, Trash2, Bot, X, Shield, RefreshCw, RotateCcw, Plus, Pencil, Wrench, Loader2, CheckCircle2, AlertTriangle, LayoutGrid, Palette, Database, FileText, Link, Keyboard, Zap } from 'lucide-react';
+import { Github, Download, FlaskConical, Trash2, Bot, X, Shield, RefreshCw, RotateCcw, Plus, Pencil, Wrench, Loader2, CheckCircle2, AlertTriangle, LayoutGrid, Palette, Database, FileText, Link, Keyboard, Zap, Mail, MessageSquare, Video, Users, Hash, Bell } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES } from '../../i18n';
 import { useToast } from '../../contexts/ToastContext';
@@ -1175,6 +1175,27 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
                 </div>
               );
             })}
+          </div>
+
+          {/* Notification accounts */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-gray-300">Notification accounts</h3>
+            <p className="text-xs text-gray-500">Connect accounts so AssistantCaddy can send alerts and reminders through your preferred channels.</p>
+            {([
+              { id: 'work-email', label: 'Work Email', Icon: Mail },
+              { id: 'personal-email', label: 'Personal Email', Icon: Mail },
+              { id: 'slack', label: 'Slack', Icon: MessageSquare },
+              { id: 'zoom', label: 'Zoom', Icon: Video },
+              { id: 'teams', label: 'Microsoft Teams', Icon: Users },
+              { id: 'discord', label: 'Discord', Icon: Hash },
+            ] as const).map(({ id, label, Icon }) => (
+              <div key={id} className="flex items-center gap-3 py-2 border-b border-gray-800/60 last:border-0">
+                <Icon size={15} className="shrink-0 text-gray-600" />
+                <span className="flex-1 text-sm text-gray-500">{label}</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-medium border border-gray-700 text-gray-600">Coming soon</span>
+                <Bell size={14} className="text-gray-700 shrink-0" aria-hidden />
+              </div>
+            ))}
           </div>
 
           {/* Slack DM Alerts */}
