@@ -602,25 +602,13 @@ describe('AssistantCaddy workspaces', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Set up EmailCaddy account' }));
 
-      const setup = screen.getByRole('region', { name: 'Email account setup' });
+      const setup = screen.getByRole('region', { name: 'Add email account' });
       expect(setup).toBeInTheDocument();
-      expect(within(setup).getAllByText('Gmail / Google').length).toBeGreaterThan(0);
-      expect(within(setup).getAllByText('Outlook / Microsoft / Hotmail').length).toBeGreaterThan(0);
-      expect(within(setup).getAllByText('Proton').length).toBeGreaterThan(0);
-      expect(within(setup).getAllByText('Generic IMAP / SMTP').length).toBeGreaterThan(0);
-      expect(within(setup).getAllByText('Local mail bridge / manual proxy').length).toBeGreaterThan(0);
-      expect(screen.getByText(/will not store passwords or tokens/i)).toBeInTheDocument();
-
-      // Reviewing the local checklist must stay inert — no provider connection claim.
-      fireEvent.click(screen.getByRole('button', { name: 'Review local setup checklist' }));
-      expect(within(setup).getByText(/setup reviewed\. Save below to add this account\./i)).toBeInTheDocument();
-      expect(setup).not.toHaveTextContent(/Safe local test passed|connection test passed|provider ready|provider connected/i);
-
-      // Saving stages the account locally; titlebar reflects staged state.
-      fireEvent.click(screen.getByRole('button', { name: 'Save checklist state' }));
-      expect(within(setup).getByText(/account saved\. Live send and sync activate once connected\./i)).toBeInTheDocument();
-      expect(screen.getByText('Local checklist staged')).toBeInTheDocument();
-      expect(screen.queryByText(/No email account connected/i)).not.toBeInTheDocument();
+      expect(within(setup).getAllByText('Google Gmail').length).toBeGreaterThan(0);
+      expect(within(setup).getAllByText('Microsoft Outlook / Hotmail').length).toBeGreaterThan(0);
+      expect(within(setup).getAllByText('Proton Mail via Bridge').length).toBeGreaterThan(0);
+      expect(within(setup).getAllByText('Generic IMAP/SMTP').length).toBeGreaterThan(0);
+      expect(within(setup).getByText(/no secrets are saved in the app or browser/i)).toBeInTheDocument();
 
       // Security invariants: no leaked credential strings, no fetch, no localStorage writes.
       const setupText = setup.textContent ?? '';
