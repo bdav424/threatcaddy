@@ -1013,7 +1013,7 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-xl font-bold text-gray-100">{t('title')}</h2>
             {onClose && (
-              <button onClick={onClose} className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200" aria-label={t('closeSettings')}>
+              <button onClick={onClose} className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200" aria-label={t('closeSettings')} title={t('closeSettings')}>
                 <X size={18} />
               </button>
             )}
@@ -1034,6 +1034,7 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
                   aria-controls={`settings-panel-${item.key}`}
                   id={`settings-tab-${item.key}`}
                   onClick={() => setActiveTab(item.key)}
+                  title={item.description}
                   className={`shrink-0 border-b-2 px-0.5 pb-3 text-sm font-medium transition-colors ${
                     active
                       ? 'border-accent text-gray-100'

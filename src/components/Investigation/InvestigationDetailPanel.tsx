@@ -114,6 +114,7 @@ export function InvestigationDetailPanel({
             onClick={onClose}
             className="p-1.5 rounded hover:bg-gray-800 text-gray-400 hover:text-gray-200"
             aria-label="Close"
+            title="Close investigation settings"
           >
             <X size={18} />
           </button>

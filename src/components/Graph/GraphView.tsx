@@ -458,7 +458,7 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
             <div className="bg-gray-900/95 border border-gray-700 rounded-lg shadow-lg p-3 w-52">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold text-gray-300">{t('view.controls')}</span>
-                <button onClick={() => setHelpOpen(false)} className="p-0.5 rounded text-gray-500 hover:text-gray-300" aria-label={t('view.closeHelp')}>
+                <button onClick={() => setHelpOpen(false)} className="p-0.5 rounded text-gray-500 hover:text-gray-300" aria-label={t('view.closeHelp')} title={t('view.closeHelp')}>
                   <XIcon size={12} />
                 </button>
               </div>

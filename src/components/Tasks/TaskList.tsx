@@ -237,6 +237,7 @@ export function TaskListView({
           onClick={() => setShowNewTask(true)}
           className="ms-auto flex h-8 items-center gap-1 rounded-md bg-accent px-2.5 text-xs font-semibold text-white transition-colors hover:bg-accent-hover"
           aria-label={t('list.newTaskAria')}
+          title={t('list.newTask')}
           data-task-new-button={compactTitlebarMode ? undefined : 'true'}
         >
           <Plus size={13} />

@@ -355,7 +355,7 @@ export function AgentPanel({
               <button onClick={() => onOpenSettings('ai')} className="block text-accent-blue hover:underline mt-0.5">{t('panel.openAISettingsLink')}</button>
             )}
           </div>
-          <button onClick={() => setLocalError(null)} className="hover:text-red-300 shrink-0" aria-label={t('panel.dismissError')}><X size={12} /></button>
+          <button onClick={() => setLocalError(null)} className="hover:text-red-300 shrink-0" aria-label={t('panel.dismissError')} title={t('panel.dismissError')}><X size={12} /></button>
         </div>
       )}
 

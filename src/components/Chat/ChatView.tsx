@@ -352,7 +352,7 @@ export function ChatView({
   // ── YOLO mode — auto-approve all write tools without prompting (persisted in settings)
   const yoloMode = settings.caddyAiYoloMode ?? false;
   const setYoloMode = useCallback((val: boolean) => {
-    onUpdateSettings({ caddyAiYoloMode: val });
+    onUpdateSettings?.({ caddyAiYoloMode: val });
   }, [onUpdateSettings]);
   // Track which thread is streaming so we don't show stale content on thread switch
   const streamingThreadRef = useRef<string | undefined>(undefined);
@@ -1513,6 +1513,7 @@ export function ChatView({
                 onClick={() => onSelectThread('')}
                 className="md:hidden p-1.5 -ms-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
                 aria-label={t('view.backToThreads')}
+                title={t('view.backToThreads')}
               >
                 <ArrowLeft size={18} />
               </button>

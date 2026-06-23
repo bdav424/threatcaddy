@@ -72,7 +72,7 @@ export function GraphDetailPanel({ node, edges, allNodes, onClose, onNavigate, o
       <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-800">
         <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: node.color }} />
         <span className="text-sm font-medium text-gray-200 flex-1 truncate">{node.label}</span>
-        <button onClick={onClose} className="p-1 rounded text-gray-500 hover:text-gray-300" aria-label={t('detail.closeDetailPanel')}>
+        <button onClick={onClose} className="p-1 rounded text-gray-500 hover:text-gray-300" aria-label={t('detail.closeDetailPanel')} title={t('detail.closeDetailPanel')}>
           <X size={14} />
         </button>
       </div>
