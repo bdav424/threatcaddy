@@ -863,6 +863,31 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ['message'],
     },
   },
+  // ── VirtualCaddy (desktop air-gap analysis) ─────────────────────────
+  {
+    name: 'submit_virtual_analysis',
+    description: 'Submit a file for air-gapped static analysis via VirtualCaddy. The desktop process computes a SHA-256 hash, extracts printable strings and IOC patterns (IPv4, domain, URL, hash), then pushes the results into the active investigation. No outbound network calls are made during analysis.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        filePath: { type: 'string', description: 'Absolute path to the file to analyze. Must be accessible to the desktop process.' },
+        investigationId: { type: 'string', description: 'ID of the investigation to associate results with. Defaults to the active investigation.' },
+      },
+      required: ['filePath'],
+    },
+  },
+  {
+    name: 'get_virtual_jobs',
+    description: 'List VirtualCaddy analysis jobs for the current investigation, including status, IOC counts, and completion timestamps.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        investigationId: { type: 'string', description: 'Investigation ID to query. Defaults to the active investigation.' },
+        status: { type: 'string', description: 'Optional status filter: queued | running | complete | error' },
+      },
+      required: [],
+    },
+  },
 ];
 
 // ── Delegation tools (Lead agent only) ─────────────────────────────────
@@ -1029,30 +1054,6 @@ export const EXECUTIVE_TOOL_DEFINITIONS = [
       type: 'object' as const,
       properties: {
         agentName: { type: 'string', description: 'Optional: profile name of another agent whose soul you want to read (e.g. "Threat Hunter"). Executive-only — non-executives are restricted to their own soul.' },
-      },
-      required: [],
-    },
-  },
-  {
-    name: 'submit_virtual_analysis',
-    description: 'Submit a file for air-gapped static analysis via VirtualCaddy. The desktop process computes a SHA-256 hash, extracts printable strings and IOC patterns (IPv4, domain, URL, hash), then pushes the results into the active investigation. No outbound network calls are made during analysis.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        filePath: { type: 'string', description: 'Absolute path to the file to analyze. Must be accessible to the desktop process.' },
-        investigationId: { type: 'string', description: 'ID of the investigation to associate results with. Defaults to the active investigation.' },
-      },
-      required: ['filePath'],
-    },
-  },
-  {
-    name: 'get_virtual_jobs',
-    description: 'List VirtualCaddy analysis jobs for the current investigation, including status, IOC counts, and completion timestamps.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        investigationId: { type: 'string', description: 'Investigation ID to query. Defaults to the active investigation.' },
-        status: { type: 'string', description: 'Optional status filter: queued | running | complete | error' },
       },
       required: [],
     },
