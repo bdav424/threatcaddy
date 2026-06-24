@@ -27,15 +27,17 @@ contextBridge.exposeInMainWorld('threatcaddyMail', {
 //   registerAccount(acct) — populates the in-memory accountRegistry in main.mjs
 //                           so IPC pull/create/update/remove handlers can resolve it.
 //                           Must be called on app start for each saved account.
-contextBridge.exposeInMainWorld('threatcaddy', {
-  calendar: {
-    startOAuth:      (providerId)          => ipcRenderer.invoke('calendar:start-oauth',      { providerId }),
-    registerAccount: (account)             => ipcRenderer.invoke('calendar:register-account', account),
-    pull:            (accountId, range)    => ipcRenderer.invoke('calendar:pull',              accountId, range),
-    create:          (accountId, event)    => ipcRenderer.invoke('calendar:create',            accountId, event),
-    update:          (accountId, event)    => ipcRenderer.invoke('calendar:update',            accountId, event),
-    remove:          (accountId, remoteId) => ipcRenderer.invoke('calendar:remove',            accountId, remoteId),
-  },
+//
+// NOTE: intentionally named 'threatcaddyCalendar' (not 'threatcaddy') to avoid
+// colliding with the agent bridge (installAgentBridge) which writes to window.threatcaddy.
+// contextBridge.exposeInMainWorld creates an immutable property, so any second write fails.
+contextBridge.exposeInMainWorld('threatcaddyCalendar', {
+  startOAuth:      (providerId)          => ipcRenderer.invoke('calendar:start-oauth',      { providerId }),
+  registerAccount: (account)             => ipcRenderer.invoke('calendar:register-account', account),
+  pull:            (accountId, range)    => ipcRenderer.invoke('calendar:pull',              accountId, range),
+  create:          (accountId, event)    => ipcRenderer.invoke('calendar:create',            accountId, event),
+  update:          (accountId, event)    => ipcRenderer.invoke('calendar:update',            accountId, event),
+  remove:          (accountId, remoteId) => ipcRenderer.invoke('calendar:remove',            accountId, remoteId),
 });
 
 // Slack DM bridge — pull recent DMs and OAuth connect.

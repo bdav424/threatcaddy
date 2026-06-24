@@ -1,7 +1,7 @@
 // src/lib/bridges.ts
 //
 // Canonical interface definitions for the desktop IPC adapters exposed via preload.mjs.
-// Both the Electron preload (window.threatcaddyMail / window.threatcaddy.calendar) and a
+// Both the Electron preload (window.threatcaddyMail / window.threatcaddyCalendar) and a
 // future server-side adapter must satisfy these interfaces. The renderer holds only
 // credentialReferenceIds — raw secrets never cross this boundary.
 
@@ -32,14 +32,14 @@ export interface DesktopCalendarBridge extends CalendarBridge {
 // ─── Resolvers ────────────────────────────────────────────────────────────────
 
 type MailBridgeGlobal = typeof globalThis & { threatcaddyMail?: MailBridge };
-type CalendarBridgeGlobal = typeof globalThis & { threatcaddy?: { calendar?: DesktopCalendarBridge } };
+type CalendarBridgeGlobal = typeof globalThis & { threatcaddyCalendar?: DesktopCalendarBridge };
 
 export function getMailBridge(): MailBridge | null {
   return (globalThis as MailBridgeGlobal).threatcaddyMail ?? null;
 }
 
 export function getCalendarBridge(): DesktopCalendarBridge | null {
-  return (globalThis as CalendarBridgeGlobal).threatcaddy?.calendar ?? null;
+  return (globalThis as CalendarBridgeGlobal).threatcaddyCalendar ?? null;
 }
 
 // ─── Slack Bridge ──────────────────────────────────────────────────────────────

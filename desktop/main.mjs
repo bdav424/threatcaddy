@@ -10,10 +10,82 @@ import { runSlackOAuthPopout } from './slack-oauth.mjs';
 import { pollSlackDMs } from './slack-sync.mjs';
 import { postSlackWebhook } from './slack-outbound.mjs';
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+
+// ── Static file server (loopback) ──────────────────────────────────────────
+// Serves dist/ over HTTP so Vite-built JS modules load correctly.
+// file:// breaks ES module CORS; a loopback server avoids that.
+
+const MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js':   'text/javascript; charset=utf-8',
+  '.mjs':  'text/javascript; charset=utf-8',
+  '.css':  'text/css; charset=utf-8',
+  '.json': 'application/json',
+  '.png':  'image/png',
+  '.svg':  'image/svg+xml',
+  '.ico':  'image/x-icon',
+  '.woff2': 'font/woff2',
+  '.woff':  'font/woff',
+  '.webmanifest': 'application/manifest+json',
+};
+
+const NO_OP_SW = [
+  "self.addEventListener('install', () => self.skipWaiting());",
+  "self.addEventListener('activate', () => self.clients.claim());",
+].join('\n');
+
+function findPort(start) {
+  return new Promise((resolve, reject) => {
+    const srv = http.createServer();
+    srv.listen(start, '127.0.0.1', () => {
+      const { port } = srv.address();
+      srv.close(() => resolve(port));
+    });
+    srv.on('error', () => {
+      if (start > start + 20) { reject(new Error('No free port found')); return; }
+      findPort(start + 1).then(resolve, reject);
+    });
+  });
+}
+
+function startStaticServer(distDir) {
+  return new Promise((resolve, reject) => {
+    findPort(4174).then((port) => {
+      const indexHtml = path.join(distDir, 'index.html');
+      const server = http.createServer((req, res) => {
+        const urlPath = (req.url || '/').split('?')[0];
+
+        // No-op service worker — prevents PWA from caching in Electron context
+        if (urlPath.endsWith('/sw.js') || urlPath.endsWith('/workbox-') || urlPath.match(/\/workbox-[^/]+\.js$/)) {
+          res.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-store' });
+          res.end(NO_OP_SW);
+          return;
+        }
+
+        const candidate = path.join(distDir, urlPath === '/' ? 'index.html' : urlPath);
+        const ext = path.extname(candidate).toLowerCase();
+        const mimeType = MIME_TYPES[ext] || 'application/octet-stream';
+
+        if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+          res.writeHead(200, { 'Content-Type': mimeType, 'Cache-Control': 'no-store' });
+          res.end(fs.readFileSync(candidate));
+        } else {
+          // SPA fallback — any unknown path serves index.html
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+          res.end(fs.existsSync(indexHtml) ? fs.readFileSync(indexHtml) : '<h1>ThreatCaddy: run pnpm build first</h1>');
+        }
+      });
+
+      server.on('error', reject);
+      server.listen(port, '127.0.0.1', () => resolve({ server, port }));
+    }, reject);
+  });
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -235,7 +307,7 @@ function applyWindowGlass(win, _config = {}) {
   win.setBackgroundColor('#00000000');
 }
 
-function createWindow() {
+function createWindow(loopbackPort) {
   const win = new BrowserWindow({
     width:    1480,
     height:   960,
@@ -274,8 +346,9 @@ function createWindow() {
       console.error('Failed to load renderer URL:', error);
     });
   } else {
-    void win.loadFile(path.join(__dirname, '..', 'dist', 'index.html')).catch((error) => {
-      console.error('Failed to load renderer file:', error);
+    // Load via loopback HTTP server — file:// breaks ES module CORS and Vite chunk resolution
+    void win.loadURL(`http://127.0.0.1:${loopbackPort}/`).catch((error) => {
+      console.error('Failed to load renderer from loopback server:', error);
     });
   }
 
@@ -286,8 +359,16 @@ function createWindow() {
 // The unused `clamp` helper is intentional — retained for future glass-geometry clamping.
 void clamp;
 
-app.whenReady().then(() => {
-  const win = createWindow();
+app.whenReady().then(async () => {
+  let loopbackPort = null;
+  if (!rendererDevUrl) {
+    const distDir = path.join(__dirname, '..', 'dist');
+    const { port } = await startStaticServer(distDir);
+    loopbackPort = port;
+    console.log(`ThreatCaddy loopback server running at http://127.0.0.1:${port}/`);
+  }
+
+  const win = createWindow(loopbackPort);
   registerMailBridge();
   registerVirtualBridge();
   registerVmIngest();
@@ -296,7 +377,7 @@ app.whenReady().then(() => {
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+      createWindow(loopbackPort);
     }
   });
 });
