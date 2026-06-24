@@ -438,7 +438,7 @@ describe('exportJSON / importJSON roundtrip', () => {
 
     // Re-import through sanitizers
     const counts = await importJSON(json);
-    expect(counts).toEqual({ notes: 1, tasks: 1, folders: 1, tags: 1, timelineEvents: 1, timelines: 1, whiteboards: 0, standaloneIOCs: 0, evidenceItems: 0, chatThreads: 0, noteTemplates: 0, playbookTemplates: 0, reportTemplates: 0, agentActions: 0, agentProfiles: 0, agentDeployments: 0, agentMeetings: 0, graphSnapshots: 0 });
+    expect(counts).toEqual({ notes: 1, tasks: 1, folders: 1, tags: 1, timelineEvents: 1, timelines: 1, whiteboards: 0, standaloneIOCs: 0, evidenceItems: 0, chatThreads: 0, noteTemplates: 0, playbookTemplates: 0, reportTemplates: 0, agentActions: 0, agentProfiles: 0, agentDeployments: 0, agentMeetings: 0, graphSnapshots: 0, virtualCaddyJobs: 0 });
 
     // Verify Note fields
     const notes = await db.notes.toArray();
