@@ -184,7 +184,9 @@ export function InvestigationCard({
             <span
               className={cn(
                 'text-[9px] font-mono font-bold px-1 py-0.5 rounded border shrink-0',
-                clsBadgeStyle.bg, clsBadgeStyle.text, clsBadgeStyle.border,
+                effectiveClsLevel.toUpperCase().includes('CLEAR')
+                  ? 'tlp-clear-badge'
+                  : cn(clsBadgeStyle.bg, clsBadgeStyle.text, clsBadgeStyle.border),
               )}
               title={`${inheritedClsLevel ? 'Inherited' : 'Investigation'} classification: ${effectiveClsLevel}`}
             >

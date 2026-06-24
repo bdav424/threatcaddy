@@ -14,6 +14,7 @@ import {
 } from 'react';
 import { useNavigation } from '../../contexts/NavigationContext';
 import { useInvestigation } from '../../contexts/InvestigationContext';
+import { RoutePopOutContext } from '../../contexts/RoutePopOutContext';
 import { downloadFile } from '../../lib/export';
 import { ClsBadge } from '../Common/ClsBadge';
 import { ToolbarSelect, type ToolbarSelectOption } from '../Common/ToolbarSelect';
@@ -2103,7 +2104,15 @@ function ChatWorkspacePanel({ routeActive, workspacePanelActive, children }: { r
   const { panel, setMode, setGeometry, focus, restore, close } = useWorkspaceOwnedPanel(chatWorkspacePanelId);
 
   if (routeActive && panel.mode === 'docked') {
-    return <RoutePanelPopOutSurface title={panel.title} onPopOut={() => { setMode('floating'); focus(); }}>{children}</RoutePanelPopOutSurface>;
+    // Provide the pop-out callback via context so ChatView can render the button
+    // inline in its own action bar rather than in a dedicated row above it.
+    return (
+      <RoutePopOutContext.Provider value={{ label: 'Pop out', onPopOut: () => { setMode('floating'); focus(); } }}>
+        <div className="relative flex h-full min-h-0 flex-1 flex-col" data-app-route-panel-surface={panel.title.toLowerCase()}>
+          <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+        </div>
+      </RoutePopOutContext.Provider>
+    );
   }
 
   return (

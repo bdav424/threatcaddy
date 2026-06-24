@@ -761,7 +761,12 @@ export function Sidebar({
               </span>
               <div className="flex-1" />
               <span
-                className={cn('text-[9px] font-mono font-bold px-1 py-px rounded border shrink-0', clsBadgeStyle.bg, clsBadgeStyle.text, clsBadgeStyle.border)}
+                className={cn(
+                  'text-[9px] font-mono font-bold px-1 py-px rounded border shrink-0',
+                  effectiveClsLevel.toUpperCase().includes('CLEAR')
+                    ? 'tlp-clear-badge'
+                    : cn(clsBadgeStyle.bg, clsBadgeStyle.text, clsBadgeStyle.border),
+                )}
                 title={`Classification: ${effectiveClsLevel}`}
               >
                 {effectiveClsLevel}

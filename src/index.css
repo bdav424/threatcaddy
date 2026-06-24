@@ -275,6 +275,24 @@ samp,
 .light .focus\:border-accent:focus { border-color: #4f46e5; }
 .light .focus\:ring-accent:focus { --tw-ring-color: #4f46e5; }
 
+/* ─── TLP:CLEAR badge — frosted glass, adapts to light/dark theme ─── */
+/* Default (dark): frosted white */
+.tlp-clear-badge {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  color: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+/* Light mode: blue glass tinge */
+.light .tlp-clear-badge {
+  background: rgba(80, 100, 160, 0.18);
+  border-color: rgba(80, 100, 180, 0.35) !important;
+  color: rgba(40, 55, 120, 0.9);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
 /* ─── Appearance token bridge for existing Tailwind utility surfaces ─── */
 body.bg-gray-950,
 .bg-gray-950 {

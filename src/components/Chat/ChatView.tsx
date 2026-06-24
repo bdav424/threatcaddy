@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Virtuoso } from 'react-virtuoso';
-import { Plus, Trash2, MessageSquare, Share2, Pencil, FileText, Key, Puzzle, Shield, ArrowLeft, Square, RefreshCw, Eye, Play, Check, X, FolderPlus, ChevronRight, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, MessageSquare, Share2, Pencil, FileText, Key, Puzzle, Shield, ArrowLeft, Square, RefreshCw, Eye, Play, Check, X, FolderPlus, ChevronRight, ChevronDown, Maximize2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { AgentHost, ChatThread, ChatMessage, LLMProvider, Settings, ToolUseBlock, ToolCallRecord } from '../../types';
 import { ClsSelect } from '../Common/ClsSelect';
@@ -13,6 +13,7 @@ import { ChatInput } from './ChatInput';
 import { FortuneIntBar } from './FortuneIntBar';
 import { useLLM } from '../../hooks/useLLM';
 import { useChatStreamSetter } from '../../contexts/ChatStreamContext';
+import { useRoutePopOut } from '../../contexts/RoutePopOutContext';
 import { DEFAULT_MODEL_PER_PROVIDER } from '../../lib/models';
 import { cn, formatDate } from '../../lib/utils';
 import { nanoid } from 'nanoid';
@@ -291,6 +292,7 @@ export function ChatView({
   const setChatStream = useChatStreamSetter();
   const { t } = useTranslation('chat');
   const { addToast } = useToast();
+  const routePopOut = useRoutePopOut();
   const { serverUrl } = useAuth();
   const serverConnected = !!serverUrl;
   const effectiveRoute = resolveRoutingMode(settings.llmRoutingMode, extensionAvailable, serverConnected);
@@ -1639,6 +1641,18 @@ export function ChatView({
                     title={t('view.shareChat')}
                   >
                     <Share2 size={14} />
+                  </button>
+                )}
+                {routePopOut && (
+                  <button
+                    type="button"
+                    onClick={routePopOut.onPopOut}
+                    className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border-subtle bg-bg-primary/75 px-2.5 text-[10px] font-semibold text-text-secondary shadow-sm transition-colors hover:border-border-medium hover:bg-bg-hover hover:text-text-primary ms-1"
+                    title={`${routePopOut.label} CaddyAI`}
+                    aria-label={`${routePopOut.label} CaddyAI`}
+                  >
+                    <Maximize2 size={12} aria-hidden="true" />
+                    <span>{routePopOut.label}</span>
                   </button>
                 )}
               </div>
