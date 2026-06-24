@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import type { InvestigationDataMode } from '../../types';
 import { formatDate, cn } from '../../lib/utils';
-import { getClsBadgeStyle, getTlpBorderColor } from '../../lib/classification';
+import { getClsBadgeStyle } from '../../lib/classification';
+import { useInvestigationClassification } from '../../hooks/useInvestigationClassification';
 
 export interface InvestigationCardProps {
   folderId: string;
@@ -93,7 +94,16 @@ export function InvestigationCard({
 
   const effectiveClsLevel = inheritedClsLevel ?? clsLevel;
   const clsBadgeStyle = effectiveClsLevel ? getClsBadgeStyle(effectiveClsLevel) : null;
-  const tlpBorderColor = getTlpBorderColor(effectiveClsLevel);
+
+  // Live TLP level from content (notes/IOCs/events) — used for border treatment only
+  const liveClsLevel = useInvestigationClassification(folderId);
+  const tlpOutlineColor = (() => {
+    const u = liveClsLevel.toUpperCase();
+    if (u.includes('RED')) return '#cc0000';
+    if (u.includes('AMBER')) return '#ff8c00';
+    if (u.includes('GREEN')) return '#007a00';
+    return 'rgba(255,255,255,0.15)';
+  })();
 
   const formattedUpdate = updatedAt
     ? typeof updatedAt === 'number'
@@ -139,23 +149,19 @@ export function InvestigationCard({
         'w-full text-start rounded-lg border transition-all duration-200 cursor-pointer',
         'hover:scale-[1.01] hover:shadow-lg',
         active
-          ? 'border-purple bg-purple/5 shadow-md'
+          ? 'bg-purple/5 shadow-md'
           : 'border-border-subtle bg-bg-raised hover:border-border-medium',
       )}
+      style={active
+        ? { border: `1.5px solid ${tlpOutlineColor}` }
+        : { boxShadow: `inset 2px 0 0 ${tlpOutlineColor}` }
+      }
     >
       {/* Color strip */}
       {color && (
         <div
           className="h-1 rounded-t-lg"
           style={{ backgroundColor: color }}
-        />
-      )}
-      {/* TLP border at top when no color strip */}
-      {!color && tlpBorderColor && (
-        <div
-          className="h-[3px] rounded-t-lg"
-          style={{ backgroundColor: tlpBorderColor }}
-          title={`Classification: ${effectiveClsLevel}`}
         />
       )}
 
@@ -357,13 +363,6 @@ export function InvestigationCard({
         </div>
       </div>
 
-      {/* TLP/PAP colored bottom border */}
-      {tlpBorderColor && (
-        <div
-          className="h-[3px] rounded-b-lg"
-          style={{ backgroundColor: tlpBorderColor }}
-        />
-      )}
     </button>
   );
 }
