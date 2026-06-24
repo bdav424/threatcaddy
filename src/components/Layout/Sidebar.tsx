@@ -5,7 +5,7 @@ import {
   Archive, Settings as SettingsIcon,
   PanelLeftClose, PanelLeft, Github, Download, Chrome, PenTool, Activity, Network, Search, Shield,
   LayoutDashboard, PanelsTopLeft, MessageSquare, LayoutTemplate, ChevronLeft, ChevronDown, ChevronRight,
-  Bot, FileOutput, FlaskConical, Sparkles, Mail, CalendarDays, Monitor, Network,
+  Bot, FileOutput, FlaskConical, Sparkles, Mail, CalendarDays, Monitor,
 } from 'lucide-react';
 import type { Timeline, Whiteboard, ViewMode } from '../../types';
 import { cn } from '../../lib/utils';
