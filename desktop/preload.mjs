@@ -136,9 +136,28 @@ contextBridge.exposeInMainWorld('threatcaddyVirtualCaddy', {
 // Network map bridge — subnet ARP/ping scan. Only available in desktop app.
 // Scans local /24 subnets only; no internet-routable probes.
 contextBridge.exposeInMainWorld('threatcaddyNetmap', {
+  // Legacy batch methods (NetMapWorkspace)
   scan: () => ipcRenderer.invoke('netmap:scan'),
   arpOnly: () => ipcRenderer.invoke('netmap:arp-only'),
   ping: (ip) => ipcRenderer.invoke('netmap:ping', { ip }),
+
+  // Streaming scan (NetworkMapPanel) — start returns immediately; devices arrive via events
+  startScan: (params) => ipcRenderer.invoke('netmap:start-scan', params),
+  detectSubnet: () => ipcRenderer.invoke('netmap:detect-subnet'),
+
+  // Desktop → renderer: a device was discovered mid-scan
+  onDeviceFound: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('netmap:device-found', listener);
+    return () => ipcRenderer.removeListener('netmap:device-found', listener);
+  },
+
+  // Desktop → renderer: scan finished (or failed)
+  onScanComplete: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('netmap:scan-complete', listener);
+    return () => ipcRenderer.removeListener('netmap:scan-complete', listener);
+  },
 });
 
 contextBridge.exposeInMainWorld('threatcaddyDesktop', {

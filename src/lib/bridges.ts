@@ -128,10 +128,43 @@ export function getVirtualCaddyBridge(): VirtualCaddyIngestBridge | null {
 // ─── Netmap Bridge ─────────────────────────────────────────────────────────────
 // ARP/ping subnet scan — desktop only. No internet-routable probes; local /24 only.
 
+export interface NetmapDeviceFoundPayload {
+  scanJobId: string;
+  investigationId: string;
+  device: {
+    id: string;
+    investigationId: string;
+    scanJobId: string;
+    ip: string;
+    mac?: string;
+    hostname?: string;
+    vendor?: string;
+    openPorts?: number[];
+    status: 'online' | 'offline' | 'unknown';
+    firstSeen: string;
+    lastSeen: string;
+    addedToInvestigation: boolean;
+  };
+}
+
+export interface NetmapScanCompletePayload {
+  scanJobId: string;
+  investigationId: string;
+  completedAt: string;
+  deviceCount: number;
+  errorMessage?: string;
+}
+
 export interface NetmapBridge {
+  // Legacy batch (NetMapWorkspace)
   scan(): Promise<{ ok: boolean; hosts: NetworkHost[]; error?: string }>;
   arpOnly(): Promise<{ ok: boolean; hosts: NetworkHost[]; error?: string }>;
   ping(ip: string): Promise<{ ok: boolean; ip: string; alive: boolean; error?: string }>;
+  // Streaming (NetworkMapPanel)
+  startScan(params: { investigationId?: string; subnet?: string }): Promise<{ ok: boolean; scanJobId: string; startedAt: string; subnet: string; error?: string }>;
+  detectSubnet(): Promise<{ subnet: string }>;
+  onDeviceFound(callback: (payload: NetmapDeviceFoundPayload) => void): () => void;
+  onScanComplete(callback: (payload: NetmapScanCompletePayload) => void): () => void;
 }
 
 type NetmapBridgeGlobal = typeof globalThis & { threatcaddyNetmap?: NetmapBridge };
