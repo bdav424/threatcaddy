@@ -7064,3 +7064,25 @@ Air-gapped VM sandbox → IOC ingest pipeline. 5 commits on master:
 - Full suite: 3164+ passed (see final run)
 
 **Air-gap invariants verified:** `vm-ingest.mjs` uses only `node:fs`, `node:path`, `node:crypto`, `node:os` — zero outbound calls. No fetch/WebSocket/exec in any `src/lib/` file. No secrets in localStorage.
+
+### S-netmap (Network Map Panel) — DONE 2026-06-24
+
+LAN device discovery via ARP + TCP probe → IOC/pivot-graph promotion. 5 commits on master:
+
+| # | Hash | Scope |
+|---|------|-------|
+| 1 | `ceb29898` | Data model — `NetworkDevice` + `NetworkScanJob` types, Dexie schema v37, backup/export/cascade |
+| 2 | `44525af1` | `desktop/net-scan.mjs` — LAN discovery via ARP + TCP probe (fs/path/crypto/os/net/dns only) |
+| 3 | `3a4bda44` | IPC bridge — preload `exposeInMainWorld`, `netmap-bridge.ts` renderer Dexie handler |
+| 4 | `b9e959b1` | `NetworkMapPanel` UI (scan controls + live device list) + CaddyAI LLM tools (67 total) + capability registry |
+| 5 | TBD | Tests (18 new) + ledger update |
+
+**Gates:**
+- `pnpm exec tsc --noEmit --skipLibCheck`: exit 0
+- `pnpm lint`: exit 0 (warnings only — pre-existing non-null-assertion pattern)
+- `llm-tools.test.ts`: 80/80 passed (TOOL_DEFINITIONS.length = 67, +5 get_network_devices tests)
+- `netmap-bridge.test.ts`: 7/7 passed
+- `network-map-panel.test.tsx`: 6/6 passed
+- Full suite: 3184 passed / 17 skipped / 0 failed (baseline 3166 + 18 new)
+
+**Air-gap invariants verified:** `net-scan.mjs` uses only `node:fs`, `node:path`, `node:crypto`, `node:os`, `node:net`, `node:dns`, `node:child_process` — LAN-only, zero outbound calls. No fetch/WebSocket/exec/postMessage in any `src/lib/` file. No secrets in localStorage or renderer bundle.

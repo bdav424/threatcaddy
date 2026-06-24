@@ -865,3 +865,62 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('1 notes');
   });
 });
+
+describe('executeTool — get_network_devices', () => {
+  const ts = new Date().toISOString();
+
+  beforeEach(async () => {
+    await db.networkDevices.clear();
+    await db.networkScanJobs.clear();
+  });
+
+  it('returns empty device list for investigation with no devices', async () => {
+    const { result } = await executeTool(makeToolUse('get_network_devices', {}), 'inv-1');
+    const parsed = JSON.parse(result);
+    expect(parsed.totalDevices).toBe(0);
+    expect(parsed.devices).toHaveLength(0);
+    expect(parsed.investigationId).toBe('inv-1');
+  });
+
+  it('returns devices scoped to investigation', async () => {
+    await db.networkDevices.bulkAdd([
+      { id: 'd1', investigationId: 'inv-1', scanJobId: 'job-1', ip: '10.0.0.1', status: 'online', firstSeen: ts, lastSeen: ts, addedToInvestigation: false },
+      { id: 'd2', investigationId: 'inv-2', scanJobId: 'job-2', ip: '10.0.0.2', status: 'online', firstSeen: ts, lastSeen: ts, addedToInvestigation: false },
+    ]);
+
+    const { result } = await executeTool(makeToolUse('get_network_devices', {}), 'inv-1');
+    const parsed = JSON.parse(result);
+    expect(parsed.totalDevices).toBe(1);
+    expect(parsed.devices[0].ip).toBe('10.0.0.1');
+  });
+
+  it('filters by scanJobId when provided', async () => {
+    await db.networkDevices.bulkAdd([
+      { id: 'd1', investigationId: 'inv-1', scanJobId: 'job-a', ip: '10.0.0.1', status: 'online', firstSeen: ts, lastSeen: ts, addedToInvestigation: false },
+      { id: 'd2', investigationId: 'inv-1', scanJobId: 'job-b', ip: '10.0.0.2', status: 'online', firstSeen: ts, lastSeen: ts, addedToInvestigation: false },
+    ]);
+
+    const { result } = await executeTool(makeToolUse('get_network_devices', { scanJobId: 'job-a' }), 'inv-1');
+    const parsed = JSON.parse(result);
+    expect(parsed.totalDevices).toBe(1);
+    expect(parsed.devices[0].ip).toBe('10.0.0.1');
+  });
+
+  it('filters by statusFilter when provided', async () => {
+    await db.networkDevices.bulkAdd([
+      { id: 'd1', investigationId: 'inv-1', scanJobId: 'job-1', ip: '10.0.0.1', status: 'online', firstSeen: ts, lastSeen: ts, addedToInvestigation: false },
+      { id: 'd2', investigationId: 'inv-1', scanJobId: 'job-1', ip: '10.0.0.2', status: 'offline', firstSeen: ts, lastSeen: ts, addedToInvestigation: false },
+    ]);
+
+    const { result } = await executeTool(makeToolUse('get_network_devices', { statusFilter: 'online' }), 'inv-1');
+    const parsed = JSON.parse(result);
+    expect(parsed.totalDevices).toBe(1);
+    expect(parsed.devices[0].status).toBe('online');
+  });
+
+  it('returns error when no investigation context', async () => {
+    const { result } = await executeTool(makeToolUse('get_network_devices', {}));
+    const parsed = JSON.parse(result);
+    expect(parsed.error).toContain('No active investigation');
+  });
+});
