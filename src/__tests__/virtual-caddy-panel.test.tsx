@@ -24,7 +24,7 @@ vi.mock('dexie', async () => {
   const actual = await vi.importActual<typeof import('dexie')>('dexie');
   return {
     ...actual,
-    liveQuery: (_fn: () => unknown) => ({
+    liveQuery: () => ({
       subscribe: ({ next }: { next: (r: unknown) => void; error?: (e: unknown) => void }) => {
         Promise.resolve([]).then(next).catch(() => {});
         return { unsubscribe: vi.fn() };
