@@ -33,6 +33,7 @@ import { IntegrationPanel } from '../Integrations/IntegrationPanel';
 import { AppearanceSettings } from './AppearanceSettings';
 import { AgentHostsConfig } from './AgentHostsConfig';
 import { SystemHygienePanel } from './SystemHygienePanel';
+import { CredentialVault } from './CredentialVault';
 import { getLocalLlmHealthUrl, normalizeLocalLlmEndpoint } from '../../lib/local-llm-endpoint';
 
 function SystemPromptEditor({ value, onChange }: { value?: string; onChange: (v: string | undefined) => void }) {
@@ -1070,6 +1071,9 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
             <p className="text-xs text-gray-500">{t('general.syncedDevicesDesc')}</p>
             <SyncDevicesPanel />
           </div>
+
+          {/* Security — Credential Vault (desktop only; hidden in web/SPA mode) */}
+          <CredentialVault />
 
           {/* Identity */}
           {(() => {

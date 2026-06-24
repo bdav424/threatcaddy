@@ -162,6 +162,18 @@ contextBridge.exposeInMainWorld('threatcaddyNetmap', {
   },
 });
 
+// Credential vault bridge — export/import all safeStorage credentials as an
+// AES-256-GCM encrypted .tckeys file. Secrets never cross to the renderer;
+// only success/count/filePath are returned.
+contextBridge.exposeInMainWorld('threatcaddyCreds', {
+  export: (password) =>
+    ipcRenderer.invoke('creds:export', { password }),
+  import: ({ filePath, base64, password }) =>
+    ipcRenderer.invoke('creds:import', { filePath, base64, password }),
+  openFile: () =>
+    ipcRenderer.invoke('creds:open-file'),
+});
+
 contextBridge.exposeInMainWorld('threatcaddyDesktop', {
   isDesktop: true,
   platform: process.platform,
