@@ -1,5 +1,6 @@
 import { useEffect, useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { getEdition } from '../../lib/edition';
 import {
   FileText, FileSearch, ListChecks, Clock, Trash2, Briefcase,
   Archive, Settings as SettingsIcon,
@@ -674,6 +675,11 @@ export function Sidebar({
             accentStyle={sidebarAccentStyle}
             accentColor={accentColorFor('expand')}
           />
+          {(getEdition() !== 'pro' || import.meta.env.DEV) && (
+            <span className="text-[8px] font-mono font-bold px-1 py-0.5 rounded bg-purple/10 text-purple/60 border border-purple/20">
+              {getEdition() === 'lite' ? 'L' : getEdition() === 'mobile' ? 'M' : 'P'}
+            </span>
+          )}
         </div>
       </nav>
     );
@@ -1152,6 +1158,11 @@ export function Sidebar({
           <SettingsIcon size={14} />
           <span>{t('sidebar.settings')}</span>
         </button>
+        {(getEdition() !== 'pro' || import.meta.env.DEV) && (
+          <span className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-purple/10 text-purple/70 border border-purple/20 shrink-0">
+            {getEdition() === 'lite' ? 'Lite' : getEdition() === 'mobile' ? 'Mobile' : 'Pro'}
+          </span>
+        )}
         <div className="flex-1" />
         <button
           onClick={() => nav(() => { setShowArchive(!showArchive); setShowTrash(false); setSelectedFolderId(undefined); setSelectedTag(undefined); })}
