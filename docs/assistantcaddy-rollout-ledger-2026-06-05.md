@@ -7075,7 +7075,7 @@ LAN device discovery via ARP + TCP probe → IOC/pivot-graph promotion. 5 commit
 | 2 | `44525af1` | `desktop/net-scan.mjs` — LAN discovery via ARP + TCP probe (fs/path/crypto/os/net/dns only) |
 | 3 | `3a4bda44` | IPC bridge — preload `exposeInMainWorld`, `netmap-bridge.ts` renderer Dexie handler |
 | 4 | `b9e959b1` | `NetworkMapPanel` UI (scan controls + live device list) + CaddyAI LLM tools (67 total) + capability registry |
-| 5 | TBD | Tests (18 new) + ledger update |
+| 5 | `7fd7dafe` | Tests (18 new) + ledger update |
 
 **Gates:**
 - `pnpm exec tsc --noEmit --skipLibCheck`: exit 0
