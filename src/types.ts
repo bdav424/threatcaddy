@@ -514,6 +514,33 @@ export interface NetworkHost {
   scannedAt: number;
 }
 
+export interface NetworkDevice {
+  id: string;
+  investigationId: string;
+  ip: string;
+  mac?: string;
+  hostname?: string;
+  vendor?: string;
+  openPorts?: number[];
+  os?: string;
+  lastSeen: string;
+  firstSeen: string;
+  status: 'online' | 'offline' | 'unknown';
+  addedToInvestigation: boolean;
+  scanJobId: string;
+}
+
+export interface NetworkScanJob {
+  id: string;
+  investigationId: string;
+  subnet: string;
+  status: 'running' | 'complete' | 'error';
+  startedAt: string;
+  completedAt?: string;
+  deviceCount: number;
+  errorMessage?: string;
+}
+
 // ── Agent Host Types ─────────────────────────────────────────────────
 
 export interface AgentHostSkill {
@@ -1344,6 +1371,8 @@ export interface ExportData {
   reportTemplates?: ReportTemplate[];
   graphSnapshots?: GraphSnapshot[];
   virtualCaddyJobs?: VirtualCaddyJob[];
+  networkDevices?: NetworkDevice[];
+  networkScanJobs?: NetworkScanJob[];
 }
 
 export const TAG_COLORS = [

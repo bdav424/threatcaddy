@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, ReportTemplate, GraphSnapshot, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus, EnrichmentCacheEntry, VirtualCaddyJob } from './types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, ReportTemplate, GraphSnapshot, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus, EnrichmentCacheEntry, VirtualCaddyJob, NetworkDevice, NetworkScanJob } from './types';
 import type { IntegrationTemplate, InstalledIntegration, IntegrationRun } from './types/integration-types';
 import { installEncryptionMiddleware } from './lib/encryptionMiddleware';
 
@@ -30,6 +30,8 @@ const db = new Dexie('ThreatCaddyDB') as Dexie & {
   graphSnapshots: EntityTable<GraphSnapshot, 'id'>;
   enrichmentCache: EntityTable<EnrichmentCacheEntry, 'id'>;
   virtualCaddyJobs: EntityTable<VirtualCaddyJob, 'id'>;
+  networkDevices: EntityTable<NetworkDevice, 'id'>;
+  networkScanJobs: EntityTable<NetworkScanJob, 'id'>;
 };
 
 db.version(1).stores({
@@ -319,6 +321,13 @@ db.version(35).stores({
 // Indexed by investigationId + status for efficient per-investigation job queries.
 db.version(36).stores({
   virtualCaddyJobs: 'id, investigationId, status, submittedAt, [investigationId+status]',
+});
+
+// Version 37: NetworkMap — discovered LAN devices and scan job records.
+// Indexed by investigationId so per-investigation queries stay efficient.
+db.version(37).stores({
+  networkDevices: 'id, investigationId, scanJobId, ip, status, [investigationId+scanJobId]',
+  networkScanJobs: 'id, investigationId, status, startedAt, [investigationId+status]',
 });
 
 function evidenceKindFromExtension(value: string): EvidenceKind {

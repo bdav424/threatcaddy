@@ -19,7 +19,7 @@ export async function buildFullBackupPayload(
   const data: BackupPayload['data'] = {};
 
   if (scope === 'all') {
-    const [notes, tasks, folders, tags, timelineEvents, timelines, whiteboards, standaloneIOCs, evidenceItems, chatThreads, agentActions, agentProfiles, agentDeployments, agentMeetings, noteTemplates, playbookTemplates, integrationTemplates, installedIntegrations, customSlashCommands, reportTemplates, graphSnapshots, virtualCaddyJobs] =
+    const [notes, tasks, folders, tags, timelineEvents, timelines, whiteboards, standaloneIOCs, evidenceItems, chatThreads, agentActions, agentProfiles, agentDeployments, agentMeetings, noteTemplates, playbookTemplates, integrationTemplates, installedIntegrations, customSlashCommands, reportTemplates, graphSnapshots, virtualCaddyJobs, networkDevices, networkScanJobs] =
       await Promise.all([
         db.notes.toArray(),
         db.tasks.toArray(),
@@ -43,11 +43,13 @@ export async function buildFullBackupPayload(
         db.reportTemplates.toArray(),
         db.graphSnapshots.toArray(),
         db.virtualCaddyJobs.toArray(),
+        db.networkDevices.toArray(),
+        db.networkScanJobs.toArray(),
       ]);
-    Object.assign(data, { notes, tasks, folders, tags, timelineEvents, timelines, whiteboards, standaloneIOCs, evidenceItems, chatThreads, agentActions, agentProfiles, agentDeployments, agentMeetings, noteTemplates, playbookTemplates, integrationTemplates, installedIntegrations, customSlashCommands, reportTemplates, graphSnapshots, virtualCaddyJobs });
+    Object.assign(data, { notes, tasks, folders, tags, timelineEvents, timelines, whiteboards, standaloneIOCs, evidenceItems, chatThreads, agentActions, agentProfiles, agentDeployments, agentMeetings, noteTemplates, playbookTemplates, integrationTemplates, installedIntegrations, customSlashCommands, reportTemplates, graphSnapshots, virtualCaddyJobs, networkDevices, networkScanJobs });
   } else if (scope === 'investigation') {
     if (!scopeId) throw new Error('scopeId required for investigation scope');
-    const [folder, notes, tasks, allTags, events, allTimelines, whiteboards, iocs, evidenceItems, chats, agentActions, agentDeployments, agentMeetings, graphSnapshots, virtualCaddyJobs] = await Promise.all([
+    const [folder, notes, tasks, allTags, events, allTimelines, whiteboards, iocs, evidenceItems, chats, agentActions, agentDeployments, agentMeetings, graphSnapshots, virtualCaddyJobs, networkScanJobs, networkDevices] = await Promise.all([
       db.folders.get(scopeId),
       db.notes.where('folderId').equals(scopeId).toArray(),
       db.tasks.where('folderId').equals(scopeId).toArray(),
@@ -63,6 +65,8 @@ export async function buildFullBackupPayload(
       db.agentMeetings.where('investigationId').equals(scopeId).toArray(),
       db.graphSnapshots.where('folderId').equals(scopeId).toArray(),
       db.virtualCaddyJobs.where('investigationId').equals(scopeId).toArray(),
+      db.networkScanJobs.where('investigationId').equals(scopeId).toArray(),
+      db.networkDevices.where('investigationId').equals(scopeId).toArray(),
     ]);
     if (!folder) throw new Error('Investigation not found');
 
@@ -84,7 +88,7 @@ export async function buildFullBackupPayload(
     Object.assign(data, {
       notes, tasks, folders: [folder], tags, timelineEvents: events, timelines, whiteboards,
       standaloneIOCs: iocs, evidenceItems, chatThreads: chats, agentActions, agentDeployments, agentMeetings,
-      graphSnapshots, virtualCaddyJobs,
+      graphSnapshots, virtualCaddyJobs, networkScanJobs, networkDevices,
     });
   } else if (scope === 'entity') {
     if (!scopeId) throw new Error('scopeId required for entity scope');

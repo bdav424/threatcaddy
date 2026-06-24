@@ -64,10 +64,12 @@ describe('Database schema', () => {
     expect(db.installedIntegrations).toBeDefined();
     expect(db.integrationRuns).toBeDefined();
     expect(db.virtualCaddyJobs).toBeDefined();
+    expect(db.networkDevices).toBeDefined();
+    expect(db.networkScanJobs).toBeDefined();
   });
 
-  it('is at version 36', () => {
-    expect(db.verno).toBe(36);
+  it('is at version 37', () => {
+    expect(db.verno).toBe(37);
   });
 });
 

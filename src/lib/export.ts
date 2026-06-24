@@ -1,5 +1,5 @@
 import { db } from '../db';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, StandaloneIOC, EvidenceItem, ChatThread, ChatMessage, NoteTemplate, PlaybookTemplate, PlaybookStep, ReportTemplate, ReportSection, GraphSnapshot, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel, IOCAnalysis, IOCEntry, IOCRelationship, TaskComment, NoteAnnotation, QuickLink, LLMProvider, IOCType, TemplateSource, PlaybookStepEntity, AgentAction, EvidenceExtractionStatus, EvidenceKind, ProductBaselineMetadata, VirtualCaddyJob } from '../types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, StandaloneIOC, EvidenceItem, ChatThread, ChatMessage, NoteTemplate, PlaybookTemplate, PlaybookStep, ReportTemplate, ReportSection, GraphSnapshot, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel, IOCAnalysis, IOCEntry, IOCRelationship, TaskComment, NoteAnnotation, QuickLink, LLMProvider, IOCType, TemplateSource, PlaybookStepEntity, AgentAction, EvidenceExtractionStatus, EvidenceKind, ProductBaselineMetadata, VirtualCaddyJob, NetworkDevice, NetworkScanJob } from '../types';
 import { TIMELINE_EVENT_TYPE_LABELS, CONFIDENCE_LEVELS, IOC_TYPE_LABELS } from '../types';
 import { nanoid } from 'nanoid';
 import { normalizeIOCEnrichment } from './ioc-enrichment-persistence';
@@ -28,6 +28,8 @@ export async function exportJSON(): Promise<string> {
   const agentDeployments = await db.agentDeployments.toArray();
   const agentMeetings = await db.agentMeetings.toArray();
   const virtualCaddyJobs = await db.virtualCaddyJobs.toArray();
+  const networkDevices = await db.networkDevices.toArray();
+  const networkScanJobs = await db.networkScanJobs.toArray();
 
   // Include quick links from settings if user has customized them
   let quickLinks: QuickLink[] | undefined;
@@ -62,6 +64,8 @@ export async function exportJSON(): Promise<string> {
     reportTemplates: reportTemplates.length > 0 ? reportTemplates : undefined,
     graphSnapshots: graphSnapshots.length > 0 ? graphSnapshots : undefined,
     virtualCaddyJobs: virtualCaddyJobs.length > 0 ? virtualCaddyJobs : undefined,
+    networkDevices: networkDevices.length > 0 ? networkDevices : undefined,
+    networkScanJobs: networkScanJobs.length > 0 ? networkScanJobs : undefined,
   };
 
   return JSON.stringify(data, null, 2);
@@ -1096,7 +1100,52 @@ function sanitizeVirtualCaddyJob(raw: unknown): VirtualCaddyJob | null {
   };
 }
 
-export async function importJSON(json: string): Promise<{ notes: number; tasks: number; folders: number; tags: number; timelineEvents: number; timelines: number; whiteboards: number; standaloneIOCs: number; evidenceItems: number; chatThreads: number; noteTemplates: number; playbookTemplates: number; reportTemplates: number; graphSnapshots: number; agentActions: number; agentProfiles: number; agentDeployments: number; agentMeetings: number; virtualCaddyJobs: number }> {
+function sanitizeNetworkDevice(r: Record<string, unknown>): NetworkDevice | null {
+  if (!r || typeof r !== 'object') return null;
+  const id = str(r.id);
+  const investigationId = str(r.investigationId);
+  const ip = str(r.ip);
+  if (!id || !investigationId || !ip) return null;
+  return {
+    id,
+    investigationId,
+    ip,
+    mac: r.mac != null ? str(r.mac) : undefined,
+    hostname: r.hostname != null ? str(r.hostname) : undefined,
+    vendor: r.vendor != null ? str(r.vendor) : undefined,
+    openPorts: Array.isArray(r.openPorts) ? r.openPorts.map(Number).filter((n) => !isNaN(n)) : undefined,
+    os: r.os != null ? str(r.os) : undefined,
+    lastSeen: str(r.lastSeen, new Date(0).toISOString()),
+    firstSeen: str(r.firstSeen, new Date(0).toISOString()),
+    status: (['online', 'offline', 'unknown'] as const).includes(r.status as NetworkDevice['status'])
+      ? (r.status as NetworkDevice['status'])
+      : 'unknown',
+    addedToInvestigation: Boolean(r.addedToInvestigation),
+    scanJobId: str(r.scanJobId, ''),
+  };
+}
+
+function sanitizeNetworkScanJob(r: Record<string, unknown>): NetworkScanJob | null {
+  if (!r || typeof r !== 'object') return null;
+  const id = str(r.id);
+  const investigationId = str(r.investigationId);
+  if (!id || !investigationId) return null;
+  const status = (['running', 'complete', 'error'] as const).includes(r.status as NetworkScanJob['status'])
+    ? (r.status as NetworkScanJob['status'])
+    : 'complete';
+  return {
+    id,
+    investigationId,
+    subnet: str(r.subnet, ''),
+    status,
+    startedAt: str(r.startedAt, new Date(0).toISOString()),
+    completedAt: r.completedAt != null ? str(r.completedAt) : undefined,
+    deviceCount: num(r.deviceCount, 0),
+    errorMessage: r.errorMessage != null ? str(r.errorMessage) : undefined,
+  };
+}
+
+export async function importJSON(json: string): Promise<{ notes: number; tasks: number; folders: number; tags: number; timelineEvents: number; timelines: number; whiteboards: number; standaloneIOCs: number; evidenceItems: number; chatThreads: number; noteTemplates: number; playbookTemplates: number; reportTemplates: number; graphSnapshots: number; agentActions: number; agentProfiles: number; agentDeployments: number; agentMeetings: number; virtualCaddyJobs: number; networkDevices: number; networkScanJobs: number }> {
   if (json.length > MAX_IMPORT_SIZE) {
     throw new Error(`Backup file too large (max ${MAX_IMPORT_SIZE / 1024 / 1024} MB)`);
   }
@@ -1186,7 +1235,15 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     .map(sanitizeVirtualCaddyJob)
     .filter((j: VirtualCaddyJob | null): j is VirtualCaddyJob => j !== null && !!j.id);
 
-  await db.transaction('rw', [db.notes, db.tasks, db.folders, db.tags, db.timelineEvents, db.timelines, db.whiteboards, db.standaloneIOCs, db.evidenceItems, db.chatThreads, db.noteTemplates, db.playbookTemplates, db.reportTemplates, db.graphSnapshots, db.agentActions, db.agentProfiles, db.agentDeployments, db.agentMeetings, db.virtualCaddyJobs], async () => {
+  const importedNetworkDevices = (Array.isArray(data.networkDevices) ? data.networkDevices : [])
+    .map(sanitizeNetworkDevice)
+    .filter((d: NetworkDevice | null): d is NetworkDevice => d !== null && !!d.id);
+
+  const importedNetworkScanJobs = (Array.isArray(data.networkScanJobs) ? data.networkScanJobs : [])
+    .map(sanitizeNetworkScanJob)
+    .filter((j: NetworkScanJob | null): j is NetworkScanJob => j !== null && !!j.id);
+
+  await db.transaction('rw', [db.notes, db.tasks, db.folders, db.tags, db.timelineEvents, db.timelines, db.whiteboards, db.standaloneIOCs, db.evidenceItems, db.chatThreads, db.noteTemplates, db.playbookTemplates, db.reportTemplates, db.graphSnapshots, db.agentActions, db.agentProfiles, db.agentDeployments, db.agentMeetings, db.virtualCaddyJobs, db.networkDevices, db.networkScanJobs], async () => {
     await db.notes.clear();
     await db.tasks.clear();
     await db.folders.clear();
@@ -1224,6 +1281,10 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     if (importedMeetings.length > 0) await db.agentMeetings.bulkAdd(importedMeetings);
     await db.virtualCaddyJobs.clear();
     if (importedVirtualCaddyJobs.length > 0) await db.virtualCaddyJobs.bulkAdd(importedVirtualCaddyJobs);
+    await db.networkDevices.clear();
+    if (importedNetworkDevices.length > 0) await db.networkDevices.bulkAdd(importedNetworkDevices);
+    await db.networkScanJobs.clear();
+    if (importedNetworkScanJobs.length > 0) await db.networkScanJobs.bulkAdd(importedNetworkScanJobs);
   });
 
   // Restore quick links to settings if present in backup
@@ -1256,6 +1317,8 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     agentDeployments: importedDeployments.length,
     agentMeetings: importedMeetings.length,
     virtualCaddyJobs: importedVirtualCaddyJobs.length,
+    networkDevices: importedNetworkDevices.length,
+    networkScanJobs: importedNetworkScanJobs.length,
   };
 }
 

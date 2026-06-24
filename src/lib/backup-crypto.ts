@@ -46,6 +46,8 @@ export interface BackupPayload {
     reportTemplates?: unknown[];
     graphSnapshots?: unknown[];
     virtualCaddyJobs?: unknown[];
+    networkDevices?: unknown[];
+    networkScanJobs?: unknown[];
   };
   deletedIds?: Record<string, string[]>;
 }
