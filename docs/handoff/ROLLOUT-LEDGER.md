@@ -23,6 +23,24 @@ Tracks sprint group commits and status. Each sprint's commits are listed with th
 
 ---
 
+## S-creds — Credential Vault
+
+**Status:** DONE
+
+| # | Commit | Hash | Description |
+|---|--------|------|-------------|
+| 1 | `feat(desktop): S-creds credential vault bridge — AES-256-GCM export/import` | `c2d4eb89` | `desktop/creds-bridge.mjs` — IPC bridge, crypto spec (PBKDF2 310k + AES-256-GCM 12-byte IV, base64 wire), `creds:export` / `creds:import` / `creds:open-file` |
+| 2 | `feat(ui): S-creds Credential Vault — renderer bridge + Settings card` | `a499ebd6` | `preload.mjs` exposes `window.threatcaddyCreds`; `src/lib/creds-bridge.ts` thin IPC wrapper; `CredentialVault.tsx` UI card; `SettingsPanel.tsx` wired |
+| 3 | `feat(test): S-creds — crypto round-trip + renderer bridge tests + ledger` | *(this commit)* | 16 new tests: 6 crypto round-trip, 10 renderer bridge mock (desktop + web mode) |
+
+**Spec:**
+- KDF: PBKDF2-SHA256, 310,000 iterations, 32-byte random salt
+- Encryption: AES-256-GCM, 12-byte random IV, auth tag appended to ciphertext
+- Wire format: `{ version: 1, salt: <base64>, iv: <base64>, data: <base64(cipher‖tag)> }`
+- Import path: `.tckeys` file or base64 string; renderer never sees raw credentials
+
+---
+
 ## S-netmap — Network Map
 
 **Status:** DONE — see `docs/assistantcaddy-rollout-ledger-2026-06-05.md` for earlier sprint details.

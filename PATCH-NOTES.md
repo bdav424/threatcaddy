@@ -39,6 +39,7 @@ This document captures every commit present in `bdav424/threatcaddy` (branch `ma
 
 ### Authentication & Sync Security
 
+- **S-creds Credential Vault** — password-protected export/import of all desktop integration credentials (mail, calendar, Slack) as an encrypted `.tckeys` file. PBKDF2-SHA256 310k iterations + AES-256-GCM 12-byte IV; base64 wire format; also returns a copyable base64 bundle for cross-device transfer. UI card in Settings › General under the Security section (`c2d4eb89`, `a499ebd6`)
 - **TOTP two-factor authentication** — Phase 1: time-based OTP 2FA (`9404e291`)
 - **Passkey (WebAuthn) authentication** — Phase 2: hardware-key and biometric login (`54aa9e1b`)
 - **Client-side AES-256-GCM sync encryption** — all sync payloads encrypted before leaving the browser (`a2805e1e`)
