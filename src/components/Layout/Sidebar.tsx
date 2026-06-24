@@ -17,6 +17,8 @@ import { TagSubList } from './TagSubList';
 import { useNavigation } from '../../contexts/NavigationContext';
 import { useInvestigation } from '../../contexts/InvestigationContext';
 import { useUIModals } from '../../contexts/UIModalContext';
+import { useInvestigationClassification } from '../../hooks/useInvestigationClassification';
+import { getClsBadgeStyle, getTlpBorderColor } from '../../lib/classification';
 import {
   WORKSPACE_PANEL_DRAG_TYPE,
   WORKSPACE_PANEL_LAUNCH_DESCRIPTORS,
@@ -55,6 +57,7 @@ const NAV_ACCENT_COLORS: Record<string, string> = {
   caddyshack: 'var(--color-purple)',
   agent: 'var(--color-accent-amber)',
   virtualcaddy: 'var(--color-accent-green)',
+  netmap: 'var(--color-accent-amber)',
   fortuneint: 'var(--color-accent-blue)',
   settings: 'var(--color-accent-blue)',
   archive: 'var(--color-accent-amber)',
@@ -509,6 +512,12 @@ export function Sidebar({
     },
   ];
 
+  // TLP/PAP classification inheritance for the active investigation
+  const inheritedClsLevel = useInvestigationClassification(selectedFolder?.id ?? null);
+  const effectiveClsLevel = inheritedClsLevel !== 'TLP:CLEAR' ? inheritedClsLevel : (selectedFolder?.clsLevel ?? 'TLP:CLEAR');
+  const clsBadgeStyle = effectiveClsLevel !== 'TLP:CLEAR' ? getClsBadgeStyle(effectiveClsLevel) : null;
+  const tlpBorderColor = getTlpBorderColor(effectiveClsLevel);
+
   // --- Collapsed: icon-only rail ---
   if (collapsed) {
     return (
@@ -698,7 +707,7 @@ export function Sidebar({
           {/* Clickable investigation card — opens settings */}
           <button
             onClick={() => setEditingFolderId(selectedFolder.id)}
-            className="w-full text-start rounded-lg border border-border-subtle bg-bg-raised hover:border-border-medium hover:bg-bg-hover transition-colors p-2 group"
+            className="w-full text-start rounded-lg border border-border-subtle bg-bg-raised hover:border-border-medium hover:bg-bg-hover transition-colors p-2 group overflow-hidden"
             title={t('sidebar.investigationSettings')}
           >
             {selectedFolder.color && (
@@ -709,6 +718,14 @@ export function Sidebar({
                 <div className={cn('w-2 h-2 rounded-full shrink-0', statusColor)} />
               )}
               <span className="text-sm font-medium text-text-primary truncate flex-1">{selectedFolder.name}</span>
+              {clsBadgeStyle && (
+                <span
+                  className={cn('text-[9px] font-mono font-bold px-1 py-px rounded border shrink-0', clsBadgeStyle.bg, clsBadgeStyle.text, clsBadgeStyle.border)}
+                  title={`Classification: ${effectiveClsLevel}`}
+                >
+                  {effectiveClsLevel}
+                </span>
+              )}
               <SettingsIcon size={12} className="text-text-muted opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0" />
             </div>
             {investigationScopedCounts && (
@@ -724,6 +741,10 @@ export function Sidebar({
                 {selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1)}
               </span>
             </div>
+            {/* TLP/PAP colored bottom border strip */}
+            {tlpBorderColor && (
+              <div className="-mx-2 -mb-2 mt-1.5 h-[3px] rounded-b" style={{ backgroundColor: tlpBorderColor }} />
+            )}
           </button>
           {/* Agent toggle + status */}
           <div className="flex items-center justify-between mt-1.5 px-0.5">
