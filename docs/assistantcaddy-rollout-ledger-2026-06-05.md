@@ -7041,3 +7041,26 @@ Work plan items 1-5 all done:
 3. Local enrichment cache — `662c6af`
 4. UI-6 leftovers — already done
 5. Command-palette + hunt narrative — `9633283`
+
+### S-Virtual (VirtualCaddy) — DONE 2026-06-23
+
+Air-gapped VM sandbox → IOC ingest pipeline. 5 commits on master:
+
+| # | Hash | Scope |
+|---|------|-------|
+| 1 | `f69c3dc2` | Data model — `VirtualCaddyJob` types, Dexie schema v36, backup/export/cascade |
+| 2 | `393d65e1` | `desktop/vm-ingest.mjs` — air-gapped SHA-256 + IOC regex extraction (fs/path/crypto/os only) |
+| 3 | `7992869a` | IPC bridge — preload `exposeInMainWorld`, `virtual-bridge.ts` renderer ingest handler |
+| 4 | `6cad8cc2` | `VirtualCaddyPanel` UI (drop-zone + live job list) + CaddyAI LLM tools + capability registry |
+| 5 | `43457acc` | Tests (15 pass) + CHANGELOG |
+| fix | `0bd8f623` | Move new tools from EXECUTIVE_TOOL_DEFINITIONS → TOOL_DEFINITIONS (TOOL_DEFINITIONS: 62 → 64) |
+
+**Gates:**
+- `tsc -b`: exit 0
+- `pnpm exec tsc --noEmit --skipLibCheck`: exit 0
+- `llm-tools.test.ts`: 75/75 passed (TOOL_DEFINITIONS.length = 64)
+- `virtual-bridge.test.ts`: 12/12 passed
+- `virtual-caddy-panel.test.tsx`: 3/3 passed
+- Full suite: 3164+ passed (see final run)
+
+**Air-gap invariants verified:** `vm-ingest.mjs` uses only `node:fs`, `node:path`, `node:crypto`, `node:os` — zero outbound calls. No fetch/WebSocket/exec in any `src/lib/` file. No secrets in localStorage.
