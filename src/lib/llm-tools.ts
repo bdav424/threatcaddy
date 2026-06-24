@@ -371,6 +371,9 @@ export async function executeTool(
       case 'post_slack_notification':        result = await executePostSlackNotification(inp, _settings); break;
       case 'submit_virtual_analysis':        result = await executeSubmitVirtualAnalysis(inp, folderId); break;
       case 'get_virtual_jobs':               result = await executeGetVirtualJobs(inp, folderId); break;
+      case 'start_network_scan':             result = await executeStartNetworkScan(inp, folderId); break;
+      case 'get_network_devices':            result = await executeGetNetworkDevices(inp, folderId); break;
+      case 'add_device_to_investigation':    result = await executeAddDeviceToInvestigation(inp, folderId); break;
       default: {
         // Dynamic skill tools: local:<skill>, host:<name>:<skill>, or LLM-safe aliases.
         const { executeHostSkill, isHostOrLocalToolName } = await import('./agent-hosts');
@@ -2206,4 +2209,90 @@ async function executeGetVirtualJobs(inp: Record<string, unknown>, folderId?: st
       errorMessage: j.errorMessage,
     })),
   });
+}
+
+async function executeStartNetworkScan(inp: Record<string, unknown>, folderId?: string): Promise<string> {
+  const investigationId = typeof inp.investigationId === 'string' ? inp.investigationId : (folderId ?? '');
+  if (!investigationId) return JSON.stringify({ error: 'No active investigation — open an investigation first' });
+
+  const win = window as unknown as Record<string, unknown>;
+  const bridge = win.threatcaddyNetmap as Record<string, unknown> | undefined;
+  if (!bridge || typeof bridge.startScan !== 'function') {
+    return JSON.stringify({ error: 'Network scan requires the desktop app' });
+  }
+
+  try {
+    const subnet = typeof inp.subnet === 'string' ? inp.subnet : undefined;
+    const result = await (bridge.startScan as (p: { investigationId: string; subnet?: string }) => Promise<{ ok: boolean; scanJobId?: string; startedAt?: string; subnet?: string; error?: string }>)({ investigationId, subnet });
+    if (!result.ok) return JSON.stringify({ error: result.error ?? 'Failed to start scan' });
+
+    const { createNetmapScanJob } = await import('./netmap-bridge');
+    await createNetmapScanJob(investigationId, result.scanJobId!, result.subnet!, result.startedAt!);
+
+    return JSON.stringify({ success: true, scanJobId: result.scanJobId, subnet: result.subnet, message: `Network scan started for ${result.subnet}. Devices will appear as they are discovered.` });
+  } catch (err) {
+    return JSON.stringify({ error: String(err) });
+  }
+}
+
+async function executeGetNetworkDevices(inp: Record<string, unknown>, folderId?: string): Promise<string> {
+  const investigationId = typeof inp.investigationId === 'string' ? inp.investigationId : (folderId ?? '');
+  if (!investigationId) return JSON.stringify({ error: 'No active investigation' });
+
+  const scanJobId = typeof inp.scanJobId === 'string' ? inp.scanJobId : undefined;
+  const statusFilter = typeof inp.statusFilter === 'string' ? inp.statusFilter : undefined;
+
+  const devices = scanJobId
+    ? await db.networkDevices.where('scanJobId').equals(scanJobId).toArray()
+    : await db.networkDevices.where('investigationId').equals(investigationId).toArray();
+
+  const filtered = statusFilter ? devices.filter(d => d.status === statusFilter) : devices;
+
+  return JSON.stringify({
+    investigationId,
+    totalDevices: filtered.length,
+    devices: filtered.map(d => ({
+      id: d.id,
+      ip: d.ip,
+      hostname: d.hostname,
+      mac: d.mac,
+      vendor: d.vendor,
+      openPorts: d.openPorts,
+      status: d.status,
+      firstSeen: d.firstSeen,
+      lastSeen: d.lastSeen,
+      addedToInvestigation: d.addedToInvestigation,
+    })),
+  });
+}
+
+async function executeAddDeviceToInvestigation(inp: Record<string, unknown>, folderId?: string): Promise<string> {
+  const deviceId = typeof inp.deviceId === 'string' ? inp.deviceId.trim() : '';
+  if (!deviceId) return JSON.stringify({ error: 'deviceId is required' });
+
+  const device = await db.networkDevices.get(deviceId);
+  if (!device) return JSON.stringify({ error: `Device not found: ${deviceId}` });
+
+  const investigationId = typeof inp.investigationId === 'string' ? inp.investigationId : (folderId ?? device.investigationId);
+  if (!investigationId) return JSON.stringify({ error: 'No active investigation' });
+
+  const { nanoid } = await import('nanoid');
+  const now = Date.now();
+  const iocId = nanoid();
+  await db.standaloneIOCs.add({
+    id: iocId,
+    type: 'ipv4',
+    value: device.ip,
+    confidence: 'low',
+    folderId: investigationId,
+    tags: ['netmap', `scan:${device.scanJobId}`],
+    trashed: false,
+    archived: false,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  await db.networkDevices.update(deviceId, { addedToInvestigation: true });
+
+  return JSON.stringify({ success: true, iocId, ip: device.ip, message: `Added ${device.ip} as IOC in investigation` });
 }

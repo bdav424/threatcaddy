@@ -117,6 +117,11 @@ const TOOL_ACTION_CLASS: Record<string, AgentActionClass> = {
   // VirtualCaddy — air-gapped sandboxed file analysis
   submit_virtual_analysis: 'create',
   get_virtual_jobs: 'read',
+
+  // NetworkMap — LAN device discovery
+  start_network_scan: 'fetch',
+  get_network_devices: 'read',
+  add_device_to_investigation: 'create',
 };
 
 /** Get the action class for a tool name. Defaults to 'modify' for unknown tools. */

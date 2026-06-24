@@ -888,6 +888,44 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: [],
     },
   },
+  // ── NetworkMap (desktop LAN discovery) ─────────────────────────────
+  {
+    name: 'start_network_scan',
+    description: 'Trigger a LAN subnet scan that discovers devices on the local network. The desktop process probes the /24 subnet via ARP + TCP and streams discovered devices back as investigation records. Desktop app required — no internet probes are made.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        subnet: { type: 'string', description: 'Subnet to scan in CIDR notation (e.g. "192.168.1.0/24"). If omitted, the local /24 subnet is auto-detected.' },
+        investigationId: { type: 'string', description: 'Investigation to associate discovered devices with. Defaults to the active investigation.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'get_network_devices',
+    description: 'Return discovered network devices for the current investigation, including IP, hostname, MAC, vendor, open ports, and status.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        investigationId: { type: 'string', description: 'Investigation ID to query. Defaults to the active investigation.' },
+        scanJobId: { type: 'string', description: 'Optional — filter to a specific scan job.' },
+        statusFilter: { type: 'string', enum: ['online', 'offline', 'unknown'], description: 'Optional status filter.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'add_device_to_investigation',
+    description: 'Promote a discovered network device\'s IP address to a StandaloneIOC in the current investigation and mark the device as added.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        deviceId: { type: 'string', description: 'ID of the NetworkDevice record to promote.' },
+        investigationId: { type: 'string', description: 'Investigation to create the IOC in. Defaults to the active investigation.' },
+      },
+      required: ['deviceId'],
+    },
+  },
 ];
 
 // ── Delegation tools (Lead agent only) ─────────────────────────────────

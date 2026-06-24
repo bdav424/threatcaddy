@@ -106,6 +106,8 @@ const CaddyShackView = lazy(() => import('./components/CaddyShack/CaddyShackView
 const AppWorkspaceShell = lazy(() => import('./components/WorkspacePanels/AppWorkspaceShell').then(m => ({ default: m.AppWorkspaceShell })));
 const VirtualCaddyWorkspace = lazy(() => import('./components/VirtualCaddy/VirtualCaddyWorkspace').then(m => ({ default: m.VirtualCaddyWorkspace })));
 const VirtualCaddyPanel = lazy(() => import('./components/VirtualCaddy/VirtualCaddyPanel').then(m => ({ default: m.VirtualCaddyPanel })));
+const NetworkMapPanel = lazy(() => import('./components/NetMap/NetworkMapPanel').then(m => ({ default: m.NetworkMapPanel })));
+const NetMapWorkspace = lazy(() => import('./components/NetMap/NetMapWorkspace').then(m => ({ default: m.NetMapWorkspace })));
 
 type WorkspacePanelLaunchRequest = {
   view: WorkspacePanelLaunchView;
@@ -142,6 +144,37 @@ import { useSlackSync } from './hooks/useSlackSync';
 import { useDmAlerts } from './hooks/useDmAlerts';
 
 const VALID_RASTER_IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp', 'image/avif']);
+
+// ─── NetMap tabbed view ───────────────────────────────────────────────────────
+// Combines the streaming discovery panel (NetworkMapPanel) and the legacy
+// ARP/ping workspace (NetMapWorkspace) in a two-tab layout under one nav entry.
+
+function NetMapTabView() {
+  const [tab, setTab] = useState<'scan' | 'legacy'>('scan');
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="shrink-0 flex border-b border-border-subtle/50 bg-bg-primary/80">
+        {(['scan', 'legacy'] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className={`px-4 py-2 text-[12px] font-semibold transition-colors border-b-2 ${
+              tab === t
+                ? 'border-accent text-accent'
+                : 'border-transparent text-text-muted hover:text-text-secondary'
+            }`}
+          >
+            {t === 'scan' ? 'Network Map' : 'Quick Scan'}
+          </button>
+        ))}
+      </div>
+      <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent" /></div>}>
+        {tab === 'scan' ? <NetworkMapPanel /> : <NetMapWorkspace />}
+      </Suspense>
+    </div>
+  );
+}
 
 // ─── VirtualCaddy tabbed view ─────────────────────────────────────────────────
 // Combines the file-watcher workspace (VirtualCaddyWorkspace) and the static
@@ -273,7 +306,7 @@ function AppDataLayer() {
   const isMobile = useIsMobile();
 
   // Compute safe default view from settings for NavigationProvider
-  const safeDefaultView = settings.defaultView === 'dashboard' || settings.defaultView === 'workspace' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'evidence' || settings.defaultView === 'products' || settings.defaultView === 'experimental' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' || settings.defaultView === 'chat' || settings.defaultView === 'caddyassistant' || settings.defaultView === 'cademail' || settings.defaultView === 'calendarcaddy' || settings.defaultView === 'caddyshack' || settings.defaultView === 'agent' || settings.defaultView === 'investigations' || settings.defaultView === 'reports' || settings.defaultView === 'virtualcaddy' ? settings.defaultView : 'notes';
+  const safeDefaultView = settings.defaultView === 'dashboard' || settings.defaultView === 'workspace' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'evidence' || settings.defaultView === 'products' || settings.defaultView === 'experimental' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' || settings.defaultView === 'chat' || settings.defaultView === 'caddyassistant' || settings.defaultView === 'cademail' || settings.defaultView === 'calendarcaddy' || settings.defaultView === 'caddyshack' || settings.defaultView === 'agent' || settings.defaultView === 'investigations' || settings.defaultView === 'reports' || settings.defaultView === 'virtualcaddy' || settings.defaultView === 'netmap' ? settings.defaultView : 'notes';
 
   return (
     <InvestigationProvider
@@ -2799,6 +2832,8 @@ const AppInner = memo(function AppInner({
           null
         ) : activeView === 'virtualcaddy' ? (
           <VirtualCaddyTabView />
+        ) : activeView === 'netmap' ? (
+          <NetMapTabView />
         ) : activeView === 'investigations' ? (
           <InvestigationsHub
             localFolders={folders}

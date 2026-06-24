@@ -285,3 +285,12 @@ registry.register({
   description: 'Submit files for air-gapped static analysis and retrieve job results.',
   tools: pick('submit_virtual_analysis', 'get_virtual_jobs'),
 });
+
+registry.register({
+  id: 'network-map',
+  name: 'Network Map',
+  scope: 'operational',
+  contextRequirements: ['active-investigation', 'desktop-only'],
+  description: 'Discover LAN devices via ARP + TCP probe and promote them to IOCs or graph nodes.',
+  tools: pick('start_network_scan', 'get_network_devices', 'add_device_to_investigation'),
+});

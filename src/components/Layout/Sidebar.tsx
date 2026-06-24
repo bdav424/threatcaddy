@@ -5,7 +5,7 @@ import {
   Archive, Settings as SettingsIcon,
   PanelLeftClose, PanelLeft, Github, Download, Chrome, PenTool, Activity, Network, Search, Shield,
   LayoutDashboard, PanelsTopLeft, MessageSquare, LayoutTemplate, ChevronLeft, ChevronDown, ChevronRight,
-  Bot, FileOutput, FlaskConical, Sparkles, Mail, CalendarDays, Monitor,
+  Bot, FileOutput, FlaskConical, Sparkles, Mail, CalendarDays, Monitor, Network,
 } from 'lucide-react';
 import type { Timeline, Whiteboard, ViewMode } from '../../types';
 import { cn } from '../../lib/utils';
@@ -79,6 +79,7 @@ const INVESTIGATION_GROUP_VIEWS: ViewMode[] = [
   'reports',
   'activity',
   'virtualcaddy',
+  'netmap',
 ];
 
 const ASSISTANT_GROUP_VIEWS: ViewMode[] = [
@@ -464,6 +465,14 @@ export function Sidebar({
       active: activeView === 'virtualcaddy' && !showTrash && !showArchive,
       onClick: () => nav(() => navToView('virtualcaddy')),
       accentKey: 'virtualcaddy',
+    },
+    {
+      key: 'netmap',
+      icon: Network,
+      label: t('sidebar.netMap', { defaultValue: 'Network Map' }),
+      active: activeView === 'netmap' && !showTrash && !showArchive,
+      onClick: () => nav(() => navToView('netmap')),
+      accentKey: 'netmap',
     },
   ];
 
