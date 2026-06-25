@@ -8,6 +8,7 @@ import type { InvestigationDataMode } from '../../types';
 import { formatDate, cn } from '../../lib/utils';
 import { getClsBadgeStyle } from '../../lib/classification';
 import { useInvestigationClassification } from '../../hooks/useInvestigationClassification';
+import { getInvestigationColorMode, tlpToAccentColor } from '../../lib/investigation-color-mode';
 
 export interface InvestigationCardProps {
   folderId: string;
@@ -105,6 +106,19 @@ export function InvestigationCard({
     return 'rgba(255,255,255,0.15)';
   })();
 
+  // Investigation color mode: manual | tlp | combined
+  const colorMode = getInvestigationColorMode();
+  // Background tint: TLP mode uses TLP-derived tint; combined uses manual color via CSS
+  const tlpBgTint = tlpToAccentColor(liveClsLevel);
+  // For combined mode, append hex alpha "1a" (≈10% opacity) to a 6-digit hex color.
+  const manualBgTint = color && /^#[0-9a-fA-F]{6}$/.test(color) ? `${color}1a` : null;
+  const cardBgTint =
+    colorMode === 'tlp'      ? tlpBgTint :
+    colorMode === 'combined' ? (manualBgTint ?? tlpBgTint) :
+    null;
+  // Color strip: shown in manual and combined modes (not in TLP-only mode)
+  const showColorStrip = !!color && colorMode !== 'tlp';
+
   const formattedUpdate = updatedAt
     ? typeof updatedAt === 'number'
       ? formatDate(updatedAt)
@@ -152,13 +166,15 @@ export function InvestigationCard({
           ? 'bg-purple/5 shadow-md'
           : 'border-border-subtle bg-bg-raised hover:border-border-medium',
       )}
-      style={active
-        ? { border: `1.5px solid ${tlpOutlineColor}` }
-        : { boxShadow: `inset 2px 0 0 ${tlpOutlineColor}` }
-      }
+      style={{
+        ...(active
+          ? { border: `1.5px solid ${tlpOutlineColor}` }
+          : { boxShadow: `inset 2px 0 0 ${tlpOutlineColor}` }),
+        ...(cardBgTint ? { backgroundColor: cardBgTint } : {}),
+      }}
     >
-      {/* Color strip */}
-      {color && (
+      {/* Color strip — manual and combined modes only */}
+      {showColorStrip && (
         <div
           className="h-1 rounded-t-lg"
           style={{ backgroundColor: color }}

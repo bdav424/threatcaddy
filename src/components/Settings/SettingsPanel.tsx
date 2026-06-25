@@ -1,4 +1,5 @@
 ﻿import { useState, useCallback } from 'react';
+import { cn } from '../../lib/utils';
 import DOMPurify from 'dompurify';
 import { Github, Download, FlaskConical, Trash2, Bot, X, Shield, RefreshCw, RotateCcw, Plus, Pencil, Wrench, Loader2, CheckCircle2, AlertTriangle, LayoutGrid, Palette, Database, FileText, Link, Keyboard, Zap, Mail, MessageSquare, Video, Users, Hash, Bell } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -34,7 +35,9 @@ import { AppearanceSettings } from './AppearanceSettings';
 import { AgentHostsConfig } from './AgentHostsConfig';
 import { SystemHygienePanel } from './SystemHygienePanel';
 import { CredentialVault } from './CredentialVault';
+import { SyncAuthSettings } from './SyncAuthSettings';
 import { getLocalLlmHealthUrl, normalizeLocalLlmEndpoint } from '../../lib/local-llm-endpoint';
+import { getInvestigationColorMode, setInvestigationColorMode, type InvestigationColorMode } from '../../lib/investigation-color-mode';
 
 function SystemPromptEditor({ value, onChange }: { value?: string; onChange: (v: string | undefined) => void }) {
   const { t } = useTranslation('settings');
@@ -1003,6 +1006,12 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
   const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab || 'general');
   const [assistantLocalTest, setAssistantLocalTest] = useState<{ status: LocalLLMTestStatus; error?: string }>({ status: 'idle' });
+  const [invColorMode, setInvColorMode] = useState<InvestigationColorMode>(getInvestigationColorMode);
+
+  const handleInvColorMode = (mode: InvestigationColorMode) => {
+    setInvColorMode(mode);
+    setInvestigationColorMode(mode);
+  };
   const selectClass = 'bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent';
   const labelClass = 'text-sm text-gray-400';
   const topTabs = TAB_META;
@@ -1071,6 +1080,9 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
             <p className="text-xs text-gray-500">{t('general.syncedDevicesDesc')}</p>
             <SyncDevicesPanel />
           </div>
+
+          {/* Security — Sync Auth MFA (desktop only; hidden in web/SPA mode) */}
+          <SyncAuthSettings />
 
           {/* Security — Credential Vault (desktop only; hidden in web/SPA mode) */}
           <CredentialVault />
@@ -1349,6 +1361,28 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
             </div>
           </div>
           <AppearanceSettings settings={settings} onUpdateSettings={onUpdateSettings} />
+
+          {/* Investigation card color mode */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-300">{t('investigationColorMode.label')}</h3>
+            <div className="flex gap-2">
+              {(['manual', 'tlp', 'combined'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => handleInvColorMode(mode)}
+                  className={cn(
+                    'px-3 py-1.5 text-xs rounded-lg border transition-colors',
+                    invColorMode === mode
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'border-border-subtle text-text-secondary hover:border-border-medium',
+                  )}
+                  title={t(`investigationColorMode.${mode}Desc`)}
+                >
+                  {t(`investigationColorMode.${mode}`)}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
