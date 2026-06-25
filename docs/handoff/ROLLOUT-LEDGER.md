@@ -46,3 +46,27 @@ Tracks sprint group commits and status. Each sprint's commits are listed with th
 **Status:** DONE — see `docs/assistantcaddy-rollout-ledger-2026-06-05.md` for earlier sprint details.
 
 ---
+
+## S8 — MFA-gated Sync Auth + Investigation Color Mode
+
+**Status:** DONE
+
+| # | Commit | Hash | Description |
+|---|--------|------|-------------|
+| 1 | `feat(security): S8 TOTP setup + DB schema + IPC bridge` | *(pending)* | `src/lib/totp.ts` (inline SHA-1/HMAC-SHA1, RFC 6238, generateSecret/getCode/verifyCode/getUri); `src/lib/sync-auth-bridge.ts` (renderer IPC wrapper); `desktop/sync-auth-bridge.mjs` (safeStorage-backed IPC handlers); `desktop/preload.mjs` + `main.mjs` wired; Dexie v38 `syncAuthSettings` table |
+| 2 | `feat(security): S8 passkey.ts + SyncAuthSettings UI` | *(pending)* | `src/lib/passkey.ts` (desktop-only WebAuthn wrapper: registerPasskey/verifyPasskey/passkeySupported); `SyncAuthSettings.tsx` (Settings > General card — TOTP setup with copyable secret+URI, passkey registration, disable MFA); `SettingsPanel.tsx` wired |
+| 3 | `feat(ui): S8 investigation color mode` | *(pending)* | `src/lib/investigation-color-mode.ts` (manual/tlp/combined, localStorage-persisted); `InvestigationCard.tsx` wired (TLP-derived bg tint, color strip per mode); Settings > Appearance 3-button toggle; i18n keys added + synced to 21 locales |
+| 4 | `feat(test): S8 tests + ledger` | *(pending)* | totp.test.ts (RFC 6238 vectors + secret/code/verify/URI), investigation-color-mode.test.ts, sync-auth-bridge.test.ts (desktop + web mode mocks); ROLLOUT-LEDGER.md + PATCH-NOTES.md updated |
+
+**Security posture:**
+- TOTP secrets stored via OS safeStorage (`electron.safeStorage`); Dexie table holds only non-secret metadata
+- Passkey public credential IDs stored via safeStorage; WebAuthn ceremony runs renderer-only (no IPC for credential ops)
+- Sync auth settings excluded from backup/export (per-device enrollment; no cross-device migration of security state)
+- `syncAuthBridge.isAvailable()` guard hides all UI in web/SPA mode
+
+**Implementation notes:**
+- TOTP: pure renderer-side (no fetch, no exec) with inline SHA-1/HMAC-SHA1 so functions stay synchronous
+- QR code display: not rendered (no QR dep); shows copyable base32 secret + otpauth:// URI for manual authenticator entry
+- Color mode: reads from localStorage on every InvestigationCard render (no re-subscribe needed; Settings toggle triggers re-render)
+
+---

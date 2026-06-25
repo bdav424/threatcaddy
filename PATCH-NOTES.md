@@ -46,6 +46,7 @@ This document captures every commit present in `bdav424/threatcaddy` (branch `ma
 - **Passkey sync-passphrase prompt** — passkey-backed derivation of the sync encryption key (`cadb12e9`)
 - **Device enrollment gate** — S8 Phase 3: new devices must complete enrollment before receiving encrypted sync data (`d762d7e5`)
 - **Strip plaintext from encrypted sync push** — ensures no cleartext content leaks through the sync channel (`c685d0a4`)
+- **S8 desktop sync auth MFA (TOTP + passkeys)** — standalone desktop TOTP and passkey MFA for sync-auth, independent of team server. Inline RFC 6238 TOTP with SHA-1/HMAC-SHA1 (no native crypto deps); secrets encrypted via OS safeStorage in main process; renderer bridge exposes opaque save/get/clear only. WebAuthn passkey registration/verification via `navigator.credentials` (desktop-only). UI card in Settings › General under Security. Dexie v38 `syncAuthSettings` table for UI metadata. *(S8 commit 1–2)*
 
 ### Mobile & PWA
 
@@ -64,6 +65,7 @@ This document captures every commit present in `bdav424/threatcaddy` (branch `ma
 - **TLP/PAP classification inheritance** — classification set on an investigation propagates to its header badge and panel border (`3fd14dd3`, `179e55b8`)
 - **TLP color border on selected investigation** — the investigation list highlights the selected item with its TLP color (`30717712`)
 - **TLP color badge** — right-aligned TLP badge on investigation cards with full border outline and briefcase icon tint (`200cc3f7`)
+- **Investigation card color mode** — 3-way setting (Manual / TLP / Combined) in Settings › Appearance. Manual: existing color-strip behavior unchanged. TLP: card background tinted from live TLP classification (RED/AMBER/GREEN/CLEAR). Combined: TLP drives border treatment, manual color tints card background. Persisted in localStorage. *(S8 commit 3)*
 
 ### NetworkMap (NetMap)
 
