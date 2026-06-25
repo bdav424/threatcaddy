@@ -471,6 +471,21 @@ export interface Settings {
   caddyAiYoloMode?: boolean;
 }
 
+// ── Sync Auth Settings ────────────────────────────────────────────────────────
+
+/** MFA method metadata for desktop sync auth. Actual secrets live in OS safeStorage. */
+export interface SyncAuthSettings {
+  id?: number;
+  userId: string;
+  /** Active MFA method. Null means MFA is disabled. */
+  method: 'totp' | 'passkey' | null;
+  /** Non-secret reference: account label used in the TOTP URI (not the HMAC key). */
+  totpSecret?: string;
+  /** Public credential ID returned by the WebAuthn authenticator. Not a secret. */
+  passkeyCredentialId?: string;
+  createdAt: number;
+}
+
 // ── VirtualCaddy Types ────────────────────────────────────────────────────────
 
 export interface VirtualFile {

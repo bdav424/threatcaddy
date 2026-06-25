@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, ReportTemplate, GraphSnapshot, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus, EnrichmentCacheEntry, VirtualCaddyJob, NetworkDevice, NetworkScanJob } from './types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, ReportTemplate, GraphSnapshot, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus, EnrichmentCacheEntry, VirtualCaddyJob, NetworkDevice, NetworkScanJob, SyncAuthSettings } from './types';
 import type { IntegrationTemplate, InstalledIntegration, IntegrationRun } from './types/integration-types';
 import { installEncryptionMiddleware } from './lib/encryptionMiddleware';
 
@@ -32,6 +32,7 @@ const db = new Dexie('ThreatCaddyDB') as Dexie & {
   virtualCaddyJobs: EntityTable<VirtualCaddyJob, 'id'>;
   networkDevices: EntityTable<NetworkDevice, 'id'>;
   networkScanJobs: EntityTable<NetworkScanJob, 'id'>;
+  syncAuthSettings: EntityTable<SyncAuthSettings, 'id'>;
 };
 
 db.version(1).stores({
@@ -328,6 +329,14 @@ db.version(36).stores({
 db.version(37).stores({
   networkDevices: 'id, investigationId, scanJobId, ip, status, [investigationId+scanJobId]',
   networkScanJobs: 'id, investigationId, status, startedAt, [investigationId+status]',
+});
+
+// Version 38: Sync auth settings — MFA method metadata (TOTP / passkey).
+// Actual secrets (TOTP key, passkey public key) are stored via safeStorage in the
+// desktop main process; this table holds only non-secret metadata for UI state.
+// Intentionally excluded from backup/export (per-device security config; re-enroll on each device).
+db.version(38).stores({
+  syncAuthSettings: '++id, userId, method, totpSecret, passkeyCredentialId, createdAt',
 });
 
 function evidenceKindFromExtension(value: string): EvidenceKind {

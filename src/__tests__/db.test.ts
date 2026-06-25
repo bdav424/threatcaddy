@@ -66,10 +66,11 @@ describe('Database schema', () => {
     expect(db.virtualCaddyJobs).toBeDefined();
     expect(db.networkDevices).toBeDefined();
     expect(db.networkScanJobs).toBeDefined();
+    expect(db.syncAuthSettings).toBeDefined();
   });
 
-  it('is at version 37', () => {
-    expect(db.verno).toBe(37);
+  it('is at version 38', () => {
+    expect(db.verno).toBe(38);
   });
 });
 

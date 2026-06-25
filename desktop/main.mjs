@@ -5,6 +5,7 @@ import { registerVmIngest } from './vm-ingest.mjs';
 import { registerNetworkScanBridge } from './network-scan.mjs';
 import { registerUpdaterBridge } from './updater.mjs';
 import { registerCredsBridge } from './creds-bridge.mjs';
+import { registerSyncAuthBridge } from './sync-auth-bridge.mjs';
 import * as cal from './mail-calendar-sync.mjs';
 import { runCalendarOAuthPopout, refreshCalendarToken } from './cal-oauth.mjs';
 import { runSlackOAuthPopout } from './slack-oauth.mjs';
@@ -376,6 +377,7 @@ app.whenReady().then(async () => {
   registerNetworkScanBridge();
   registerUpdaterBridge(win);
   registerCredsBridge();
+  registerSyncAuthBridge();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

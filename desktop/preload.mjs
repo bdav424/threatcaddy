@@ -174,6 +174,22 @@ contextBridge.exposeInMainWorld('threatcaddyCreds', {
     ipcRenderer.invoke('creds:open-file'),
 });
 
+// Sync auth bridge — MFA-gated sync auth (TOTP + passkeys).
+// Secrets are stored via safeStorage in the main process.
+// Renderer receives only success/null; raw secrets never cross this boundary.
+contextBridge.exposeInMainWorld('threatcaddySyncAuth', {
+  saveTotp: (secret) =>
+    ipcRenderer.invoke('sync-auth:save-totp', secret),
+  getTotp: () =>
+    ipcRenderer.invoke('sync-auth:get-totp'),
+  savePasskey: (credentialId, publicKey) =>
+    ipcRenderer.invoke('sync-auth:save-passkey', credentialId, publicKey),
+  getPasskey: () =>
+    ipcRenderer.invoke('sync-auth:get-passkey'),
+  clear: () =>
+    ipcRenderer.invoke('sync-auth:clear'),
+});
+
 contextBridge.exposeInMainWorld('threatcaddyDesktop', {
   isDesktop: true,
   platform: process.platform,
