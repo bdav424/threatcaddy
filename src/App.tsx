@@ -16,6 +16,7 @@ import { UIModalProvider, useUIModals } from './contexts/UIModalContext';
 const NoteList = lazy(() => import('./components/Notes/NoteList').then(m => ({ default: m.NoteList })));
 const NoteEditor = lazy(() => import('./components/Notes/NoteEditor').then(m => ({ default: m.NoteEditor })));
 const JotsPanel = lazy(() => import('./components/Notes/JotsPanel').then(m => ({ default: m.JotsPanel })));
+const MeetingImportModal = lazy(() => import('./components/Notes/MeetingImportModal').then(m => ({ default: m.MeetingImportModal })));
 const TaskListView = lazy(() => import('./components/Tasks/TaskList').then(m => ({ default: m.TaskListView })));
 const EvidenceView = lazy(() => import('./components/Evidence/EvidenceView').then(m => ({ default: m.EvidenceView })));
 const ProductView = lazy(() => import('./components/Products/ProductView').then(m => ({ default: m.ProductView })));
@@ -533,6 +534,8 @@ const AppInner = memo(function AppInner({
   const [showInvestigationTemplatePicker, setShowInvestigationTemplatePicker] = useState(false);
   const [showNoteTemplateCreator, setShowNoteTemplateCreator] = useState(false);
   const [showJotsPanel, setShowJotsPanel] = useState(false);
+  const [showMeetingImport, setShowMeetingImport] = useState(false);
+  const [whisperEndpoint, setWhisperEndpoint] = useState('');
   const [fortuneIntMode, setFortuneIntMode] = useState(false);
   const [fortuneIntOpenRequest, setFortuneIntOpenRequest] = useState(0);
 
@@ -565,6 +568,14 @@ const AppInner = memo(function AppInner({
   useEffect(() => {
     const timer = window.setTimeout(() => setStartupGraceExpired(true), 6000);
     return () => window.clearTimeout(timer);
+  }, []);
+
+  // Load Whisper endpoint from safeStorage (desktop only)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.threatcaddyNotes) return;
+    window.threatcaddyNotes.getWhisperEndpoint().then((url) => {
+      if (url) setWhisperEndpoint(url);
+    }).catch(() => { /* ignore */ });
   }, []);
 
   // Destructure frequently-used context values
@@ -2409,6 +2420,7 @@ const AppInner = memo(function AppInner({
           onCreate={handleNotesWorkspaceCreate}
           onCreateTyped={selectedFolderId ? handleNotesWorkspaceCreateTyped : undefined}
           onOpenJots={selectedFolderId ? () => setShowJotsPanel(true) : undefined}
+          onImportMeeting={selectedFolderId ? () => setShowMeetingImport(true) : undefined}
           attachedTemplates={selectedFolder ? attachedInvestigationTemplates : []}
           onCreateFromTemplate={handleCreateNoteFromTemplate}
           onManageTemplates={selectedFolder ? () => setShowInvestigationTemplatePicker(true) : undefined}
@@ -2500,6 +2512,8 @@ const AppInner = memo(function AppInner({
               await noteTemplatesHook.saveNoteAsTemplate(n);
               addToast('success', tt('investigation.savedAsTemplate', { name: n.title }));
             }}
+            whisperEnabled={settings.whisperEnabled && !!whisperEndpoint}
+            whisperEndpoint={whisperEndpoint}
           />
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-gray-600">
@@ -3082,6 +3096,26 @@ const AppInner = memo(function AppInner({
           templates={noteTemplatesHook.templates}
         />
       </Suspense>
+
+      {showMeetingImport && selectedFolderId && (
+        <Suspense fallback={null}>
+          <MeetingImportModal
+            onClose={() => setShowMeetingImport(false)}
+            onImport={async (title, content) => {
+              const folder = folders.find((f) => f.id === selectedFolderId);
+              const newNote = await notes.createNote({
+                title,
+                content,
+                folderId: selectedFolderId,
+                clsLevel: folder?.clsLevel,
+              });
+              setSelectedNoteId(newNote.id);
+              navigateTo('notes');
+              setShowMeetingImport(false);
+            }}
+          />
+        </Suspense>
+      )}
 
       {showJotsPanel && selectedFolderId && (
         <Suspense fallback={null}>

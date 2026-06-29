@@ -190,6 +190,18 @@ contextBridge.exposeInMainWorld('threatcaddySyncAuth', {
     ipcRenderer.invoke('sync-auth:clear'),
 });
 
+// Notes helpers — file import and Whisper transcription endpoint.
+contextBridge.exposeInMainWorld('threatcaddyNotes', {
+  // Open OS file picker for .txt/.vtt/.md meeting notes. Returns { ok, content, name } | { ok: false }.
+  pickFile: () => ipcRenderer.invoke('notes:pick-file'),
+
+  // Store Whisper endpoint URL in OS safeStorage. Returns { ok }.
+  saveWhisperEndpoint: (url) => ipcRenderer.invoke('notes:whisper-save-endpoint', url),
+
+  // Retrieve the stored Whisper endpoint URL. Returns string | null.
+  getWhisperEndpoint: () => ipcRenderer.invoke('notes:whisper-get-endpoint'),
+});
+
 contextBridge.exposeInMainWorld('threatcaddyDesktop', {
   isDesktop: true,
   platform: process.platform,

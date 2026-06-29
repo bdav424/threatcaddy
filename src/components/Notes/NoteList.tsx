@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUpDown, FileText, Download, FolderPlus, Pencil, FilePlus, Plus, Pin, BookOpen, ClipboardList, StickyNote, ChevronDown } from 'lucide-react';
+import { ArrowUpDown, FileText, Download, FolderPlus, Pencil, FilePlus, Plus, Pin, BookOpen, ClipboardList, StickyNote, ChevronDown, Upload } from 'lucide-react';
 import { useTranslation, Trans } from 'react-i18next';
 import type { Note, NoteType, SortOption, IOCType, Folder, NoteTemplate } from '../../types';
 import { cn } from '../../lib/utils';
@@ -31,13 +31,14 @@ interface NoteListProps {
   onCreate?: () => void;
   onCreateTyped?: (type: NoteType) => void;
   onOpenJots?: () => void;
+  onImportMeeting?: () => void;
   attachedTemplates?: NoteTemplate[];
   onCreateFromTemplate?: (templateId: string) => void;
   onManageTemplates?: () => void;
   emptyHint?: string;
 }
 
-export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, title, selectedIOCTypes, onIOCTypesChange, folders, tiExportConfig, onTrash, onCreateFolder, onMoveToFolder, onRenameFolder, onDeleteFolder, onCreate, onCreateTyped, onOpenJots, attachedTemplates = [], onCreateFromTemplate, onManageTemplates, emptyHint }: NoteListProps) {
+export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, title, selectedIOCTypes, onIOCTypesChange, folders, tiExportConfig, onTrash, onCreateFolder, onMoveToFolder, onRenameFolder, onDeleteFolder, onCreate, onCreateTyped, onOpenJots, onImportMeeting, attachedTemplates = [], onCreateFromTemplate, onManageTemplates, emptyHint }: NoteListProps) {
   const { t } = useTranslation('notes');
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showSortMenu, setShowSortMenu] = useState(false);
@@ -168,6 +169,17 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
               ))}
             </select>
           </label>
+        )}
+        {onImportMeeting && (
+          <button
+            type="button"
+            onClick={onImportMeeting}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] border border-border-subtle bg-bg-raised/70 text-text-secondary transition-colors hover:border-border-medium hover:bg-bg-hover hover:text-text-primary"
+            title="Import meeting notes (.txt, .vtt, .md)"
+            aria-label="Import meeting notes"
+          >
+            <Upload size={13} />
+          </button>
         )}
         {onOpenJots && (
           <button
@@ -307,7 +319,7 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
         </div>
       </div>
     );
-  }, [compactHistoryNotes, compactTitlebarMode, handleBulkExport, notesWithIOCs.length, onCreate, onCreateFolder, onCreateTyped, onManageTemplates, onOpenJots, onSelect, onSortChange, selectedId, showExportMenu, showNewFolder, showSortMenu, showTypeMenu, sort, t]);
+  }, [compactHistoryNotes, compactTitlebarMode, handleBulkExport, notesWithIOCs.length, onCreate, onCreateFolder, onCreateTyped, onImportMeeting, onManageTemplates, onOpenJots, onSelect, onSortChange, selectedId, showExportMenu, showNewFolder, showSortMenu, showTypeMenu, sort, t]);
   const noteTitlebarAccessory = useMemo(
     () => noteTitlebarControls ? { content: noteTitlebarControls, replaceTitle: true } : null,
     [noteTitlebarControls],
@@ -395,6 +407,16 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
           )}
         </div>
         <div className="flex items-center gap-1" data-note-toolbar-actions="true">
+          {onImportMeeting && (
+            <button
+              onClick={onImportMeeting}
+              className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300"
+              title="Import meeting notes (.txt, .vtt, .md)"
+              aria-label="Import meeting notes"
+            >
+              <Upload size={14} />
+            </button>
+          )}
           {onCreateFolder && (
             <button
               onClick={() => setShowNewFolder(!showNewFolder)}

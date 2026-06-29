@@ -26,6 +26,7 @@ import { downloadFile } from '../../lib/export';
 import { InlineConflictBanner } from '../Common/InlineConflictBanner';
 import type { ConflictInfo } from '../Common/InlineConflictBanner';
 import { useWorkspacePanelChromeState } from '../WorkspacePanels/WorkspacePanel';
+import { WhisperRecorder } from './WhisperRecorder';
 
 // ── Definition note helpers ──────────────────────────────────────────────────
 
@@ -123,6 +124,8 @@ interface NoteEditorProps {
   onNavigateToNote?: (noteId: string) => void;
   onShareLink?: (note: Note) => void;
   onSaveAsTemplate?: (note: Note) => void;
+  whisperEnabled?: boolean;
+  whisperEndpoint?: string;
 }
 
 export function NoteEditor({
@@ -146,6 +149,8 @@ export function NoteEditor({
   onNavigateToNote,
   onShareLink,
   onSaveAsTemplate,
+  whisperEnabled,
+  whisperEndpoint,
 }: NoteEditorProps) {
   const { t } = useTranslation('notes');
   const iocCount = note.iocAnalysis?.iocs.filter((i) => !i.dismissed).length ?? 0;
@@ -1011,6 +1016,22 @@ export function NoteEditor({
               <PlusCircle size={13} />
               Add entry
             </button>
+          </>
+        )}
+
+        {whisperEnabled && whisperEndpoint && (
+          <>
+            <div className="w-px h-5 bg-gray-700 mx-1" />
+            <WhisperRecorder
+              endpoint={whisperEndpoint}
+              onTranscript={(text) => {
+                const now = new Date();
+                const pad = (n: number) => String(n).padStart(2, '0');
+                const ts = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+                const block = `\n\n---\n*Whisper transcript — ${ts}*\n\n${text}`;
+                handleContentChange(content + block);
+              }}
+            />
           </>
         )}
 

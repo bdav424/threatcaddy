@@ -28,7 +28,14 @@ interface ThreatCaddyDesktopAPI {
   setWindowGlass: (config: ThreatCaddyDesktopGlassConfig) => Promise<void>;
 }
 
+interface ThreatCaddyNotesAPI {
+  pickFile: () => Promise<{ ok: boolean; content?: string; name?: string }>;
+  saveWhisperEndpoint: (url: string) => Promise<{ ok: boolean }>;
+  getWhisperEndpoint: () => Promise<string | null>;
+}
+
 interface Window {
   launchQueue?: LaunchQueue;
   threatcaddyDesktop?: ThreatCaddyDesktopAPI;
+  threatcaddyNotes?: ThreatCaddyNotesAPI;
 }

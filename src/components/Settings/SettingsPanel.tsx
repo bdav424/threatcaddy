@@ -1,4 +1,4 @@
-﻿import { useState, useCallback } from 'react';
+﻿import { useState, useCallback, useEffect } from 'react';
 import { cn } from '../../lib/utils';
 import DOMPurify from 'dompurify';
 import { Github, Download, FlaskConical, Trash2, Bot, X, Shield, RefreshCw, RotateCcw, Plus, Pencil, Wrench, Loader2, CheckCircle2, AlertTriangle, LayoutGrid, Palette, Database, FileText, Link, Keyboard, Zap, Mail, MessageSquare, Video, Users, Hash, Bell } from 'lucide-react';
@@ -1688,6 +1688,8 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
       {activeTab === 'integrations' && (
         <div className="space-y-6" role="tabpanel" id="settings-panel-integrations" aria-labelledby="settings-tab-integrations">
           <IntegrationPanel />
+          {/* Whisper Live Transcription */}
+          <WhisperSettingsSection settings={settings} onUpdateSettings={onUpdateSettings} />
           {/* Enrichment Cache TTL */}
           <div className="space-y-2 rounded-xl border border-border-subtle/40 bg-bg-primary/40 p-4">
             <div>
@@ -1742,6 +1744,85 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
 }
 
 // â”€â”€ Local LLM Configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+// ── Whisper Live Transcription Settings ────────────────────────────────────
+
+interface WhisperSettingsSectionProps {
+  settings: Settings;
+  onUpdateSettings: (updates: Partial<Settings>) => void;
+}
+
+function WhisperSettingsSection({ settings, onUpdateSettings }: WhisperSettingsSectionProps) {
+  const isDesktop = typeof window !== 'undefined' && !!window.threatcaddyNotes;
+  const [endpoint, setEndpoint] = useState('');
+  const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(isDesktop);
+
+  useEffect(() => {
+    if (!isDesktop) return;
+    void (async () => {
+      try {
+        const url = await window.threatcaddyNotes!.getWhisperEndpoint();
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        if (url) setEndpoint(url);
+      } finally {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setLoading(false);
+      }
+    })();
+  }, [isDesktop]);
+
+  const handleSaveEndpoint = useCallback(async () => {
+    if (!isDesktop) return;
+    try {
+      await window.threatcaddyNotes!.saveWhisperEndpoint(endpoint.trim());
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch { /* ignore */ }
+  }, [isDesktop, endpoint]);
+
+  if (!isDesktop) return null;
+
+  return (
+    <div className="space-y-3 rounded-xl border border-border-subtle/40 bg-bg-primary/40 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-text-primary">Live Transcription (Whisper)</h3>
+          <p className="text-xs text-text-secondary mt-0.5">
+            Transcribe mic audio using a local Whisper server (e.g. whisper.cpp). Desktop-only. Audio never leaves your machine.
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={settings.whisperEnabled ?? false}
+          onClick={() => onUpdateSettings({ whisperEnabled: !(settings.whisperEnabled ?? false) })}
+          className={`relative mt-0.5 inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${settings.whisperEnabled ? 'bg-accent' : 'bg-gray-700'}`}
+        >
+          <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform ${settings.whisperEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+        </button>
+      </div>
+      {settings.whisperEnabled && !loading && (
+        <div className="flex items-center gap-2 pt-1">
+          <input
+            type="url"
+            value={endpoint}
+            onChange={(e) => { setEndpoint(e.target.value); setSaved(false); }}
+            placeholder="http://localhost:9000"
+            className="flex-1 rounded-lg border border-border-subtle bg-bg-surface px-3 py-1.5 text-sm text-text-primary placeholder-text-muted focus:border-accent/40 focus:outline-none"
+          />
+          <button
+            onClick={handleSaveEndpoint}
+            disabled={!endpoint.trim()}
+            className="rounded-lg bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/25 disabled:opacity-40"
+          >
+            {saved ? 'Saved!' : 'Save'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface LocalLLMConfigProps {
   settings: Settings;

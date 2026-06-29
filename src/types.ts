@@ -473,6 +473,10 @@ export interface Settings {
   // ── CaddyAI Behaviour ─────────────────────────────────────────────────────
   /** When true, CaddyAI auto-approves all write-tool confirmations without prompting. */
   caddyAiYoloMode?: boolean;
+
+  // ── Live Transcription (desktop-only, Whisper) ────────────────────────────
+  /** Enable local Whisper transcription via mic button in Notes panel. Desktop-only. */
+  whisperEnabled?: boolean;
 }
 
 // ── Sync Auth Settings ────────────────────────────────────────────────────────

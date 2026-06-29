@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, safeStorage, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, shell } from 'electron';
 import { registerMailBridge } from './mail-bridge.mjs';
 import { registerVirtualBridge } from './virtual-bridge.mjs';
 import { registerVmIngest } from './vm-ingest.mjs';
@@ -296,6 +296,46 @@ ipcMain.handle('slack:revoke', (_e, credRefId) => {
 
 ipcMain.handle('slack:post-webhook', async (_e, webhookUrl, payload) => {
   return postSlackWebhook(webhookUrl, payload);
+});
+
+// ── Notes helpers ─────────────────────────────────────────────────────────
+
+// Open a file picker scoped to Zoom/meeting export formats (.txt, .vtt, .md).
+// Returns { ok: true, content: string, name: string } or { ok: false }.
+ipcMain.handle('notes:pick-file', async () => {
+  const win = BrowserWindow.getFocusedWindow();
+  const result = await dialog.showOpenDialog(win ?? undefined, {
+    title: 'Import Meeting Notes',
+    filters: [{ name: 'Meeting Files', extensions: ['txt', 'vtt', 'md'] }],
+    properties: ['openFile'],
+  });
+  if (result.canceled || result.filePaths.length === 0) return { ok: false };
+  const filePath = result.filePaths[0];
+  const content = fs.readFileSync(filePath, 'utf-8');
+  return { ok: true, content, name: path.basename(filePath) };
+});
+
+// Store the Whisper endpoint URL in safeStorage (encrypted on disk).
+const WHISPER_ENDPOINT_KEY = 'notes:whisper-endpoint';
+ipcMain.handle('notes:whisper-save-endpoint', (_e, url) => {
+  if (!safeStorage.isEncryptionAvailable()) return { ok: false };
+  if (typeof url !== 'string' || url.length > 500) return { ok: false };
+  const encrypted = safeStorage.encryptString(url);
+  app.getPath('userData');
+  const storeFile = path.join(app.getPath('userData'), 'whisper-endpoint.enc');
+  fs.writeFileSync(storeFile, encrypted);
+  return { ok: true };
+});
+
+ipcMain.handle('notes:whisper-get-endpoint', () => {
+  if (!safeStorage.isEncryptionAvailable()) return null;
+  const storeFile = path.join(app.getPath('userData'), 'whisper-endpoint.enc');
+  try {
+    const encrypted = fs.readFileSync(storeFile);
+    return safeStorage.decryptString(encrypted);
+  } catch {
+    return null;
+  }
 });
 
 // ── Window ─────────────────────────────────────────────────────────────────
