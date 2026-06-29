@@ -1523,23 +1523,47 @@ function RoutePanelPopOutSurface({
   popOutLabel?: string;
   children: ReactNode;
 }) {
+  const { selectedFolder } = useInvestigation();
+  const tlpGlow = workspaceTlpGlow(selectedFolder?.clsLevel);
+
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col" data-app-route-panel-surface={title.toLowerCase()}>
       <div
-        className="flex h-10 shrink-0 items-center justify-end border-b border-border-subtle/35 bg-bg-primary/45 px-3"
+        className="flex h-10 shrink-0 items-center border-b bg-bg-primary/45 px-3"
         data-app-route-panel-actions="true"
+        style={{
+          borderBottomColor: tlpGlow.border,
+          boxShadow: `0 4px 14px ${tlpGlow.glow}`,
+        }}
       >
-        <button
-          type="button"
-          aria-label={`${popOutLabel} ${title}`}
-          title={`${popOutLabel} ${title}`}
-          onClick={onPopOut}
-          className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border-subtle bg-bg-primary/75 px-2.5 text-[10px] font-semibold text-text-secondary shadow-sm transition-colors hover:border-border-medium hover:bg-bg-hover hover:text-text-primary"
-        >
-          <Maximize2 size={12} aria-hidden="true" />
-          <span>{popOutLabel}</span>
-        </button>
+        <div className="flex-1" />
+        <div className="flex items-center gap-1.5">
+          {selectedFolder?.clsLevel ? (
+            <ClsBadge level={selectedFolder.clsLevel} />
+          ) : (
+            <span className="inline-flex h-5 items-center rounded border border-border-subtle bg-bg-primary/60 px-1.5 text-[9px] font-semibold uppercase tracking-wide text-text-muted">
+              TLP
+            </span>
+          )}
+        </div>
+        <div className="flex flex-1 justify-end">
+          <button
+            type="button"
+            aria-label={`${popOutLabel} ${title}`}
+            title={`${popOutLabel} ${title}`}
+            onClick={onPopOut}
+            className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border-subtle bg-bg-primary/75 px-2.5 text-[10px] font-semibold text-text-secondary shadow-sm transition-colors hover:border-border-medium hover:bg-bg-hover hover:text-text-primary"
+          >
+            <Maximize2 size={12} aria-hidden="true" />
+            <span>{popOutLabel}</span>
+          </button>
+        </div>
       </div>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-10 h-px"
+        style={{ background: `linear-gradient(90deg, transparent, ${tlpGlow.border}, transparent)` }}
+      />
       <div className="flex min-h-0 flex-1 flex-col">
         {children}
       </div>
