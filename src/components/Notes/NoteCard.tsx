@@ -31,7 +31,7 @@ export const NoteCard = React.memo(function NoteCard({ note, active, onSelect, o
       draggable={draggable}
       onDragStart={onDragStart}
       className={cn(
-        'w-full text-start p-3 rounded-lg border transition-colors cursor-pointer group relative',
+        'w-full text-start p-3 rounded-lg border transition-colors cursor-pointer group relative min-h-[44px]',
         active
           ? 'bg-accent/10 border-accent/30'
           : 'bg-bg-raised border-border-subtle hover:bg-bg-hover hover:border-border-medium'

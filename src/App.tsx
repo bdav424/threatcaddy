@@ -2758,9 +2758,9 @@ const AppInner = memo(function AppInner({
   return (
     <ScreenshareContext.Provider value={screenshareCtx}>
     <ActivityLogContext.Provider value={activityLog.log}>
-      {/* Analyst mode banner on mobile */}
+      {/* Analyst mode back-pill — desktop-style banner hidden on narrow viewports */}
       {isMobile && forceAnalystMode && (
-        <div className="bg-accent/10 border-b border-accent/20 px-3 py-2 flex items-center justify-between text-xs shrink-0">
+        <div className="hidden sm:flex bg-accent/10 border-b border-accent/20 px-3 py-2 items-center justify-between text-xs shrink-0">
           <span className="text-text-secondary">Analyst Mode — optimized for desktop</span>
           <button
             onClick={() => setForceAnalystMode(false)}

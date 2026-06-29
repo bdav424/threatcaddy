@@ -121,7 +121,7 @@ export function DashboardView({ links, onUpdateLinks, onViewChange, folders, all
               aria-label={`Open quick link ${link.title}`}
               onClick={() => handlePanelClick(link.url)}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlePanelClick(link.url); } }}
-              className="group relative rounded-lg border border-border-subtle bg-bg-raised p-4 cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:border-border-medium"
+              className="group relative rounded-lg border border-border-subtle bg-bg-raised p-4 cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:border-border-medium min-h-[44px]"
               style={{
                 borderLeftWidth: '4px',
                 borderLeftColor: link.color || '#3b82f6',
@@ -185,7 +185,7 @@ export function DashboardView({ links, onUpdateLinks, onViewChange, folders, all
                   <button
                     key={tool.view}
                     onClick={() => onViewChange(tool.view)}
-                    className="group rounded-lg border border-border-subtle bg-bg-raised p-3 cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:border-border-medium text-start"
+                    className="group rounded-lg border border-border-subtle bg-bg-raised p-3 cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:border-border-medium text-start min-h-[44px]"
                     style={{
                       borderLeftWidth: '3px',
                       borderLeftColor: tool.color,

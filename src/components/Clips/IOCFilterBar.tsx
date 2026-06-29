@@ -19,7 +19,7 @@ export function IOCFilterBar({ selectedTypes, onChange }: IOCFilterBarProps) {
   };
 
   return (
-    <div className="flex gap-1 overflow-x-auto px-3 py-1.5 border-b border-gray-800 scrollbar-thin">
+    <div className="flex flex-nowrap gap-1 overflow-x-auto px-3 py-1.5 border-b border-gray-800 scrollbar-thin [-webkit-overflow-scrolling:touch]">
       {ALL_IOC_TYPES.map((type) => (
         <IOCBadge
           key={type}
