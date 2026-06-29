@@ -853,7 +853,7 @@ export function Sidebar({
 
         <div data-tour="investigations">
           <NavItem
-            icon={<Briefcase size={16} style={selectedFolder && tlpIconColor ? { color: tlpIconColor } : undefined} />}
+            icon={<Briefcase size={16} />}
             label={t('sidebar.investigations')}
             active={investigationsActive}
             onClick={() => nav(() => navToView('investigations'))}
