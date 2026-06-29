@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../Common/ConfirmDialog';
 import type { Tag } from '../../types';
 import { cn, formatFullDate } from '../../lib/utils';
 import { PlaybookProgress } from '../Playbooks/PlaybookProgress';
+import { useInvestigationClassification } from '../../hooks/useInvestigationClassification';
 
 interface InvestigationDetailPanelProps {
   folder: Folder;
@@ -64,6 +65,7 @@ export function InvestigationDetailPanel({
   const [name, setName] = useState(folder.name);
   const [description, setDescription] = useState(folder.description || '');
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const computedClsLevel = useInvestigationClassification(folder.id);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -103,7 +105,7 @@ export function InvestigationDetailPanel({
   }, [handleKeyDown]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Investigation details">
+    <div className="fixed inset-0 z-[300] flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Investigation details">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div className="relative bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto mx-4">
         {/* Header */}
@@ -215,7 +217,7 @@ export function InvestigationDetailPanel({
             <div>
               <label className="block text-xs font-medium text-gray-400 mb-1">{t('detail.classificationLabel')}</label>
               <select
-                value={folder.clsLevel || ''}
+                value={folder.clsLevel || computedClsLevel || ''}
                 onChange={(e) => onUpdate(folder.id, { clsLevel: e.target.value || undefined })}
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent"
               >

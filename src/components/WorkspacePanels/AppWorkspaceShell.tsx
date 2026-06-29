@@ -1599,7 +1599,7 @@ function RoutePanelPopOutSurface({
       </div>
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-10 h-px"
+        className="pointer-events-none absolute inset-x-0 top-[41px] h-px"
         style={{ background: `linear-gradient(90deg, transparent, ${tlpGlow.border}, transparent)` }}
       />
       <div className="flex min-h-0 flex-1 flex-col">
