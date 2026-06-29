@@ -1,4 +1,3 @@
-// TODO: Full Capacitor implementation in S-mobile.
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {

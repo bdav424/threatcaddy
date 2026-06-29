@@ -12,6 +12,8 @@
     "build:pro": "tsc -b && vite build --config vite.config.pro.ts",
     "build:mobile": "tsc -b && vite build --config vite.config.mobile.ts",
     "cap:sync": "cap sync",
+    "cap:android": "cap open android",
+    "cap:ios": "cap open ios",
     "build:single": "tsc -b && vite build --config vite.config.single.ts",
     "copy:standalone": "node scripts/copy-standalone-artifacts.mjs --dist",
     "update:standalone": "pnpm build:single && node scripts/copy-standalone-artifacts.mjs --workspace",
