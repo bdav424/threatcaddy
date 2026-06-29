@@ -17,6 +17,7 @@ const NoteList = lazy(() => import('./components/Notes/NoteList').then(m => ({ d
 const NoteEditor = lazy(() => import('./components/Notes/NoteEditor').then(m => ({ default: m.NoteEditor })));
 const JotsPanel = lazy(() => import('./components/Notes/JotsPanel').then(m => ({ default: m.JotsPanel })));
 const MeetingImportModal = lazy(() => import('./components/Notes/MeetingImportModal').then(m => ({ default: m.MeetingImportModal })));
+const JournalView = lazy(() => import('./components/Journal/JournalView').then(m => ({ default: m.JournalView })));
 const TaskListView = lazy(() => import('./components/Tasks/TaskList').then(m => ({ default: m.TaskListView })));
 const EvidenceView = lazy(() => import('./components/Evidence/EvidenceView').then(m => ({ default: m.EvidenceView })));
 const ProductView = lazy(() => import('./components/Products/ProductView').then(m => ({ default: m.ProductView })));
@@ -2944,6 +2945,23 @@ const AppInner = memo(function AppInner({
           null /* WhiteboardView is always-mounted below for workspace panel persistence */
         ) : activeView === 'chat' ? (
           null
+        ) : activeView === 'journal' ? (
+          <Suspense fallback={null}>
+            <JournalView
+              folders={folders}
+              onTearToInvestigation={async (content, title, investigationId) => {
+                const folder = folders.find((f) => f.id === investigationId);
+                const now = new Date();
+                const dateStr = now.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+                await notes.createNote({
+                  title: `${title} (from Journal, ${dateStr})`,
+                  content: `*Torn from Journal on ${dateStr}*\n\n${content}`,
+                  folderId: investigationId,
+                  clsLevel: folder?.clsLevel,
+                });
+              }}
+            />
+          </Suspense>
         ) : activeView === 'virtualcaddy' ? (
           <VirtualCaddyTabView />
         ) : activeView === 'netmap' ? (

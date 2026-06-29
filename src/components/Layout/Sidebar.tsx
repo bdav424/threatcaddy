@@ -6,7 +6,7 @@ import {
   Archive, Settings as SettingsIcon,
   PanelLeftClose, PanelLeft, Github, Download, Chrome, PenTool, Activity, Network, Search, Shield,
   LayoutDashboard, PanelsTopLeft, MessageSquare, LayoutTemplate, ChevronLeft, ChevronDown, ChevronRight,
-  Bot, FileOutput, FlaskConical, Sparkles, Mail, CalendarDays, Monitor,
+  Bot, FileOutput, FlaskConical, Sparkles, Mail, CalendarDays, Monitor, BookMarked,
 } from 'lucide-react';
 import type { Timeline, Whiteboard, ViewMode } from '../../types';
 import { cn } from '../../lib/utils';
@@ -323,6 +323,14 @@ export function Sidebar({
       active: activeView === 'experimental' && !showTrash && !showArchive,
       onClick: () => nav(() => navToView('experimental')),
       accentKey: 'experimental',
+    },
+    {
+      key: 'journal',
+      icon: BookMarked,
+      label: t('sidebar.journal', { defaultValue: 'Journal' }),
+      active: activeView === 'journal' && !showTrash && !showArchive,
+      onClick: () => nav(() => navToView('journal')),
+      accentKey: 'journal',
     },
     {
       key: 'investigations',
@@ -852,6 +860,15 @@ export function Sidebar({
         </div>
 
         <div className="h-px bg-border-subtle mx-1 my-1.5" />
+
+        <NavItem
+          icon={<BookMarked size={16} />}
+          label={t('sidebar.journal', { defaultValue: 'Journal' })}
+          active={activeView === 'journal' && !showTrash && !showArchive}
+          onClick={() => nav(() => navToView('journal'))}
+          accentStyle={sidebarAccentStyle}
+          accentColor={accentColorFor('journal')}
+        />
 
         <div data-tour="investigations">
           <NavItem

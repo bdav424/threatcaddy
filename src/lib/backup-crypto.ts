@@ -48,6 +48,7 @@ export interface BackupPayload {
     virtualCaddyJobs?: unknown[];
     networkDevices?: unknown[];
     networkScanJobs?: unknown[];
+    journalPages?: unknown[];
   };
   deletedIds?: Record<string, string[]>;
 }

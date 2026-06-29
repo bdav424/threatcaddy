@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, ReportTemplate, GraphSnapshot, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus, EnrichmentCacheEntry, VirtualCaddyJob, NetworkDevice, NetworkScanJob, SyncAuthSettings } from './types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, ReportTemplate, GraphSnapshot, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus, EnrichmentCacheEntry, VirtualCaddyJob, NetworkDevice, NetworkScanJob, SyncAuthSettings, JournalPage } from './types';
 import type { IntegrationTemplate, InstalledIntegration, IntegrationRun } from './types/integration-types';
 import { installEncryptionMiddleware } from './lib/encryptionMiddleware';
 
@@ -33,6 +33,7 @@ const db = new Dexie('ThreatCaddyDB') as Dexie & {
   networkDevices: EntityTable<NetworkDevice, 'id'>;
   networkScanJobs: EntityTable<NetworkScanJob, 'id'>;
   syncAuthSettings: EntityTable<SyncAuthSettings, 'id'>;
+  journalPages: EntityTable<JournalPage, 'id'>;
 };
 
 db.version(1).stores({
@@ -346,6 +347,11 @@ db.version(39).stores({}).upgrade(async (tx) => {
   await tx.table('notes').toCollection().modify((note: Record<string, unknown>) => {
     if (!note.noteType) note.noteType = 'note';
   });
+});
+
+// Version 40: Journal pages — top-level investigation-independent notebook.
+db.version(40).stores({
+  journalPages: '++id, title, createdAt, updatedAt, linkedInvestigationId',
 });
 
 function evidenceKindFromExtension(value: string): EvidenceKind {

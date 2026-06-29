@@ -306,7 +306,27 @@ export type SidebarAccentStyle = 'default' | 'color-chips';
 export type BackgroundEffectPattern = 'none' | 'dots' | 'synapse' | 'rain' | 'constellations' | 'perlin-flow' | 'petals' | 'sparkles' | 'embers' | 'swirls';
 
 /** Top-level view/page the user can navigate to. */
-export type ViewMode = 'dashboard' | 'workspace' | 'notes' | 'tasks' | 'evidence' | 'products' | 'experimental' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat' | 'caddyassistant' | 'cademail' | 'calendarcaddy' | 'caddyshack' | 'agent' | 'investigations' | 'reports' | 'virtualcaddy' | 'netmap';
+export type ViewMode = 'dashboard' | 'workspace' | 'notes' | 'tasks' | 'evidence' | 'products' | 'experimental' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat' | 'caddyassistant' | 'cademail' | 'calendarcaddy' | 'caddyshack' | 'agent' | 'investigations' | 'reports' | 'virtualcaddy' | 'netmap' | 'journal';
+
+// ── Journal Page ────────────────────────────────────────────────────────────
+export type JournalPageTheme = 'plain' | 'paper' | 'lined' | 'bullet' | 'grid' | 'cream' | 'blue-gray' | 'sage' | 'watermark';
+
+export interface JournalPageThemeOptions {
+  watermarkText?: string;
+  watermarkImageUrl?: string;
+}
+
+export interface JournalPage {
+  id: string;
+  title: string;
+  content: string;
+  theme: JournalPageTheme;
+  themeOptions?: JournalPageThemeOptions;
+  createdAt: number;
+  updatedAt: number;
+  linkedInvestigationId?: string;
+  linkedAt?: number;
+}
 export type EditorMode = 'edit' | 'preview' | 'split';
 export type TaskViewMode = 'list' | 'kanban';
 
@@ -1396,6 +1416,7 @@ export interface ExportData {
   virtualCaddyJobs?: VirtualCaddyJob[];
   networkDevices?: NetworkDevice[];
   networkScanJobs?: NetworkScanJob[];
+  journalPages?: JournalPage[];
 }
 
 export const TAG_COLORS = [
