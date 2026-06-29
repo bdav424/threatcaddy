@@ -50,6 +50,8 @@ This document captures every commit present in `bdav424/threatcaddy` (branch `ma
 
 ### Mobile & PWA
 
+- **S-mobile LAN sync diff/merge engine** — full bidirectional Dexie snapshot sync over LAN. Desktop serves GET/POST /sync endpoints; mobile PWA client calls `syncNow(url, token)` to pull desktop snapshot (newer-wins merge into local Dexie) then push local snapshot back. 18-table coverage. Bidirectional IPC bridges Electron main ↔ renderer so the Node sync server can read/write Dexie without duplicating data in the main process. *(S-mobile commit 1–4, `9604c7a2`–`f36e9d2a`)*
+- **Mobile sync settings panel** — PWA-only Settings card with IP:port + Bearer token inputs (localStorage-persisted), Sync Now button with result counts, 5-min auto-sync (foreground-only), and error display. Self-hides inside Electron. (`f36e9d2a`)
 - **Capacitor 8.4.1 native shell** — Android + iOS native app scaffolding (S-mobile step 2) (`6f8914c0`)
 - **Push notification infrastructure** — S-mobile step 6: native push plumbing for mobile alerts (`c1098846`)
 - **PWA manifest enhancements** — `share_target`, `shortcuts`, and `display_override` for the Mobile companion edition (`d6a64c3f`)

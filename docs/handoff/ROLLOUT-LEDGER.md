@@ -70,3 +70,30 @@ Tracks sprint group commits and status. Each sprint's commits are listed with th
 - Color mode: reads from localStorage on every InvestigationCard render (no re-subscribe needed; Settings toggle triggers re-render)
 
 ---
+
+## S-mobile — Mobile Sync + Capacitor PWA Build
+
+**Status:** DONE
+
+| # | Commit | Hash | Description |
+|---|--------|------|-------------|
+| 1 | `feat(sync): LAN sync diff/merge engine — bidirectional Dexie snapshot sync` | `9604c7a2` | `src/lib/lan-sync-engine.ts` (exportSyncSnapshot/importSyncSnapshot, 18-table snapshot, newer-wins/remote-wins merge); `src/lib/sync-bridge.ts` (getSyncSnapshot, importLanSnapshot, syncNow, self-registering bidirectional IPC IIFE); `desktop/sync-server.mjs` (GET /sync + POST /sync routes with setExportCallback/setImportCallback); `desktop/main.mjs` (registerLanSyncBridge — bidirectional IPC with 8s/15s timeouts); `desktop/preload.mjs` (onRequestExport, onRequestImport, respondExport, respondImport channels) |
+| 2 | `feat(mobile): Capacitor config + mobile build scripts` | `23c72a38` | `capacitor.config.ts` (remove TODO, finalized config); `package.json` (cap:android, cap:ios aliases) |
+| 3 | `feat(mobile): PWA sync settings — connect to desktop LAN sync server` | `f36e9d2a` | `src/components/Settings/MobileSyncSettings.tsx` (IP:port + token inputs, Sync Now, auto-sync toggle 5 min foreground-only, result card, error display, localStorage persistence); `SettingsPanel.tsx` wired below LanSyncSettings |
+| 4 | `feat(test): S-mobile tests + ledger` | *(this commit)* | `src/__tests__/lan-sync-engine.test.ts` (16 tests: export shape, newer-wins add/update/skip/conflict/error, remote-wins, edge cases); `ROLLOUT-LEDGER.md` + `PATCH-NOTES.md` updated |
+
+**Architecture:**
+- Desktop is always the sync server (LAN HTTP on port 7463); mobile PWA is always the client
+- `GET /sync` triggers a bidirectional IPC round-trip: sync-server.mjs → main.mjs → renderer (Dexie) → back; 8 s timeout
+- `POST /sync` same path in reverse with 15 s timeout for merge writes
+- Mobile PWA calls `syncNow(url, token)`: pull remote snapshot → import (newer-wins) → push local snapshot
+- No Dexie data stored in the Node main process; all persistence stays in renderer IndexedDB
+
+**Implementation notes:**
+- LAN sync engine is separate from cloud SyncEngine (server-api.ts) — no shared state
+- `syncNow` does a single bidirectional exchange per call; no long-polling or WebSocket
+- MobileSyncSettings self-hides in Electron via `isLanSyncAvailable()` (checks `window.threatcaddyLanSync`); LanSyncSettings self-hides in PWA via the same guard inverted
+- Auto-sync timer checks `document.visibilityState === 'visible'` before firing to avoid background battery drain on mobile
+- Bearer token stored in `localStorage` on mobile (connection preference, not a secret); on desktop it is stored in OS safeStorage via the existing lansync IPC
+
+---
