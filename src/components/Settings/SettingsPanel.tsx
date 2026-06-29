@@ -37,6 +37,7 @@ import { SystemHygienePanel } from './SystemHygienePanel';
 import { CredentialVault } from './CredentialVault';
 import { SyncAuthSettings } from './SyncAuthSettings';
 import { LanSyncSettings } from './LanSyncSettings';
+import { MobileSyncSettings } from './MobileSyncSettings';
 import { getLocalLlmHealthUrl, normalizeLocalLlmEndpoint } from '../../lib/local-llm-endpoint';
 import { getInvestigationColorMode, setInvestigationColorMode, type InvestigationColorMode } from '../../lib/investigation-color-mode';
 
@@ -1090,6 +1091,9 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
 
           {/* LAN Sync — desktop-only; component self-hides when IPC bridge absent */}
           <LanSyncSettings />
+
+          {/* Mobile sync — PWA/mobile-only; self-hides inside Electron */}
+          <MobileSyncSettings />
 
           {/* Identity */}
           {(() => {
