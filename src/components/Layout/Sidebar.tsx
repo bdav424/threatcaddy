@@ -730,12 +730,12 @@ export function Sidebar({
           {/* Clickable investigation card — opens settings */}
           <button
             onClick={() => setEditingFolderId(selectedFolder.id)}
-            className="w-full text-start rounded-lg border bg-bg-raised hover:bg-bg-hover transition-colors p-2 group overflow-hidden"
+            className="relative w-full text-start rounded-lg border bg-bg-raised hover:bg-bg-hover transition-colors p-2 group overflow-hidden"
             style={{ borderColor: tlpFullBorderColor }}
             title={t('sidebar.investigationSettings')}
           >
             {selectedFolder.color && (
-              <div className="h-0.5 rounded-full mb-1.5 -mx-0.5" style={{ backgroundColor: selectedFolder.color }} />
+              <div className="absolute left-0 top-[4px] bottom-[4px] w-[3px] rounded-full" style={{ backgroundColor: selectedFolder.color }} aria-hidden="true" />
             )}
             <div className="flex items-center gap-2">
               <Briefcase

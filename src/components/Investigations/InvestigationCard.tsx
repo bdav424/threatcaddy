@@ -160,7 +160,7 @@ export function InvestigationCard({
     <button
       onClick={() => onOpen(folderId)}
       className={cn(
-        'w-full text-start rounded-lg border transition-all duration-200 cursor-pointer',
+        'relative w-full text-start rounded-lg border transition-all duration-200 cursor-pointer',
         'hover:scale-[1.01] hover:shadow-lg',
         active
           ? 'bg-purple/5 shadow-md'
@@ -173,11 +173,12 @@ export function InvestigationCard({
         ...(cardBgTint ? { backgroundColor: cardBgTint } : {}),
       }}
     >
-      {/* Color strip — manual and combined modes only */}
-      {showColorStrip && (
+      {/* Color accent — small left-border strip for user-chosen color (manual/combined modes) */}
+      {showColorStrip && color && (
         <div
-          className="h-1 rounded-t-lg"
+          className="absolute left-0 top-[4px] bottom-[4px] w-[3px] rounded-full"
           style={{ backgroundColor: color }}
+          aria-hidden="true"
         />
       )}
 
