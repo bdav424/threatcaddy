@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   FileText, CheckSquare, Search, Clock, Layout, MessageSquare,
-  Download, CloudOff, MoreVertical, Settings, Archive, Trash2, Loader2,
+  Download, CloudOff, MoreVertical, Settings, Archive, Trash2, Loader2, Timer,
 } from 'lucide-react';
 import type { InvestigationDataMode } from '../../types';
 import { formatDate, cn } from '../../lib/utils';
@@ -13,7 +13,8 @@ import { getInvestigationColorMode, tlpToAccentColor } from '../../lib/investiga
 export interface InvestigationCardProps {
   folderId: string;
   name: string;
-  status: 'active' | 'closed' | 'archived';
+  status: 'active' | 'monitoring' | 'closed' | 'archived';
+  isStale?: boolean;
   color?: string;
   icon?: string;
   description?: string;
@@ -43,9 +44,10 @@ export interface InvestigationCardProps {
 }
 
 const STATUS_STYLES: Record<string, { dot: string; text: string }> = {
-  active:   { dot: 'bg-accent-green', text: 'text-accent-green' },
-  closed:   { dot: 'bg-text-muted',   text: 'text-text-muted' },
-  archived: { dot: 'bg-accent-amber', text: 'text-accent-amber' },
+  active:     { dot: 'bg-accent-green', text: 'text-accent-green' },
+  monitoring: { dot: 'bg-accent-blue',  text: 'text-accent-blue' },
+  closed:     { dot: 'bg-text-muted',   text: 'text-text-muted' },
+  archived:   { dot: 'bg-accent-amber', text: 'text-accent-amber' },
 };
 
 const DATA_MODE_CLASSES: Record<InvestigationDataMode, string> = {
@@ -67,6 +69,7 @@ export function InvestigationCard({
   folderId,
   name,
   status,
+  isStale,
   color,
   icon,
   description,
@@ -180,6 +183,13 @@ export function InvestigationCard({
           style={{ backgroundColor: color }}
           aria-hidden="true"
         />
+      )}
+
+      {/* Stale indicator */}
+      {isStale && (
+        <div className="absolute right-2 top-2 text-text-muted/50" title="Stale — no activity in the last 7 days" aria-label="Stale investigation">
+          <Timer size={12} />
+        </div>
       )}
 
       <div className="p-3">

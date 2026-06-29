@@ -35,6 +35,7 @@ interface InvestigationDetailPanelProps {
 
 const STATUS_KEYS: { value: InvestigationStatus; key: string }[] = [
   { value: 'active', key: 'detail.active' },
+  { value: 'monitoring', key: 'detail.monitoring' },
   { value: 'closed', key: 'detail.closed' },
   { value: 'archived', key: 'detail.archived' },
 ];

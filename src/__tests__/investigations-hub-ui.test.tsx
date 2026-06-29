@@ -70,14 +70,15 @@ describe('InvestigationsHub', () => {
     vi.clearAllMocks();
   });
 
-  it('renders "My Investigations" section with local folder cards', () => {
+  it('renders "Active" section with local folder cards', () => {
     render(
       <InvestigationsHub
         {...defaultHubProps}
         localFolders={[makeFolder()]}
       />
     );
-    expect(screen.getByText('My Investigations')).toBeInTheDocument();
+    // "Active" appears in both the section heading and the card's status badge
+    expect(screen.getAllByText('Active').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Op Falcon')).toBeInTheDocument();
   });
 
@@ -117,7 +118,7 @@ describe('InvestigationsHub', () => {
 
   it('shows empty state when no investigations', () => {
     render(<InvestigationsHub {...defaultHubProps} />);
-    expect(screen.getByText('No local investigations')).toBeInTheDocument();
+    expect(screen.getByText('No active investigations')).toBeInTheDocument();
     expect(screen.getByText('No shared investigations — ask a team member to invite you')).toBeInTheDocument();
   });
 
@@ -133,7 +134,7 @@ describe('InvestigationsHub', () => {
     expect(onCreate).toHaveBeenCalledOnce();
   });
 
-  it('correctly partitions folders into local/synced/shared sections', () => {
+  it('correctly partitions folders into status sections + shared', () => {
     const localOnly = makeFolder({ id: 'local-1', name: 'Pure Local' });
     const syncedFolder = makeFolder({ id: 'synced-1', name: 'Synced Folder' });
     const remoteOnly = makeRemoteSummary({ folderId: 'remote-only', folder: { name: 'Remote Only', status: 'active', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-02T00:00:00Z' } });
@@ -148,9 +149,8 @@ describe('InvestigationsHub', () => {
       />
     );
 
-    // Pure Local should be in My Investigations
+    // Both local and synced active folders appear in the Active section
     expect(screen.getByText('Pure Local')).toBeInTheDocument();
-    // Synced Folder should be in Synced Investigations
     expect(screen.getByText('Synced Folder')).toBeInTheDocument();
     // Remote Only should be in Shared With Me
     expect(screen.getByText('Remote Only')).toBeInTheDocument();

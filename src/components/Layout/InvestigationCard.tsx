@@ -14,14 +14,18 @@ export function InvestigationCard({ folder, counts, onEditFolder, synced }: Inve
   const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
   const statusColor = status === 'active'
     ? 'bg-accent-green'
-    : status === 'archived'
-      ? 'bg-accent-amber'
-      : 'bg-text-muted';
+    : status === 'monitoring'
+      ? 'bg-accent-blue'
+      : status === 'archived'
+        ? 'bg-accent-amber'
+        : 'bg-text-muted';
   const statusTextColor = status === 'active'
     ? 'text-accent-green'
-    : status === 'archived'
-      ? 'text-accent-amber'
-      : 'text-text-muted';
+    : status === 'monitoring'
+      ? 'text-accent-blue'
+      : status === 'archived'
+        ? 'text-accent-amber'
+        : 'text-text-muted';
 
   const stats: { label: string; value: number; color: string; bgColor: string; icon: typeof FileText }[] = [
     { label: 'Notes', value: counts.notes, color: 'text-accent-blue', bgColor: 'bg-accent-blue/10', icon: FileText },

@@ -201,7 +201,7 @@ export interface Task {
   completedAt?: number;
 }
 
-export type InvestigationStatus = 'active' | 'closed' | 'archived';
+export type InvestigationStatus = 'active' | 'monitoring' | 'closed' | 'archived';
 
 export type ClosureResolution = 'resolved' | 'false-positive' | 'escalated' | 'duplicate' | 'inconclusive';
 

@@ -702,9 +702,11 @@ export function Sidebar({
   const selectedStatus = selectedFolder ? (selectedFolder.status || 'active') : 'active';
   const statusTextColor = selectedStatus === 'active'
     ? 'text-accent-green'
-    : selectedStatus === 'archived'
-      ? 'text-accent-amber'
-      : 'text-text-muted';
+    : selectedStatus === 'monitoring'
+      ? 'text-accent-blue'
+      : selectedStatus === 'archived'
+        ? 'text-accent-amber'
+        : 'text-text-muted';
 
   // --- Expanded: full sidebar ---
   return (
