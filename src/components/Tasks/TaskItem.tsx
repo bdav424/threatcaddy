@@ -53,6 +53,16 @@ export const TaskItem = React.memo(function TaskItem({ task, onToggleComplete, o
     onUpdateTask(task.id, { checklist: updated });
   };
 
+  const toggleSubtaskItem = (parentId: string, childId: string) => {
+    if (!task.checklist || !onUpdateTask) return;
+    const updated = task.checklist.map(c =>
+      c.id === parentId
+        ? { ...c, children: c.children?.map(ch => ch.id === childId ? { ...ch, done: !ch.done } : ch) }
+        : c,
+    );
+    onUpdateTask(task.id, { checklist: updated });
+  };
+
   return (
     <div className="relative">
     <div
@@ -226,21 +236,43 @@ export const TaskItem = React.memo(function TaskItem({ task, onToggleComplete, o
         data-task-checklist="true"
       >
         {task.checklist!.map((item) => (
-          <button
-            key={item.id}
-            onClick={(e) => { e.stopPropagation(); toggleChecklistItem(item.id); }}
-            className="flex items-center gap-2 w-full text-start py-0.5 group/cl hover:bg-bg-hover rounded px-1 -mx-1 transition-colors"
-            data-task-checklist-item="true"
-            title={item.text}
-          >
-            {item.done
-              ? <CheckSquare size={13} className="text-green-400 shrink-0" />
-              : <Square size={13} className="text-gray-500 group-hover/cl:text-gray-300 shrink-0" />
-            }
-            <span className={cn('text-xs', compact ? 'line-clamp-2 whitespace-normal break-words leading-4' : 'truncate', item.done ? 'text-gray-500 line-through' : 'text-gray-300')}>
-              {item.text}
-            </span>
-          </button>
+          <React.Fragment key={item.id}>
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleChecklistItem(item.id); }}
+              className="flex items-center gap-2 w-full text-start py-0.5 group/cl hover:bg-bg-hover rounded px-1 -mx-1 transition-colors"
+              data-task-checklist-item="true"
+              title={item.text}
+            >
+              {item.done
+                ? <CheckSquare size={13} className="text-green-400 shrink-0" />
+                : <Square size={13} className="text-gray-500 group-hover/cl:text-gray-300 shrink-0" />
+              }
+              <span className={cn('text-xs', compact ? 'line-clamp-2 whitespace-normal break-words leading-4' : 'truncate', item.done ? 'text-gray-500 line-through' : 'text-gray-300')}>
+                {item.text}
+              </span>
+            </button>
+            {(item.children ?? []).length > 0 && (
+              <div className="ml-4 space-y-px border-l border-border-subtle/40 pl-2" data-task-subtask-list="true">
+                {(item.children ?? []).map((child) => (
+                  <button
+                    key={child.id}
+                    onClick={(e) => { e.stopPropagation(); toggleSubtaskItem(item.id, child.id); }}
+                    className="flex items-center gap-2 w-full text-start py-0.5 group/sl hover:bg-bg-hover rounded px-1 -mx-1 transition-colors"
+                    data-task-subtask-item="true"
+                    title={child.text}
+                  >
+                    {child.done
+                      ? <CheckSquare size={11} className="text-green-400/80 shrink-0" />
+                      : <Square size={11} className="text-gray-600 group-hover/sl:text-gray-400 shrink-0" />
+                    }
+                    <span className={cn('text-[11px]', compact ? 'line-clamp-2 whitespace-normal break-words leading-4' : 'truncate', child.done ? 'text-gray-600 line-through' : 'text-gray-400')}>
+                      {child.text}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </React.Fragment>
         ))}
       </div>
     )}
