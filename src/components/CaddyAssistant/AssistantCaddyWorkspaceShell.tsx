@@ -166,7 +166,7 @@ function EmailCaddyWorkspacePanel({
     setAssistantWorkspacePanelDragPayload(event, 'email');
   }, []);
 
-  if (routeActive) {
+  if (routeActive && panel.mode === 'docked') {
     return <>{typeof children === 'function' ? children(false, handleSurfaceDragStart) : children}</>;
   }
 
@@ -182,7 +182,7 @@ function EmailCaddyWorkspacePanel({
       onPanelFocus={focus}
       onRestore={restore}
       onClose={handleClose}
-      active={workspacePanelActive}
+      active={workspacePanelActive || (routeActive && panel.mode !== 'docked')}
       showFloatingPlaceholder={false}
       preserveChildrenAcrossModes
       deferMount
@@ -237,7 +237,7 @@ function CalendarCaddyWorkspacePanel({
     setAssistantWorkspacePanelDragPayload(event, 'calendar');
   }, []);
 
-  if (routeActive) {
+  if (routeActive && panel.mode === 'docked') {
     return <>{typeof children === 'function' ? children(false, panel.geometry.width, handleSurfaceDragStart) : children}</>;
   }
 
@@ -253,7 +253,7 @@ function CalendarCaddyWorkspacePanel({
       onPanelFocus={focus}
       onRestore={restore}
       onClose={handleClose}
-      active={workspacePanelActive}
+      active={workspacePanelActive || (routeActive && panel.mode !== 'docked')}
       showFloatingPlaceholder={false}
       preserveChildrenAcrossModes
       deferMount
