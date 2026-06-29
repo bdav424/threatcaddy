@@ -22,6 +22,7 @@ import {
   type WorkspacePanelMode,
 } from './workspace-panel-context';
 import {
+  getWorkspaceApproachCueSegments,
   getWorkspaceJoinCueSegments,
   getWorkspaceMosaicAttachmentState,
   getWorkspaceMosaicExposedEdgeSegments,
@@ -932,6 +933,33 @@ function JoinWallCues({ segments }: { segments: readonly WorkspaceJoinCueSegment
   );
 }
 
+function ApproachCues({ segments }: { segments: readonly WorkspaceJoinCueSegment[] }) {
+  if (typeof document === 'undefined' || segments.length === 0) return null;
+
+  return createPortal(
+    <>
+      {segments.map((segment, index) => {
+        const vertical = segment.side === 'left' || segment.side === 'right';
+        const style: CSSProperties = vertical
+          ? { left: segment.rect.x - 0.5, top: segment.rect.y, width: 1, height: segment.rect.height }
+          : { left: segment.rect.x, top: segment.rect.y - 0.5, width: segment.rect.width, height: 1 };
+
+        return (
+          <span
+            key={`approach-${segment.side}-${index}`}
+            aria-hidden="true"
+            className="pointer-events-none fixed z-[117] bg-accent opacity-40"
+            style={style}
+            data-workspace-approach-cue="true"
+            data-workspace-approach-cue-side={segment.side}
+          />
+        );
+      })}
+    </>,
+    document.body,
+  );
+}
+
 export function WorkspacePanel({
   id,
   title,
@@ -976,6 +1004,7 @@ export function WorkspacePanel({
   const [activeSharedSeamEdge, setActiveSharedSeamEdge] = useState<ResizeEdge | null>(null);
   const [snapPreview, setSnapPreview] = useState<WorkspaceGridPlacement | null>(null);
   const [snapPreviewCanvas, setSnapPreviewCanvas] = useState(() => readWorkspaceCanvasRect());
+  const [approachCues, setApproachCues] = useState<WorkspaceJoinCueSegment[]>([]);
   const [headerAccessory, setHeaderAccessory] = useState<WorkspacePanelHeaderAccessory | null>(null);
   const { canvas: workspaceCanvas, refreshCanvas } = useMeasuredWorkspaceCanvas();
   const providerPanel = workspacePanelContext?.getPanel(id);
@@ -1119,6 +1148,11 @@ export function WorkspacePanel({
         pointerY: moveEvent.clientY,
       });
       setSnapPreview(pendingSnapPlacement);
+      if (!pendingSnapPlacement) {
+        setApproachCues(getWorkspaceApproachCueSegments(nextGeometry, canvas, occupiedGridPlacements, id));
+      } else {
+        setApproachCues([]);
+      }
     };
 
     const handlePointerUp = () => {
@@ -1128,6 +1162,7 @@ export function WorkspacePanel({
         dragTarget.releasePointerCapture(event.pointerId);
       }
       setSnapPreview(null);
+      setApproachCues([]);
       setSnapPreviewCanvas(readWorkspaceCanvasRect());
 
       if (pendingSnapPlacement) {
@@ -1462,6 +1497,7 @@ export function WorkspacePanel({
         </section>
         {active && snapPreview && <SnapPreview placement={snapPreview} />}
         {active && joinCueSegments.length > 0 && <JoinWallCues segments={joinCueSegments} />}
+        {active && !snapPreview && approachCues.length > 0 && <ApproachCues segments={approachCues} />}
       </>
     );
   }
@@ -1575,6 +1611,7 @@ export function WorkspacePanel({
         )}
         {active && snapPreview && <SnapPreview placement={snapPreview} />}
         {active && joinCueSegments.length > 0 && <JoinWallCues segments={joinCueSegments} />}
+        {active && !snapPreview && approachCues.length > 0 && <ApproachCues segments={approachCues} />}
       </>
     );
   }

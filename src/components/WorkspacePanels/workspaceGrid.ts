@@ -1422,6 +1422,73 @@ export function getWorkspaceJoinCueSegments(
   return segments;
 }
 
+const APPROACH_CUE_THRESHOLD = 20;
+
+/**
+ * Returns subtle approach-cue segments when a floating panel's edge is within
+ * APPROACH_CUE_THRESHOLD px of a canvas boundary or another panel's edge.
+ * Intended to show before the full snap preview fires.
+ */
+export function getWorkspaceApproachCueSegments(
+  movingRect: WorkspacePanelGeometry,
+  canvas: WorkspaceCanvasRect,
+  occupants: readonly WorkspaceGridOccupant[] = [],
+  movingPanelId = '',
+): WorkspaceJoinCueSegment[] {
+  const right = movingRect.x + movingRect.width;
+  const bottom = movingRect.y + movingRect.height;
+  const canvasRight = canvas.x + canvas.width;
+  const canvasBottom = canvas.y + canvas.height;
+  const segments: WorkspaceJoinCueSegment[] = [];
+  const seen = new Set<string>();
+
+  const addSeg = (side: WorkspaceMosaicSide, rect: WorkspacePanelGeometry) => {
+    const key = `${side}:${Math.round(rect.x)}:${Math.round(rect.y)}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    segments.push({ side, kind: 'workspace-edge', rect });
+  };
+
+  const dist = (a: number, b: number) => Math.abs(a - b);
+
+  // Canvas edges
+  if (dist(movingRect.x, canvas.x) > 0 && dist(movingRect.x, canvas.x) <= APPROACH_CUE_THRESHOLD) {
+    addSeg('left', { x: canvas.x, y: movingRect.y, width: 0, height: movingRect.height });
+  }
+  if (dist(right, canvasRight) > 0 && dist(right, canvasRight) <= APPROACH_CUE_THRESHOLD) {
+    addSeg('right', { x: canvasRight, y: movingRect.y, width: 0, height: movingRect.height });
+  }
+  if (dist(movingRect.y, canvas.y) > 0 && dist(movingRect.y, canvas.y) <= APPROACH_CUE_THRESHOLD) {
+    addSeg('top', { x: movingRect.x, y: canvas.y, width: movingRect.width, height: 0 });
+  }
+  if (dist(bottom, canvasBottom) > 0 && dist(bottom, canvasBottom) <= APPROACH_CUE_THRESHOLD) {
+    addSeg('bottom', { x: movingRect.x, y: canvasBottom, width: movingRect.width, height: 0 });
+  }
+
+  // Neighbor panel edges
+  occupants.forEach((occupant) => {
+    if (occupant.id === movingPanelId || occupant.placement?.kind !== 'affixed') return;
+    const other = occupant.rect;
+    const otherRight = other.x + other.width;
+    const otherBottom = other.y + other.height;
+
+    if (dist(right, other.x) > 0 && dist(right, other.x) <= APPROACH_CUE_THRESHOLD) {
+      addSeg('right', { x: other.x, y: movingRect.y, width: 0, height: movingRect.height });
+    }
+    if (dist(movingRect.x, otherRight) > 0 && dist(movingRect.x, otherRight) <= APPROACH_CUE_THRESHOLD) {
+      addSeg('left', { x: otherRight, y: movingRect.y, width: 0, height: movingRect.height });
+    }
+    if (dist(bottom, other.y) > 0 && dist(bottom, other.y) <= APPROACH_CUE_THRESHOLD) {
+      addSeg('bottom', { x: movingRect.x, y: other.y, width: movingRect.width, height: 0 });
+    }
+    if (dist(movingRect.y, otherBottom) > 0 && dist(movingRect.y, otherBottom) <= APPROACH_CUE_THRESHOLD) {
+      addSeg('top', { x: movingRect.x, y: otherBottom, width: movingRect.width, height: 0 });
+    }
+  });
+
+  return segments;
+}
+
 export function summarizeWorkspaceMosaicSides(state: WorkspaceMosaicAttachmentState) {
   return (['left', 'right', 'top', 'bottom'] as const)
     .filter((side) => state[side])
