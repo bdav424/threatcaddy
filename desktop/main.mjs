@@ -392,6 +392,64 @@ ipcMain.handle('lansync:clear-headscale', () => {
   return { ok: true };
 });
 
+/**
+ * Wire bidirectional renderer↔server IPC for LAN sync snapshot export/import.
+ * Call once after the BrowserWindow is created.
+ *
+ * When a mobile device calls GET /sync or POST /sync, the sync server
+ * (which runs in the main process) delegates Dexie access to the renderer
+ * via these channels rather than maintaining its own copy of the data.
+ */
+function registerLanSyncBridge(win) {
+  const EXPORT_TIMEOUT_MS = 8_000;
+  const IMPORT_TIMEOUT_MS = 15_000;
+
+  const pendingExports = new Map();
+  const pendingImports = new Map();
+
+  ipcMain.on('lansync:export-result', (_e, reqId, snapshot) => {
+    const resolve = pendingExports.get(reqId);
+    if (resolve) { resolve(snapshot); pendingExports.delete(reqId); }
+  });
+
+  ipcMain.on('lansync:import-result', (_e, reqId, result) => {
+    const resolve = pendingImports.get(reqId);
+    if (resolve) { resolve(result); pendingImports.delete(reqId); }
+  });
+
+  const requestExport = () => new Promise((resolve) => {
+    if (win.isDestroyed()) { resolve(null); return; }
+    const reqId = Math.random().toString(36).slice(2);
+    pendingExports.set(reqId, resolve);
+    win.webContents.send('lansync:request-export', reqId);
+    setTimeout(() => {
+      if (pendingExports.has(reqId)) { pendingExports.delete(reqId); resolve(null); }
+    }, EXPORT_TIMEOUT_MS);
+  });
+
+  const requestImport = (snapshot, strategy) => new Promise((resolve) => {
+    if (win.isDestroyed()) {
+      resolve({ added: 0, updated: 0, skipped: 0, errors: ['window closed'] });
+      return;
+    }
+    const reqId = Math.random().toString(36).slice(2);
+    pendingImports.set(reqId, resolve);
+    win.webContents.send('lansync:request-import', reqId, snapshot, strategy);
+    setTimeout(() => {
+      if (pendingImports.has(reqId)) {
+        pendingImports.delete(reqId);
+        resolve({ added: 0, updated: 0, skipped: 0, errors: ['timeout'] });
+      }
+    }, IMPORT_TIMEOUT_MS);
+  });
+
+  // Wire callbacks into the sync server once it's loaded
+  getSyncServer().then((ss) => {
+    ss.setExportCallback(requestExport);
+    ss.setImportCallback(requestImport);
+  }).catch(() => { /* server not yet started — callbacks will be set on first start */ });
+}
+
 ipcMain.handle('notes:whisper-get-endpoint', () => {
   if (!safeStorage.isEncryptionAvailable()) return null;
   const storeFile = path.join(app.getPath('userData'), 'whisper-endpoint.enc');
@@ -506,6 +564,7 @@ app.whenReady().then(async () => {
   registerUpdaterBridge(win);
   registerCredsBridge();
   registerSyncAuthBridge();
+  registerLanSyncBridge(win);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

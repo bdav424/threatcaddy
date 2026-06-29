@@ -202,7 +202,8 @@ contextBridge.exposeInMainWorld('threatcaddyNotes', {
   getWhisperEndpoint: () => ipcRenderer.invoke('notes:whisper-get-endpoint'),
 });
 
-// LAN sync bridge — start/stop HTTP sync server, manage Headscale config.
+// LAN sync bridge — start/stop HTTP sync server, manage Headscale config,
+// and bidirectional snapshot IPC for the mobile sync server routes.
 // Auth key never returns to renderer; only serverUrl is readable after save.
 contextBridge.exposeInMainWorld('threatcaddyLanSync', {
   start:          (opts) => ipcRenderer.invoke('lansync:start', opts),
@@ -211,6 +212,21 @@ contextBridge.exposeInMainWorld('threatcaddyLanSync', {
   saveHeadscale:  (cfg)  => ipcRenderer.invoke('lansync:save-headscale', cfg),
   getHeadscale:   ()     => ipcRenderer.invoke('lansync:get-headscale'),
   clearHeadscale: ()     => ipcRenderer.invoke('lansync:clear-headscale'),
+
+  // Bidirectional snapshot IPC — main asks renderer to export/import Dexie data
+  // so the HTTP sync server can serve mobile clients without storing data in Node.
+  onRequestExport: (cb) => {
+    ipcRenderer.on('lansync:request-export', (_, reqId) => cb(reqId));
+  },
+  onRequestImport: (cb) => {
+    ipcRenderer.on('lansync:request-import', (_, reqId, snapshot, strategy) => cb(reqId, snapshot, strategy));
+  },
+  respondExport: (reqId, snapshot) => {
+    ipcRenderer.send('lansync:export-result', reqId, snapshot);
+  },
+  respondImport: (reqId, result) => {
+    ipcRenderer.send('lansync:import-result', reqId, result);
+  },
 });
 
 contextBridge.exposeInMainWorld('threatcaddyDesktop', {

@@ -20,6 +20,14 @@ let server = null;
 let serverToken = null;   // shared secret, set on start
 let latestBlob = null;    // in-memory staging for a received backup
 
+// Callbacks wired by main.mjs after window is ready (bidirectional renderer IPC).
+// null until registerLanSyncBridge() runs.
+let _requestExport = null;
+let _requestImport = null;
+
+export function setExportCallback(fn) { _requestExport = fn; }
+export function setImportCallback(fn) { _requestImport = fn; }
+
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
 function getLANAddress() {
@@ -72,6 +80,34 @@ function handleRequest(req, res) {
   }
 
   if (!serverToken || token !== serverToken) { authFail(res); return; }
+
+  // ── Dexie snapshot sync routes (used by mobile PWA) ─────────────────────────
+  if (url === '/sync' && req.method === 'GET') {
+    if (!_requestExport) { send(res, 503, { error: 'Sync not ready' }); return; }
+    _requestExport()
+      .then((snapshot) => {
+        if (!snapshot) { send(res, 503, { error: 'Snapshot unavailable' }); return; }
+        send(res, 200, snapshot);
+      })
+      .catch(() => send(res, 500, { error: 'Export failed' }));
+    return;
+  }
+
+  if (url === '/sync' && req.method === 'POST') {
+    readBody(req)
+      .then(async (raw) => {
+        try {
+          const snapshot = JSON.parse(raw);
+          if (!_requestImport) { send(res, 503, { error: 'Sync not ready' }); return; }
+          const result = await _requestImport(snapshot, 'newer-wins');
+          send(res, 200, result);
+        } catch {
+          send(res, 400, { error: 'Invalid sync payload' });
+        }
+      })
+      .catch(() => send(res, 500, { error: 'Read error' }));
+    return;
+  }
 
   if (url === '/push-backup' && req.method === 'POST') {
     readBody(req).then((raw) => {
