@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, safeStorage, shell } from 'electron';
 import { registerMailBridge } from './mail-bridge.mjs';
 import { registerVirtualBridge } from './virtual-bridge.mjs';
 import { registerVmIngest } from './vm-ingest.mjs';
@@ -336,6 +336,29 @@ function createWindow(loopbackPort) {
   win.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  win.webContents.on('context-menu', (_event, params) => {
+    const { editFlags, isEditable, selectionText } = params;
+    if (!isEditable && !selectionText) return;
+    const template = [];
+    if (isEditable) {
+      template.push(
+        { role: 'undo', enabled: editFlags.canUndo },
+        { role: 'redo', enabled: editFlags.canRedo },
+        { type: 'separator' },
+        { role: 'cut', enabled: editFlags.canCut },
+      );
+    }
+    template.push({ role: 'copy', enabled: editFlags.canCopy });
+    if (isEditable) {
+      template.push(
+        { role: 'paste', enabled: editFlags.canPaste },
+        { type: 'separator' },
+        { role: 'selectAll', enabled: editFlags.canSelectAll },
+      );
+    }
+    Menu.buildFromTemplate(template).popup({ window: win });
   });
 
   ipcMain.removeHandler('threatcaddy-desktop:set-window-glass');
