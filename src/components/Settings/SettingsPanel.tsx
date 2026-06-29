@@ -36,6 +36,7 @@ import { AgentHostsConfig } from './AgentHostsConfig';
 import { SystemHygienePanel } from './SystemHygienePanel';
 import { CredentialVault } from './CredentialVault';
 import { SyncAuthSettings } from './SyncAuthSettings';
+import { LanSyncSettings } from './LanSyncSettings';
 import { getLocalLlmHealthUrl, normalizeLocalLlmEndpoint } from '../../lib/local-llm-endpoint';
 import { getInvestigationColorMode, setInvestigationColorMode, type InvestigationColorMode } from '../../lib/investigation-color-mode';
 
@@ -1086,6 +1087,9 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
 
           {/* Security — Credential Vault (desktop only; hidden in web/SPA mode) */}
           <CredentialVault />
+
+          {/* LAN Sync — desktop-only; component self-hides when IPC bridge absent */}
+          <LanSyncSettings />
 
           {/* Identity */}
           {(() => {

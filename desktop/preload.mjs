@@ -202,6 +202,17 @@ contextBridge.exposeInMainWorld('threatcaddyNotes', {
   getWhisperEndpoint: () => ipcRenderer.invoke('notes:whisper-get-endpoint'),
 });
 
+// LAN sync bridge — start/stop HTTP sync server, manage Headscale config.
+// Auth key never returns to renderer; only serverUrl is readable after save.
+contextBridge.exposeInMainWorld('threatcaddyLanSync', {
+  start:          (opts) => ipcRenderer.invoke('lansync:start', opts),
+  stop:           ()     => ipcRenderer.invoke('lansync:stop'),
+  status:         ()     => ipcRenderer.invoke('lansync:status'),
+  saveHeadscale:  (cfg)  => ipcRenderer.invoke('lansync:save-headscale', cfg),
+  getHeadscale:   ()     => ipcRenderer.invoke('lansync:get-headscale'),
+  clearHeadscale: ()     => ipcRenderer.invoke('lansync:clear-headscale'),
+});
+
 contextBridge.exposeInMainWorld('threatcaddyDesktop', {
   isDesktop: true,
   platform: process.platform,

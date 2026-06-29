@@ -327,6 +327,71 @@ ipcMain.handle('notes:whisper-save-endpoint', (_e, url) => {
   return { ok: true };
 });
 
+// ── LAN sync server IPC ────────────────────────────────────────────────────────
+// Imports at module top would cause circular-import issues; load lazily via dynamic import.
+let _syncServer = null;
+async function getSyncServer() {
+  if (!_syncServer) {
+    _syncServer = await import('./sync-server.mjs');
+  }
+  return _syncServer;
+}
+
+const HEADSCALE_KEY_FILE = path.join(app.getPath('userData'), 'headscale-config.enc');
+
+ipcMain.handle('lansync:start', async (_e, { port, token } = {}) => {
+  try {
+    const ss = await getSyncServer();
+    return ss.startSyncServer({ port, token });
+  } catch (err) {
+    return { running: false, error: String(err.message) };
+  }
+});
+
+ipcMain.handle('lansync:stop', async () => {
+  try {
+    const ss = await getSyncServer();
+    return ss.stopSyncServer();
+  } catch {
+    return { running: false };
+  }
+});
+
+ipcMain.handle('lansync:status', async () => {
+  try {
+    const ss = await getSyncServer();
+    return ss.getStatus();
+  } catch {
+    return { running: false };
+  }
+});
+
+// Persist Headscale server URL + auth key via safeStorage
+ipcMain.handle('lansync:save-headscale', (_e, { serverUrl, authKey }) => {
+  if (!safeStorage.isEncryptionAvailable()) return { ok: false, reason: 'safeStorage unavailable' };
+  if (typeof serverUrl !== 'string' || typeof authKey !== 'string') return { ok: false, reason: 'invalid args' };
+  const payload = JSON.stringify({ serverUrl: serverUrl.trim(), authKey: authKey.trim() });
+  const encrypted = safeStorage.encryptString(payload);
+  fs.writeFileSync(HEADSCALE_KEY_FILE, encrypted);
+  return { ok: true };
+});
+
+ipcMain.handle('lansync:get-headscale', () => {
+  if (!safeStorage.isEncryptionAvailable()) return null;
+  try {
+    const encrypted = fs.readFileSync(HEADSCALE_KEY_FILE);
+    const parsed = JSON.parse(safeStorage.decryptString(encrypted));
+    return { serverUrl: parsed.serverUrl ?? '', authKey: '' }; // never return authKey to renderer
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle('lansync:clear-headscale', () => {
+  try { fs.unlinkSync(HEADSCALE_KEY_FILE); } catch { /* already gone */ }
+  return { ok: true };
+});
+
 ipcMain.handle('notes:whisper-get-endpoint', () => {
   if (!safeStorage.isEncryptionAvailable()) return null;
   const storeFile = path.join(app.getPath('userData'), 'whisper-endpoint.enc');
