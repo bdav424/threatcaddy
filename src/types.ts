@@ -61,6 +61,8 @@ export interface CalendarEvent {
   syncState?: 'local' | 'dirty' | 'synced';
 }
 
+export type NoteType = 'note' | 'journal' | 'definition' | 'sticky';
+
 /** An investigation note with markdown content, tags, and optional IOC analysis. */
 export interface Note {
   id: string;
@@ -88,6 +90,8 @@ export interface Note {
   isFolder?: boolean;
   /** Set true when an observer-role agent created this note — analyst should review before it's trusted as investigation output. */
   reviewRequired?: boolean;
+  /** Structural type of the note. Undefined/missing is treated as 'note'. */
+  noteType?: NoteType;
   /** Links this note to the VirtualCaddy job that created it, if any. */
   virtualCaddyJobId?: string;
   createdBy?: string;

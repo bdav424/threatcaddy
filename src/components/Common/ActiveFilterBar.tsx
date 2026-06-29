@@ -1,9 +1,10 @@
-import { Briefcase, Tag } from 'lucide-react';
+import { Briefcase, Tag, Pin } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { InvestigationStatus, PlaybookExecution } from '../../types';
 
 const statusColors: Record<InvestigationStatus, string> = {
   active: 'bg-green-500/20 text-green-400',
+  monitoring: 'bg-blue-500/20 text-blue-400',
   closed: 'bg-gray-500/20 text-gray-400',
   archived: 'bg-yellow-500/20 text-yellow-400',
 };
@@ -17,11 +18,13 @@ interface ActiveFilterBarProps {
   onClear: () => void;
   onEditFolder?: () => void;
   playbookExecution?: PlaybookExecution;
+  onOpenJots?: () => void;
+  jotsCount?: number;
 }
 
-const STATUS_KEYS: Record<InvestigationStatus, string> = { active: 'hub.active', closed: 'hub.closed', archived: 'hub.archived' };
+const STATUS_KEYS: Record<InvestigationStatus, string> = { active: 'hub.active', monitoring: 'hub.monitoring', closed: 'hub.closed', archived: 'hub.archived' };
 
-export function ActiveFilterBar({ folderName, folderColor, folderStatus, tagName, tagColor, onClear, onEditFolder, playbookExecution }: ActiveFilterBarProps) {
+export function ActiveFilterBar({ folderName, folderColor, folderStatus, tagName, tagColor, onClear, onEditFolder, playbookExecution, onOpenJots, jotsCount }: ActiveFilterBarProps) {
   const { t } = useTranslation('investigations');
   if (!folderName && !tagName) return null;
 
@@ -79,6 +82,17 @@ export function ActiveFilterBar({ folderName, folderColor, folderStatus, tagName
           </div>
           <span className="text-[10px] text-gray-500 tabular-nums">{pbCompleted}/{pbTotal}</span>
         </span>
+      )}
+      {onOpenJots && (
+        <button
+          onClick={onOpenJots}
+          className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-gray-400 transition-colors hover:bg-gray-700 hover:text-gray-200"
+          aria-label="Open Jots"
+          title="Jots (sticky notes)"
+        >
+          <Pin size={11} />
+          Jots{jotsCount ? ` (${jotsCount})` : ''}
+        </button>
       )}
       <button
         onClick={onClear}

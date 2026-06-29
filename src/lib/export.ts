@@ -205,6 +205,9 @@ export function sanitizeNote(raw: unknown): Note | null {
     annotations: Array.isArray(r.annotations)
       ? (r.annotations as unknown[]).map(sanitizeAnnotation).filter((a): a is NoteAnnotation => a !== null)
       : undefined,
+    noteType: (typeof r.noteType === 'string' && (['note', 'journal', 'definition', 'sticky'] as string[]).includes(r.noteType))
+      ? (r.noteType as NonNullable<Note['noteType']>)
+      : undefined,
     createdAt: num(r.createdAt, Date.now()),
     updatedAt: num(r.updatedAt, Date.now()),
   };

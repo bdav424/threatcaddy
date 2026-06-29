@@ -1,6 +1,7 @@
-import { ArrowUpDown, FileText, Download, FolderPlus, Pencil, FilePlus, Plus } from 'lucide-react';
+import React from 'react';
+import { ArrowUpDown, FileText, Download, FolderPlus, Pencil, FilePlus, Plus, Pin, BookOpen, ClipboardList, StickyNote, ChevronDown } from 'lucide-react';
 import { useTranslation, Trans } from 'react-i18next';
-import type { Note, SortOption, IOCType, Folder, NoteTemplate } from '../../types';
+import type { Note, NoteType, SortOption, IOCType, Folder, NoteTemplate } from '../../types';
 import { cn } from '../../lib/utils';
 import { NoteCard } from './NoteCard';
 import { IOCFilterBar } from '../Clips/IOCFilterBar';
@@ -28,20 +29,24 @@ interface NoteListProps {
   onRenameFolder?: (noteId: string, newName: string) => void;
   onDeleteFolder?: (noteId: string, action: 'trash_contents' | 'move_out') => void;
   onCreate?: () => void;
+  onCreateTyped?: (type: NoteType) => void;
+  onOpenJots?: () => void;
   attachedTemplates?: NoteTemplate[];
   onCreateFromTemplate?: (templateId: string) => void;
   onManageTemplates?: () => void;
   emptyHint?: string;
 }
 
-export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, title, selectedIOCTypes, onIOCTypesChange, folders, tiExportConfig, onTrash, onCreateFolder, onMoveToFolder, onRenameFolder, onDeleteFolder, onCreate, attachedTemplates = [], onCreateFromTemplate, onManageTemplates, emptyHint }: NoteListProps) {
+export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, title, selectedIOCTypes, onIOCTypesChange, folders, tiExportConfig, onTrash, onCreateFolder, onMoveToFolder, onRenameFolder, onDeleteFolder, onCreate, onCreateTyped, onOpenJots, attachedTemplates = [], onCreateFromTemplate, onManageTemplates, emptyHint }: NoteListProps) {
   const { t } = useTranslation('notes');
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [showNewFolder, setShowNewFolder] = useState(false);
+  const [showTypeMenu, setShowTypeMenu] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [newFolderIcon, setNewFolderIcon] = useState('📁');
+  const typeMenuRef = useRef<HTMLDivElement>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [deletingFolderId, setDeletingFolderId] = useState<string | null>(null);
@@ -99,6 +104,17 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
     return () => document.removeEventListener('mousedown', handler);
   }, [showSortMenu]);
 
+  useEffect(() => {
+    if (!showTypeMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (typeMenuRef.current && !typeMenuRef.current.contains(e.target as Node)) {
+        setShowTypeMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showTypeMenu]);
+
   const handleBulkExport = useCallback((format: 'json' | 'csv' | 'flat-json' | 'flat-csv') => {
     setShowExportMenu(false);
     const entries: IOCExportEntry[] = notesWithIOCs.map((n) => ({
@@ -153,17 +169,64 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
             </select>
           </label>
         )}
-        {onCreate && (
+        {onOpenJots && (
           <button
             type="button"
-            onClick={onCreate}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] border border-accent/30 bg-accent/14 text-accent transition-colors hover:bg-accent/20"
-            title="Create a blank note"
-            aria-label="Create blank note"
-            data-note-new-button="true"
+            onClick={onOpenJots}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] border border-border-subtle bg-bg-raised/70 text-text-secondary transition-colors hover:border-border-medium hover:bg-bg-hover hover:text-text-primary"
+            title="Open Jots (sticky notes)"
+            aria-label="Open Jots"
+            data-jots-button="true"
           >
-            <FilePlus size={13} />
+            <Pin size={13} />
           </button>
+        )}
+        {(onCreate || onCreateTyped) && (
+          <div className="relative" ref={typeMenuRef}>
+            {onCreateTyped ? (
+              <button
+                type="button"
+                onClick={() => setShowTypeMenu(!showTypeMenu)}
+                className="flex h-6 items-center gap-0.5 rounded-[8px] border border-accent/30 bg-accent/14 px-1.5 text-accent transition-colors hover:bg-accent/20"
+                title="Create new note"
+                aria-label="Create new note"
+                data-note-new-button="true"
+              >
+                <FilePlus size={13} />
+                <ChevronDown size={10} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onCreate}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] border border-accent/30 bg-accent/14 text-accent transition-colors hover:bg-accent/20"
+                title="Create a blank note"
+                aria-label="Create blank note"
+                data-note-new-button="true"
+              >
+                <FilePlus size={13} />
+              </button>
+            )}
+            {showTypeMenu && onCreateTyped && (
+              <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-lg border border-border-medium bg-bg-raised shadow-lg">
+                {([
+                  ['note', 'Note', FileText],
+                  ['journal', 'Journal', BookOpen],
+                  ['definition', 'Definition', ClipboardList],
+                  ['sticky', 'Sticky Jot', StickyNote],
+                ] as [NoteType, string, React.ElementType][]).map(([type, label, Icon]) => (
+                  <button
+                    key={type}
+                    onClick={() => { onCreateTyped(type); setShowTypeMenu(false); }}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary first:rounded-t-lg last:rounded-b-lg"
+                  >
+                    <Icon size={13} className="shrink-0 text-text-muted" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         )}
         {onManageTemplates && (
           <button
@@ -244,7 +307,7 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
         </div>
       </div>
     );
-  }, [compactHistoryNotes, compactTitlebarMode, handleBulkExport, notesWithIOCs.length, onCreate, onCreateFolder, onManageTemplates, onSelect, onSortChange, selectedId, showExportMenu, showNewFolder, showSortMenu, sort, t]);
+  }, [compactHistoryNotes, compactTitlebarMode, handleBulkExport, notesWithIOCs.length, onCreate, onCreateFolder, onCreateTyped, onManageTemplates, onOpenJots, onSelect, onSortChange, selectedId, showExportMenu, showNewFolder, showSortMenu, showTypeMenu, sort, t]);
   const noteTitlebarAccessory = useMemo(
     () => noteTitlebarControls ? { content: noteTitlebarControls, replaceTitle: true } : null,
     [noteTitlebarControls],
@@ -259,17 +322,52 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
       >
         <div className="min-w-0 flex flex-wrap items-center gap-1.5" data-note-toolbar-primary="true">
           <span className="text-sm font-medium text-gray-300 truncate me-1" data-note-toolbar-title="true">{t('list.titleWithCount', { title: title || t('list.defaultTitle'), count: notes.length })}</span>
-          {onCreate && (
-            <button
-              onClick={onCreate}
-              className="inline-flex h-6 items-center gap-1 rounded-md border border-gray-700 bg-gray-800 px-2 text-[11px] font-medium text-gray-300 transition-colors hover:border-accent/50 hover:bg-accent/10 hover:text-accent"
-              title="Create a blank note"
-              aria-label="Create blank note"
-              data-note-new-button={compactTitlebarMode ? undefined : 'true'}
-            >
-              <FilePlus size={12} />
-              <span data-note-new-button-label={compactTitlebarMode ? undefined : 'true'}>New Note</span>
-            </button>
+          {(onCreate || onCreateTyped) && (
+            <div className="relative" ref={compactTitlebarMode ? undefined : typeMenuRef}>
+              {onCreateTyped ? (
+                <button
+                  onClick={() => setShowTypeMenu(!showTypeMenu)}
+                  className="inline-flex h-6 items-center gap-1 rounded-md border border-gray-700 bg-gray-800 px-2 text-[11px] font-medium text-gray-300 transition-colors hover:border-accent/50 hover:bg-accent/10 hover:text-accent"
+                  title="Create new note"
+                  aria-label="Create new note"
+                  data-note-new-button={compactTitlebarMode ? undefined : 'true'}
+                >
+                  <FilePlus size={12} />
+                  <span data-note-new-button-label={compactTitlebarMode ? undefined : 'true'}>New Note</span>
+                  <ChevronDown size={10} />
+                </button>
+              ) : (
+                <button
+                  onClick={onCreate}
+                  className="inline-flex h-6 items-center gap-1 rounded-md border border-gray-700 bg-gray-800 px-2 text-[11px] font-medium text-gray-300 transition-colors hover:border-accent/50 hover:bg-accent/10 hover:text-accent"
+                  title="Create a blank note"
+                  aria-label="Create blank note"
+                  data-note-new-button={compactTitlebarMode ? undefined : 'true'}
+                >
+                  <FilePlus size={12} />
+                  <span data-note-new-button-label={compactTitlebarMode ? undefined : 'true'}>New Note</span>
+                </button>
+              )}
+              {!compactTitlebarMode && showTypeMenu && onCreateTyped && (
+                <div className="absolute left-0 top-full z-50 mt-1 w-40 rounded-lg border border-border-medium bg-bg-raised shadow-lg">
+                  {([
+                    ['note', 'Note', FileText],
+                    ['journal', 'Journal', BookOpen],
+                    ['definition', 'Definition', ClipboardList],
+                    ['sticky', 'Sticky Jot', StickyNote],
+                  ] as [NoteType, string, React.ElementType][]).map(([type, label, Icon]) => (
+                    <button
+                      key={type}
+                      onClick={() => { onCreateTyped(type); setShowTypeMenu(false); }}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary first:rounded-t-lg last:rounded-b-lg"
+                    >
+                      <Icon size={13} className="shrink-0 text-text-muted" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
           {attachedTemplates.map((template) => (
             <button

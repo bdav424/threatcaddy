@@ -15,6 +15,7 @@ import { InvestigationProvider, useInvestigation } from './contexts/Investigatio
 import { UIModalProvider, useUIModals } from './contexts/UIModalContext';
 const NoteList = lazy(() => import('./components/Notes/NoteList').then(m => ({ default: m.NoteList })));
 const NoteEditor = lazy(() => import('./components/Notes/NoteEditor').then(m => ({ default: m.NoteEditor })));
+const JotsPanel = lazy(() => import('./components/Notes/JotsPanel').then(m => ({ default: m.JotsPanel })));
 const TaskListView = lazy(() => import('./components/Tasks/TaskList').then(m => ({ default: m.TaskListView })));
 const EvidenceView = lazy(() => import('./components/Evidence/EvidenceView').then(m => ({ default: m.EvidenceView })));
 const ProductView = lazy(() => import('./components/Products/ProductView').then(m => ({ default: m.ProductView })));
@@ -51,7 +52,7 @@ import { clipBuffer } from './lib/clipBuffer';
 import { formatBytes, openFilePicker, getDroppedFiles, dispatchFile, type FileOpenDetail } from './lib/file-handler';
 import { hasPendingChanges } from './lib/pending-changes';
 import { useInvestigationData } from './hooks/useInvestigationData';
-import type { ConfidenceLevel, EvidenceItem, IOCType, Note, NoteTemplate, Task, TimelineEvent, ChatThread, ChatAttachment, StandaloneIOC, ViewMode } from './types';
+import type { ConfidenceLevel, EvidenceItem, IOCType, Note, NoteTemplate, NoteType, Task, TimelineEvent, ChatThread, ChatAttachment, StandaloneIOC, ViewMode } from './types';
 import { DEFAULT_QUICK_LINKS } from './types';
 const DashboardView = lazy(() => import('./components/Dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
 import { FileText, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
@@ -531,6 +532,7 @@ const AppInner = memo(function AppInner({
   } | null>(null);
   const [showInvestigationTemplatePicker, setShowInvestigationTemplatePicker] = useState(false);
   const [showNoteTemplateCreator, setShowNoteTemplateCreator] = useState(false);
+  const [showJotsPanel, setShowJotsPanel] = useState(false);
   const [fortuneIntMode, setFortuneIntMode] = useState(false);
   const [fortuneIntOpenRequest, setFortuneIntOpenRequest] = useState(0);
 
@@ -1337,6 +1339,45 @@ const AppInner = memo(function AppInner({
     });
     handleSearchNavigateToNote(note.id);
   }, [loggedCreateNote, selectedFolderId, showQuickCapture, folders, handleSearchNavigateToNote]);
+
+  const handleNewTypedNote = useCallback(async (type: NoteType) => {
+    if (showQuickCapture) return;
+    setShowTrash(false);
+    setShowArchive(false);
+    const folder = selectedFolderId ? folders.find((f) => f.id === selectedFolderId) : undefined;
+    if (type === 'sticky') {
+      const note = await loggedCreateNote({
+        noteType: 'sticky',
+        title: 'Jot',
+        folderId: selectedFolderId,
+        clsLevel: folder?.clsLevel,
+      });
+      setShowJotsPanel(true);
+      void note;
+      return;
+    }
+    if (type === 'definition') {
+      const existing = notes.notes.find((n) => n.folderId === selectedFolderId && n.noteType === 'definition' && !n.trashed);
+      if (existing) {
+        addToast('info', 'This investigation already has a Definition note.');
+        handleSearchNavigateToNote(existing.id);
+        return;
+      }
+    }
+    const defaultContent = type === 'definition'
+      ? '## Scope\n\n## Hypothesis\n\n## Objective\n'
+      : type === 'journal'
+        ? `### ${new Date().toLocaleString()}\n\n`
+        : '';
+    const note = await loggedCreateNote({
+      noteType: type,
+      title: type === 'journal' ? 'Journal' : type === 'definition' ? 'Definition' : 'Untitled Note',
+      content: defaultContent,
+      folderId: selectedFolderId,
+      clsLevel: folder?.clsLevel,
+    });
+    handleSearchNavigateToNote(note.id);
+  }, [loggedCreateNote, selectedFolderId, showQuickCapture, folders, handleSearchNavigateToNote, notes.notes, addToast, setShowJotsPanel]);
 
   const handleCreateNoteFromTemplate = useCallback(async (templateId: string) => {
     const template = noteTemplateMap.get(resolveBuiltinTemplateId(templateId));
@@ -2192,6 +2233,61 @@ const AppInner = memo(function AppInner({
 
   const handleNotesWorkspaceCreate = workspaceRouteActive ? handleCreateWorkspaceNote : handleNewNote;
 
+  const handleCreateWorkspaceTypedNote = useCallback(async (type: NoteType) => {
+    if (showQuickCapture) return;
+    setShowTrash(false);
+    setShowArchive(false);
+    const folder = selectedFolderId ? folders.find((f) => f.id === selectedFolderId) : undefined;
+    if (type === 'sticky') {
+      const note = await loggedCreateNote({
+        noteType: 'sticky',
+        title: 'Jot',
+        folderId: selectedFolderId,
+        clsLevel: folder?.clsLevel,
+      });
+      void note;
+      await notes.reload();
+      setShowJotsPanel(true);
+      return;
+    }
+    if (type === 'definition') {
+      const existing = notes.notes.find((n) => n.folderId === selectedFolderId && n.noteType === 'definition' && !n.trashed);
+      if (existing) {
+        addToast('info', 'This investigation already has a Definition note.');
+        await notes.reload();
+        setSelectedNoteId(existing.id);
+        return;
+      }
+    }
+    const defaultContent = type === 'definition'
+      ? '## Scope\n\n## Hypothesis\n\n## Objective\n'
+      : type === 'journal'
+        ? `### ${new Date().toLocaleString()}\n\n`
+        : '';
+    noteNavGraceRef.current = true;
+    try {
+      const note = await loggedCreateNote({
+        noteType: type,
+        title: type === 'journal' ? 'Journal' : type === 'definition' ? 'Definition' : 'Untitled Note',
+        content: defaultContent,
+        folderId: selectedFolderId,
+        clsLevel: folder?.clsLevel,
+      });
+      await notes.reload();
+      setSelectedNoteId(note.id);
+      window.setTimeout(() => { noteNavGraceRef.current = false; }, 2000);
+    } catch (error) {
+      noteNavGraceRef.current = false;
+      throw error;
+    }
+  }, [folders, loggedCreateNote, noteNavGraceRef, notes, selectedFolderId, setSelectedNoteId, showQuickCapture, addToast, setShowJotsPanel]);
+
+  const handleNotesWorkspaceCreateTyped = workspaceRouteActive ? handleCreateWorkspaceTypedNote : handleNewTypedNote;
+
+  const jotsCount = selectedFolderId
+    ? notes.notes.filter((n) => n.noteType === 'sticky' && n.folderId === selectedFolderId && !n.trashed && !n.archived).length
+    : 0;
+
   const filterBar = !assistantWorkspaceActive && !workspaceRouteActive && (selectedFolderId || selectedTag) ? (
     <ActiveFilterBar
       folderName={selectedFolder?.name}
@@ -2202,6 +2298,8 @@ const AppInner = memo(function AppInner({
       onClear={() => { setSelectedFolderId(undefined); setSelectedTag(undefined); }}
       onEditFolder={selectedFolderId ? () => setEditingFolderId(selectedFolderId) : undefined}
       playbookExecution={selectedFolder?.playbookExecution}
+      onOpenJots={selectedFolderId ? () => setShowJotsPanel(true) : undefined}
+      jotsCount={jotsCount}
     />
   ) : null;
   const remoteInvestigationBanner = investigationMode === 'remote' && selectedFolderId && !assistantWorkspaceActive ? (
@@ -2309,6 +2407,8 @@ const AppInner = memo(function AppInner({
           folders={folders}
           emptyHint={hiddenLocalNotesHint}
           onCreate={handleNotesWorkspaceCreate}
+          onCreateTyped={selectedFolderId ? handleNotesWorkspaceCreateTyped : undefined}
+          onOpenJots={selectedFolderId ? () => setShowJotsPanel(true) : undefined}
           attachedTemplates={selectedFolder ? attachedInvestigationTemplates : []}
           onCreateFromTemplate={handleCreateNoteFromTemplate}
           onManageTemplates={selectedFolder ? () => setShowInvestigationTemplatePicker(true) : undefined}
@@ -2982,6 +3082,27 @@ const AppInner = memo(function AppInner({
           templates={noteTemplatesHook.templates}
         />
       </Suspense>
+
+      {showJotsPanel && selectedFolderId && (
+        <Suspense fallback={null}>
+          <JotsPanel
+            notes={notes.notes}
+            onClose={() => setShowJotsPanel(false)}
+            onCreateJot={async () => {
+              const folder = folders.find((f) => f.id === selectedFolderId);
+              await notes.createNote({
+                noteType: 'sticky',
+                title: 'Jot',
+                folderId: selectedFolderId,
+                clsLevel: folder?.clsLevel,
+              });
+            }}
+            onUpdateJot={(id, updates) => notes.updateNote(id, updates)}
+            onTrashJot={(id) => notes.trashNote(id)}
+            onSelect={(id) => { setSelectedNoteId(id); navigateTo('notes'); }}
+          />
+        </Suspense>
+      )}
 
       <Suspense fallback={null}>
         <InvestigationTemplatePicker

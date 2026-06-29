@@ -339,6 +339,15 @@ db.version(38).stores({
   syncAuthSettings: '++id, userId, method, totpSecret, passkeyCredentialId, createdAt',
 });
 
+// Version 39: Note types — journal, definition, sticky.
+// noteType is an unindexed field; no schema change needed, just a data migration
+// so existing notes get an explicit 'note' type instead of undefined.
+db.version(39).stores({}).upgrade(async (tx) => {
+  await tx.table('notes').toCollection().modify((note: Record<string, unknown>) => {
+    if (!note.noteType) note.noteType = 'note';
+  });
+});
+
 function evidenceKindFromExtension(value: string): EvidenceKind {
   const lower = value.toLowerCase();
   if (lower.endsWith('pdf')) return 'pdf';

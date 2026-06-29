@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Upload, Briefcase, MessageSquare, Search, Lock, LockOpen, Share2, FileText, Download, AlertTriangle, Check } from 'lucide-react';
+import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Upload, Briefcase, MessageSquare, Search, Lock, LockOpen, Share2, FileText, Download, AlertTriangle, Check, BookOpen, PlusCircle } from 'lucide-react';
 import type { Note, Task, TimelineEvent, Tag, Folder, EditorMode, Settings, NoteAnnotation } from '../../types';
 import { NOTE_COLORS } from '../../types';
 import { nanoid } from 'nanoid';
@@ -26,6 +26,81 @@ import { downloadFile } from '../../lib/export';
 import { InlineConflictBanner } from '../Common/InlineConflictBanner';
 import type { ConflictInfo } from '../Common/InlineConflictBanner';
 import { useWorkspacePanelChromeState } from '../WorkspacePanels/WorkspacePanel';
+
+// ── Definition note helpers ──────────────────────────────────────────────────
+
+interface DefinitionFields { scope: string; hypothesis: string; objective: string; }
+
+function parseDefinitionContent(raw: string): DefinitionFields {
+  const sections: DefinitionFields = { scope: '', hypothesis: '', objective: '' };
+  const sectionRe = /^## (Scope|Hypothesis|Objective)\s*$/im;
+  const parts = raw.split(sectionRe);
+  for (let i = 1; i < parts.length; i += 2) {
+    const key = parts[i].toLowerCase() as keyof DefinitionFields;
+    if (key in sections) sections[key] = (parts[i + 1] ?? '').trim();
+  }
+  return sections;
+}
+
+function serializeDefinitionContent(fields: DefinitionFields): string {
+  return `## Scope\n${fields.scope}\n\n## Hypothesis\n${fields.hypothesis}\n\n## Objective\n${fields.objective}`.trimEnd();
+}
+
+// ── DefinitionEditor ────────────────────────────────────────────────────────
+
+interface DefinitionEditorProps {
+  content: string;
+  onChange: (content: string) => void;
+  readOnly?: boolean;
+}
+
+function DefinitionEditor({ content, onChange, readOnly }: DefinitionEditorProps) {
+  const [fields, setFields] = useState<DefinitionFields>(() => parseDefinitionContent(content));
+  const prevContentRef = useRef(content);
+
+  // Sync incoming content changes (e.g. remote merge) into local fields
+  useEffect(() => {
+    if (content !== prevContentRef.current) {
+      prevContentRef.current = content;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFields(parseDefinitionContent(content));
+    }
+  }, [content]);
+
+  const handleField = (key: keyof DefinitionFields, value: string) => {
+    const next = { ...fields, [key]: value };
+    setFields(next);
+    const serialized = serializeDefinitionContent(next);
+    prevContentRef.current = serialized;
+    onChange(serialized);
+  };
+
+  const fieldConfig: { key: keyof DefinitionFields; label: string; placeholder: string }[] = [
+    { key: 'scope', label: 'Scope', placeholder: 'What is this investigation investigating?' },
+    { key: 'hypothesis', label: 'Hypothesis', placeholder: 'Working theory or initial hypothesis…' },
+    { key: 'objective', label: 'Objective', placeholder: 'What does a successful outcome look like?' },
+  ];
+
+  return (
+    <div className="flex flex-col gap-4 overflow-y-auto p-4">
+      {fieldConfig.map(({ key, label, placeholder }) => (
+        <div key={key} className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wide text-text-muted">{label}</label>
+          <textarea
+            value={fields[key]}
+            onChange={(e) => handleField(key, e.target.value)}
+            placeholder={readOnly ? '' : placeholder}
+            readOnly={readOnly}
+            rows={key === 'hypothesis' ? 5 : 3}
+            className="w-full resize-none rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm leading-relaxed text-text-primary placeholder-text-muted focus:border-accent/40 focus:outline-none"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 
 interface NoteEditorProps {
   note: Note;
@@ -810,44 +885,57 @@ export function NoteEditor({
           )}
         </div>
         <div className="relative min-h-0 flex-1">
-          <textarea
-            ref={textareaRef}
-            value={content}
-            onChange={(e) => {
-              handleContentChange(e.target.value);
-              const val = e.target.value;
-              setTimeout(() => {
-                if (textareaRef.current) {
-                  const pos = textareaRef.current.selectionStart;
-                  detectSlashTrigger(val, pos);
-                  detectLinkTrigger(val, pos);
-                }
-              }, 0);
-            }}
-            onKeyDown={handleEditorKeyDown}
-            className="note-editor h-full w-full resize-none bg-transparent px-3 py-2 text-sm leading-relaxed text-text-primary placeholder-text-muted focus:outline-none focus:ring-0"
-            placeholder="Start writing..."
-            readOnly={note.trashed}
-            aria-label={t('editor.contentAria')}
-            data-note-compact-body="true"
-          />
-          {slashMenuOpen && filteredSlashCommands.length > 0 && (
-            <SlashCommandMenu
-              commands={filteredSlashCommands}
-              activeIndex={slashActiveIndex}
-              position={slashMenuPosition}
-              onSelect={executeSlashCommand}
-              menuRef={slashMenuRef}
-            />
-          )}
-          {linkMenuOpen && linkCandidates.length > 0 && (
-            <LinkAutocompleteMenu
-              items={linkCandidates}
-              activeIndex={linkActiveIndex}
-              position={linkMenuPosition}
-              onSelect={executeLinkSelection}
-              menuRef={linkMenuRef}
-            />
+          {note.noteType === 'definition' ? (
+            <>
+              <div ref={mirrorRef} aria-hidden="true" className="hidden" />
+              <DefinitionEditor
+                content={content}
+                onChange={handleContentChange}
+                readOnly={note.trashed}
+              />
+            </>
+          ) : (
+            <>
+              <textarea
+                ref={textareaRef}
+                value={content}
+                onChange={(e) => {
+                  handleContentChange(e.target.value);
+                  const val = e.target.value;
+                  setTimeout(() => {
+                    if (textareaRef.current) {
+                      const pos = textareaRef.current.selectionStart;
+                      detectSlashTrigger(val, pos);
+                      detectLinkTrigger(val, pos);
+                    }
+                  }, 0);
+                }}
+                onKeyDown={handleEditorKeyDown}
+                className="note-editor h-full w-full resize-none bg-transparent px-3 py-2 text-sm leading-relaxed text-text-primary placeholder-text-muted focus:outline-none focus:ring-0"
+                placeholder="Start writing..."
+                readOnly={note.trashed}
+                aria-label={t('editor.contentAria')}
+                data-note-compact-body="true"
+              />
+              {slashMenuOpen && filteredSlashCommands.length > 0 && (
+                <SlashCommandMenu
+                  commands={filteredSlashCommands}
+                  activeIndex={slashActiveIndex}
+                  position={slashMenuPosition}
+                  onSelect={executeSlashCommand}
+                  menuRef={slashMenuRef}
+                />
+              )}
+              {linkMenuOpen && linkCandidates.length > 0 && (
+                <LinkAutocompleteMenu
+                  items={linkCandidates}
+                  activeIndex={linkActiveIndex}
+                  position={linkMenuPosition}
+                  onSelect={executeLinkSelection}
+                  menuRef={linkMenuRef}
+                />
+              )}
+            </>
           )}
         </div>
         {(mergeIndicator === 'merged' || saved) && (
@@ -897,6 +985,34 @@ export function NoteEditor({
         >
           <Eye size={16} />
         </button>
+
+        {note.noteType === 'journal' && (
+          <>
+            <div className="w-px h-5 bg-gray-700 mx-1" />
+            <button
+              onClick={() => {
+                const now = new Date();
+                const pad = (n: number) => String(n).padStart(2, '0');
+                const ts = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+                const entry = `\n\n---\n### ${ts}\n\n`;
+                const newContent = content + entry;
+                handleContentChange(newContent);
+                setTimeout(() => {
+                  if (textareaRef.current) {
+                    textareaRef.current.selectionStart = textareaRef.current.selectionEnd = newContent.length;
+                    textareaRef.current.focus();
+                  }
+                }, 50);
+              }}
+              className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors"
+              title="Append a new timestamped entry"
+              aria-label="Add journal entry"
+            >
+              <PlusCircle size={13} />
+              Add entry
+            </button>
+          </>
+        )}
 
         <div className="w-px h-5 bg-gray-700 mx-1" />
 
@@ -1159,6 +1275,14 @@ export function NoteEditor({
 
       {/* Title */}
       <div className="px-2 sm:px-4 pt-2 sm:pt-3 shrink-0">
+        {note.noteType && note.noteType !== 'note' && (
+          <div className="mb-1.5 flex items-center gap-1.5">
+            {note.noteType === 'journal' && <BookOpen size={12} className="text-text-muted" />}
+            <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
+              {note.noteType === 'journal' ? 'Journal' : note.noteType === 'definition' ? 'Definition' : 'Sticky Jot'}
+            </span>
+          </div>
+        )}
         {note.reviewRequired && (
           <div
             role="note"
@@ -1188,7 +1312,16 @@ export function NoteEditor({
           ref={editorMode === 'split' ? editorPreview.containerRef : undefined}
           style={showIOCPanel ? { width: `${editorIOC.ratio * 100}%` } : { flex: 1 }}
         >
-          {showEditor && (
+          {showEditor && note.noteType === 'definition' ? (
+            <div className="flex-1 overflow-hidden" style={editorMode === 'split' ? { width: `${editorPreview.ratio * 100}%` } : {}}>
+              <div ref={mirrorRef} aria-hidden="true" className="hidden" />
+              <DefinitionEditor
+                content={content}
+                onChange={handleContentChange}
+                readOnly={note.trashed}
+              />
+            </div>
+          ) : showEditor && (
             <div
               className="relative flex overflow-hidden"
               style={editorMode === 'split' ? { width: `${editorPreview.ratio * 100}%` } : { flex: 1 }}
