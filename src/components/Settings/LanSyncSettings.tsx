@@ -1,16 +1,14 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Wifi, WifiOff, RefreshCw, Shield, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Wifi, WifiOff, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import {
   isLanSyncAvailable,
   startLanSyncServer,
   stopLanSyncServer,
   getLanSyncStatus,
-  saveHeadscaleConfig,
-  getHeadscaleConfig,
-  clearHeadscaleConfig,
   type LanSyncStatus,
 } from '../../lib/sync-bridge';
+import { WireGuardSettings } from './WireGuardSettings';
 
 function generateToken() {
   return nanoid(32);
@@ -22,10 +20,6 @@ export function LanSyncSettings() {
   const [token, setToken] = useState('');
   const [showToken, setShowToken] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [hsUrl, setHsUrl] = useState('');
-  const [hsKey, setHsKey] = useState('');
-  const [hsUrlSaved, setHsUrlSaved] = useState('');
-  const [hsSaved, setHsSaved] = useState(false);
 
   const refreshStatus = useCallback(async () => {
     const s = await getLanSyncStatus();
@@ -38,14 +32,6 @@ export function LanSyncSettings() {
     const id = setInterval(() => { void refreshStatus(); }, 5000);
     return () => clearInterval(id);
   }, [available, refreshStatus]);
-
-  useEffect(() => {
-    if (!available) return;
-    void (async () => {
-      const cfg = await getHeadscaleConfig();
-      if (cfg) setHsUrlSaved(cfg.serverUrl);
-    })();
-  }, [available]);
 
   const handleToggle = useCallback(async () => {
     setBusy(true);
@@ -63,23 +49,6 @@ export function LanSyncSettings() {
       setBusy(false);
     }
   }, [status.running, token]);
-
-  const handleSaveHeadscale = useCallback(async () => {
-    const r = await saveHeadscaleConfig({ serverUrl: hsUrl.trim(), authKey: hsKey.trim() });
-    if (r.ok) {
-      setHsUrlSaved(hsUrl.trim());
-      setHsKey('');
-      setHsSaved(true);
-      setTimeout(() => setHsSaved(false), 2500);
-    }
-  }, [hsUrl, hsKey]);
-
-  const handleClearHeadscale = useCallback(async () => {
-    await clearHeadscaleConfig();
-    setHsUrlSaved('');
-    setHsUrl('');
-    setHsKey('');
-  }, []);
 
   if (!available) return null;
 
@@ -159,47 +128,7 @@ export function LanSyncSettings() {
         </div>
       )}
 
-      {/* WireGuard / Headscale */}
-      <div className="border-t border-border-subtle pt-4 space-y-2">
-        <h4 className="text-xs font-semibold text-text-primary flex items-center gap-1.5">
-          <Shield size={12} />
-          WireGuard / Headscale (optional)
-        </h4>
-        <p className="text-[11px] text-text-muted">
-          Connect via a Headscale-managed WireGuard overlay network for cross-network LAN sync.
-          Auth key is stored encrypted in the OS keychain and never sent to ThreatCaddy servers.
-        </p>
-        {hsUrlSaved && (
-          <div className="flex items-center justify-between rounded bg-accent/5 border border-accent/20 px-2 py-1.5 text-xs">
-            <span className="text-text-muted">Server: <span className="text-text-primary font-mono">{hsUrlSaved}</span></span>
-            <button onClick={handleClearHeadscale} className="text-red-400 hover:text-red-300 ml-2">
-              <Trash2 size={11} />
-            </button>
-          </div>
-        )}
-        <input
-          type="url"
-          value={hsUrl}
-          onChange={(e) => setHsUrl(e.target.value)}
-          placeholder="https://headscale.example.com"
-          className="w-full rounded-lg border border-border-subtle bg-bg-surface px-3 py-1.5 text-xs text-text-primary placeholder-text-muted focus:border-accent/40 focus:outline-none"
-        />
-        <input
-          type="password"
-          value={hsKey}
-          onChange={(e) => setHsKey(e.target.value)}
-          placeholder="Headscale auth key (write-only)"
-          autoComplete="new-password"
-          className="w-full rounded-lg border border-border-subtle bg-bg-surface px-3 py-1.5 text-xs text-text-primary placeholder-text-muted focus:border-accent/40 focus:outline-none"
-        />
-        <button
-          onClick={handleSaveHeadscale}
-          disabled={!hsUrl.trim() || !hsKey.trim()}
-          className="rounded-lg bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/25 disabled:opacity-40 transition-colors"
-        >
-          {hsSaved ? 'Saved!' : 'Save Headscale config'}
-        </button>
-      </div>
+      <WireGuardSettings />
     </div>
   );
 }

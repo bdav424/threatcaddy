@@ -264,3 +264,12 @@ contextBridge.exposeInMainWorld('threatcaddyUpdater', {
   checkForUpdates: () => ipcRenderer.send('updater:check'),
   installAndQuit: () => ipcRenderer.send('updater:install-and-quit'),
 });
+
+// WireGuard / Headscale peer bridge.
+// Auth key stays in main process (safeStorage); renderer gets only connection status and peer metadata.
+contextBridge.exposeInMainWorld('threatcaddyWireGuard', {
+  getStatus:       ()                        => ipcRenderer.invoke('wg:get-status'),
+  listPeers:       ()                        => ipcRenderer.invoke('wg:list-peers'),
+  registerMachine: (machineKey, user)        => ipcRenderer.invoke('wg:register-machine', { machineKey, user }),
+  getRoutes:       ()                        => ipcRenderer.invoke('wg:get-routes'),
+});
