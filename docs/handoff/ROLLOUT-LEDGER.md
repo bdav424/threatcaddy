@@ -97,3 +97,17 @@ Tracks sprint group commits and status. Each sprint's commits are listed with th
 - Bearer token stored in `localStorage` on mobile (connection preference, not a secret); on desktop it is stored in OS safeStorage via the existing lansync IPC
 
 ---
+
+## UI Bug Batch — 2026-06-29
+
+**Status:** DONE
+
+| # | Commit | Hash | Description |
+|---|--------|------|-------------|
+| 1 | `fix(ui): TLP badge + Pop out on single header row — no wrapping second row` | `e8ed4a58` | `RoutePanelPopOutSurface` refactored to single flex row: [title] [TLP badge 200px centered] [Pop out]. Badge non-interactive. |
+| 2 | `fix(ui): TLP badge 2.5x wider, non-clickable; finder icon moved to investigation sidebar` | `aaed3aae` | Workspace bar TLP badge → non-interactive div (min-width 200px). ScanSearch moved from workspace bar to sidebar investigation card as "Find TLP source" button. Pre-existing lint errors fixed. |
+| 3 | `feat(journal): rich text toolbar, CSS backgrounds, drawing layer, fix red border` | `3f8a95ab` | `PageEditor` textarea → contenteditable with H1–H3/Bold/Italic/Underline/Lists/HR toolbar. CSS patterns (`.lined-page`, `.bullet-page`, `.grid-page`, `.watermark-page`) added. Drawing canvas overlay with pressure-sensitive strokes, color picker, base64 PNG save. DB v41 (JournalPage.drawingData). |
+| 4 | `fix(nav): restore VirtualCaddy nav entry — was hidden behind feature gate` | `75dae631` | VirtualCaddy and Network Map NavItems added to expanded sidebar investigationsExpanded section — were in collapsed rail only. |
+| 5 | `fix(workspace): bottom snap zone, soft snap indicator, combined border drag` | `409fe068` | `SharedSeamIndicator` accent glow → `rgba(255,255,255,0.25)` 2px line with 150ms fade. Bottom snap indicator appears when panel bottom edge within 12px of workspace bottom during resize. |
+
+---
