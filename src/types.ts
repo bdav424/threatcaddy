@@ -322,6 +322,7 @@ export interface JournalPage {
   content: string;
   theme: JournalPageTheme;
   themeOptions?: JournalPageThemeOptions;
+  drawingData?: string;
   createdAt: number;
   updatedAt: number;
   linkedInvestigationId?: string;

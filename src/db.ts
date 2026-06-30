@@ -354,6 +354,9 @@ db.version(40).stores({
   journalPages: '++id, title, createdAt, updatedAt, linkedInvestigationId',
 });
 
+// Version 41: JournalPage.drawingData — canvas drawing stored as base64 PNG.
+db.version(41).stores({});
+
 function evidenceKindFromExtension(value: string): EvidenceKind {
   const lower = value.toLowerCase();
   if (lower.endsWith('pdf')) return 'pdf';

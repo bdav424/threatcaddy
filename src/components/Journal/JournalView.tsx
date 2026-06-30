@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { BookOpen, Plus, Trash2, Send, Palette, Upload } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Send, Palette, Upload, Pencil, X } from 'lucide-react';
 import { useJournalPages, JOURNAL_THEME_LABELS, JOURNAL_THEMES } from '../../hooks/useJournalPages';
 import type { JournalPage, JournalPageTheme, Folder } from '../../types';
 import { cn } from '../../lib/utils';
@@ -117,6 +117,178 @@ function ThemePicker({ current, onChange, onClose }: ThemePickerProps) {
   );
 }
 
+// ── Rich text toolbar ─────────────────────────────────────────────────────────
+
+type DrawColor = 'black' | 'red' | 'blue' | 'green' | 'eraser';
+
+const DRAW_COLORS: { key: DrawColor; label: string; hex: string }[] = [
+  { key: 'black', label: 'Black', hex: '#1a1a1a' },
+  { key: 'red', label: 'Red', hex: '#ef4444' },
+  { key: 'blue', label: 'Blue', hex: '#3b82f6' },
+  { key: 'green', label: 'Green', hex: '#22c55e' },
+  { key: 'eraser', label: 'Eraser', hex: '#ffffff' },
+];
+
+function RichToolbar({ onFormat }: { onFormat: (cmd: string, val?: string) => void }) {
+  const btn = (label: string, cmd: string, val?: string, title?: string) => (
+    <button
+      type="button"
+      onMouseDown={(e) => { e.preventDefault(); onFormat(cmd, val); }}
+      className="rounded px-1.5 py-0.5 text-[11px] font-medium text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors"
+      title={title ?? label}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <div className="flex items-center gap-0.5 flex-wrap">
+      {btn('H1', 'formatBlock', '<h1>', 'Heading 1')}
+      {btn('H2', 'formatBlock', '<h2>', 'Heading 2')}
+      {btn('H3', 'formatBlock', '<h3>', 'Heading 3')}
+      <div className="w-px h-4 bg-border-subtle mx-1" />
+      {btn('B', 'bold', undefined, 'Bold')}
+      {btn('I', 'italic', undefined, 'Italic')}
+      {btn('U', 'underline', undefined, 'Underline')}
+      <div className="w-px h-4 bg-border-subtle mx-1" />
+      {btn('• List', 'insertUnorderedList', undefined, 'Bulleted list')}
+      {btn('1. List', 'insertOrderedList', undefined, 'Numbered list')}
+      {btn('—', 'insertHorizontalRule', undefined, 'Horizontal rule')}
+    </div>
+  );
+}
+
+// ── Drawing canvas ────────────────────────────────────────────────────────────
+
+interface DrawingCanvasProps {
+  initialData?: string;
+  onSave: (data: string) => void;
+  onExit: () => void;
+}
+
+function DrawingCanvas({ initialData, onSave, onExit }: DrawingCanvasProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [drawColor, setDrawColor] = useState<DrawColor>('black');
+  const isDrawing = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    if (initialData) {
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0);
+      img.src = initialData;
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const scheduleSave = useCallback(() => {
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      const canvas = canvasRef.current;
+      if (canvas) onSave(canvas.toDataURL('image/png'));
+    }, 800);
+  }, [onSave]);
+
+  const getPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current!.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    isDrawing.current = true;
+    canvasRef.current?.setPointerCapture(e.pointerId);
+    const ctx = canvasRef.current?.getContext('2d');
+    if (!ctx) return;
+    const { x, y } = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawing.current) return;
+    const ctx = canvasRef.current?.getContext('2d');
+    if (!ctx) return;
+    const color = DRAW_COLORS.find((c) => c.key === drawColor)!;
+    const pressure = e.pressure > 0 ? e.pressure : 0.5;
+    ctx.lineWidth = drawColor === 'eraser' ? 24 : pressure * 4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = color.hex;
+    ctx.globalCompositeOperation = drawColor === 'eraser' ? 'destination-out' : 'source-over';
+    const { x, y } = getPos(e);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+
+  const handlePointerUp = () => {
+    isDrawing.current = false;
+    scheduleSave();
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+    onSave('');
+  };
+
+  return (
+    <div className="absolute inset-0 z-10 flex flex-col">
+      {/* Draw toolbar */}
+      <div className="flex items-center gap-2 shrink-0 bg-bg-raised/95 backdrop-blur border-b border-border-subtle px-3 py-1.5">
+        <span className="text-[11px] font-semibold text-text-muted">Draw mode</span>
+        <div className="flex items-center gap-1">
+          {DRAW_COLORS.map(({ key, hex, label }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setDrawColor(key)}
+              title={label}
+              className={cn(
+                'h-5 w-5 rounded-full border-2 transition-transform',
+                drawColor === key ? 'scale-125 border-text-primary' : 'border-transparent hover:scale-110',
+                key === 'eraser' && 'border-border-subtle bg-bg-surface',
+              )}
+              style={key !== 'eraser' ? { backgroundColor: hex } : undefined}
+            >
+              {key === 'eraser' && <span className="text-[9px] text-text-muted">✕</span>}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={clearCanvas}
+          className="ml-2 rounded px-2 py-0.5 text-[10px] text-text-muted hover:bg-red-500/10 hover:text-red-400 transition-colors"
+        >
+          Clear drawing
+        </button>
+        <div className="flex-1" />
+        <button
+          type="button"
+          onClick={onExit}
+          className="flex items-center gap-1 rounded px-2 py-0.5 text-[10px] text-text-muted hover:bg-bg-hover hover:text-text-primary transition-colors"
+        >
+          <X size={11} /> Exit draw
+        </button>
+      </div>
+      <canvas
+        ref={canvasRef}
+        className="flex-1 w-full cursor-crosshair"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+      />
+    </div>
+  );
+}
+
 // ── Page editor ───────────────────────────────────────────────────────────────
 
 interface PageEditorProps {
@@ -130,20 +302,37 @@ interface PageEditorProps {
 
 function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageEditorProps) {
   const [title, setTitle] = useState(page.title);
-  const [content, setContent] = useState(page.content);
   const [showThemePicker, setShowThemePicker] = useState(false);
+  const [drawMode, setDrawMode] = useState(false);
+  const editorRef = useRef<HTMLDivElement>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const lastPageId = useRef<string>('');
 
-  // Sync state when page changes
+  // Sync content into contenteditable when page changes (but not on every keystroke)
   useEffect(() => {
-    setTitle(page.title);
-    setContent(page.content);
-  }, [page.id, page.title, page.content]);
+    if (lastPageId.current !== page.id) {
+      lastPageId.current = page.id;
+      setTitle(page.title);
+      if (editorRef.current) {
+        editorRef.current.innerHTML = page.content || '';
+      }
+    }
+  }, [page.id, page.content, page.title]);
 
-  const scheduleContentSave = useCallback((val: string) => {
+  const scheduleContentSave = useCallback(() => {
     clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => onUpdate({ content: val }), 600);
+    saveTimer.current = setTimeout(() => {
+      if (editorRef.current) {
+        onUpdate({ content: editorRef.current.innerHTML });
+      }
+    }, 600);
   }, [onUpdate]);
+
+  const handleFormat = useCallback((cmd: string, val?: string) => {
+    editorRef.current?.focus();
+    document.execCommand(cmd, false, val);
+    scheduleContentSave();
+  }, [scheduleContentSave]);
 
   const handleTitleBlur = useCallback(() => {
     if (title !== page.title) onUpdate({ title });
@@ -153,8 +342,8 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
 
   return (
     <div className="flex flex-col h-full">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-2 shrink-0 bg-bg-raised">
+      {/* Top toolbar */}
+      <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-2 shrink-0 bg-bg-raised flex-wrap">
         <div className="relative">
           <button
             onClick={() => setShowThemePicker(!showThemePicker)}
@@ -172,14 +361,27 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
             />
           )}
         </div>
+        <div className="w-px h-4 bg-border-subtle" />
+        <RichToolbar onFormat={handleFormat} />
         <div className="flex-1" />
+        <button
+          onClick={() => setDrawMode((v) => !v)}
+          className={cn(
+            'flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors',
+            drawMode ? 'bg-accent text-white' : 'text-text-muted hover:bg-bg-hover hover:text-text-primary',
+          )}
+          title="Toggle drawing mode"
+        >
+          <Pencil size={12} />
+          Draw
+        </button>
         <button
           onClick={onImportMeeting}
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-text-muted hover:bg-bg-hover hover:text-text-primary"
           title="Import meeting notes into this page"
         >
           <Upload size={12} />
-          Import meeting
+          Import
         </button>
         <button
           onClick={onTear}
@@ -199,8 +401,8 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
       </div>
 
       {/* Page surface */}
-      <div className={cn('flex-1 overflow-auto', themeClasses)}>
-        <div className="mx-auto max-w-3xl px-8 py-6">
+      <div className={cn('flex-1 overflow-auto relative', themeClasses)}>
+        <div className="mx-auto max-w-3xl px-8 py-6 relative">
           {/* Linked badge */}
           {page.linkedInvestigationId && (
             <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-2.5 py-0.5 text-xs text-accent">
@@ -216,16 +418,23 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
             placeholder="Page title…"
             className="mb-4 w-full bg-transparent text-2xl font-bold text-inherit placeholder-gray-400 outline-none"
           />
-          {/* Content */}
-          <textarea
-            value={content}
-            onChange={(e) => {
-              setContent(e.target.value);
-              scheduleContentSave(e.target.value);
-            }}
-            placeholder="Start writing…"
-            className="min-h-[60vh] w-full resize-none bg-transparent text-sm leading-relaxed text-inherit placeholder-gray-400 outline-none"
+          {/* Rich text content */}
+          <div
+            ref={editorRef}
+            contentEditable
+            suppressContentEditableWarning
+            onInput={scheduleContentSave}
+            data-placeholder="Start writing…"
+            className="min-h-[60vh] w-full bg-transparent text-sm leading-7 text-inherit outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 empty:before:pointer-events-none"
           />
+          {/* Drawing canvas overlay */}
+          {drawMode && (
+            <DrawingCanvas
+              initialData={page.drawingData}
+              onSave={(data) => onUpdate({ drawingData: data || undefined })}
+              onExit={() => setDrawMode(false)}
+            />
+          )}
         </div>
       </div>
     </div>
