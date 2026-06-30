@@ -442,6 +442,8 @@ export interface Settings {
   bgEffectIntensity?: number;    // 0–100
   bgEffectSize?: number;         // 40–180
   frostedPanels?: boolean;
+  /** Auto-snap floating panels to snapped panel edges within 16 px during move (default true). */
+  workspacePanelSnap?: boolean;
   /** Configured external agent hosts for skill execution */
   agentHosts?: AgentHost[];
   /** Skills discovered from the local LLM endpoint (GET /skills) */

@@ -14,6 +14,7 @@ import {
 import { createPortal } from 'react-dom';
 import { Dock, Maximize2, Minimize2, Move, RotateCcw, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useSettings } from '../../hooks/useSettings';
 import {
   WorkspacePanelContext,
   freeWorkspacePanelPlacement,
@@ -530,6 +531,118 @@ function sharedCornerResizeGroup(panelId: string, edge: ResizeEdge, panelGeometr
   return tiles.length > 0 ? { tiles } : null;
 }
 
+type SeamZone = 'center' | 'edge-a' | 'edge-b';
+
+function getSeamZone(event: PointerEvent<HTMLButtonElement>, edge: ResizeEdge): SeamZone {
+  if (isCorner(edge)) return 'center';
+  const rect = event.currentTarget.getBoundingClientRect();
+  if (edge === 'bottom' || edge === 'top') {
+    const relX = rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0.5;
+    if (relX < 0.2) return 'edge-a';
+    if (relX > 0.8) return 'edge-b';
+  } else if (edge === 'left' || edge === 'right') {
+    const relY = rect.height > 0 ? (event.clientY - rect.top) / rect.height : 0.5;
+    if (relY < 0.2) return 'edge-a';
+    if (relY > 0.8) return 'edge-b';
+  }
+  return 'center';
+}
+
+function filterNeighborsByZone(
+  neighbors: SharedResizeNeighbor[],
+  zone: SeamZone,
+  edge: ResizeEdge,
+  panelGeometry: WorkspacePanelGeometry,
+): SharedResizeNeighbor[] {
+  if (zone === 'center' || isCorner(edge) || neighbors.length <= 1) return neighbors;
+  const panelCenterX = panelGeometry.x + panelGeometry.width / 2;
+  const panelCenterY = panelGeometry.y + panelGeometry.height / 2;
+  let filtered: SharedResizeNeighbor[];
+  if (edge === 'bottom' || edge === 'top') {
+    filtered = neighbors.filter((n) => {
+      const nCenterX = n.geometry.x + n.geometry.width / 2;
+      return zone === 'edge-a' ? nCenterX < panelCenterX : nCenterX >= panelCenterX;
+    });
+  } else {
+    filtered = neighbors.filter((n) => {
+      const nCenterY = n.geometry.y + n.geometry.height / 2;
+      return zone === 'edge-a' ? nCenterY < panelCenterY : nCenterY >= panelCenterY;
+    });
+  }
+  return filtered.length > 0 ? filtered : neighbors;
+}
+
+function findCoParentIds(
+  panelId: string,
+  edge: ResizeEdge,
+  panelGeometry: WorkspacePanelGeometry,
+): string[] {
+  if (isCorner(edge) || typeof document === 'undefined') return [];
+  if (!snappedPanelElement(panelId)) return [];
+  const candidates = document.querySelectorAll<HTMLElement>(
+    '[data-workspace-panel-chrome="snapped"][data-workspace-panel-snap-zone]',
+  );
+  const panelRight = panelGeometry.x + panelGeometry.width;
+  const panelBottom = panelGeometry.y + panelGeometry.height;
+  const coParents: string[] = [];
+  for (const candidate of Array.from(candidates)) {
+    const candidateId = candidate.dataset.workspacePanel;
+    if (!candidateId || candidateId === panelId) continue;
+    const cg = geometryFromElement(candidate);
+    const isCoParent =
+      (edge === 'bottom' && Math.abs((cg.y + cg.height) - panelBottom) <= SHARED_SEAM_TOLERANCE)
+      || (edge === 'top' && Math.abs(cg.y - panelGeometry.y) <= SHARED_SEAM_TOLERANCE)
+      || (edge === 'right' && Math.abs((cg.x + cg.width) - panelRight) <= SHARED_SEAM_TOLERANCE)
+      || (edge === 'left' && Math.abs(cg.x - panelGeometry.x) <= SHARED_SEAM_TOLERANCE);
+    if (isCoParent) coParents.push(candidateId);
+  }
+  return coParents;
+}
+
+const MOVE_SNAP_THRESHOLD = 16;
+
+function findMoveSnapTarget(
+  panelId: string,
+  geometry: WorkspacePanelGeometry,
+): { snappedGeometry: WorkspacePanelGeometry; snapEdge: SeamEdge } | null {
+  if (typeof document === 'undefined') return null;
+  const candidates = document.querySelectorAll<HTMLElement>(
+    '[data-workspace-panel-chrome="snapped"][data-workspace-panel-snap-zone]',
+  );
+  let bestDistance = MOVE_SNAP_THRESHOLD;
+  let result: { snappedGeometry: WorkspacePanelGeometry; snapEdge: SeamEdge } | null = null;
+  const panelRight = geometry.x + geometry.width;
+  const panelBottom = geometry.y + geometry.height;
+  for (const candidate of Array.from(candidates)) {
+    const candidateId = candidate.dataset.workspacePanel;
+    if (!candidateId || candidateId === panelId) continue;
+    const cg = geometryFromElement(candidate);
+    const cgRight = cg.x + cg.width;
+    const cgBottom = cg.y + cg.height;
+    const leftDist = Math.abs(geometry.x - cgRight);
+    if (leftDist < bestDistance) {
+      bestDistance = leftDist;
+      result = { snappedGeometry: { ...geometry, x: cgRight }, snapEdge: 'left' };
+    }
+    const rightDist = Math.abs(panelRight - cg.x);
+    if (rightDist < bestDistance) {
+      bestDistance = rightDist;
+      result = { snappedGeometry: { ...geometry, x: cg.x - geometry.width }, snapEdge: 'right' };
+    }
+    const topDist = Math.abs(geometry.y - cgBottom);
+    if (topDist < bestDistance) {
+      bestDistance = topDist;
+      result = { snappedGeometry: { ...geometry, y: cgBottom }, snapEdge: 'top' };
+    }
+    const bottomDist = Math.abs(panelBottom - cg.y);
+    if (bottomDist < bestDistance) {
+      bestDistance = bottomDist;
+      result = { snappedGeometry: { ...geometry, y: cg.y - geometry.height }, snapEdge: 'bottom' };
+    }
+  }
+  return result;
+}
+
 function clampSeam(value: number, lowerBound: number, upperBound: number) {
   if (lowerBound <= upperBound) return clamp(value, lowerBound, upperBound);
   return (lowerBound + upperBound) / 2;
@@ -715,9 +828,10 @@ function EdgeIndicator({ activeEdge, snapped = false }: { activeEdge: ResizeEdge
   );
 }
 
-function SharedSeamIndicator({ edge }: { edge: ResizeEdge | null }) {
+function SharedSeamIndicator({ edge, combined = false }: { edge: ResizeEdge | null; combined?: boolean }) {
   if (!edge) return null;
   const sides = edgeSides(edge);
+  const bgColor = combined ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.25)';
 
   return (
     <>
@@ -732,12 +846,30 @@ function SharedSeamIndicator({ edge }: { edge: ResizeEdge | null }) {
             side === 'top' && 'left-0 right-0 top-[-1px] h-[2px] rounded-[1px]',
             side === 'bottom' && 'bottom-[-1px] left-0 right-0 h-[2px] rounded-[1px]',
           )}
-          style={{ backgroundColor: 'rgba(255,255,255,0.25)' }}
+          style={{ backgroundColor: bgColor }}
           data-resize-seam-indicator={edge}
           data-resize-seam-side={side}
         />
       ))}
     </>
+  );
+}
+
+function MoveSnapEdgeIndicator({ edge }: { edge: SeamEdge | null }) {
+  if (!edge) return null;
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'pointer-events-none absolute z-[26] animate-[seam-fade-in_80ms_ease-out] rounded-[1px]',
+        edge === 'left' && 'bottom-0 left-[-1px] top-0 w-[2px]',
+        edge === 'right' && 'bottom-0 right-[-1px] top-0 w-[2px]',
+        edge === 'top' && 'left-0 right-0 top-[-1px] h-[2px]',
+        edge === 'bottom' && 'bottom-[-1px] left-0 right-0 h-[2px]',
+      )}
+      style={{ backgroundColor: 'rgba(255,255,255,0.55)' }}
+      data-move-snap-edge={edge}
+    />
   );
 }
 
@@ -996,6 +1128,8 @@ export function WorkspacePanel({
   onClose,
 }: WorkspacePanelProps) {
   const workspacePanelContext = useContext(WorkspacePanelContext);
+  const { settings } = useSettings();
+  const panelSnapEnabled = settings.workspacePanelSnap !== false;
   // Tracks whether this panel has ever been active; once true, stays true so children stay mounted.
   const [hasEverBeenActive, setHasEverBeenActive] = useState(() => !deferMount || active);
   useEffect(() => {
@@ -1003,6 +1137,8 @@ export function WorkspacePanel({
   }, [active, hasEverBeenActive]);
   const [activeResizeEdge, setActiveResizeEdge] = useState<ResizeEdge | null>(null);
   const [activeSharedSeamEdge, setActiveSharedSeamEdge] = useState<ResizeEdge | null>(null);
+  const [resizeCombined, setResizeCombined] = useState(false);
+  const [moveSnapEdge, setMoveSnapEdge] = useState<SeamEdge | null>(null);
   const [bottomSnapNear, setBottomSnapNear] = useState(false);
   const [snapPreview, setSnapPreview] = useState<WorkspaceGridPlacement | null>(null);
   const [snapPreviewCanvas, setSnapPreviewCanvas] = useState(() => readWorkspaceCanvasRect());
@@ -1120,7 +1256,7 @@ export function WorkspacePanel({
 
     const handlePointerMove = (moveEvent: globalThis.PointerEvent) => {
       moved = true;
-      const nextGeometry = clampGeometry(
+      const rawGeometry = clampGeometry(
         {
           ...startGeometry,
           x: startGeometry.x + moveEvent.clientX - startX,
@@ -1131,6 +1267,9 @@ export function WorkspacePanel({
         { keepHeaderReachable: true },
       );
 
+      const snapTarget = panelSnapEnabled ? findMoveSnapTarget(id, rawGeometry) : null;
+      const nextGeometry = snapTarget ? snapTarget.snappedGeometry : rawGeometry;
+      setMoveSnapEdge(snapTarget?.snapEdge ?? null);
       onGeometryChange(nextGeometry);
       lastGeometry = nextGeometry;
       const canvas = readWorkspaceCanvasRect();
@@ -1165,6 +1304,7 @@ export function WorkspacePanel({
       }
       setSnapPreview(null);
       setApproachCues([]);
+      setMoveSnapEdge(null);
       setSnapPreviewCanvas(readWorkspaceCanvasRect());
 
       if (pendingSnapPlacement) {
@@ -1191,13 +1331,29 @@ export function WorkspacePanel({
     const startY = event.clientY;
     const startGeometry = renderedPanelGeometry;
     const seamGroup = sharedCornerResizeGroup(id, edge, startGeometry);
-    const seamNeighbors = sharedResizeNeighbors(id, edge, startGeometry)
+    const allSeamNeighbors = sharedResizeNeighbors(id, edge, startGeometry)
       .filter((neighbor) => workspacePanelContext?.getPanel(neighbor.id));
+    const zone = getSeamZone(event, edge);
+    const seamNeighbors = filterNeighborsByZone(allSeamNeighbors, zone, edge, startGeometry);
+    const isCombined = zone === 'center' && (seamNeighbors.length > 1 || (seamGroup !== null && seamGroup.tiles.length > 1));
     setActiveResizeEdge(edge);
     setActiveSharedSeamEdge(seamGroup || seamNeighbors.length > 0 ? edge : null);
-    if (seamNeighbors.length > 0 && !isCorner(edge)) {
+    setResizeCombined(isCombined);
+    if (!isCorner(edge)) {
       const seamEdge = edge as SeamEdge;
-      seamNeighbors.forEach((n) => workspacePanelContext?.notifySeamEdge(n.id, OPPOSITE_SEAM_EDGE[seamEdge]));
+      if (seamNeighbors.length > 0) {
+        seamNeighbors.forEach((n) => workspacePanelContext?.notifySeamEdge(n.id, OPPOSITE_SEAM_EDGE[seamEdge]));
+      }
+      // Group glow: co-parents (panels sharing the same edge) also glow
+      const coParentIds = findCoParentIds(id, seamEdge, startGeometry);
+      coParentIds.forEach((cpId) => workspacePanelContext?.notifySeamEdge(cpId, seamEdge));
+    }
+    if (seamGroup) {
+      // Corner group glow: notify tiles to show the side that faces the corner
+      seamGroup.tiles.forEach((tile) => {
+        const glowEdge = tile.xEdge ?? tile.yEdge;
+        if (glowEdge) workspacePanelContext?.notifySeamEdge(tile.id, glowEdge as SeamEdge);
+      });
     }
 
     const updatePlacementRect = (panelId: string, nextGeometry: WorkspacePanelGeometry) => {
@@ -1257,9 +1413,16 @@ export function WorkspacePanel({
       window.removeEventListener('pointerup', handlePointerUp);
       setActiveResizeEdge(null);
       setActiveSharedSeamEdge(null);
+      setResizeCombined(false);
       setBottomSnapNear(false);
-      if (seamNeighbors.length > 0 && !isCorner(edge)) {
+      if (!isCorner(edge)) {
+        const seamEdge = edge as SeamEdge;
         seamNeighbors.forEach((n) => workspacePanelContext?.notifySeamEdge(n.id, null));
+        const coParentIds = findCoParentIds(id, seamEdge, startGeometry);
+        coParentIds.forEach((cpId) => workspacePanelContext?.notifySeamEdge(cpId, null));
+      }
+      if (seamGroup) {
+        seamGroup.tiles.forEach((tile) => workspacePanelContext?.notifySeamEdge(tile.id, null));
       }
     };
 
@@ -1269,12 +1432,20 @@ export function WorkspacePanel({
 
   const activateResizeEdge = (edge: ResizeEdge) => {
     setActiveResizeEdge(edge);
-    const isSeam = !!(sharedCornerResizeGroup(id, edge, panelGeometry) || sharedResizeNeighbors(id, edge, panelGeometry).length > 0);
+    const cornerGroup = isCorner(edge) ? sharedCornerResizeGroup(id, edge, panelGeometry) : null;
+    const seamNeighbors = !isCorner(edge) ? sharedResizeNeighbors(id, edge, panelGeometry) : [];
+    const isSeam = !!(cornerGroup || seamNeighbors.length > 0);
     setActiveSharedSeamEdge(isSeam ? edge : null);
-    if (isSeam && !isCorner(edge)) {
+    if (!isCorner(edge)) {
       const seamEdge = edge as SeamEdge;
-      sharedResizeNeighbors(id, seamEdge, panelGeometry).forEach((n) => {
-        workspacePanelContext?.notifySeamEdge(n.id, OPPOSITE_SEAM_EDGE[seamEdge]);
+      seamNeighbors.forEach((n) => workspacePanelContext?.notifySeamEdge(n.id, OPPOSITE_SEAM_EDGE[seamEdge]));
+      const coParentIds = findCoParentIds(id, seamEdge, panelGeometry);
+      coParentIds.forEach((cpId) => workspacePanelContext?.notifySeamEdge(cpId, seamEdge));
+    }
+    if (cornerGroup) {
+      cornerGroup.tiles.forEach((tile) => {
+        const glowEdge = tile.xEdge ?? tile.yEdge;
+        if (glowEdge) workspacePanelContext?.notifySeamEdge(tile.id, glowEdge as SeamEdge);
       });
     }
   };
@@ -1287,6 +1458,12 @@ export function WorkspacePanel({
       sharedResizeNeighbors(id, seamEdge, panelGeometry).forEach((n) => {
         workspacePanelContext?.notifySeamEdge(n.id, null);
       });
+      findCoParentIds(id, seamEdge, panelGeometry).forEach((cpId) => {
+        workspacePanelContext?.notifySeamEdge(cpId, null);
+      });
+    } else {
+      const cornerGroup = sharedCornerResizeGroup(id, edge, panelGeometry);
+      cornerGroup?.tiles.forEach((tile) => workspacePanelContext?.notifySeamEdge(tile.id, null));
     }
   };
 
@@ -1486,7 +1663,8 @@ export function WorkspacePanel({
             <>
               <MosaicBorderMergeMasks masks={mosaicMergeMasks} />
               <EdgeIndicator activeEdge={snapped && sharedSeamEdge ? null : activeResizeEdge} snapped={snapped} />
-              <SharedSeamIndicator edge={sharedSeamEdge} />
+              <SharedSeamIndicator edge={sharedSeamEdge} combined={resizeCombined} />
+              <MoveSnapEdgeIndicator edge={moveSnapEdge} />
               {bottomSnapNear && (
                 <span
                   aria-hidden="true"
@@ -1607,7 +1785,8 @@ export function WorkspacePanel({
             </div>
             <MosaicBorderMergeMasks masks={mosaicMergeMasks} />
             <EdgeIndicator activeEdge={snapped && sharedSeamEdge ? null : activeResizeEdge} snapped={snapped} />
-            <SharedSeamIndicator edge={sharedSeamEdge} />
+            <SharedSeamIndicator edge={sharedSeamEdge} combined={resizeCombined} />
+            <MoveSnapEdgeIndicator edge={moveSnapEdge} />
             {resizeHandles.map((handle) => (
               <button
                 key={handle.edge}

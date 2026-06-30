@@ -1177,6 +1177,20 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
               </div>
               <p className="text-[10px] text-gray-500 text-end">{t('general.languageHelp')}</p>
             </div>
+
+            {/* Workspace panels */}
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-sm text-gray-300">Panel snap-to-connect</span>
+                <p className="text-xs text-gray-500">Auto-snap floating panels flush to snapped panel edges within 16 px while dragging.</p>
+              </div>
+              <button
+                onClick={() => onUpdateSettings({ workspacePanelSnap: settings.workspacePanelSnap === false ? true : false })}
+                className={`relative w-9 h-5 rounded-full transition-colors ${settings.workspacePanelSnap !== false ? 'bg-accent' : 'bg-gray-700'}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${settings.workspacePanelSnap !== false ? 'translate-x-4' : ''}`} />
+              </button>
+            </div>
           </div>
 
           {/* Notifications */}
