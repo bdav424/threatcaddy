@@ -271,7 +271,12 @@ function DrawingCanvas({ initialData, onSave, onExit }: DrawingCanvasProps) {
         <div className="flex-1" />
         <button
           type="button"
-          onClick={onExit}
+          onClick={() => {
+            clearTimeout(saveTimer.current);
+            const canvas = canvasRef.current;
+            if (canvas) onSave(canvas.toDataURL('image/png'));
+            onExit();
+          }}
           className="flex items-center gap-1 rounded px-2 py-0.5 text-[10px] text-text-muted hover:bg-bg-hover hover:text-text-primary transition-colors"
         >
           <X size={11} /> Exit draw
@@ -304,6 +309,7 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
   const [title, setTitle] = useState(page.title);
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [drawMode, setDrawMode] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastPageId = useRef<string>('');
@@ -392,13 +398,42 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
           Tear to investigation
         </button>
         <button
-          onClick={onDelete}
+          onClick={() => setConfirmDelete(true)}
           className="flex h-6 w-6 items-center justify-center rounded text-text-muted hover:bg-red-500/10 hover:text-red-400"
           title="Delete page"
         >
           <Trash2 size={13} />
         </button>
       </div>
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-xs rounded-xl border border-border-medium bg-bg-raised shadow-2xl">
+            <div className="px-4 py-3 border-b border-border-subtle">
+              <span className="text-sm font-semibold text-text-primary">Delete page?</span>
+            </div>
+            <div className="p-4 space-y-4">
+              <p className="text-xs text-text-muted">
+                <strong className="text-text-primary">"{page.title || 'Untitled'}"</strong> will be permanently deleted.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="flex-1 rounded-lg border border-border-subtle px-3 py-2 text-sm text-text-secondary hover:bg-bg-hover"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { setConfirmDelete(false); onDelete(); }}
+                  className="flex-1 rounded-lg bg-red-500 px-3 py-2 text-sm font-medium text-white hover:bg-red-600"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Page surface */}
       <div className={cn('flex-1 overflow-auto relative', themeClasses)}>

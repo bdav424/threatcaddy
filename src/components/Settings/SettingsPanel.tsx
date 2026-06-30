@@ -485,16 +485,7 @@ const TAB_META: Array<{
   { key: 'system', icon: AlertTriangle, labelKey: 'tabs.system', defaultLabel: 'System', description: 'Backup, reset, and local hygiene controls.', group: 'Admin' },
 ];
 
-type AssistantAISetupStatus = 'connected' | 'configured' | 'failed' | 'local-only' | 'not-configured';
 type LocalLLMTestStatus = 'idle' | 'testing' | 'success' | 'error';
-
-const assistantAIStatusMeta: Record<AssistantAISetupStatus, { label: string; className: string }> = {
-  connected: { label: 'Connected', className: 'border-green-500/30 bg-green-500/10 text-green-300' },
-  configured: { label: 'Configured', className: 'border-blue-500/30 bg-blue-500/10 text-blue-300' },
-  failed: { label: 'Failed', className: 'border-red-500/30 bg-red-500/10 text-red-300' },
-  'local-only': { label: 'Local-only', className: 'border-amber-500/30 bg-amber-500/10 text-amber-300' },
-  'not-configured': { label: 'Not configured', className: 'border-gray-700 bg-gray-800/70 text-gray-400' },
-};
 
 
 type AssistantModelPreset = 'codex-high' | 'chatgpt-medium' | 'chatgpt-low' | 'ollama-low' | 'caddyai';
@@ -538,15 +529,6 @@ const ASSISTANT_MODEL_PRESETS: Array<{
 
 
 
-function hasConfiguredLLMRoute(settings: Settings) {
-  return Boolean(
-    settings.llmAnthropicApiKey?.trim()
-      || settings.llmOpenAIApiKey?.trim()
-      || settings.llmGeminiApiKey?.trim()
-      || settings.llmMistralApiKey?.trim()
-      || (settings.llmLocalEndpoint?.trim() && settings.llmLocalModelName?.trim()),
-  );
-}
 
 function getCurrentLLMProvider(settings: Settings): Settings['llmDefaultProvider'] {
   return settings.llmDefaultProvider
@@ -579,14 +561,7 @@ function getAssistantModelPreset(settings: Settings): AssistantModelPreset {
   return 'chatgpt-medium';
 }
 
-function StatusPill({ status }: { status: AssistantAISetupStatus }) {
-  const meta = assistantAIStatusMeta[status];
-  return (
-    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${meta.className}`}>
-      {meta.label}
-    </span>
-  );
-}
+
 
 function AssistantCaddyAISetup({
   settings,
@@ -603,16 +578,6 @@ function AssistantCaddyAISetup({
 }) {
   const currentProvider = getAssistantProvider(settings);
   const currentModel = getAssistantModel(settings);
-  const hasAnyRoute = hasConfiguredLLMRoute(settings);
-  const openAIConfigured = Boolean(settings.llmOpenAIApiKey?.trim());
-  const localConfigured = Boolean(settings.llmLocalEndpoint?.trim() && settings.llmLocalModelName?.trim());
-  const localStatus: AssistantAISetupStatus = localTestStatus === 'error'
-    ? 'failed'
-    : localTestStatus === 'success'
-      ? 'connected'
-      : localConfigured
-        ? 'local-only'
-        : 'not-configured';
   const activePreset = getAssistantModelPreset(settings);
   const routeSelection = !settings.assistantLlmSeparate
     ? 'caddyai'
@@ -675,107 +640,110 @@ function AssistantCaddyAISetup({
         aria-label="AssistantCaddy route selection"
       >
         <div>
-          <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-300">Assistant route selection</h5>
+          <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-300">Assistant route</h5>
           <p className="mt-1 text-[11px] leading-5 text-gray-500">
-            Choose which existing route AssistantCaddy should use. This updates provider and model selection only.
+            Choose which route AssistantCaddy uses. Configure credentials inline.
           </p>
         </div>
-        <label className="flex items-center gap-2 text-xs text-gray-300">
-          <input
-            type="checkbox"
-            checked={!settings.assistantLlmSeparate}
-            onChange={(e) => onUpdateSettings({ assistantLlmSeparate: !e.target.checked })}
-          />
-          Use the same model as ThreatCaddy AI (CaddyAI)
-        </label>
-        {settings.assistantLlmSeparate && (
-          <div className="flex items-center justify-between">
-            <label className={labelClass}>AssistantCaddy model</label>
-            <select
-              value={settings.assistantLlmDefaultModel || currentModel || 'gpt-5.4'}
-              onChange={(e) => {
-                const model = e.target.value;
-                const provider = (MODEL_PROVIDER_MAP[model]
-                  || (model === settings.assistantLlmLocalModelName || model === settings.llmLocalModelName
-                    ? 'local'
-                    : 'anthropic')) as Settings['llmDefaultProvider'];
-                onUpdateSettings({
-                  assistantLlmSeparate: true,
-                  assistantLlmDefaultModel: model,
-                  assistantLlmDefaultProvider: provider,
-                });
-              }}
-              className={selectClass}
-            >
-              {Array.from(new Set(MODELS.map((m) => m.group))).map((group) => (
-                <optgroup key={group} label={group}>
-                  {MODELS.filter((m) => m.group === group).map((m) => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
-                  ))}
-                </optgroup>
-              ))}
-              {settings.llmLocalModelName && (
-                <optgroup label="Local">
-                  <option value={settings.llmLocalModelName}>{settings.llmLocalModelName} (local)</option>
-                </optgroup>
-              )}
-            </select>
+        <div>
+          <label className={labelClass}>Route</label>
+          <select
+            value={routeSelection}
+            onChange={(event) => {
+              const value = event.target.value;
+              if (value === 'caddyai') { selectCurrentCaddyAI(); return; }
+              if (value === 'openai') { selectOpenAI(); return; }
+              if (value === 'local') { selectLocal(); return; }
+            }}
+            aria-label="Assistant route"
+            className={`${selectClass} mt-1 w-full`}
+          >
+            <option value="caddyai">CaddyAI (same as ThreatCaddy AI)</option>
+            <option value="openai">OpenAI-compatible API</option>
+            <option value="local">Local / Ollama</option>
+          </select>
+        </div>
+
+        {routeSelection === 'caddyai' && (
+          <p className="text-[11px] text-gray-500">AssistantCaddy follows the existing CaddyAI baseline route. No separate credentials needed.</p>
+        )}
+
+        {routeSelection === 'openai' && (
+          <div className="space-y-2.5">
+            <div>
+              <label className={labelClass}>API key</label>
+              <input
+                type="password"
+                value={settings.llmOpenAIApiKey || ''}
+                onChange={(e) => onUpdateSettings({ llmOpenAIApiKey: e.target.value || undefined })}
+                placeholder="sk-…"
+                autoComplete="off"
+                className={`${selectClass} mt-1 w-full font-mono`}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Model name</label>
+              <input
+                type="text"
+                value={settings.assistantLlmDefaultModel || ''}
+                onChange={(e) => onUpdateSettings({ assistantLlmSeparate: true, assistantLlmDefaultProvider: 'openai', assistantLlmDefaultModel: e.target.value || undefined })}
+                placeholder="gpt-4o"
+                className={`${selectClass} mt-1 w-full`}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Base URL <span className="text-gray-600">(optional — leave blank for api.openai.com)</span></label>
+              <input
+                type="text"
+                value={settings.assistantLlmOpenAIBaseUrl || ''}
+                onChange={(e) => onUpdateSettings({ assistantLlmOpenAIBaseUrl: e.target.value || undefined })}
+                placeholder="https://api.openai.com"
+                className={`${selectClass} mt-1 w-full`}
+              />
+            </div>
           </div>
         )}
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-          <div>
-            <label className={labelClass}>Assistant route</label>
-            <select
-              value={routeSelection}
-              onChange={(event) => {
-                const value = event.target.value;
-                if (value === 'caddyai') {
-                  selectCurrentCaddyAI();
-                  return;
-                }
-                if (value === 'openai') {
-                  selectOpenAI();
-                  return;
-                }
-                if (value === 'local') {
-                  selectLocal();
-                  return;
-                }
-                onOpenIntegrations();
-              }}
-              aria-label="Assistant route"
-              className={`${selectClass} mt-1 w-full`}
-            >
-              <option value="caddyai">Existing CaddyAI route</option>
-              <option value="openai">OpenAI-compatible API</option>
-              <option value="local">Local Ollama / localhost</option>
-              <option value="generic">Generic adapter placeholder</option>
-            </select>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusPill status={hasAnyRoute ? 'configured' : 'not-configured'} />
-            <StatusPill status={openAIConfigured ? 'configured' : 'not-configured'} />
-            <StatusPill status={localStatus} />
-          </div>
-        </div>
-        <div className="grid gap-3 lg:grid-cols-2">
-          <div>
-            <label className={labelClass}>Current model</label>
-            <div className="mt-1 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-200">
-              {currentModel || 'Not configured'}
+
+        {routeSelection === 'local' && (
+          <div className="space-y-2.5">
+            <div>
+              <label className={labelClass}>Endpoint</label>
+              <input
+                type="text"
+                value={settings.assistantLlmLocalEndpoint || settings.llmLocalEndpoint || ''}
+                onChange={(e) => onUpdateSettings({ assistantLlmLocalEndpoint: e.target.value || undefined })}
+                placeholder="http://localhost:11434/v1"
+                className={`${selectClass} mt-1 w-full`}
+              />
             </div>
-          </div>
-          <div>
-            <label className={labelClass}>Route notes</label>
-            <div className="mt-1 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-400">
-              {routeSelection === 'openai' && (openAIConfigured ? 'OpenAI-compatible key is present in existing settings.' : 'Add an API key below in the legacy route key settings block.')}
-              {routeSelection === 'local' && (localConfigured ? 'Local endpoint and model are present in the explicit runtime controls block.' : 'Configure endpoint and model below in explicit runtime controls.')}
-              {routeSelection === 'caddyai' && 'AssistantCaddy follows the existing CaddyAI baseline route.'}
+            <div>
+              <label className={labelClass}>Model name</label>
+              <input
+                type="text"
+                value={settings.assistantLlmDefaultModel || settings.assistantLlmLocalModelName || ''}
+                onChange={(e) => {
+                  const val = e.target.value || undefined;
+                  onUpdateSettings({ assistantLlmSeparate: true, assistantLlmDefaultProvider: 'local', assistantLlmDefaultModel: val, assistantLlmLocalModelName: val });
+                }}
+                placeholder="llama3"
+                className={`${selectClass} mt-1 w-full`}
+              />
             </div>
+            <div>
+              <label className={labelClass}>API key <span className="text-gray-600">(optional)</span></label>
+              <input
+                type="password"
+                value={settings.assistantLlmLocalApiKey || ''}
+                onChange={(e) => onUpdateSettings({ assistantLlmLocalApiKey: e.target.value || undefined })}
+                placeholder="optional-key"
+                autoComplete="off"
+                className={`${selectClass} mt-1 w-full font-mono`}
+              />
+            </div>
+            {localTestStatus === 'error' && localTestError && (
+              <p className="text-[11px] text-red-300">{localTestError}</p>
+            )}
           </div>
-        </div>
-        {routeSelection === 'local' && localTestStatus === 'error' && localTestError && (
-          <p className="text-[11px] text-red-300">{localTestError}</p>
         )}
       </section>
       <section className="space-y-3 rounded-lg border border-gray-800 bg-gray-900/25 p-3" aria-label="Assistant AI selector">

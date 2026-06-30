@@ -69,7 +69,9 @@ export function resolveAssistantLLMConfig(s: Settings): ResolvedLLMConfig {
     apiKey: apiKeyFor(provider, s),
     endpoint: provider === 'local'
       ? (s.assistantLlmLocalEndpoint ?? s.llmLocalEndpoint)
-      : undefined,
+      : provider === 'openai' && s.assistantLlmOpenAIBaseUrl?.trim()
+        ? s.assistantLlmOpenAIBaseUrl.trim()
+        : undefined,
     systemPrompt: s.assistantLlmSystemPrompt ?? s.llmSystemPrompt,
   };
 }

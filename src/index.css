@@ -1646,8 +1646,8 @@ body.tc-desktop-shell-body {
     to bottom,
     transparent,
     transparent 27px,
-    rgba(255, 255, 255, 0.06) 27px,
-    rgba(255, 255, 255, 0.06) 28px
+    rgba(0, 0, 0, 0.10) 27px,
+    rgba(0, 0, 0, 0.10) 28px
   );
 }
 
@@ -1657,7 +1657,7 @@ body.tc-desktop-shell-body {
 }
 
 .dark .bullet-page {
-  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.18) 1px, transparent 1px);
 }
 
 .grid-page {
@@ -1669,8 +1669,8 @@ body.tc-desktop-shell-body {
 
 .dark .grid-page {
   background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+    linear-gradient(to right, rgba(0, 0, 0, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.08) 1px, transparent 1px);
 }
 
 .watermark-page {

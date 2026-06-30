@@ -473,11 +473,10 @@ describe('SettingsPanel', { timeout: 30000 }, () => {
     clickTab('AI');
 
     const aiRegion = within(screen.getByRole('region', { name: 'AssistantCaddy AI setup' }));
-    expect(aiRegion.getByText('Existing CaddyAI route')).toBeInTheDocument();
+    expect(aiRegion.getByText('CaddyAI (same as ThreatCaddy AI)')).toBeInTheDocument();
     expect(aiRegion.getByText('OpenAI-compatible API')).toBeInTheDocument();
-    expect(aiRegion.getByText('Local Ollama / localhost')).toBeInTheDocument();
-    expect(aiRegion.getByText('Generic adapter placeholder')).toBeInTheDocument();
-    expect(aiRegion.getAllByText('Not configured').length).toBeGreaterThanOrEqual(3);
+    expect(aiRegion.getByText('Local / Ollama')).toBeInTheDocument();
+    expect(aiRegion.queryByText('Generic adapter placeholder')).not.toBeInTheDocument();
     expect(aiRegion.getByText('Email and calendar setup live under Integrations/route-specific setup, not AssistantCaddy AI.')).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Email provider onboarding' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Calendar provider onboarding' })).not.toBeInTheDocument();

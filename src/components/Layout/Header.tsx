@@ -99,7 +99,14 @@ export function Header({
   });
   return (
     <header data-tour="header" className={cn("app-window-titlebar h-12 sm:h-14 border-b border-gray-800 flex items-center px-2 sm:px-4 gap-2 sm:gap-3 bg-gray-900/50 backdrop-blur-sm shrink-0 relative z-40", screenshareMaxLevel && "pt-0.5")}>
-      {screenshareMaxLevel && <div className="absolute top-0 left-0 right-0 h-0.5 bg-red-500" />}
+      {screenshareMaxLevel && (
+        <div className={cn(
+          'absolute top-0 left-0 right-0 h-0.5',
+          screenshareMaxLevel === 'TLP:GREEN' ? 'bg-green-500' :
+          screenshareMaxLevel === 'TLP:AMBER' ? 'bg-amber-500' :
+          'bg-red-500',
+        )} />
+      )}
       {/* Mobile: toggle mobile overlay sidebar */}
       <button
         onClick={onMobileMenuToggle}

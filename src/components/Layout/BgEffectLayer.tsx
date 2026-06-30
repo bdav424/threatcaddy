@@ -124,6 +124,7 @@ export function BgEffectLayer({
     let dpr = 1;
     let swirls: SwirlSeed[] = [];
     let points: MovingPoint[] = [];
+    const perlinTrails = new Map<MovingPoint, Array<{ x: number; y: number }>>();
 
     const resize = () => {
       width = window.innerWidth;
@@ -136,6 +137,7 @@ export function BgEffectLayer({
       context.setTransform(dpr, 0, 0, dpr, 0, 0);
       swirls = createSwirls(width, height, scale);
       points = createPoints(width, height, scale, starDensity);
+      perlinTrails.clear();
     };
 
     const stepPoints = (delta: number) => {
@@ -251,21 +253,38 @@ export function BgEffectLayer({
     };
 
     const drawPerlinFlow = (time: number) => {
+      const trailLength = Math.max(6, Math.round(scale * 22));
       for (const point of points) {
         const angle = Math.sin(point.x * 0.006 + time * 0.0007) * Math.PI
           + Math.cos(point.y * 0.005 + time * 0.00045);
         point.x += Math.cos(angle) * (reducedMotion ? 0.08 : 0.9 * scale);
         point.y += Math.sin(angle) * (reducedMotion ? 0.08 : 0.9 * scale);
         point.twinkle -= 0.003;
+
         if (point.x < -20 || point.x > width + 20 || point.y < -20 || point.y > height + 20 || point.twinkle < -1) {
           point.x = Math.random() * width;
           point.y = Math.random() * height;
           point.twinkle = Math.random() * Math.PI * 2;
+          perlinTrails.delete(point);
+          continue;
         }
-        context.fillStyle = rgba(effectColor, alphaBase * 0.18);
-        context.beginPath();
-        context.arc(point.x, point.y, Math.max(0.8, point.radius * 0.7), 0, Math.PI * 2);
-        context.fill();
+
+        if (!perlinTrails.has(point)) perlinTrails.set(point, []);
+        const trail = perlinTrails.get(point)!;
+        trail.push({ x: point.x, y: point.y });
+        if (trail.length > trailLength) trail.shift();
+
+        if (trail.length < 2) continue;
+        for (let i = 1; i < trail.length; i++) {
+          const fade = i / trail.length;
+          context.strokeStyle = rgba(effectColor, alphaBase * 0.28 * fade);
+          context.lineWidth = Math.max(0.4, point.radius * 0.55 * fade);
+          context.lineCap = 'round';
+          context.beginPath();
+          context.moveTo(trail[i - 1].x, trail[i - 1].y);
+          context.lineTo(trail[i].x, trail[i].y);
+          context.stroke();
+        }
       }
     };
 

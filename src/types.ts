@@ -392,6 +392,8 @@ export interface Settings {
   assistantLlmLocalEndpoint?: string;
   assistantLlmLocalApiKey?: string;
   assistantLlmLocalModelName?: string;
+  /** Optional base URL override for OpenAI-compatible route (e.g. Azure, OpenRouter). */
+  assistantLlmOpenAIBaseUrl?: string;
   /** Optional separate system prompt for the AssistantCaddy persona. */
   assistantLlmSystemPrompt?: string;
   llmSystemPrompt?: string;

@@ -653,6 +653,7 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
   const [editingTheme, setEditingTheme] = useState(false);
   const [draft, setDraft] = useState<ThemeDraft>(() => toDraft(COLOR_SCHEMES[0]));
   const [draftMode, setDraftMode] = useState<'dark' | 'light'>(settings.theme ?? 'dark');
+  useEffect(() => { setDraftMode(settings.theme ?? 'dark'); }, [settings.theme]);
   const [paletteEditor, setPaletteEditor] = useState<PaletteEditorState | null>(null);
   const [dragStart, setDragStart] = useState<{ pointerId: number; x: number; y: number; originX: number; originY: number } | null>(null);
   const [wheelPointerId, setWheelPointerId] = useState<number | null>(null);
@@ -2031,28 +2032,48 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
               <input type="range" min={0} max={40} value={panelBlur} onChange={(e) => onUpdateSettings({ windowGlassBlur: Number(e.target.value) })} className="h-1.5 w-full accent-accent" />
             </div>
 
-            <div className="flex items-center justify-between rounded-lg border border-gray-700/60 bg-black/10 px-3 py-2.5">
-              <div>
-                <div className="text-xs font-medium text-gray-300">Frosted panels</div>
-                <div className="mt-0.5 text-[11px] text-gray-500">Lift panels off the animated background. Requires Panel transparency &gt; 0.</div>
+            <div className="space-y-3 rounded-lg border border-gray-700/60 bg-black/10 px-3 py-2.5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-medium text-gray-300">Frosted panels</div>
+                  <div className="mt-0.5 text-[11px] text-gray-500">Lift panels off the animated background with a glass effect.</div>
+                </div>
+                <label className="relative inline-flex cursor-pointer items-center">
+                  <input
+                    type="checkbox"
+                    checked={settings.frostedPanels ?? false}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      onUpdateSettings({
+                        frostedPanels: on,
+                        ...(on && panelTransparency === 0 && panelBlur === 0
+                          ? { windowGlassTransparency: 35, windowGlassBlur: 14 }
+                          : {}),
+                      });
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="peer h-5 w-9 rounded-full bg-gray-700 transition-colors peer-checked:bg-accent peer-focus:ring-1 peer-focus:ring-accent/50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-4" />
+                </label>
               </div>
-              <div className="flex items-center gap-2">
-                {panelTransparency === 0 && panelBlur === 0 && (
-                  <button
-                    onClick={() => onUpdateSettings({ windowGlassTransparency: 35, windowGlassBlur: 14 })}
-                    className="rounded border border-gray-600 px-2 py-1 text-[10px] text-gray-400 hover:border-accent/50 hover:text-accent transition-colors"
-                  >
-                    Quick preset
-                  </button>
-                )}
-                <button
-                  onClick={() => onUpdateSettings({ windowGlassTransparency: 0, windowGlassBlur: 0 })}
-                  disabled={panelTransparency === 0 && panelBlur === 0}
-                  className="rounded border border-gray-700 px-2 py-1 text-[10px] text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  Reset
-                </button>
-              </div>
+              {(settings.frostedPanels) && (
+                <div className="space-y-2 border-t border-gray-700/50 pt-2">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-400">Frost opacity</span>
+                      <span className="text-xs tabular-nums text-gray-500">{panelTransparency}%</span>
+                    </div>
+                    <input type="range" min={0} max={100} value={panelTransparency} onChange={(e) => onUpdateSettings({ windowGlassTransparency: Number(e.target.value) })} className="h-1.5 w-full accent-accent" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-400">Glow intensity</span>
+                      <span className="text-xs tabular-nums text-gray-500">{bgEffectIntensity}%</span>
+                    </div>
+                    <input type="range" min={0} max={100} step={5} value={bgEffectIntensity} onChange={(e) => onUpdateSettings({ bgEffectIntensity: Number(e.target.value) })} aria-label="Glow intensity" className="h-1.5 w-full accent-accent" />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
