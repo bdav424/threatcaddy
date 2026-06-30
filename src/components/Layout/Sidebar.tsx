@@ -1054,6 +1054,28 @@ export function Sidebar({
                 accentColor={accentColorFor('activity')}
               />
             </div>
+            <div className="ms-4">
+              <NavItem
+                icon={<Monitor size={14} />}
+                label={t('sidebar.virtualCaddy', { defaultValue: 'VirtualCaddy' })}
+                active={activeView === 'virtualcaddy' && !showTrash && !showArchive}
+                onClick={() => nav(() => navToView('virtualcaddy'))}
+                compact
+                accentStyle={sidebarAccentStyle}
+                accentColor={accentColorFor('virtualcaddy')}
+              />
+            </div>
+            <div className="ms-4">
+              <NavItem
+                icon={<Network size={14} />}
+                label={t('sidebar.netMap', { defaultValue: 'Network Map' })}
+                active={activeView === 'netmap' && !showTrash && !showArchive}
+                onClick={() => nav(() => navToView('netmap'))}
+                compact
+                accentStyle={sidebarAccentStyle}
+                accentColor={accentColorFor('netmap')}
+              />
+            </div>
           </div>
         )}
 
