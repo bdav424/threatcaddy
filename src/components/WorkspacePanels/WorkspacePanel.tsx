@@ -726,12 +726,13 @@ function SharedSeamIndicator({ edge }: { edge: ResizeEdge | null }) {
           key={side}
           aria-hidden="true"
           className={cn(
-            'pointer-events-none absolute z-[25] bg-accent shadow-[0_0_18px_var(--color-accent)]',
-            side === 'left' && 'bottom-0 left-[-2px] top-0 w-[4px]',
-            side === 'right' && 'bottom-0 right-[-2px] top-0 w-[4px]',
-            side === 'top' && 'left-0 right-0 top-[-2px] h-[4px]',
-            side === 'bottom' && 'bottom-[-2px] left-0 right-0 h-[4px]',
+            'pointer-events-none absolute z-[25] animate-[seam-fade-in_150ms_ease-out]',
+            side === 'left' && 'bottom-0 left-[-1px] top-0 w-[2px] rounded-[1px]',
+            side === 'right' && 'bottom-0 right-[-1px] top-0 w-[2px] rounded-[1px]',
+            side === 'top' && 'left-0 right-0 top-[-1px] h-[2px] rounded-[1px]',
+            side === 'bottom' && 'bottom-[-1px] left-0 right-0 h-[2px] rounded-[1px]',
           )}
+          style={{ backgroundColor: 'rgba(255,255,255,0.25)' }}
           data-resize-seam-indicator={edge}
           data-resize-seam-side={side}
         />
@@ -1002,6 +1003,7 @@ export function WorkspacePanel({
   }, [active, hasEverBeenActive]);
   const [activeResizeEdge, setActiveResizeEdge] = useState<ResizeEdge | null>(null);
   const [activeSharedSeamEdge, setActiveSharedSeamEdge] = useState<ResizeEdge | null>(null);
+  const [bottomSnapNear, setBottomSnapNear] = useState(false);
   const [snapPreview, setSnapPreview] = useState<WorkspaceGridPlacement | null>(null);
   const [snapPreviewCanvas, setSnapPreviewCanvas] = useState(() => readWorkspaceCanvasRect());
   const [approachCues, setApproachCues] = useState<WorkspaceJoinCueSegment[]>([]);
@@ -1241,7 +1243,13 @@ export function WorkspacePanel({
         }
       }
 
-      applySelfGeometry(resizeGeometry(startGeometry, edge, dx, dy, minWidth, minHeight, { keepHeaderReachable: !snapped }));
+      const nextGeometry = resizeGeometry(startGeometry, edge, dx, dy, minWidth, minHeight, { keepHeaderReachable: !snapped });
+      applySelfGeometry(nextGeometry);
+      if (edge === 'bottom' || edge === 'bottom-left' || edge === 'bottom-right') {
+        const safe = viewportSafeRect();
+        const panelBottomEdge = nextGeometry.y + nextGeometry.height;
+        setBottomSnapNear(safe.bottom - panelBottomEdge <= 12);
+      }
     };
 
     const handlePointerUp = () => {
@@ -1249,6 +1257,7 @@ export function WorkspacePanel({
       window.removeEventListener('pointerup', handlePointerUp);
       setActiveResizeEdge(null);
       setActiveSharedSeamEdge(null);
+      setBottomSnapNear(false);
       if (seamNeighbors.length > 0 && !isCorner(edge)) {
         seamNeighbors.forEach((n) => workspacePanelContext?.notifySeamEdge(n.id, null));
       }
@@ -1478,6 +1487,13 @@ export function WorkspacePanel({
               <MosaicBorderMergeMasks masks={mosaicMergeMasks} />
               <EdgeIndicator activeEdge={snapped && sharedSeamEdge ? null : activeResizeEdge} snapped={snapped} />
               <SharedSeamIndicator edge={sharedSeamEdge} />
+              {bottomSnapNear && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute bottom-[-1px] left-0 right-0 z-[25] h-[2px] animate-[seam-fade-in_150ms_ease-out] rounded-[1px]"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.25)' }}
+                />
+              )}
               {resizeHandles.map((handle) => (
                 <button
                   key={handle.edge}
