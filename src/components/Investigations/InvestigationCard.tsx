@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import type { InvestigationColorMode } from '../../lib/investigation-color-mode';
 import { useTranslation } from 'react-i18next';
 import {
   FileText, CheckSquare, Search, Clock, Layout, MessageSquare,
@@ -109,8 +110,13 @@ export function InvestigationCard({
     return 'rgba(255,255,255,0.15)';
   })();
 
-  // Investigation color mode: manual | tlp | combined
-  const colorMode = getInvestigationColorMode();
+  // Investigation color mode: manual | tlp | combined — reactive to settings changes
+  const [colorMode, setColorMode] = useState<InvestigationColorMode>(getInvestigationColorMode);
+  useEffect(() => {
+    const handler = (e: CustomEvent<InvestigationColorMode>) => setColorMode(e.detail);
+    window.addEventListener('tc:invColorModeChanged', handler as EventListener);
+    return () => window.removeEventListener('tc:invColorModeChanged', handler as EventListener);
+  }, []);
   // Background tint: TLP mode uses TLP-derived tint; combined uses manual color via CSS
   const tlpBgTint = tlpToAccentColor(liveClsLevel);
   // For combined mode, append hex alpha "1a" (≈10% opacity) to a 6-digit hex color.

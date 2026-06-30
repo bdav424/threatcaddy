@@ -61,3 +61,6 @@ android/local.properties
 ios/App/Pods
 ios/App/build
 ios/.xcode.env.local
+dist-desktop/
+dist-lite/
+dist-mobile/

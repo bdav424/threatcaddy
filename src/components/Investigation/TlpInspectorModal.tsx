@@ -81,14 +81,21 @@ export function TlpInspectorModal({ open, onClose, folder, onInvestigationCreate
     }
   }, [folder, targetLevel, copyName, onInvestigationCreated, onClose]);
 
+  // Group by source type (file/document type), then sort each group by TLP level descending
+  const TYPE_ORDER: TlpContributingItemType[] = ['evidence', 'note', 'ioc', 'task', 'timeline-event'];
   const grouped = items.reduce<Record<string, TlpContributingItem[]>>((acc, item) => {
-    const key = item.clsLevel;
+    const key = item.type;
     if (!acc[key]) acc[key] = [];
     acc[key].push(item);
     return acc;
   }, {});
 
-  const sortedLevels = Object.keys(grouped).sort((a, b) => clsLevelIndex(b) - clsLevelIndex(a));
+  // Sort items within each group by TLP level descending
+  for (const key of Object.keys(grouped)) {
+    grouped[key].sort((a, b) => clsLevelIndex(b.clsLevel) - clsLevelIndex(a.clsLevel));
+  }
+
+  const sortedLevels = TYPE_ORDER.filter((t) => grouped[t]?.length > 0);
 
   return (
     <Modal
@@ -199,28 +206,27 @@ export function TlpInspectorModal({ open, onClose, folder, onInvestigationCreate
 
           {!loading && items.length > 0 && (
             <div className="space-y-3">
-              {sortedLevels.map((level) => (
-                <div key={level}>
-                  <div className="mb-1.5 flex items-center gap-2">
-                    <ClsBadge level={level} />
-                    <span className="text-xs text-gray-500">{grouped[level].length} item{grouped[level].length !== 1 ? 's' : ''}</span>
-                  </div>
-                  <div className="space-y-0.5 rounded-lg border border-gray-700 bg-gray-800/60 p-2">
-                    {grouped[level].map((item) => {
-                      const Icon = TYPE_ICONS[item.type];
-                      return (
+              {sortedLevels.map((type) => {
+                const Icon = TYPE_ICONS[type];
+                const typeItems = grouped[type];
+                return (
+                  <div key={type}>
+                    <div className="mb-1.5 flex items-center gap-2">
+                      <Icon size={13} className="shrink-0 text-gray-400" aria-hidden="true" />
+                      <span className="text-xs font-semibold text-gray-300">{TYPE_LABELS[type]}</span>
+                      <span className="text-xs text-gray-500">{typeItems.length} item{typeItems.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="space-y-0.5 rounded-lg border border-gray-700 bg-gray-800/60 p-2">
+                      {typeItems.map((item) => (
                         <div key={item.id} className="flex items-center gap-2 rounded px-1.5 py-1 hover:bg-gray-700/60">
-                          <Icon size={12} className="shrink-0 text-gray-500" aria-hidden="true" />
-                          <span className="min-w-[72px] text-[10px] font-medium uppercase tracking-wide text-gray-500">
-                            {TYPE_LABELS[item.type]}
-                          </span>
+                          <ClsBadge level={item.clsLevel} />
                           <span className="truncate text-xs text-gray-300">{item.title}</span>
                         </div>
-                      );
-                    })}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

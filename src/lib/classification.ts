@@ -8,15 +8,15 @@ export interface ClsBadgeStyle {
 }
 
 const TLP_STYLES: Record<string, ClsBadgeStyle> = {
-  'TLP:RED':          { bg: 'bg-red-500/20',    text: 'text-red-400',    border: 'border-red-500/40' },
-  'TLP:AMBER+STRICT': { bg: 'bg-amber-500/20',  text: 'text-amber-400',  border: 'border-amber-500/60' },
-  'TLP:AMBER':        { bg: 'bg-amber-500/20',  text: 'text-amber-400',  border: 'border-amber-500/40' },
-  'TLP:GREEN':        { bg: 'bg-green-500/20',  text: 'text-green-400',  border: 'border-green-500/40' },
-  'TLP:CLEAR':        { bg: 'bg-gray-500/20',   text: 'text-gray-400',   border: 'border-gray-500/40' },
-  'PAP:RED':          { bg: 'bg-red-500/20',    text: 'text-red-400',    border: 'border-red-500/40' },
-  'PAP:AMBER':        { bg: 'bg-amber-500/20',  text: 'text-amber-400',  border: 'border-amber-500/40' },
-  'PAP:GREEN':        { bg: 'bg-green-500/20',  text: 'text-green-400',  border: 'border-green-500/40' },
-  'PAP:WHITE':        { bg: 'bg-gray-500/20',   text: 'text-gray-400',   border: 'border-gray-500/40' },
+  'TLP:RED':          { bg: 'bg-red-500/20',    text: 'text-red-700 dark:text-red-400',    border: 'border-red-500/40' },
+  'TLP:AMBER+STRICT': { bg: 'bg-amber-500/20',  text: 'text-amber-700 dark:text-amber-400',  border: 'border-amber-500/60' },
+  'TLP:AMBER':        { bg: 'bg-amber-500/20',  text: 'text-amber-700 dark:text-amber-400',  border: 'border-amber-500/40' },
+  'TLP:GREEN':        { bg: 'bg-green-500/20',  text: 'text-green-700 dark:text-green-400',  border: 'border-green-500/40' },
+  'TLP:CLEAR':        { bg: 'bg-gray-500/20',   text: 'text-gray-700 dark:text-gray-400',   border: 'border-gray-500/40' },
+  'PAP:RED':          { bg: 'bg-red-500/20',    text: 'text-red-700 dark:text-red-400',    border: 'border-red-500/40' },
+  'PAP:AMBER':        { bg: 'bg-amber-500/20',  text: 'text-amber-700 dark:text-amber-400',  border: 'border-amber-500/40' },
+  'PAP:GREEN':        { bg: 'bg-green-500/20',  text: 'text-green-700 dark:text-green-400',  border: 'border-green-500/40' },
+  'PAP:WHITE':        { bg: 'bg-gray-500/20',   text: 'text-gray-700 dark:text-gray-400',   border: 'border-gray-500/40' },
 };
 
 const NEUTRAL_STYLE: ClsBadgeStyle = { bg: 'bg-gray-500/20', text: 'text-gray-400', border: 'border-gray-500/40' };

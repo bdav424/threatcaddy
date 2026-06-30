@@ -1140,7 +1140,7 @@ function WorkspaceLayoutTemplateControls({
 
   return (
     <div
-      className="absolute left-0 right-0 top-0 z-[220] flex h-10 items-center justify-between gap-2 border-b bg-bg-raised/92 px-3 backdrop-blur-xl"
+      className="absolute left-0 right-0 top-0 z-[220] flex h-10 items-center justify-between gap-2 border-b border-white/20 bg-bg-raised/92 px-3 backdrop-blur-xl"
       data-workspace-layout-template-controls="true"
       data-workspace-investigation-layer="true"
       data-workspace-tlp-level={tlpLevel}
@@ -1151,14 +1151,13 @@ function WorkspaceLayoutTemplateControls({
     >
       <div className="flex min-w-0 items-center gap-2">
         <div
-          className="inline-flex items-center"
-          style={{ minWidth: '200px', justifyContent: 'center' }}
+          className="inline-flex items-center px-1"
           data-workspace-tlp-inspect="true"
         >
           {selectedFolder?.clsLevel ? (
             <ClsBadge level={selectedFolder.clsLevel} />
           ) : (
-            <span className="inline-flex h-6 items-center rounded-[7px] border border-border-subtle bg-bg-primary/60 px-2 text-[10px] font-semibold uppercase text-text-muted">
+            <span className="inline-flex h-6 items-center rounded-[7px] border border-border-subtle bg-bg-primary/60 px-6 text-[10px] font-semibold uppercase text-text-muted">
               {tlpLevel}
             </span>
           )}
@@ -1547,16 +1546,7 @@ function RoutePanelPopOutSurface({
         <div className="flex min-w-0 flex-1 items-center overflow-hidden">
           <span className="truncate text-[11px] font-semibold text-text-secondary">{title}</span>
         </div>
-        <div className="flex shrink-0 items-center justify-center" style={{ minWidth: '200px' }}>
-          {selectedFolder?.clsLevel ? (
-            <ClsBadge level={selectedFolder.clsLevel} />
-          ) : (
-            <span className="inline-flex h-5 items-center rounded border border-border-subtle bg-bg-primary/60 px-1.5 text-[9px] font-semibold uppercase tracking-wide text-text-muted">
-              TLP
-            </span>
-          )}
-        </div>
-        <div className="flex min-w-0 flex-1 justify-end">
+        <div className="flex shrink-0 items-center justify-end">
           <button
             type="button"
             aria-label={`${popOutLabel} ${title}`}

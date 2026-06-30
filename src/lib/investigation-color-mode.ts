@@ -18,6 +18,7 @@ export function getInvestigationColorMode(): InvestigationColorMode {
 export function setInvestigationColorMode(mode: InvestigationColorMode): void {
   try {
     localStorage.setItem(STORAGE_KEY, mode);
+    window.dispatchEvent(new CustomEvent('tc:invColorModeChanged', { detail: mode }));
   } catch { /* ignore */ }
 }
 
