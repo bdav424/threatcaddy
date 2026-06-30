@@ -27,7 +27,7 @@ export function WhisperRecorder({ onTranscript, endpoint }: WhisperRecorderProps
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch (err) {
+    } catch {
       setState('error');
       setErrorMsg('Microphone access denied. Allow mic in browser settings.');
       return;

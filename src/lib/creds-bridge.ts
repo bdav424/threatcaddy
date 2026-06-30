@@ -33,7 +33,7 @@ function getBridge() {
 export const credsBridge = {
   async exportCredentials(
     password: string,
-    _filePath?: string,
+    _filePath?: string, // eslint-disable-line @typescript-eslint/no-unused-vars
   ): Promise<{ success: boolean; base64?: string; exportedCount?: number; error?: string }> {
     const bridge = getBridge();
     if (!bridge) return { success: false, error: 'desktop-only' };

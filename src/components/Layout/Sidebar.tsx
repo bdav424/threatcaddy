@@ -6,7 +6,7 @@ import {
   Archive, Settings as SettingsIcon,
   PanelLeftClose, PanelLeft, Github, Download, Chrome, PenTool, Activity, Network, Search, Shield,
   LayoutDashboard, PanelsTopLeft, MessageSquare, LayoutTemplate, ChevronLeft, ChevronDown, ChevronRight,
-  Bot, FileOutput, FlaskConical, Sparkles, Mail, CalendarDays, Monitor, BookMarked,
+  Bot, FileOutput, FlaskConical, Sparkles, Mail, CalendarDays, Monitor, BookMarked, ScanSearch,
 } from 'lucide-react';
 import type { Timeline, Whiteboard, ViewMode } from '../../types';
 import { cn } from '../../lib/utils';
@@ -20,6 +20,7 @@ import { useInvestigation } from '../../contexts/InvestigationContext';
 import { useUIModals } from '../../contexts/UIModalContext';
 import { useInvestigationClassification } from '../../hooks/useInvestigationClassification';
 import { getClsBadgeStyle } from '../../lib/classification';
+import { TlpInspectorModal } from '../Investigation/TlpInspectorModal';
 import {
   WORKSPACE_PANEL_DRAG_TYPE,
   WORKSPACE_PANEL_LAUNCH_DESCRIPTORS,
@@ -175,6 +176,7 @@ export function Sidebar({
   const [investigationsExpanded, setInvestigationsExpanded] = useState(true);
   const [assistantExpanded, setAssistantExpanded] = useState(true);
   const [workspaceNavDropState, setWorkspaceNavDropState] = useState<'idle' | 'valid'>('idle');
+  const [tlpInspectorOpen, setTlpInspectorOpen] = useState(false);
 
   useEffect(() => {
     if (investigationsActive) {
@@ -783,6 +785,18 @@ export function Sidebar({
               </span>
             </div>
           </button>
+          {/* TLP inspector trigger — outside card button to avoid nested buttons */}
+          <button
+            type="button"
+            onClick={() => setTlpInspectorOpen(true)}
+            className="mt-1 flex w-full items-center gap-1 text-[10px] text-text-muted hover:text-text-secondary transition-colors"
+            title="Find TLP source"
+            aria-label="Find TLP source"
+          >
+            <ScanSearch size={10} />
+            <span>Find TLP source</span>
+          </button>
+          <TlpInspectorModal open={tlpInspectorOpen} onClose={() => setTlpInspectorOpen(false)} folder={selectedFolder} />
           {/* Agent toggle + status */}
           <div className="flex items-center justify-between mt-1.5 px-0.5">
             <div className="flex items-center gap-1.5">
