@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- panel-id constants are co-located with the shell component by design */
-import { Bot, Briefcase, Download, Maximize2, Save, ScanSearch, Upload } from 'lucide-react';
+import { Bot, Briefcase, Download, Maximize2, Save, Upload } from 'lucide-react';
 import {
   createContext,
   useCallback,
@@ -17,7 +17,7 @@ import { useInvestigation } from '../../contexts/InvestigationContext';
 import { RoutePopOutContext } from '../../contexts/RoutePopOutContext';
 import { downloadFile } from '../../lib/export';
 import { ClsBadge } from '../Common/ClsBadge';
-import { TlpInspectorModal } from '../Investigation/TlpInspectorModal';
+
 import { ToolbarSelect, type ToolbarSelectOption } from '../Common/ToolbarSelect';
 import {
   ASSISTANT_WORKSPACE_PANEL_LAUNCH_DESCRIPTORS,
@@ -1124,7 +1124,7 @@ function WorkspaceLayoutTemplateControls({
     }
   }, [applyLayoutPanels, layoutAllowedPanelIds, onApplied, persistSavedLayouts, savedLayouts]);
 
-  const [tlpInspectorOpen, setTlpInspectorOpen] = useState(false);
+
   const investigationLabel = selectedFolder?.name || 'No investigation selected';
   const tlpLevel = selectedFolder?.clsLevel || 'TLP';
   const tlpGlow = workspaceTlpGlow(selectedFolder?.clsLevel);
@@ -1150,13 +1150,9 @@ function WorkspaceLayoutTemplateControls({
       }}
     >
       <div className="flex min-w-0 items-center gap-2">
-        <button
-          type="button"
-          onClick={() => selectedFolder && setTlpInspectorOpen(true)}
-          disabled={!selectedFolder}
-          className="inline-flex items-center gap-1 transition-opacity hover:opacity-80 disabled:cursor-default"
-          aria-label="Find what's raising TLP"
-          title={selectedFolder ? 'Find what\'s raising TLP' : 'Select an investigation to inspect TLP'}
+        <div
+          className="inline-flex items-center"
+          style={{ minWidth: '200px', justifyContent: 'center' }}
           data-workspace-tlp-inspect="true"
         >
           {selectedFolder?.clsLevel ? (
@@ -1166,15 +1162,7 @@ function WorkspaceLayoutTemplateControls({
               {tlpLevel}
             </span>
           )}
-          {selectedFolder && <ScanSearch size={10} className="text-text-muted" aria-hidden="true" />}
-        </button>
-        {selectedFolder && (
-          <TlpInspectorModal
-            open={tlpInspectorOpen}
-            onClose={() => setTlpInspectorOpen(false)}
-            folder={selectedFolder}
-          />
-        )}
+        </div>
         <ToolbarSelect
           value={selectedFolderId || ''}
           options={investigationOptions}
@@ -1545,46 +1533,30 @@ function RoutePanelPopOutSurface({
 }) {
   const { selectedFolder } = useInvestigation();
   const tlpGlow = workspaceTlpGlow(selectedFolder?.clsLevel);
-  const [tlpInspectorOpen, setTlpInspectorOpen] = useState(false);
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col" data-app-route-panel-surface={title.toLowerCase()}>
       <div
-        className="flex h-10 shrink-0 items-center border-b bg-bg-primary/45 px-3"
+        className="flex h-10 shrink-0 items-center gap-2 overflow-hidden border-b bg-bg-primary/45 px-3"
         data-app-route-panel-actions="true"
         style={{
           borderBottomColor: tlpGlow.border,
           boxShadow: `0 4px 14px ${tlpGlow.glow}`,
         }}
       >
-        <div className="flex-1" />
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => selectedFolder && setTlpInspectorOpen(true)}
-            disabled={!selectedFolder}
-            className="inline-flex items-center gap-1 transition-opacity hover:opacity-75 disabled:cursor-default"
-            aria-label="Find what's raising TLP"
-            title={selectedFolder ? "Find what's raising TLP" : undefined}
-          >
-            {selectedFolder?.clsLevel ? (
-              <ClsBadge level={selectedFolder.clsLevel} />
-            ) : (
-              <span className="inline-flex h-5 items-center rounded border border-border-subtle bg-bg-primary/60 px-1.5 text-[9px] font-semibold uppercase tracking-wide text-text-muted">
-                TLP
-              </span>
-            )}
-            {selectedFolder && <ScanSearch size={9} className="text-text-muted" aria-hidden="true" />}
-          </button>
-          {selectedFolder && (
-            <TlpInspectorModal
-              open={tlpInspectorOpen}
-              onClose={() => setTlpInspectorOpen(false)}
-              folder={selectedFolder}
-            />
+        <div className="flex min-w-0 flex-1 items-center overflow-hidden">
+          <span className="truncate text-[11px] font-semibold text-text-secondary">{title}</span>
+        </div>
+        <div className="flex shrink-0 items-center justify-center" style={{ minWidth: '200px' }}>
+          {selectedFolder?.clsLevel ? (
+            <ClsBadge level={selectedFolder.clsLevel} />
+          ) : (
+            <span className="inline-flex h-5 items-center rounded border border-border-subtle bg-bg-primary/60 px-1.5 text-[9px] font-semibold uppercase tracking-wide text-text-muted">
+              TLP
+            </span>
           )}
         </div>
-        <div className="flex flex-1 justify-end">
+        <div className="flex min-w-0 flex-1 justify-end">
           <button
             type="button"
             aria-label={`${popOutLabel} ${title}`}
