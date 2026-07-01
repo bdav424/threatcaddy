@@ -158,7 +158,7 @@ export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdat
       <div className="flex items-center gap-2 p-2 border-b border-gray-800 shrink-0">
         <button
           onClick={onBack}
-          className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors shrink-0"
           title="Back to list"
         >
           <ArrowLeft size={18} />
@@ -166,13 +166,14 @@ export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdat
         <input
           value={name}
           onChange={(e) => handleNameChange(e.target.value)}
-          className="flex-1 bg-transparent text-gray-200 text-sm font-medium px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-accent"
+          className="min-w-0 flex-1 bg-transparent text-gray-200 text-sm font-medium px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-accent"
           placeholder="Whiteboard name"
         />
         <EntityInvestigationBar
           folders={folders}
           currentFolderId={whiteboard.folderId}
           onMove={handleFolderChange}
+          className="min-w-0 flex-1"
         />
         <ClsSelect
           value={whiteboard.clsLevel}
@@ -181,7 +182,7 @@ export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdat
         />
         <button
           onClick={handleExportPNG}
-          className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors shrink-0"
           title="Export as PNG"
         >
           <Image size={16} />
@@ -190,7 +191,7 @@ export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdat
         {onDelete && (
           <button
             onClick={() => setShowConfirmDelete(true)}
-            className="p-1.5 rounded text-red-500 hover:text-red-400 hover:bg-gray-800"
+            className="p-1.5 rounded text-red-500 hover:text-red-400 hover:bg-gray-800 shrink-0"
             title="Delete whiteboard"
             aria-label="Delete whiteboard"
           >

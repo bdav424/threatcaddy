@@ -86,33 +86,33 @@ export function EntityInvestigationBar({ folders, currentFolderId, onMove, class
   useEffect(() => () => clearTimeout(annotationTimeoutRef.current), []);
 
   return (
-    <div ref={containerRef} className={cn('relative flex items-center gap-1', className)}>
+    <div ref={containerRef} className={cn('relative flex min-w-0 items-center gap-1', className)}>
       <button
         type="button"
         onClick={() => currentFolder && setEditingFolderId(currentFolder.id)}
         disabled={!currentFolder}
         className={cn(
-          'flex items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors',
+          'flex min-w-0 flex-1 items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors',
           currentFolder ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'cursor-default text-gray-500',
         )}
         title={currentFolder ? `Investigation options for ${currentFolder.name}` : NO_INVESTIGATION_LABEL}
         aria-label={currentFolder ? `Open investigation options for ${currentFolder.name}` : NO_INVESTIGATION_LABEL}
       >
-        <Briefcase size={14} />
-        <span className="max-w-[140px] truncate">{currentFolder?.name || NO_INVESTIGATION_LABEL}</span>
+        <Briefcase size={14} className="shrink-0" />
+        <span className="min-w-0 flex-1 truncate">{currentFolder?.name || NO_INVESTIGATION_LABEL}</span>
       </button>
 
-      <div className="relative">
+      <div className="relative shrink-0">
         <button
           type="button"
           onClick={() => setShowMoveMenu((v) => !v)}
-          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200"
+          className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-xs text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200"
           title="Move to a different investigation"
           aria-haspopup="listbox"
           aria-expanded={showMoveMenu}
         >
           <span>Move to</span>
-          <ChevronDown size={12} className={cn('transition-transform', showMoveMenu && 'rotate-180')} />
+          <ChevronDown size={12} className={cn('shrink-0 transition-transform', showMoveMenu && 'rotate-180')} />
         </button>
         {showMoveMenu && (
           <div

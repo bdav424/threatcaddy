@@ -1082,11 +1082,12 @@ export function NoteEditor({
           )}
         </div>
 
-        <div className="hidden sm:flex items-center">
+        <div className="hidden min-w-0 flex-1 sm:flex items-center">
           <EntityInvestigationBar
             folders={folders}
             currentFolderId={note.folderId}
             onMove={(folderId) => onUpdate(note.id, { folderId })}
+            className="min-w-0"
           />
         </div>
 
@@ -1227,7 +1228,7 @@ export function NoteEditor({
           </div>
         )}
 
-        <div className="ms-auto flex items-center gap-2">
+        <div className="ms-auto flex shrink-0 items-center gap-2">
           {shareMessage && (
             <span className={cn('text-xs', shareMessage.type === 'success' ? 'text-green-400' : 'text-red-400')} role="status">
               {shareMessage.text}
