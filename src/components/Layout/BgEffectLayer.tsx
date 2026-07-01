@@ -6,6 +6,8 @@ interface BgEffectLayerProps {
   color?: string;
   intensity?: number;
   size?: number;
+  glowIntensity?: number;
+  trailLength?: number;
   theme: 'dark' | 'light';
 }
 
@@ -95,6 +97,8 @@ export function BgEffectLayer({
   color,
   intensity = 60,
   size = 100,
+  glowIntensity = 50,
+  trailLength = 30,
   theme,
 }: BgEffectLayerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -118,6 +122,8 @@ export function BgEffectLayer({
     const alphaBase = clamp(intensity / 100, 0.08, 1);
     const scale = clamp(size / 100, 0.45, 2);
     const starDensity = 0.75 + alphaBase * 0.45;
+    const glowBlur = clamp(glowIntensity, 0, 100) / 5;
+    const trailFadeAlpha = clamp(0.02 + ((100 - clamp(trailLength, 0, 100)) / 100) * 0.1, 0.02, 0.12);
     let frame = 0;
     let width = 0;
     let height = 0;
@@ -405,7 +411,10 @@ export function BgEffectLayer({
     };
 
     const render = (time: number) => {
-      context.clearRect(0, 0, width, height);
+      context.globalCompositeOperation = 'destination-out';
+      context.fillStyle = `rgba(0,0,0,${trailFadeAlpha})`;
+      context.fillRect(0, 0, width, height);
+      context.globalCompositeOperation = 'source-over';
 
       const wash = context.createRadialGradient(width * 0.5, height * 0.35, 0, width * 0.5, height * 0.35, Math.max(width, height) * 0.78);
       wash.addColorStop(0, rgba(effectColor, alphaBase * 0.08));
@@ -413,7 +422,7 @@ export function BgEffectLayer({
       context.fillStyle = wash;
       context.fillRect(0, 0, width, height);
 
-      context.shadowBlur = 28 * scale;
+      context.shadowBlur = glowBlur * scale;
       context.shadowColor = rgba(effectColor, alphaBase * 0.22);
       switch (pattern) {
         case 'dots':
@@ -473,7 +482,7 @@ export function BgEffectLayer({
       window.removeEventListener('resize', handleResize);
       context.clearRect(0, 0, width, height);
     };
-  }, [color, intensity, pattern, size, theme]);
+  }, [color, intensity, pattern, size, glowIntensity, trailLength, theme]);
 
   if (pattern === 'none') {
     return null;

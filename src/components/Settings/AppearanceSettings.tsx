@@ -694,6 +694,8 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
   const bgEffectColor = isColor(settings.bgEffectColor) ? settings.bgEffectColor : fallbackBgEffectColor;
   const bgEffectIntensity = clamp(settings.bgEffectIntensity ?? 60, 0, 100);
   const bgEffectSize = clamp(settings.bgEffectSize ?? 100, 40, 180);
+  const particleGlowIntensity = clamp(settings.particleGlowIntensity ?? 50, 0, 100);
+  const particleTrailLength = clamp(settings.particleTrailLength ?? 30, 0, 100);
   const themeEffectColor = getPaletteEffectColor(bgEffectPattern, runtimeModeColors) ?? runtimeModeColors['--color-accent'];
   const bgEffectHsl = hexToHsl(bgEffectColor);
   const fontFamily = settings.appearanceFontFamily || selectedCustom?.fontFamily || FONT_OPTIONS[0].value;
@@ -1713,7 +1715,8 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
           </div>
 
           <div
-            className="rounded-xl border p-3 shadow-inner"
+            data-theme={draftMode}
+            className={`${draftMode} rounded-xl border p-3 shadow-inner`}
             style={{ backgroundColor: activeModeColors['--color-bg-deep'], borderColor: activeModeColors['--color-border-subtle'] }}
           >
             <div className="mb-3 flex items-center justify-between gap-2">
@@ -2271,6 +2274,44 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
                 className="h-2 w-full accent-accent"
               />
               <div className="flex justify-between text-[10px] text-gray-600"><span>Fine</span><span>Large</span></div>
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">Glow intensity</span>
+                <span className="text-xs tabular-nums text-gray-500">{particleGlowIntensity}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={particleGlowIntensity}
+                onChange={(event) => onUpdateSettings({ particleGlowIntensity: Number(event.target.value) })}
+                aria-label="Glow intensity"
+                className="h-2 w-full accent-accent"
+              />
+              <div className="flex justify-between text-[10px] text-gray-600"><span>Crisp</span><span>Radiant</span></div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">Trail length</span>
+                <span className="text-xs tabular-nums text-gray-500">{particleTrailLength}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={particleTrailLength}
+                onChange={(event) => onUpdateSettings({ particleTrailLength: Number(event.target.value) })}
+                aria-label="Trail length"
+                className="h-2 w-full accent-accent"
+              />
+              <div className="flex justify-between text-[10px] text-gray-600"><span>Short</span><span>Long</span></div>
             </div>
           </div>
 

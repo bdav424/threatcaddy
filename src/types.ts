@@ -443,6 +443,8 @@ export interface Settings {
   bgEffectColor?: string;
   bgEffectIntensity?: number;    // 0–100
   bgEffectSize?: number;         // 40–180
+  particleGlowIntensity?: number; // 0–100; default 50
+  particleTrailLength?: number;   // 0–100; default 30
   frostedPanels?: boolean;
   /** Auto-snap floating panels to snapped panel edges within 16 px during move (default true). */
   workspacePanelSnap?: boolean;

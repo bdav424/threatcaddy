@@ -18,6 +18,8 @@ interface AppLayoutProps {
   bgEffectColor?: string;
   bgEffectIntensity?: number;
   bgEffectSize?: number;
+  particleGlowIntensity?: number;
+  particleTrailLength?: number;
   theme?: 'dark' | 'light';
 }
 
@@ -35,6 +37,8 @@ export function AppLayout({
   bgEffectColor,
   bgEffectIntensity,
   bgEffectSize,
+  particleGlowIntensity,
+  particleTrailLength,
   theme,
 }: AppLayoutProps) {
   const { t } = useTranslation('common');
@@ -70,6 +74,8 @@ export function AppLayout({
         color={bgEffectColor}
         intensity={bgEffectIntensity ?? 60}
         size={bgEffectSize ?? 100}
+        glowIntensity={particleGlowIntensity ?? 50}
+        trailLength={particleTrailLength ?? 30}
         theme={resolvedTheme}
       />
       <div className="app-window-ambient pointer-events-none absolute inset-0 z-0" />
