@@ -42,7 +42,7 @@ const NO_OP_SW = [
   "self.addEventListener('activate', () => self.clients.claim());",
 ].join('\n');
 
-function findPort(start) {
+function findPort(start, maxPort = start + 20) {
   return new Promise((resolve, reject) => {
     const srv = http.createServer();
     srv.listen(start, '127.0.0.1', () => {
@@ -50,8 +50,8 @@ function findPort(start) {
       srv.close(() => resolve(port));
     });
     srv.on('error', () => {
-      if (start > start + 20) { reject(new Error('No free port found')); return; }
-      findPort(start + 1).then(resolve, reject);
+      if (start >= maxPort) { reject(new Error('No free port found')); return; }
+      findPort(start + 1, maxPort).then(resolve, reject);
     });
   });
 }
@@ -93,6 +93,8 @@ function startStaticServer(distDir) {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rendererDevUrl = process.env.TC_DESKTOP_DEV_URL;
+
+app.setPath('userData', path.join(app.getPath('appData'), 'ThreatCaddy'));
 
 // ── Calendar credential store ──────────────────────────────────────────────
 // Mirrors the mail-bridge.mjs pattern. Raw tokens are never returned to the
@@ -497,6 +499,24 @@ function createWindow(loopbackPort) {
 
   win.once('ready-to-show', () => { win.show(); });
 
+  win.webContents.on('did-finish-load', () => {
+    console.log(`ThreatCaddy desktop renderer loaded: ${win.webContents.getURL()}`);
+  });
+
+  win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error(`ThreatCaddy desktop renderer failed to load ${validatedURL}: ${errorCode} ${errorDescription}`);
+  });
+
+  win.webContents.on('render-process-gone', (_event, details) => {
+    console.error('ThreatCaddy desktop renderer process gone:', details);
+  });
+
+  win.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    if (level >= 2 && /(^Uncaught|^Unhandled|Failed to load module|Cannot assign|ReferenceError|TypeError)/i.test(message)) {
+      console.error(`ThreatCaddy renderer console [${sourceId}:${line}]: ${message}`);
+    }
+  });
+
   win.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
     return { action: 'deny' };
@@ -568,7 +588,7 @@ app.whenReady().then(async () => {
   registerWireGuardBridge();
   registerLanSyncBridge(win);
 
-  app.on('activate', () => {
+  app.on('activate', async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow(loopbackPort);
     }

@@ -1,4 +1,5 @@
 packages: []
 onlyBuiltDependencies:
-  - esbuild
   - electron
+  - electron-winstaller
+  - esbuild

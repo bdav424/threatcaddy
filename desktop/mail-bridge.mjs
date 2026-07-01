@@ -18,14 +18,26 @@
 //   app.whenReady().then(() => { createWindow(); registerMailBridge(); });
 
 import { ipcMain, safeStorage } from 'electron';
-import { ImapFlow } from 'imapflow';
-import nodemailer from 'nodemailer';
-import { simpleParser } from 'mailparser';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { runOAuthPopout } from './mail-oauth.mjs';
+
+let mailDepsPromise;
+
+async function getMailDeps() {
+  mailDepsPromise ??= Promise.all([
+    import('imapflow'),
+    import('nodemailer'),
+    import('mailparser'),
+  ]).then(([imapflow, nodemailer, mailparser]) => ({
+    ImapFlow: imapflow.ImapFlow,
+    nodemailer: nodemailer.default ?? nodemailer,
+    simpleParser: mailparser.simpleParser,
+  }));
+  return mailDepsPromise;
+}
 
 // --- credential store: encrypted-at-rest, keyed by a reference id the renderer holds ---
 // The renderer only ever passes a credentialReferenceId. Raw host/user/password/token
@@ -53,7 +65,8 @@ function loadCredential(ref) {
 }
 
 // --- transports ---
-function imapClient(cred) {
+async function imapClient(cred) {
+  const { ImapFlow } = await getMailDeps();
   const isOAuth = cred.authMethod === 'oauth' || cred.auth?.oauth;
   const auth = isOAuth
     ? { user: cred.auth.user, accessToken: cred.auth.oauth.accessToken }
@@ -74,7 +87,8 @@ function imapClient(cred) {
   });
 }
 
-function smtpTransport(cred) {
+async function smtpTransport(cred) {
+  const { nodemailer } = await getMailDeps();
   const isOAuth = cred.authMethod === 'oauth' || cred.auth?.oauth;
   const auth = isOAuth
     ? { type: 'OAuth2', user: cred.auth.user, accessToken: cred.auth.oauth.accessToken }
@@ -96,14 +110,14 @@ function smtpTransport(cred) {
 // --- actions ---
 // PROBE: verify sign-in + read; NEVER sends. Satisfies "connection test ≠ send" rule.
 async function probe(cred) {
-  const c = imapClient(cred);
+  const c = await imapClient(cred);
   await c.connect();
   try {
     const lock = await c.getMailboxLock('INBOX');
     try {
       const status = await c.status('INBOX', { messages: true, unseen: true });
       let smtpOk = true;
-      try { await smtpTransport(cred).verify(); } catch { smtpOk = false; }
+      try { await (await smtpTransport(cred)).verify(); } catch { smtpOk = false; }
       return {
         status: 'executed', adapterCalled: true, willSend: false,
         reason: 'probe_read_ok', messages: status.messages, unseen: status.unseen, smtpOk,
@@ -113,7 +127,7 @@ async function probe(cred) {
 }
 
 async function listInbox(cred, { mailbox = 'INBOX', limit = 50 } = {}) {
-  const c = imapClient(cred);
+  const c = await imapClient(cred);
   await c.connect();
   const out = [];
   try {
@@ -136,7 +150,8 @@ async function listInbox(cred, { mailbox = 'INBOX', limit = 50 } = {}) {
 }
 
 async function fetchMessage(cred, { mailbox = 'INBOX', uid }) {
-  const c = imapClient(cred);
+  const { simpleParser } = await getMailDeps();
+  const c = await imapClient(cred);
   await c.connect();
   try {
     const lock = await c.getMailboxLock(mailbox);
@@ -159,7 +174,7 @@ async function fetchMessage(cred, { mailbox = 'INBOX', uid }) {
 
 // SAVE DRAFT: IMAP APPEND to Drafts. No external send.
 async function saveDraft(cred, { mailbox = 'Drafts', mime }) {
-  const c = imapClient(cred);
+  const c = await imapClient(cred);
   await c.connect();
   try {
     const res = await c.append(mailbox, mime, ['\\Draft']);
@@ -173,7 +188,7 @@ async function send(cred, { confirmedSend, message }) {
   if (confirmedSend !== true) {
     return { status: 'blocked', adapterCalled: false, willSend: false, reason: 'send_not_confirmed' };
   }
-  const info = await smtpTransport(cred).sendMail({
+  const info = await (await smtpTransport(cred)).sendMail({
     from: message.from ?? cred.from,
     to: message.to, cc: message.cc, bcc: message.bcc,
     subject: message.subject, text: message.text, html: message.html,

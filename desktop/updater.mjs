@@ -1,5 +1,4 @@
 // Electron main-process only. Do NOT import from renderer or src/lib.
-import { autoUpdater } from 'electron-updater';
 import { ipcMain, app } from 'electron';
 
 /**
@@ -18,9 +17,11 @@ import { ipcMain, app } from 'electron';
  *   updater:check             — trigger a manual check
  *   updater:install-and-quit  — quitAndInstall()
  */
-export function registerUpdaterBridge(win) {
+export async function registerUpdaterBridge(win) {
   // Never run the updater in dev mode; app.isPackaged is false in dev.
   if (!app.isPackaged) return;
+
+  const { autoUpdater } = await import('electron-updater');
 
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;

@@ -7,6 +7,23 @@ import { sanitizeEmailAccounts } from '../lib/email-onboarding';
 import i18n, { RTL_LANGS } from '../i18n';
 
 const SETTINGS_KEY = 'threatcaddy-settings';
+
+function applyLocalDevLlmDefaults(settings: Settings): Settings {
+  if (typeof window === 'undefined') return settings;
+  const localDevPorts = new Set(['4174', '4175', '4179']);
+  if (window.location.hostname !== '127.0.0.1' || !localDevPorts.has(window.location.port)) return settings;
+  if (settings.llmLocalEndpoint || settings.llmLocalModelName || settings.llmDefaultProvider) return settings;
+
+  return {
+    ...settings,
+    llmDefaultProvider: 'local',
+    llmDefaultModel: 'gpt-5.4',
+    llmLocalEndpoint: 'http://127.0.0.1:11435/v1',
+    llmLocalApiKey: 'codex-local-dev',
+    llmLocalModelName: 'gpt-5.4',
+  };
+}
+
 function migrateSettings(raw: Record<string, unknown>): Record<string, unknown> {
   if (typeof raw.llmLocalEndpoint === 'string') {
     const normalized = normalizeLocalLlmEndpoint(raw.llmLocalEndpoint);
@@ -53,12 +70,12 @@ function loadSettings(): Settings {
     const stored = localStorage.getItem(SETTINGS_KEY);
     if (stored) {
       const raw = migrateSettings(JSON.parse(stored));
-      return { ...DEFAULT_SETTINGS, ...raw } as Settings;
+      return applyLocalDevLlmDefaults({ ...DEFAULT_SETTINGS, ...raw } as Settings);
     }
   } catch {
     // ignore
   }
-  return DEFAULT_SETTINGS;
+  return applyLocalDevLlmDefaults(DEFAULT_SETTINGS);
 }
 
 /** Read the current settings snapshot from localStorage without creating React state. */

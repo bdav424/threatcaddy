@@ -34,8 +34,18 @@ interface ThreatCaddyNotesAPI {
   getWhisperEndpoint: () => Promise<string | null>;
 }
 
+interface ThreatCaddyCalendarAPI {
+  startOAuth: (providerId: string) => Promise<{ credRefId: string; email: string | null }>;
+  registerAccount: (account: unknown) => Promise<unknown>;
+  pull: (accountId: string, range: { timeMinISO: string; timeMaxISO: string }) => Promise<unknown>;
+  create: (accountId: string, event: unknown) => Promise<unknown>;
+  update: (accountId: string, event: unknown) => Promise<unknown>;
+  remove: (accountId: string, remoteId: string) => Promise<unknown>;
+}
+
 interface Window {
   launchQueue?: LaunchQueue;
+  threatcaddyCalendar?: ThreatCaddyCalendarAPI;
   threatcaddyDesktop?: ThreatCaddyDesktopAPI;
   threatcaddyNotes?: ThreatCaddyNotesAPI;
 }

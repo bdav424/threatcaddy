@@ -32,14 +32,18 @@ export interface DesktopCalendarBridge extends CalendarBridge {
 // ─── Resolvers ────────────────────────────────────────────────────────────────
 
 type MailBridgeGlobal = typeof globalThis & { threatcaddyMail?: MailBridge };
-type CalendarBridgeGlobal = typeof globalThis & { threatcaddyCalendar?: DesktopCalendarBridge };
+type CalendarBridgeGlobal = typeof globalThis & {
+  threatcaddyCalendar?: DesktopCalendarBridge;
+  threatcaddy?: { calendar?: DesktopCalendarBridge };
+};
 
 export function getMailBridge(): MailBridge | null {
   return (globalThis as MailBridgeGlobal).threatcaddyMail ?? null;
 }
 
 export function getCalendarBridge(): DesktopCalendarBridge | null {
-  return (globalThis as CalendarBridgeGlobal).threatcaddyCalendar ?? null;
+  const global = globalThis as CalendarBridgeGlobal;
+  return global.threatcaddyCalendar ?? global.threatcaddy?.calendar ?? null;
 }
 
 // ─── Slack Bridge ──────────────────────────────────────────────────────────────
