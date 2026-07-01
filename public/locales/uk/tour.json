@@ -1,7 +1,0 @@
-{
-  "stepCounter": "{{current}} / {{total}}",
-  "skipTour": "Пропустити тур",
-  "back": "Назад",
-  "next": "Далі",
-  "finish": "Завершити"
-}

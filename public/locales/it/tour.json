@@ -1,7 +1,0 @@
-{
-  "stepCounter": "{{current}} / {{total}}",
-  "skipTour": "Salta il tour",
-  "back": "Indietro",
-  "next": "Avanti",
-  "finish": "Fine"
-}

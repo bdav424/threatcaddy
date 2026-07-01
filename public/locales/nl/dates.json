@@ -1,6 +1,0 @@
-{
-  "justNow": "Zojuist",
-  "minutesAgo": "{{count}}m geleden",
-  "hoursAgo": "{{count}}u geleden",
-  "daysAgo": "{{count}}d geleden"
-}

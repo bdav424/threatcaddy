@@ -1,6 +1,0 @@
-{
-  "justNow": "Ahora mismo",
-  "minutesAgo": "hace {{count}}min",
-  "hoursAgo": "hace {{count}}h",
-  "daysAgo": "hace {{count}}d"
-}

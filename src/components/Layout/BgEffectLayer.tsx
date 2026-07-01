@@ -7,7 +7,6 @@ interface BgEffectLayerProps {
   intensity?: number;
   size?: number;
   glowIntensity?: number;
-  trailLength?: number;
   theme: 'dark' | 'light';
 }
 
@@ -18,6 +17,9 @@ type MovingPoint = {
   vy: number;
   radius: number;
   twinkle: number;
+  emberSpark: boolean;
+  emberSides: number;
+  emberRot: number;
 };
 
 type SwirlSeed = {
@@ -29,6 +31,9 @@ type SwirlSeed = {
   phase: number;
   width: number;
 };
+
+const MAX_PARTICLES = 100;
+const TRAIL_FADE_ALPHA = 0.05;
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
@@ -81,7 +86,7 @@ function createSwirls(width: number, height: number, scale: number) {
 }
 
 function createPoints(width: number, height: number, scale: number, density: number) {
-  const count = Math.max(18, Math.round(((width * height) / 65000) * density));
+  const count = Math.min(MAX_PARTICLES, Math.max(18, Math.round(((width * height) / 65000) * density)));
   return Array.from({ length: count }, () => ({
     x: Math.random() * width,
     y: Math.random() * height,
@@ -89,6 +94,9 @@ function createPoints(width: number, height: number, scale: number, density: num
     vy: (Math.random() - 0.5) * 0.18 * scale,
     radius: (1.2 + Math.random() * 2.6) * scale,
     twinkle: Math.random() * Math.PI * 2,
+    emberSpark: Math.random() < 0.2,
+    emberSides: 3 + Math.floor(Math.random() * 3),
+    emberRot: Math.random() * Math.PI * 2,
   } satisfies MovingPoint));
 }
 
@@ -98,10 +106,20 @@ export function BgEffectLayer({
   intensity = 60,
   size = 100,
   glowIntensity = 50,
-  trailLength = 30,
   theme,
 }: BgEffectLayerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const colorRef = useRef(color);
+  const intensityRef = useRef(intensity);
+  const glowRef = useRef(glowIntensity);
+  const themeRef = useRef(theme);
+
+  useEffect(() => {
+    colorRef.current = color;
+    intensityRef.current = intensity;
+    glowRef.current = glowIntensity;
+    themeRef.current = theme;
+  }, [color, intensity, glowIntensity, theme]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -114,23 +132,25 @@ export function BgEffectLayer({
       return;
     }
 
-    const effectColor = normalizeHex(color) || getPaletteFallbackColor(theme);
-    const glowColor = theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.34)';
     const reducedMotion = typeof window.matchMedia === 'function'
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const shouldAnimate = !reducedMotion && pattern !== 'dots';
-    const alphaBase = clamp(intensity / 100, 0.08, 1);
     const scale = clamp(size / 100, 0.45, 2);
-    const starDensity = 0.75 + alphaBase * 0.45;
-    const glowBlur = clamp(glowIntensity, 0, 100) / 5;
-    const trailFadeAlpha = clamp(0.02 + ((100 - clamp(trailLength, 0, 100)) / 100) * 0.1, 0.02, 0.12);
     let frame = 0;
     let width = 0;
     let height = 0;
     let dpr = 1;
     let swirls: SwirlSeed[] = [];
     let points: MovingPoint[] = [];
-    const perlinTrails = new Map<MovingPoint, Array<{ x: number; y: number }>>();
+    let petalCount = 0;
+    let lastTime = 0;
+
+    // Reassigned every frame from the refs above so color/theme/glow updates
+    // don't need to tear down and recreate the particle arrays.
+    let effectColor = normalizeHex(colorRef.current) || getPaletteFallbackColor(themeRef.current);
+    let alphaBase = clamp(intensityRef.current / 100, 0.08, 1);
+    let glowBlur = clamp(glowRef.current, 0, 100) / 5;
+    let glowColor = themeRef.current === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.34)';
 
     const resize = () => {
       width = window.innerWidth;
@@ -141,17 +161,18 @@ export function BgEffectLayer({
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
       context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const starDensity = 0.75 + clamp(intensityRef.current / 100, 0.08, 1) * 0.45;
       swirls = createSwirls(width, height, scale);
       points = createPoints(width, height, scale, starDensity);
-      perlinTrails.clear();
+      petalCount = Math.max(18, Math.round(points.length * 0.55));
     };
 
-    const stepPoints = (delta: number) => {
-      const speedScale = reducedMotion ? 0.08 : delta * 0.05;
+    const stepPoints = (speedMultiplier: number, dt: number) => {
+      const speedScale = speedMultiplier * 0.05 * dt;
       for (const point of points) {
         point.x += point.vx * speedScale;
         point.y += point.vy * speedScale;
-        point.twinkle += delta * 0.0015;
+        point.twinkle += speedMultiplier * 0.0015 * dt;
         if (point.x < -20) point.x = width + 20;
         if (point.x > width + 20) point.x = -20;
         if (point.y < -20) point.y = height + 20;
@@ -159,8 +180,8 @@ export function BgEffectLayer({
       }
     };
 
-    const drawSparkles = (time: number) => {
-      stepPoints(reducedMotion ? 0.8 : 1.6);
+    const drawSparkles = (time: number, dt: number) => {
+      stepPoints(reducedMotion ? 0.8 : 1.6, dt);
       for (const point of points) {
         const twinkle = 0.35 + ((Math.sin(time * 0.0015 + point.twinkle) + 1) / 2) * 0.65;
         context.strokeStyle = rgba(effectColor, alphaBase * 0.22 * twinkle);
@@ -238,9 +259,9 @@ export function BgEffectLayer({
       }
     };
 
-    const drawRain = () => {
+    const drawRain = (dt: number) => {
       for (const point of points) {
-        point.y += reducedMotion ? 0.12 : (1.4 + point.radius) * (0.35 + alphaBase);
+        point.y += (reducedMotion ? 0.12 : (1.4 + point.radius) * (0.35 + alphaBase)) * dt;
         if (point.y > height + 80) {
           point.y = -40;
           point.x = Math.random() * width;
@@ -258,47 +279,43 @@ export function BgEffectLayer({
       }
     };
 
-    const drawPerlinFlow = (time: number) => {
-      const trailLength = Math.max(6, Math.round(scale * 22));
+    const drawPerlinFlow = (time: number, dt: number) => {
+      const segLength = Math.max(6, scale * 14);
       for (const point of points) {
         const angle = Math.sin(point.x * 0.006 + time * 0.0007) * Math.PI
           + Math.cos(point.y * 0.005 + time * 0.00045);
-        point.x += Math.cos(angle) * (reducedMotion ? 0.08 : 0.9 * scale);
-        point.y += Math.sin(angle) * (reducedMotion ? 0.08 : 0.9 * scale);
-        point.twinkle -= 0.003;
+        const stepX = Math.cos(angle) * (reducedMotion ? 0.08 : 0.9 * scale) * dt;
+        const stepY = Math.sin(angle) * (reducedMotion ? 0.08 : 0.9 * scale) * dt;
+        point.x += stepX;
+        point.y += stepY;
+        point.twinkle -= 0.003 * dt;
 
         if (point.x < -20 || point.x > width + 20 || point.y < -20 || point.y > height + 20 || point.twinkle < -1) {
           point.x = Math.random() * width;
           point.y = Math.random() * height;
           point.twinkle = Math.random() * Math.PI * 2;
-          perlinTrails.delete(point);
           continue;
         }
 
-        if (!perlinTrails.has(point)) perlinTrails.set(point, []);
-        const trail = perlinTrails.get(point)!;
-        trail.push({ x: point.x, y: point.y });
-        if (trail.length > trailLength) trail.shift();
-
-        if (trail.length < 2) continue;
-        for (let i = 1; i < trail.length; i++) {
-          const fade = i / trail.length;
-          context.strokeStyle = rgba(effectColor, alphaBase * 0.28 * fade);
-          context.lineWidth = Math.max(0.4, point.radius * 0.55 * fade);
-          context.lineCap = 'round';
-          context.beginPath();
-          context.moveTo(trail[i - 1].x, trail[i - 1].y);
-          context.lineTo(trail[i].x, trail[i].y);
-          context.stroke();
-        }
+        const mag = Math.hypot(stepX, stepY) || 1;
+        const dirX = stepX / mag;
+        const dirY = stepY / mag;
+        context.strokeStyle = rgba(effectColor, alphaBase * 0.3);
+        context.lineWidth = Math.max(0.4, point.radius * 0.6);
+        context.lineCap = 'round';
+        context.beginPath();
+        context.moveTo(point.x - dirX * segLength, point.y - dirY * segLength);
+        context.lineTo(point.x, point.y);
+        context.stroke();
       }
     };
 
-    const drawPetals = (time: number) => {
-      for (const point of points.slice(0, Math.max(18, Math.round(points.length * 0.55)))) {
-        point.y += reducedMotion ? 0.06 : (0.28 + point.radius * 0.12) * scale;
+    const drawPetals = (time: number, dt: number) => {
+      for (let i = 0; i < petalCount && i < points.length; i += 1) {
+        const point = points[i];
+        point.y += (reducedMotion ? 0.06 : (0.28 + point.radius * 0.12) * scale) * dt;
         point.x += Math.sin(time * 0.001 + point.twinkle) * 0.35 * scale;
-        point.twinkle += 0.012;
+        point.twinkle += 0.012 * dt;
         if (point.y > height + 20) {
           point.y = -20;
           point.x = Math.random() * width;
@@ -314,25 +331,47 @@ export function BgEffectLayer({
       }
     };
 
-    const drawEmbers = () => {
+    const drawEmbers = (dt: number) => {
       for (const point of points) {
-        point.y -= reducedMotion ? 0.04 : (0.25 + point.radius * 0.08) * scale;
-        point.x += Math.sin(point.twinkle) * 0.22 * scale;
-        point.twinkle += 0.018;
+        point.y -= (reducedMotion ? 0.04 : (0.25 + point.radius * 0.08) * scale) * dt;
+        point.x += Math.sin(point.twinkle) * 0.22 * scale * dt;
+        point.twinkle += 0.018 * dt;
         if (point.y < -20) {
           point.y = height + 20;
           point.x = Math.random() * width;
         }
         const glow = 0.25 + ((Math.sin(point.twinkle) + 1) / 2) * 0.75;
-        context.fillStyle = rgba(effectColor, alphaBase * 0.38 * glow);
+        context.fillStyle = rgba(effectColor, alphaBase * 0.42 * glow);
+
+        if (point.emberSpark) {
+          context.beginPath();
+          context.arc(point.x, point.y, point.radius * 0.45, 0, Math.PI * 2);
+          context.fill();
+          continue;
+        }
+
+        const flakeSize = point.radius * 1.6;
+        const rotation = point.emberRot + point.twinkle * 0.4;
+        context.save();
+        context.translate(point.x, point.y);
+        context.rotate(rotation);
         context.beginPath();
-        context.arc(point.x, point.y, point.radius * 0.78, 0, Math.PI * 2);
+        for (let side = 0; side < point.emberSides; side += 1) {
+          const angle = (side / point.emberSides) * Math.PI * 2;
+          const radius = side % 2 === 0 ? flakeSize : flakeSize * 0.45;
+          const px = Math.cos(angle) * radius;
+          const py = Math.sin(angle) * radius * 0.55;
+          if (side === 0) context.moveTo(px, py);
+          else context.lineTo(px, py);
+        }
+        context.closePath();
         context.fill();
+        context.restore();
       }
     };
 
-    const drawConstellations = (time: number) => {
-      stepPoints(reducedMotion ? 0.7 : 1.25);
+    const drawConstellations = (time: number, dt: number) => {
+      stepPoints(reducedMotion ? 0.7 : 1.25, dt);
 
       for (let index = 0; index < points.length; index += 1) {
         const point = points[index];
@@ -371,7 +410,7 @@ export function BgEffectLayer({
       context.fill();
     };
 
-    const drawSwirls = (time: number) => {
+    const drawSwirls = (time: number, dt: number) => {
       const rotation = reducedMotion ? 0.00006 : 0.00018;
       const baseRadius = Math.min(width, height) * 0.06 * scale;
 
@@ -399,7 +438,7 @@ export function BgEffectLayer({
       }
 
       for (const point of points) {
-        point.twinkle += reducedMotion ? 0.005 : 0.015;
+        point.twinkle += (reducedMotion ? 0.005 : 0.015) * dt;
         const orbit = 14 * scale;
         const px = point.x + Math.cos(point.twinkle) * orbit;
         const py = point.y + Math.sin(point.twinkle * 1.2) * orbit * 0.6;
@@ -411,8 +450,16 @@ export function BgEffectLayer({
     };
 
     const render = (time: number) => {
+      const dt = lastTime === 0 ? 1 : clamp((time - lastTime) / (1000 / 60), 0.25, 3);
+      lastTime = time;
+
+      effectColor = normalizeHex(colorRef.current) || getPaletteFallbackColor(themeRef.current);
+      alphaBase = clamp(intensityRef.current / 100, 0.08, 1);
+      glowBlur = clamp(glowRef.current, 0, 100) / 5;
+      glowColor = themeRef.current === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.34)';
+
       context.globalCompositeOperation = 'destination-out';
-      context.fillStyle = `rgba(0,0,0,${trailFadeAlpha})`;
+      context.fillStyle = `rgba(0,0,0,${TRAIL_FADE_ALPHA})`;
       context.fillRect(0, 0, width, height);
       context.globalCompositeOperation = 'source-over';
 
@@ -423,77 +470,4 @@ export function BgEffectLayer({
       context.fillRect(0, 0, width, height);
 
       context.shadowBlur = glowBlur * scale;
-      context.shadowColor = rgba(effectColor, alphaBase * 0.22);
-      switch (pattern) {
-        case 'dots':
-          drawDots();
-          break;
-        case 'synapse':
-          drawSynapse(time);
-          break;
-        case 'rain':
-          drawRain();
-          break;
-        case 'constellations':
-          drawConstellations(time);
-          break;
-        case 'perlin-flow':
-          drawPerlinFlow(time);
-          break;
-        case 'petals':
-          drawPetals(time);
-          break;
-        case 'sparkles':
-          drawSparkles(time);
-          break;
-        case 'embers':
-          drawEmbers();
-          break;
-        case 'swirls':
-        default:
-          drawSwirls(time);
-          break;
-      }
-      context.shadowBlur = 0;
-
-      const vignette = context.createLinearGradient(0, 0, 0, height);
-      vignette.addColorStop(0, glowColor);
-      vignette.addColorStop(0.35, 'rgba(0,0,0,0)');
-      vignette.addColorStop(1, theme === 'dark' ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.12)');
-      context.fillStyle = vignette;
-      context.fillRect(0, 0, width, height);
-
-      if (shouldAnimate) {
-        frame = window.requestAnimationFrame(render);
-      }
-    };
-
-    const handleResize = () => {
-      resize();
-      if (!shouldAnimate) render(performance.now());
-    };
-
-    resize();
-    render(performance.now());
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      if (frame) window.cancelAnimationFrame(frame);
-      window.removeEventListener('resize', handleResize);
-      context.clearRect(0, 0, width, height);
-    };
-  }, [color, intensity, pattern, size, glowIntensity, trailLength, theme]);
-
-  if (pattern === 'none') {
-    return null;
-  }
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className="app-window-bg-effect pointer-events-none absolute inset-0 z-0"
-      data-bg-effect-pattern={pattern}
-      aria-hidden
-    />
-  );
-}
+      context.shadowColor = rgba(effectColor, alphaBase * 0.

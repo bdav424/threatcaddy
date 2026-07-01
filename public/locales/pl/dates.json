@@ -1,6 +1,0 @@
-{
-  "justNow": "Przed chwilą",
-  "minutesAgo": "{{count}}min temu",
-  "hoursAgo": "{{count}}godz temu",
-  "daysAgo": "{{count}}d temu"
-}
