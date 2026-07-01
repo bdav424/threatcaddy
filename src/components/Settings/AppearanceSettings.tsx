@@ -1370,7 +1370,7 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
                     <button onClick={() => selectTheme(theme)} className="flex w-full items-center gap-2 text-left">
                       <span className="h-4 w-4 shrink-0 rounded-full border border-white/20" style={{ backgroundColor: theme.swatch }} />
                       <span className="min-w-0 flex-1 truncate text-sm text-gray-200">{theme.label}</span>
-                      <span className={`rounded-full border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] ${theme.preferredTheme === 'light' ? 'border-gray-300 bg-white text-gray-700' : 'border-gray-700 bg-gray-900 text-gray-200'}`}>{theme.preferredTheme}</span>
+                      <span className={`rounded-full border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] ${theme.preferredTheme === 'light' ? 'border-gray-300 bg-white text-gray-700' : runtimeThemeMode === 'dark' ? 'border-gray-700 bg-gray-900 text-gray-200' : 'border-gray-900 bg-black text-white'}`}>{theme.preferredTheme}</span>
                       {scheme === theme.id && <Check size={14} className="text-accent" />}
                     </button>
                   </div>
