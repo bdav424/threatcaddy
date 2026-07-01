@@ -694,7 +694,8 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
   const bgEffectColor = isColor(settings.bgEffectColor) ? settings.bgEffectColor : fallbackBgEffectColor;
   const bgEffectIntensity = clamp(settings.bgEffectIntensity ?? 60, 0, 100);
   const bgEffectSize = clamp(settings.bgEffectSize ?? 100, 40, 180);
-  const bgGlowIntensity = clamp(settings.bgGlowIntensity ?? 50, 0, 100);
+  const particleGlowIntensity = clamp(settings.particleGlowIntensity ?? 50, 0, 100);
+  const particleTrailLength = clamp(settings.particleTrailLength ?? 30, 0, 100);
   const themeEffectColor = getPaletteEffectColor(bgEffectPattern, runtimeModeColors) ?? runtimeModeColors['--color-accent'];
   const bgEffectHsl = hexToHsl(bgEffectColor);
   const fontFamily = settings.appearanceFontFamily || selectedCustom?.fontFamily || FONT_OPTIONS[0].value;
@@ -794,7 +795,6 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
     bgEffectColor: undefined,
     bgEffectIntensity: 60,
     bgEffectSize: 100,
-    bgGlowIntensity: 50,
   });
 
   const startCreateTheme = () => {
@@ -2059,6 +2059,24 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
                   <div className="peer h-5 w-9 rounded-full bg-gray-700 transition-colors peer-checked:bg-accent peer-focus:ring-1 peer-focus:ring-accent/50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-4" />
                 </label>
               </div>
+              {(settings.frostedPanels) && (
+                <div className="space-y-2 border-t border-gray-700/50 pt-2">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-400">Frost opacity</span>
+                      <span className="text-xs tabular-nums text-gray-500">{panelTransparency}%</span>
+                    </div>
+                    <input type="range" min={0} max={100} value={panelTransparency} onChange={(e) => onUpdateSettings({ windowGlassTransparency: Number(e.target.value) })} className="h-1.5 w-full accent-accent" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-400">Glow intensity</span>
+                      <span className="text-xs tabular-nums text-gray-500">{bgEffectIntensity}%</span>
+                    </div>
+                    <input type="range" min={0} max={100} step={5} value={bgEffectIntensity} onChange={(e) => onUpdateSettings({ bgEffectIntensity: Number(e.target.value) })} aria-label="Glow intensity" className="h-1.5 w-full accent-accent" />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2259,22 +2277,42 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
             </div>
           </div>
 
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-400">Glow intensity</span>
-              <span className="text-xs tabular-nums text-gray-500">{bgGlowIntensity}%</span>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">Glow intensity</span>
+                <span className="text-xs tabular-nums text-gray-500">{particleGlowIntensity}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={particleGlowIntensity}
+                onChange={(event) => onUpdateSettings({ particleGlowIntensity: Number(event.target.value) })}
+                aria-label="Glow intensity"
+                className="h-2 w-full accent-accent"
+              />
+              <div className="flex justify-between text-[10px] text-gray-600"><span>Crisp</span><span>Radiant</span></div>
             </div>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={bgGlowIntensity}
-              onChange={(event) => onUpdateSettings({ bgGlowIntensity: Number(event.target.value) })}
-              aria-label="Glow intensity"
-              className="h-2 w-full accent-accent"
-            />
-            <div className="flex justify-between text-[10px] text-gray-600"><span>Crisp</span><span>Radiant</span></div>
+
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">Trail length</span>
+                <span className="text-xs tabular-nums text-gray-500">{particleTrailLength}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={particleTrailLength}
+                onChange={(event) => onUpdateSettings({ particleTrailLength: Number(event.target.value) })}
+                aria-label="Trail length"
+                className="h-2 w-full accent-accent"
+              />
+              <div className="flex justify-between text-[10px] text-gray-600"><span>Short</span><span>Long</span></div>
+            </div>
           </div>
 
           <div className="overflow-hidden rounded-xl border border-gray-800 bg-black/20">
@@ -2560,4 +2598,3 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
     </div>
   );
 }
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    

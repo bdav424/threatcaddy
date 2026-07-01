@@ -1,0 +1,13 @@
+{
+  "desktopOnly": "Slack 直接消息阅读仅在 ThreatCaddy 桌面应用中可用。",
+  "connectSlack": "连接 Slack 工作区",
+  "connecting": "正在连接…",
+  "disconnect": "断开连接",
+  "connectHint": "打开 Slack OAuth 窗口。需要 im:read、im:history 和 users:read 用户范围。",
+  "alertsEnabled": "在覆盖面板中显示 DM 警告",
+  "snoozeDuration": "消音时长",
+  "snooze1h": "1 小时",
+  "snooze2h": "2 小时",
+  "snooze4h": "4 小时",
+  "snooze8h": "8 小时"
+}

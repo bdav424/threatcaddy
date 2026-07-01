@@ -1,0 +1,46 @@
+{
+  "passphraseTitle": "Enable Encrypted Sync",
+  "passphraseSubtitle": "Enter your sync passphrase to encrypt data before it reaches the server",
+  "passphraseHint": "You signed in with a passkey. Enter the sync passphrase you set on your first device. If this is your first device, choose any passphrase — you'll need it on future devices.",
+  "passphrasePlaceholder": "Sync passphrase",
+  "passphraseSubmit": "Enable encryption",
+  "passphraseApplying": "Applying…",
+  "passphraseLater": "Later",
+  "passphraseError": "Failed to set sync passphrase. Please try again.",
+  "passphrasePrivacy": "The passphrase never leaves your device. Your data is encrypted locally before syncing.",
+  "devices": {
+    "thisDevice": "This device",
+    "pendingApproval": "Pending approval",
+    "revoked": "Revoked",
+    "lastSeen": "Last seen {{time}}",
+    "addDevice": "Add device",
+    "revoke": "Revoke device",
+    "confirmRevoke": "Confirm revoke",
+    "notConnected": "Connect to a team server to manage synced devices.",
+    "loading": "Loading devices…",
+    "empty": "No devices enrolled yet."
+  },
+  "pairing": {
+    "title": "Add a sync device",
+    "chooseModeHint": "Choose whether this is the trusted device generating the code, or the new device redeeming one.",
+    "showCode": "Show pairing code",
+    "showCodeDesc": "This is a trusted device — generate a code for the new one to scan or type.",
+    "enterCode": "Enter pairing code",
+    "enterCodeDesc": "This is the new device — enter the code shown on a trusted device.",
+    "showCodeHint": "Scan the QR code or type the code on the new device. Expires in 10 minutes.",
+    "qrAlt": "Pairing QR code",
+    "expires": "Expires at {{time}}",
+    "enterCodeHint": "Enter the 8-character code shown on your trusted device.",
+    "confirm": "Pair this device",
+    "invalidCode": "Invalid or expired pairing code. Please try again.",
+    "back": "Back"
+  },
+  "enrollment": {
+    "pendingTitle": "Sync approval pending",
+    "pendingDesc": "This device is waiting for approval before it can sync. On a trusted device, go to Settings → Synced Devices and generate a pairing code.",
+    "revokedTitle": "Sync access revoked",
+    "revokedDesc": "This device has been removed from the sync group. Contact the account owner or pair again from Settings.",
+    "notRegisteredTitle": "Sync not set up",
+    "notRegisteredDesc": "This device has not joined the encrypted sync group yet."
+  }
+}

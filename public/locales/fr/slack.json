@@ -1,0 +1,13 @@
+{
+  "desktopOnly": "La lecture des messages directs Slack n'est disponible que dans l'application de bureau ThreatCaddy.",
+  "connectSlack": "Connecter l'espace de travail Slack",
+  "connecting": "Connexion en cours…",
+  "disconnect": "Déconnecter",
+  "connectHint": "Ouvre une fenêtre OAuth Slack. Nécessite les scopes utilisateur im:read, im:history et users:read.",
+  "alertsEnabled": "Afficher les alertes DM dans le panneau de superposition",
+  "snoozeDuration": "Mettre en silence pendant",
+  "snooze1h": "1 heure",
+  "snooze2h": "2 heures",
+  "snooze4h": "4 heures",
+  "snooze8h": "8 heures"
+}

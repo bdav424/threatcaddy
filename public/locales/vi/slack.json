@@ -1,0 +1,13 @@
+{
+  "desktopOnly": "Đọc Slack DM chỉ khả dụng trong ứng dụng desktop ThreatCaddy.",
+  "connectSlack": "Kết nối Không gian làm việc Slack",
+  "connecting": "Đang kết nối…",
+  "disconnect": "Ngắt kết nối",
+  "connectHint": "Mở cửa sổ OAuth Slack. Yêu cầu các phạm vi người dùng im:read, im:history và users:read.",
+  "alertsEnabled": "Hiển thị cảnh báo DM trong bảng điều khiển overlay",
+  "snoozeDuration": "Tắt tiếng cho",
+  "snooze1h": "1 giờ",
+  "snooze2h": "2 giờ",
+  "snooze4h": "4 giờ",
+  "snooze8h": "8 giờ"
+}

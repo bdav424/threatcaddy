@@ -1,0 +1,732 @@
+import React from 'react';
+import { ArrowUpDown, FileText, Download, FolderPlus, Pencil, FilePlus, Plus, Pin, ClipboardList, StickyNote, ChevronDown, Upload } from 'lucide-react';
+import { useTranslation, Trans } from 'react-i18next';
+import type { Note, NoteType, SortOption, IOCType, Folder, NoteTemplate } from '../../types';
+import { cn } from '../../lib/utils';
+import { NoteCard } from './NoteCard';
+import { StickyJotFab } from './StickyJotFab';
+import { IOCFilterBar } from '../Clips/IOCFilterBar';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { formatIOCsJSON, formatIOCsCSV, formatIOCsFlatJSON, formatIOCsFlatCSV } from '../../lib/ioc-export';
+import type { IOCExportEntry, ThreatIntelExportConfig } from '../../lib/ioc-export';
+import { downloadFile } from '../../lib/export';
+import { Virtuoso } from 'react-virtuoso';
+import { useWorkspacePanelChromeState, useWorkspacePanelHeaderAccessory } from '../WorkspacePanels/WorkspacePanel';
+
+interface NoteListProps {
+  notes: Note[];
+  selectedId?: string;
+  onSelect: (id: string) => void;
+  sort: SortOption;
+  onSortChange: (sort: SortOption) => void;
+  title?: string;
+  selectedIOCTypes?: IOCType[];
+  onIOCTypesChange?: (types: IOCType[]) => void;
+  folders?: Folder[];
+  tiExportConfig?: ThreatIntelExportConfig;
+  onTrash?: (id: string) => void;
+  onCreateFolder?: (name: string, icon?: string) => void;
+  onMoveToFolder?: (noteId: string, parentNoteId: string | null) => void;
+  onRenameFolder?: (noteId: string, newName: string) => void;
+  onDeleteFolder?: (noteId: string, action: 'trash_contents' | 'move_out') => void;
+  onCreate?: () => void;
+  onCreateTyped?: (type: NoteType) => void;
+  onOpenJots?: () => void;
+  onImportMeeting?: () => void;
+  attachedTemplates?: NoteTemplate[];
+  onCreateFromTemplate?: (templateId: string) => void;
+  onManageTemplates?: () => void;
+  emptyHint?: string;
+}
+
+export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, title, selectedIOCTypes, onIOCTypesChange, folders, tiExportConfig, onTrash, onCreateFolder, onMoveToFolder, onRenameFolder, onDeleteFolder, onCreate, onCreateTyped, onOpenJots, onImportMeeting, attachedTemplates = [], onCreateFromTemplate, onManageTemplates, emptyHint }: NoteListProps) {
+  const { t } = useTranslation('notes');
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [showNewFolder, setShowNewFolder] = useState(false);
+  const [showTypeMenu, setShowTypeMenu] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [newFolderIcon, setNewFolderIcon] = useState('📁');
+  const typeMenuRef = useRef<HTMLDivElement>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [deletingFolderId, setDeletingFolderId] = useState<string | null>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
+  const workspacePanelChrome = useWorkspacePanelChromeState();
+  const compactTitlebarMode = Boolean(workspacePanelChrome?.compact);
+
+  const notesWithIOCs = useMemo(
+    () => notes.filter((n) => n.iocAnalysis && n.iocAnalysis.iocs.some((ioc) => !ioc.dismissed)),
+    [notes]
+  );
+
+  const compactHistoryNotes = useMemo(
+    () => notes.filter((note) => !note.isFolder),
+    [notes],
+  );
+
+  const childCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const n of notes) {
+      if (n.parentNoteId) map.set(n.parentNoteId, (map.get(n.parentNoteId) || 0) + 1);
+    }
+    return map;
+  }, [notes]);
+
+  const folderMap = useMemo(() => {
+    const map = new Map<string, Folder>();
+    if (folders) {
+      for (const f of folders) map.set(f.id, f);
+    }
+    return map;
+  }, [folders]);
+
+  useEffect(() => {
+    if (!showExportMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showExportMenu]);
+
+  useEffect(() => {
+    if (!showSortMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (sortMenuRef.current && !sortMenuRef.current.contains(e.target as Node)) {
+        setShowSortMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showSortMenu]);
+
+  useEffect(() => {
+    if (!showTypeMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (typeMenuRef.current && !typeMenuRef.current.contains(e.target as Node)) {
+        setShowTypeMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showTypeMenu]);
+
+  const handleBulkExport = useCallback((format: 'json' | 'csv' | 'flat-json' | 'flat-csv') => {
+    setShowExportMenu(false);
+    const entries: IOCExportEntry[] = notesWithIOCs.map((n) => ({
+      clipTitle: n.title,
+      sourceUrl: n.sourceUrl,
+      iocs: n.iocAnalysis?.iocs ?? [],
+      tags: n.tags,
+      entityClsLevel: n.clsLevel,
+    }));
+    const dateStr = new Date().toISOString().slice(0, 10);
+    if (format === 'flat-json') {
+      downloadFile(formatIOCsFlatJSON(entries, tiExportConfig), `iocs-export-${dateStr}-flat.json`, 'application/json');
+    } else if (format === 'flat-csv') {
+      downloadFile(formatIOCsFlatCSV(entries, tiExportConfig), `iocs-export-${dateStr}-flat.csv`, 'text/csv');
+    } else if (format === 'json') {
+      downloadFile(formatIOCsJSON(entries), `iocs-export-${dateStr}.json`, 'application/json');
+    } else {
+      downloadFile(formatIOCsCSV(entries), `iocs-export-${dateStr}.csv`, 'text/csv');
+    }
+  }, [notesWithIOCs, tiExportConfig]);
+
+  const noteTitlebarControls = useMemo(() => {
+    if (!compactTitlebarMode) return null;
+
+    return (
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-1" data-note-titlebar-controls="true">
+        {compactHistoryNotes.length > 0 && (
+          <label
+            className="mr-auto flex min-w-0 flex-1 items-center gap-1 rounded-[8px] border border-border-subtle bg-bg-raised/70 px-1.5 text-text-secondary"
+            title="Switch existing note"
+            data-note-history-selector="true"
+            data-workspace-panel-no-drag="true"
+          >
+            <FileText size={12} className="shrink-0 text-text-muted" aria-hidden="true" />
+            <select
+              value={selectedId ?? ''}
+              onChange={(event) => {
+                if (event.target.value) {
+                  onSelect(event.target.value);
+                }
+              }}
+              className="h-6 min-w-0 flex-1 bg-transparent text-[10px] font-semibold text-text-primary outline-none"
+              aria-label="Select existing note"
+              data-note-history-select="true"
+            >
+              {!selectedId && <option value="">Select note</option>}
+              {compactHistoryNotes.map((note) => (
+                <option key={note.id} value={note.id}>
+                  {note.title || t('common:untitled')}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {onImportMeeting && (
+          <button
+            type="button"
+            onClick={onImportMeeting}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] border border-border-subtle bg-bg-raised/70 text-text-secondary transition-colors hover:border-border-medium hover:bg-bg-hover hover:text-text-primary"
+            title="Import meeting notes (.txt, .vtt, .md)"
+            aria-label="Import meeting notes"
+          >
+            <Upload size={13} />
+          </button>
+        )}
+        {onOpenJots && (
+          <button
+            type="button"
+            onClick={onOpenJots}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] border border-border-subtle bg-bg-raised/70 text-text-secondary transition-colors hover:border-border-medium hover:bg-bg-hover hover:text-text-primary"
+            title="Open Jots (sticky notes)"
+            aria-label="Open Jots"
+            data-jots-button="true"
+          >
+            <Pin size={13} />
+          </button>
+        )}
+        {(onCreate || onCreateTyped) && (
+          <div className="relative" ref={typeMenuRef}>
+            {onCreateTyped ? (
+              <button
+                type="button"
+                onClick={() => setShowTypeMenu(!showTypeMenu)}
+                className="flex h-6 items-center gap-0.5 rounded-[8px] border border-accent/30 bg-accent/14 px-1.5 text-accent transition-colors hover:bg-accent/20"
+                title="Create new note"
+                aria-label="Create new note"
+                data-note-new-button="true"
+              >
+                <FilePlus size={13} />
+                <ChevronDown size={10} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onCreate}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] border border-accent/30 bg-accent/14 text-accent transition-colors hover:bg-accent/20"
+                title="Create a blank note"
+                aria-label="Create blank note"
+                data-note-new-button="true"
+              >
+                <FilePlus size={13} />
+              </button>
+            )}
+            {showTypeMenu && onCreateTyped && (
+              <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-lg border border-border-medium bg-bg-raised shadow-lg">
+                {([
+                  ['note', 'Note', FileText],
+                  ['definition', 'Definition', ClipboardList],
+                  ['sticky', 'Sticky Jot', StickyNote],
+                ] as [NoteType, string, React.ElementType][]).map(([type, label, Icon]) => (
+                  <button
+                    key={type}
+                    onClick={() => { onCreateTyped(type); setShowTypeMenu(false); }}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary first:rounded-t-lg last:rounded-b-lg"
+                  >
+                    <Icon size={13} className="shrink-0 text-text-muted" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {onManageTemplates && (
+          <button
+            type="button"
+            onClick={onManageTemplates}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] border border-border-subtle bg-bg-raised/70 text-text-secondary transition-colors hover:border-border-medium hover:bg-bg-hover hover:text-text-primary"
+            title="Add templates to this investigation"
+            aria-label="Add templates to this investigation"
+            data-note-template-manage-button="true"
+          >
+            <Plus size={13} />
+          </button>
+        )}
+        {onCreateFolder && (
+          <button
+            type="button"
+            onClick={() => setShowNewFolder(!showNewFolder)}
+            className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] border border-border-subtle bg-bg-raised/70 text-text-secondary transition-colors hover:border-border-medium hover:bg-bg-hover hover:text-text-primary', showNewFolder && 'border-accent/30 bg-accent/10 text-accent')}
+            title={t('list.newFolder')}
+            aria-label={t('list.newFolderAria')}
+            data-note-folder-button="true"
+          >
+            <FolderPlus size={13} />
+          </button>
+        )}
+        {notesWithIOCs.length > 0 && (
+          <div className="relative" ref={exportMenuRef}>
+            <button
+              type="button"
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] border border-border-subtle bg-bg-raised/70 text-text-secondary transition-colors hover:border-border-medium hover:bg-bg-hover hover:text-text-primary"
+              title={t('list.downloadIOCs')}
+              aria-label={t('list.downloadIOCsAria')}
+              data-note-export-button="true"
+            >
+              <Download size={13} />
+            </button>
+            {showExportMenu && (
+              <div
+                className="absolute right-0 top-full z-40 mt-1 w-40 rounded-lg border border-gray-700 bg-gray-800 shadow-lg"
+                data-note-export-menu="true"
+              >
+                <button onClick={() => handleBulkExport('flat-json')} className="w-full rounded-t-lg px-3 py-1.5 text-start text-xs text-gray-300 hover:bg-gray-700">{t('list.exportJSONFlat')}</button>
+                <button onClick={() => handleBulkExport('flat-csv')} className="w-full px-3 py-1.5 text-start text-xs text-gray-300 hover:bg-gray-700">{t('list.exportCSVFlat')}</button>
+                <button onClick={() => handleBulkExport('json')} className="w-full px-3 py-1.5 text-start text-xs text-gray-300 hover:bg-gray-700">{t('list.exportJSONGrouped')}</button>
+                <button onClick={() => handleBulkExport('csv')} className="w-full rounded-b-lg px-3 py-1.5 text-start text-xs text-gray-300 hover:bg-gray-700">{t('list.exportCSVGrouped')}</button>
+              </div>
+            )}
+          </div>
+        )}
+        <div className="relative" ref={sortMenuRef}>
+          <button
+            type="button"
+            onClick={() => setShowSortMenu(!showSortMenu)}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] border border-border-subtle bg-bg-raised/70 text-text-secondary transition-colors hover:border-border-medium hover:bg-bg-hover hover:text-text-primary"
+            aria-label={t('list.sortNotesAria')}
+            title={t('list.sortNotes')}
+            data-note-sort-button="true"
+          >
+            <ArrowUpDown size={13} />
+          </button>
+          {showSortMenu && (
+            <div
+              className="absolute right-0 top-full z-40 mt-1 w-36 rounded-lg border border-gray-700 bg-gray-800 shadow-lg"
+              data-note-sort-menu="true"
+            >
+              {([['updatedAt', t('list.sortLastModified')], ['createdAt', t('list.sortCreated')], ['title', t('list.sortTitle')], ['iocCount', t('list.sortIOCCount')]] as [SortOption, string][]).map(([value, label]) => (
+                <button
+                  key={value}
+                  onClick={() => { onSortChange(value); setShowSortMenu(false); }}
+                  className={`w-full px-3 py-1.5 text-start text-xs hover:bg-gray-700 ${sort === value ? 'text-accent' : 'text-gray-300'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }, [compactHistoryNotes, compactTitlebarMode, handleBulkExport, notesWithIOCs.length, onCreate, onCreateFolder, onCreateTyped, onImportMeeting, onManageTemplates, onOpenJots, onSelect, onSortChange, selectedId, showExportMenu, showNewFolder, showSortMenu, showTypeMenu, sort, t]);
+  const noteTitlebarAccessory = useMemo(
+    () => noteTitlebarControls ? { content: noteTitlebarControls, replaceTitle: true } : null,
+    [noteTitlebarControls],
+  );
+  useWorkspacePanelHeaderAccessory(noteTitlebarAccessory);
+
+  return (
+    <div className="relative w-full border-r border-gray-800 flex flex-col h-full overflow-hidden" data-note-list="true">
+      <div
+        className={cn('flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-800 shrink-0', compactTitlebarMode && 'hidden')}
+        data-note-toolbar="true"
+      >
+        <div className="min-w-0 flex flex-wrap items-center gap-1.5" data-note-toolbar-primary="true">
+          <span className="text-sm font-medium text-gray-300 truncate me-1" data-note-toolbar-title="true">{t('list.titleWithCount', { title: title || t('list.defaultTitle'), count: notes.length })}</span>
+          {(onCreate || onCreateTyped) && (
+            <div className="relative" ref={compactTitlebarMode ? undefined : typeMenuRef}>
+              {onCreateTyped ? (
+                <button
+                  onClick={() => setShowTypeMenu(!showTypeMenu)}
+                  className="inline-flex h-6 items-center gap-1 rounded-md border border-gray-700 bg-gray-800 px-2 text-[11px] font-medium text-gray-300 transition-colors hover:border-accent/50 hover:bg-accent/10 hover:text-accent"
+                  title="Create new note"
+                  aria-label="Create new note"
+                  data-note-new-button={compactTitlebarMode ? undefined : 'true'}
+                >
+                  <FilePlus size={12} />
+                  <span data-note-new-button-label={compactTitlebarMode ? undefined : 'true'}>New Note</span>
+                  <ChevronDown size={10} />
+                </button>
+              ) : (
+                <button
+                  onClick={onCreate}
+                  className="inline-flex h-6 items-center gap-1 rounded-md border border-gray-700 bg-gray-800 px-2 text-[11px] font-medium text-gray-300 transition-colors hover:border-accent/50 hover:bg-accent/10 hover:text-accent"
+                  title="Create a blank note"
+                  aria-label="Create blank note"
+                  data-note-new-button={compactTitlebarMode ? undefined : 'true'}
+                >
+                  <FilePlus size={12} />
+                  <span data-note-new-button-label={compactTitlebarMode ? undefined : 'true'}>New Note</span>
+                </button>
+              )}
+              {!compactTitlebarMode && showTypeMenu && onCreateTyped && (
+                <div className="absolute left-0 top-full z-50 mt-1 w-40 rounded-lg border border-border-medium bg-bg-raised shadow-lg">
+                  {([
+                    ['note', 'Note', FileText],
+                    ['definition', 'Definition', ClipboardList],
+                    ['sticky', 'Sticky Jot', StickyNote],
+                  ] as [NoteType, string, React.ElementType][]).map(([type, label, Icon]) => (
+                    <button
+                      key={type}
+                      onClick={() => { onCreateTyped(type); setShowTypeMenu(false); }}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary first:rounded-t-lg last:rounded-b-lg"
+                    >
+                      <Icon size={13} className="shrink-0 text-text-muted" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {attachedTemplates.map((template) => (
+            <button
+              key={template.id}
+              onClick={() => onCreateFromTemplate?.(template.id)}
+              className="inline-flex h-6 max-w-[140px] items-center gap-1 rounded-md border border-accent/30 bg-accent/10 px-2 text-[11px] font-medium text-accent transition-colors hover:border-accent/60 hover:bg-accent/20"
+              title={`Create note from ${template.name}`}
+              aria-label={`Create note from ${template.name}`}
+              data-note-template-button="true"
+            >
+              {template.icon && <span className="shrink-0">{template.icon}</span>}
+              <span className="truncate">{template.name}</span>
+            </button>
+          ))}
+          {onManageTemplates && (
+            <button
+              onClick={onManageTemplates}
+              className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-gray-700 bg-gray-800 text-gray-500 transition-colors hover:border-accent/50 hover:bg-accent/10 hover:text-accent"
+              title="Add templates to this investigation"
+              aria-label="Add templates to this investigation"
+              data-note-template-manage-button={compactTitlebarMode ? undefined : 'true'}
+            >
+              <Plus size={12} />
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-1" data-note-toolbar-actions="true">
+          {onImportMeeting && (
+            <button
+              onClick={onImportMeeting}
+              className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300"
+              title="Import meeting notes (.txt, .vtt, .md)"
+              aria-label="Import meeting notes"
+            >
+              <Upload size={14} />
+            </button>
+          )}
+          {onCreateFolder && (
+            <button
+              onClick={() => setShowNewFolder(!showNewFolder)}
+              className={cn('p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300', showNewFolder && 'bg-gray-800 text-gray-300')}
+              title={t('list.newFolder')}
+              aria-label={t('list.newFolderAria')}
+              data-note-folder-button={compactTitlebarMode ? undefined : 'true'}
+            >
+              <FolderPlus size={14} />
+            </button>
+          )}
+          {notesWithIOCs.length > 0 && (
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300"
+                title={t('list.downloadIOCs')}
+                aria-label={t('list.downloadIOCsAria')}
+                data-note-export-button={compactTitlebarMode ? undefined : 'true'}
+              >
+                <Download size={14} />
+              </button>
+              {showExportMenu && (
+                <div
+                  className="absolute right-0 top-full mt-1 w-40 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10"
+                  data-note-export-menu={compactTitlebarMode ? undefined : 'true'}
+                >
+                  <button onClick={() => handleBulkExport('flat-json')} className="w-full text-start px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-700 rounded-t-lg">{t('list.exportJSONFlat')}</button>
+                  <button onClick={() => handleBulkExport('flat-csv')} className="w-full text-start px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-700">{t('list.exportCSVFlat')}</button>
+                  <button onClick={() => handleBulkExport('json')} className="w-full text-start px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-700">{t('list.exportJSONGrouped')}</button>
+                  <button onClick={() => handleBulkExport('csv')} className="w-full text-start px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-700 rounded-b-lg">{t('list.exportCSVGrouped')}</button>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="relative" ref={sortMenuRef}>
+            <button
+              onClick={() => setShowSortMenu(!showSortMenu)}
+              className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300"
+              aria-label={t('list.sortNotesAria')}
+              title={t('list.sortNotes')}
+              data-note-sort-button={compactTitlebarMode ? undefined : 'true'}
+            >
+              <ArrowUpDown size={14} />
+            </button>
+            {showSortMenu && (
+              <div
+                className="absolute right-0 top-full mt-1 w-36 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10"
+                data-note-sort-menu={compactTitlebarMode ? undefined : 'true'}
+              >
+                {([['updatedAt', t('list.sortLastModified')], ['createdAt', t('list.sortCreated')], ['title', t('list.sortTitle')], ['iocCount', t('list.sortIOCCount')]] as [SortOption, string][]).map(([value, label]) => (
+                  <button
+                    key={value}
+                    onClick={() => { onSortChange(value); setShowSortMenu(false); }}
+                    className={`w-full text-start px-3 py-1.5 text-xs hover:bg-gray-700 ${sort === value ? 'text-accent' : 'text-gray-300'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* New folder form */}
+      {showNewFolder && onCreateFolder && (
+        <div className="px-3 py-2 border-b border-gray-800 bg-bg-raised/50">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                const icons = ['📁', '📂', '🗂️', '📋', '🔒', '⭐', '🔍', '📊', '🎯', '🛡️', '📝', '💡'];
+                const idx = icons.indexOf(newFolderIcon);
+                setNewFolderIcon(icons[(idx + 1) % icons.length]);
+              }}
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-border-subtle bg-surface hover:bg-surface-raised text-base"
+              title={t('list.clickToChangeIcon')}
+            >
+              {newFolderIcon}
+            </button>
+            <input
+              type="text"
+              autoFocus
+              maxLength={200}
+              value={newFolderName}
+              onChange={e => setNewFolderName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && newFolderName.trim()) {
+                  onCreateFolder(newFolderName.trim(), newFolderIcon);
+                  setNewFolderName('');
+                  setNewFolderIcon('📁');
+                  setShowNewFolder(false);
+                }
+                if (e.key === 'Escape') setShowNewFolder(false);
+              }}
+              placeholder={t('list.folderNamePlaceholder')}
+              className="flex-1 bg-surface border border-border-subtle rounded-lg px-3 py-1.5 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-blue/50"
+            />
+            <button
+              onClick={() => {
+                if (newFolderName.trim()) {
+                  onCreateFolder(newFolderName.trim(), newFolderIcon);
+                  setNewFolderName('');
+                  setNewFolderIcon('📁');
+                  setShowNewFolder(false);
+                }
+              }}
+              disabled={!newFolderName.trim()}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-blue text-white hover:bg-accent-blue/90 disabled:opacity-40 transition-colors"
+            >
+              {t('common:create')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(notesWithIOCs.length > 0 || (selectedIOCTypes && selectedIOCTypes.length > 0)) && selectedIOCTypes && onIOCTypesChange && (
+        <IOCFilterBar selectedTypes={selectedIOCTypes} onChange={onIOCTypesChange} />
+      )}
+
+      <div className="flex-1 overflow-hidden p-2" data-note-content="true">
+        {notes.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-500" data-note-empty-state="true">
+            <FileText size={40} strokeWidth={1.5} className="text-gray-600" data-note-empty-icon="true" />
+            <p className="text-sm" data-note-empty-copy="true">{t('emptyState')}</p>
+            {emptyHint && (
+              <p className="max-w-xs text-center text-xs leading-relaxed text-gray-500">{emptyHint}</p>
+            )}
+            {onCreate && (
+              <button
+                onClick={onCreate}
+                className="px-4 py-2 rounded-lg bg-accent/10 text-accent text-sm font-medium hover:bg-accent/20 transition-colors"
+                data-note-empty-button="true"
+              >
+                {t('createFirst')}
+              </button>
+            )}
+          </div>
+        ) : (
+          <Virtuoso
+            data={(() => {
+              // Build display list: top-level notes + expanded folder children
+              const topLevel = notes.filter(n => !n.parentNoteId);
+              const result: Note[] = [];
+              for (const note of topLevel) {
+                result.push(note);
+                if (note.isFolder && expandedFolders.has(note.id)) {
+                  const children = notes.filter(n => n.parentNoteId === note.id);
+                  result.push(...children);
+                }
+              }
+              return result;
+            })()}
+            itemContent={(_index, note) => {
+              const folder = note.folderId ? folderMap.get(note.folderId) : undefined;
+              const isSubNote = !!note.parentNoteId;
+              const childCount = note.isFolder ? (childCountMap.get(note.id) || 0) : 0;
+              return (
+                <div className={cn('pb-1.5', isSubNote && 'ms-4')}>
+                  {note.isFolder ? (() => {
+                    const iconTag = note.tags?.find(t => t.startsWith('icon:'));
+                    const folderIcon = iconTag ? iconTag.replace('icon:', '') : (expandedFolders.has(note.id) ? '📂' : '📁');
+                    return (<>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={expandedFolders.has(note.id)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); const next = new Set(expandedFolders); if (next.has(note.id)) next.delete(note.id); else next.add(note.id); setExpandedFolders(next); } }}
+                      onClick={() => {
+                        const next = new Set(expandedFolders);
+                        if (next.has(note.id)) next.delete(note.id);
+                        else next.add(note.id);
+                        setExpandedFolders(next);
+                      }}
+                      onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('ring-2', 'ring-accent-blue'); }}
+                      onDragLeave={(e) => { e.currentTarget.classList.remove('ring-2', 'ring-accent-blue'); }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.currentTarget.classList.remove('ring-2', 'ring-accent-blue');
+                        const draggedId = e.dataTransfer.getData('text/plain');
+                        if (draggedId && draggedId !== note.id && onMoveToFolder) {
+                          onMoveToFolder(draggedId, note.id);
+                        }
+                      }}
+                      className={cn(
+                        'group w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-start transition-colors cursor-pointer',
+                        selectedId === note.id ? 'bg-purple/10 border border-purple/30' : 'hover:bg-bg-hover border border-transparent',
+                      )}
+                    >
+                      <div className="relative shrink-0">
+                        <span className="text-xl">{folderIcon}</span>
+                        {childCount > 0 && (
+                          <span className="absolute -top-1.5 -right-2.5 text-[9px] font-bold text-accent-blue bg-accent-blue/15 px-1.5 py-0.5 rounded-full min-w-[18px] text-center">{childCount}</span>
+                        )}
+                      </div>
+                      <span className={cn('text-xs transition-transform', expandedFolders.has(note.id) ? 'rotate-90 text-accent-blue' : 'text-accent-amber')}>▶</span>
+                      {renamingId === note.id ? (
+                        <input
+                          ref={renameInputRef}
+                          type="text"
+                          maxLength={200}
+                          className="text-sm font-medium text-text-primary flex-1 bg-surface-raised border border-accent-blue rounded px-1.5 py-0.5 outline-none"
+                          value={renameValue}
+                          onChange={e => setRenameValue(e.target.value)}
+                          onClick={e => e.stopPropagation()}
+                          onKeyDown={e => {
+                            e.stopPropagation();
+                            if (e.key === 'Enter' && renameValue.trim()) {
+                              onRenameFolder?.(note.id, renameValue.trim());
+                              setRenamingId(null);
+                            } else if (e.key === 'Escape') {
+                              setRenamingId(null);
+                            }
+                          }}
+                          onBlur={() => {
+                            if (renameValue.trim() && renameValue.trim() !== note.title) {
+                              onRenameFolder?.(note.id, renameValue.trim());
+                            }
+                            setRenamingId(null);
+                          }}
+                          autoFocus
+                        />
+                      ) : (
+                        <>
+                          <span className="text-sm font-medium text-text-primary flex-1 truncate">{note.title}</span>
+                          {onRenameFolder && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setRenamingId(note.id); setRenameValue(note.title); }}
+                              className="text-text-muted hover:text-text-primary opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all shrink-0"
+                              title={t('list.renameFolder')}
+                              aria-label={t('list.renameFolderAria', { name: note.title })}
+                            >
+                              <Pencil size={10} />
+                            </button>
+                          )}
+                        </>
+                      )}
+                      {onDeleteFolder && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeletingFolderId(note.id); }}
+                          className="text-text-muted hover:text-red-400 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all shrink-0"
+                          title={t('list.deleteFolder')}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        </button>
+                      )}
+                      {isSubNote && onMoveToFolder && (
+                        <button onClick={(e) => { e.stopPropagation(); onMoveToFolder(note.id, null); }}
+                          className="text-[9px] text-text-muted hover:text-text-secondary opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" title={t('list.moveToTopLevel')}>↑</button>
+                      )}
+                    </div>
+                    {/* Delete folder confirmation */}
+                    {deletingFolderId === note.id && onDeleteFolder && (
+                      <div className="mx-3 mb-2 p-2 rounded-lg border border-red-500/30 bg-red-500/5 text-xs space-y-2" onClick={e => e.stopPropagation()}>
+                        <p className="text-text-secondary">
+                          {childCount > 0
+                            ? <Trans i18nKey="list.deleteFolderConfirmWithNotes" ns="notes" values={{ name: note.title, count: childCount, s: childCount !== 1 ? 's' : '' }} components={{ strong: <strong /> }} />
+                            : <Trans i18nKey="list.deleteFolderConfirm" ns="notes" values={{ name: note.title }} components={{ strong: <strong /> }} />
+                          }
+                        </p>
+                        <div className="flex gap-2">
+                          {childCount === 0 ? (
+                            <button
+                              onClick={() => { setDeletingFolderId(null); onDeleteFolder(note.id, 'move_out'); }}
+                              className="px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                            >
+                              {t('list.deleteFolderButton')}
+                            </button>
+                          ) : (<>
+                            <button
+                              onClick={() => { setDeletingFolderId(null); onDeleteFolder(note.id, 'move_out'); }}
+                              className="px-2 py-1 rounded bg-surface-raised text-text-primary hover:bg-bg-hover transition-colors"
+                            >
+                              {t('list.moveNotesOutAndDelete')}
+                            </button>
+                            <button
+                              onClick={() => { setDeletingFolderId(null); onDeleteFolder(note.id, 'trash_contents'); }}
+                              className="px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                            >
+                              {t('list.trashAll')}
+                            </button>
+                          </>)}
+                          <button
+                            onClick={() => setDeletingFolderId(null)}
+                            className="px-2 py-1 rounded text-text-muted hover:text-text-secondary transition-colors"
+                          >
+                            {t('common:cancel')}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>); })() : (
+                    <NoteCard
+                      note={note}
+                      active={note.id === selectedId}
+                      onSelect={onSelect}
+                      onTrash={onTrash}
+                      folderColor={folder?.color}
+                      folderName={folder?.name}
+                      draggable
+                      onDragStart={(e) => e.dataTransfer.setData('text/plain', note.id)}
+                    />
+                  )}
+                </div>
+              );
+            }}
+          />
+        )}
+      </div>
+
+      {onCreateTyped && <StickyJotFab onCreate={() => onCreateTyped('sticky')} />}
+    </div>
+  );
+}

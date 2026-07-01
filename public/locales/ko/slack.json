@@ -1,0 +1,13 @@
+{
+  "desktopOnly": "Slack DM 읽기는 ThreatCaddy 데스크톱 앱에서만 사용 가능합니다.",
+  "connectSlack": "Slack 워크스페이스 연결",
+  "connecting": "연결 중…",
+  "disconnect": "연결 해제",
+  "connectHint": "Slack OAuth 창을 엽니다. im:read, im:history 및 users:read 사용자 범위가 필요합니다.",
+  "alertsEnabled": "오버레이 패널에서 DM 알림 표시",
+  "snoozeDuration": "다음 기간 동안 음소거:",
+  "snooze1h": "1시간",
+  "snooze2h": "2시간",
+  "snooze4h": "4시간",
+  "snooze8h": "8시간"
+}

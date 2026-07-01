@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ThreatCaddy</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 350px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #030712;
+      color: #f9fafb;
+      padding: 16px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #374151;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-logo {
+      width: 28px;
+      height: 28px;
+    }
+
+    h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #6366f1;
+    }
+
+    .version {
+      font-size: 11px;
+      color: #9ca3af;
+    }
+
+    section {
+      margin-bottom: 20px;
+    }
+
+    h2 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #e5e7eb;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat {
+      background: #1f2937;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #374151;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: #f9fafb;
+    }
+
+    .capture-form {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .capture-title {
+      width: 100%;
+      padding: 8px 12px;
+      background: #1f2937;
+      color: #f9fafb;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .capture-title:focus {
+      border-color: #6366f1;
+    }
+
+    .capture-title::placeholder {
+      color: #6b7280;
+    }
+
+    .capture-textarea {
+      width: 100%;
+      height: 80px;
+      padding: 8px 12px;
+      background: #1f2937;
+      color: #f9fafb;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .capture-textarea:focus {
+      border-color: #6366f1;
+    }
+
+    .capture-textarea::placeholder {
+      color: #6b7280;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px 16px;
+      background: #6366f1;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 8px;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #818cf8;
+    }
+
+    button.secondary {
+      background: #374151;
+      color: #f9fafb;
+    }
+
+    button.secondary:hover {
+      background: #4b5563;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .recent-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .recent-item {
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      padding: 10px 12px;
+      cursor: default;
+    }
+
+    .recent-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #f9fafb;
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .recent-preview {
+      font-size: 12px;
+      color: #9ca3af;
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .recent-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 6px;
+      font-size: 11px;
+      color: #6b7280;
+    }
+
+    .recent-source {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 180px;
+    }
+
+    .recent-empty {
+      text-align: center;
+      padding: 16px;
+      color: #6b7280;
+      font-size: 13px;
+    }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .help-text {
+      font-size: 12px;
+      color: #9ca3af;
+      line-height: 1.5;
+      padding: 12px;
+      background: #1f2937;
+      border-radius: 6px;
+      border: 1px solid #374151;
+    }
+
+    .kbd {
+      display: inline-block;
+      padding: 2px 6px;
+      background: #374151;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #e5e7eb;
+    }
+
+    footer {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #374151;
+      text-align: center;
+      font-size: 11px;
+      color: #9ca3af;
+    }
+
+    footer a {
+      color: #818cf8;
+      text-decoration: none;
+      margin: 0 4px;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    .save-success {
+      color: #10b981;
+      font-size: 12px;
+      text-align: center;
+      padding: 6px;
+      display: none;
+    }
+
+    .save-success.show {
+      display: block;
+    }
+
+    .save-error {
+      color: #ef4444;
+      font-size: 12px;
+      text-align: center;
+      padding: 6px;
+      display: none;
+    }
+
+    .save-error.show {
+      display: block;
+    }
+
+    .options-toggle {
+      background: none;
+      border: none;
+      color: #9ca3af;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 2px 0;
+      margin-bottom: 0;
+      width: auto;
+      text-align: left;
+      font-weight: 400;
+      transition: color 0.2s;
+    }
+
+    .options-toggle:hover {
+      color: #e5e7eb;
+      background: none;
+    }
+
+    .options-panel {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px 10px;
+      background: #111827;
+      border: 1px solid #374151;
+      border-radius: 6px;
+    }
+
+    .options-panel.show {
+      display: flex;
+    }
+
+    .option-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .option-row label {
+      font-size: 11px;
+      color: #9ca3af;
+      white-space: nowrap;
+      min-width: 72px;
+    }
+
+    .option-row input,
+    .option-row select {
+      flex: 1;
+      padding: 4px 8px;
+      background: #1f2937;
+      color: #f9fafb;
+      border: 1px solid #374151;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+    }
+
+    .option-row input:focus,
+    .option-row select:focus {
+      border-color: #6366f1;
+    }
+
+    .option-row input::placeholder {
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <img src="assets/icon.svg" alt="ThreatCaddy" class="header-logo" />
+      <div>
+        <h1 data-i18n="appName">ThreatCaddy</h1>
+        <div class="version" data-i18n="version">v1.1.1</div>
+      </div>
+    </div>
+    <button id="settings-btn" style="background:none;border:none;color:#9ca3af;cursor:pointer;padding:4px;margin:0;width:auto;transition:color 0.2s;" data-i18n-title="settingsTooltip" title="Settings">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </header>
+
+  <section>
+    <h2 data-i18n="quickStats">Quick Stats</h2>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label" data-i18n="captures">Captures</div>
+        <div class="stat-value" id="total-captures">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label" data-i18n="thisWeek">This Week</div>
+        <div class="stat-value" id="week-captures">0</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 data-i18n="quickCapture">Quick Capture</h2>
+    <div class="capture-form">
+      <input
+        type="text"
+        id="capture-title"
+        class="capture-title"
+        data-i18n-placeholder="noteTitlePlaceholder"
+        placeholder="Note title (optional)"
+      />
+      <textarea
+        id="capture-text"
+        class="capture-textarea"
+        data-i18n-placeholder="captureTextPlaceholder"
+        placeholder="Type or paste a note..."
+      ></textarea>
+      <button type="button" class="options-toggle" id="options-toggle" data-i18n-options="options">&#9662; Options</button>
+      <div class="options-panel" id="options-panel">
+        <div class="option-row">
+          <label for="opt-folder" data-i18n="investigation">Investigation</label>
+          <input type="text" id="opt-folder" data-i18n-placeholder="defaultClips" placeholder="Default: Clips" />
+        </div>
+        <div class="option-row">
+          <label for="opt-entity" data-i18n="saveAs">Save as</label>
+          <select id="opt-entity">
+            <option value="note" data-i18n="entityNote">Note</option>
+            <option value="task" data-i18n="entityTask">Task</option>
+            <option value="timeline-event" data-i18n="entityTimelineEvent">Timeline Event</option>
+          </select>
+        </div>
+        <div class="option-row">
+          <label for="opt-cls" data-i18n="classification">Classification</label>
+          <select id="opt-cls">
+            <option value="" data-i18n="classificationNone">None</option>
+            <option value="TLP:CLEAR">TLP:CLEAR</option>
+            <option value="TLP:GREEN">TLP:GREEN</option>
+            <option value="TLP:AMBER">TLP:AMBER</option>
+            <option value="TLP:AMBER+STRICT">TLP:AMBER+STRICT</option>
+            <option value="TLP:RED">TLP:RED</option>
+          </select>
+        </div>
+      </div>
+      <button id="save-btn" data-i18n="saveNote">Save Note</button>
+      <div class="save-success" id="save-success" data-i18n="saved">Saved!</div>
+      <div class="save-error" id="save-error" data-i18n="saveFailed">Failed to save. Please try again.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2 data-i18n="recentCaptures">Recent Captures</h2>
+    <div class="recent-list" id="recent-list">
+      <div class="recent-empty" data-i18n="noCaptures">No captures yet. Select text on any page and right-click to save.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2 data-i18n="quickActions">Quick Actions</h2>
+    <div class="actions">
+      <button id="open-app-btn" data-i18n="openThreatCaddy">Open ThreatCaddy</button>
+      <button id="review-btn" class="secondary" data-i18n="reviewAllCaptures">Review All Captures</button>
+    </div>
+  </section>
+
+  <section>
+    <h2 data-i18n="permissions">Permissions</h2>
+    <div class="help-text" style="display:flex;align-items:center;gap:8px;justify-content:space-between;margin-bottom:8px;">
+      <div>
+        <strong data-i18n="allowCaddyAI">Allow CaddyAI</strong><br>
+        <span style="font-size:11px;color:#9ca3af;" data-i18n="allowCaddyAIDesc">Grants access to AI provider APIs (Anthropic, OpenAI, Google, Mistral).</span>
+      </div>
+      <label style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0;">
+        <input type="checkbox" id="ai-perm-toggle" style="opacity:0;width:0;height:0;">
+        <span id="ai-perm-slider" class="perm-slider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#4b5563;border-radius:11px;transition:background-color .2s;"></span>
+      </label>
+    </div>
+    <div class="help-text" style="display:flex;align-items:center;gap:8px;justify-content:space-between;">
+      <div>
+        <strong data-i18n="allowUrlFetching">Allow URL fetching</strong><br>
+        <span style="font-size:11px;color:#9ca3af;" data-i18n="allowUrlFetchingDesc">Required for the /fetch command and non-localhost local LLMs.</span>
+      </div>
+      <label style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0;">
+        <input type="checkbox" id="url-perm-toggle" style="opacity:0;width:0;height:0;">
+        <span id="url-perm-slider" class="perm-slider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#4b5563;border-radius:11px;transition:background-color .2s;"></span>
+      </label>
+    </div>
+  </section>
+
+  <section>
+    <div class="help-text">
+      <strong data-i18n="howToUse">How to use:</strong><br>
+      <span data-i18n="howToUseContextMenu">Select text and right-click "Save to ThreatCaddy"</span><br>
+      <span data-i18n="howToUseShortcut">Or use keyboard shortcut:</span> <span class="kbd" id="shortcut-kbd"></span> <span data-i18n="howToUseShortcutSuffix">(clips selection, or full page if nothing selected)</span><br>
+      <br>
+      <strong data-i18n="privacyLabel">Privacy:</strong><br>
+      <span data-i18n="privacyText">All data stays local on your device. API keys are sent only to your chosen provider. No tracking.</span>
+    </div>
+  </section>
+
+  <footer>
+    <a href="https://threatcaddy.com" target="_blank" rel="noopener noreferrer">threatcaddy.com</a>
+    <span style="color: #6b7280;">·</span>
+    <a href="https://threatcaddy.com/privacy.html" target="_blank" rel="noopener noreferrer">Privacy</a>
+    <span style="color: #6b7280;">·</span>
+    <a href="https://github.com/peterhanily/threatcaddy" target="_blank" rel="noopener noreferrer">GitHub</a>
+  </footer>
+
+  <div id="settings-page" style="display:none;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+      <button id="settings-back" style="background:none;border:none;color:#9ca3af;cursor:pointer;padding:4px;margin:0;width:auto;" data-i18n-title="back" title="Back">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+      </button>
+      <h2 style="margin:0;" data-i18n="settings">Settings</h2>
+    </div>
+
+    <section style="margin-bottom:20px;">
+      <h2 style="font-size:13px;" data-i18n="targetUrl">Target URL</h2>
+      <div class="help-text" style="margin-bottom:8px;">
+        <span style="font-size:11px;color:#9ca3af;" data-i18n="targetUrlDesc">The ThreatCaddy instance URL this extension connects to.</span>
+      </div>
+      <input type="text" id="settings-target-url" class="capture-title" data-i18n-placeholder="targetUrlPlaceholder" placeholder="https://threatcaddy.com" style="margin-bottom:4px;" />
+      <button id="settings-save-url" style="font-size:12px;padding:6px 12px;" data-i18n="save">Save</button>
+      <div id="settings-url-saved" class="save-success" data-i18n="saved">Saved!</div>
+    </section>
+
+    <section style="margin-bottom:20px;">
+      <h2 style="font-size:13px;" data-i18n="permissions">Permissions</h2>
+      <div class="help-text" style="display:flex;align-items:center;gap:8px;justify-content:space-between;margin-bottom:8px;">
+        <div>
+          <strong data-i18n="allowCaddyAI">Allow CaddyAI</strong><br>
+          <span style="font-size:11px;color:#9ca3af;" data-i18n="allowCaddyAIDesc">Grants access to AI provider APIs (Anthropic, OpenAI, Google, Mistral).</span>
+        </div>
+        <label style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0;">
+          <input type="checkbox" id="settings-ai-toggle" style="opacity:0;width:0;height:0;">
+          <span id="settings-ai-slider" class="perm-slider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#4b5563;border-radius:11px;transition:background-color .2s;"></span>
+        </label>
+      </div>
+      <div class="help-text" style="display:flex;align-items:center;gap:8px;justify-content:space-between;">
+        <div>
+          <strong data-i18n="allowUrlFetching">Allow URL fetching</strong><br>
+          <span style="font-size:11px;color:#9ca3af;" data-i18n="allowUrlFetchingDesc">Required for the /fetch command and non-localhost local LLMs.</span>
+        </div>
+        <label style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0;">
+          <input type="checkbox" id="settings-url-toggle" style="opacity:0;width:0;height:0;">
+          <span id="settings-url-slider" class="perm-slider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#4b5563;border-radius:11px;transition:background-color .2s;"></span>
+        </label>
+      </div>
+    </section>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

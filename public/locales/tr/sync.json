@@ -1,0 +1,46 @@
+{
+  "passphraseTitle": "Şifrelenmiş Senkronizasyonu Etkinleştir",
+  "passphraseSubtitle": "Verileri sunucuya ulaşmadan önce şifrelemek için senkronizasyon parolanızı girin",
+  "passphraseHint": "Bir erişim anahtarı ile oturum açtınız. İlk cihazınızda ayarladığınız senkronizasyon parolasını girin. Bu ilk cihazınızsa, herhangi bir parola seçin — gelecek cihazlarda buna ihtiyacınız olacak.",
+  "passphrasePlaceholder": "Senkronizasyon parolası",
+  "passphraseSubmit": "Şifrelemeyi Etkinleştir",
+  "passphraseApplying": "Uygulanıyor…",
+  "passphraseLater": "Daha Sonra",
+  "passphraseError": "Senkronizasyon parolası ayarlanamadı. Lütfen yeniden deneyin.",
+  "passphrasePrivacy": "Parola cihazınızı asla terk etmez. Verileriniz senkronizasyondan önce yerel olarak şifrelenir.",
+  "devices": {
+    "thisDevice": "Bu cihaz",
+    "pendingApproval": "Onay Bekleniyor",
+    "revoked": "İptal Edildi",
+    "lastSeen": "Son Görülme {{time}}",
+    "addDevice": "Cihaz Ekle",
+    "revoke": "Cihazı İptal Et",
+    "confirmRevoke": "İptali Onayla",
+    "notConnected": "Senkronize edilen cihazları yönetmek için bir takım sunucusuna bağlanın.",
+    "loading": "Cihazlar Yükleniyor…",
+    "empty": "Henüz kayıtlı cihaz yok."
+  },
+  "pairing": {
+    "title": "Senkronizasyon Cihazı Ekle",
+    "chooseModeHint": "Bunun kodu oluşturan güvenilir cihaz mı yoksa onu kullanan yeni cihaz mı olduğunu seçin.",
+    "showCode": "Eşleştirme Kodunu Göster",
+    "showCodeDesc": "Bu güvenilir bir cihazdır — yeni cihazın tarayabileceği veya yazabileceği bir kod oluşturun.",
+    "enterCode": "Eşleştirme Kodunu Girin",
+    "enterCodeDesc": "Bu yeni cihazdır — güvenilir bir cihazda gösterilen kodu girin.",
+    "showCodeHint": "QR kodunu tarayın veya yeni cihazda kodu yazın. 10 dakikada sona erer.",
+    "qrAlt": "Eşleştirme QR Kodu",
+    "expires": "Süresi {{time}} Bitiyor",
+    "enterCodeHint": "Güvenilir cihazınızda gösterilen 8 karakterli kodu girin.",
+    "confirm": "Bu Cihazı Eşleştir",
+    "invalidCode": "Eşleştirme kodu geçersiz veya süresi dolmuş. Lütfen yeniden deneyin.",
+    "back": "Geri"
+  },
+  "enrollment": {
+    "pendingTitle": "Senkronizasyon Onayı Bekleniyor",
+    "pendingDesc": "Bu cihaz senkronize olmadan önce onay beklemektedir. Güvenilir bir cihazda Ayarlar → Senkronize Edilen Cihazlar kısmına gidip eşleştirme kodu oluşturun.",
+    "revokedTitle": "Senkronizasyon Erişimi İptal Edildi",
+    "revokedDesc": "Bu cihaz senkronizasyon grubundan kaldırılmıştır. Hesap sahibine başvurun veya Ayarlardan yeniden eşleştirin.",
+    "notRegisteredTitle": "Senkronizasyon Ayarlanmadı",
+    "notRegisteredDesc": "Bu cihaz henüz şifreli senkronizasyon grubuna katılmamıştır."
+  }
+}

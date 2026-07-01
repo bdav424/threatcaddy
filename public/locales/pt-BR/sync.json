@@ -1,0 +1,46 @@
+{
+  "passphraseTitle": "Ativar sincronização criptografada",
+  "passphraseSubtitle": "Digite sua frase-senha de sincronização para criptografar dados antes de chegarem ao servidor",
+  "passphraseHint": "Você se conectou com uma chave de acesso. Digite a frase-senha de sincronização que você definiu em seu primeiro dispositivo. Se este for seu primeiro dispositivo, escolha qualquer frase-senha — você precisará dela em dispositivos futuros.",
+  "passphrasePlaceholder": "Frase-senha de sincronização",
+  "passphraseSubmit": "Ativar criptografia",
+  "passphraseApplying": "Aplicando…",
+  "passphraseLater": "Mais tarde",
+  "passphraseError": "Falha ao definir a frase-senha de sincronização. Tente novamente.",
+  "passphrasePrivacy": "A frase-senha nunca sai do seu dispositivo. Seus dados são criptografados localmente antes de serem sincronizados.",
+  "devices": {
+    "thisDevice": "Este dispositivo",
+    "pendingApproval": "Aguardando aprovação",
+    "revoked": "Revogado",
+    "lastSeen": "Visto pela última vez {{time}}",
+    "addDevice": "Adicionar dispositivo",
+    "revoke": "Revogar dispositivo",
+    "confirmRevoke": "Confirmar revogação",
+    "notConnected": "Conecte-se a um servidor de equipe para gerenciar dispositivos sincronizados.",
+    "loading": "Carregando dispositivos…",
+    "empty": "Nenhum dispositivo registrado ainda."
+  },
+  "pairing": {
+    "title": "Adicione um dispositivo de sincronização",
+    "chooseModeHint": "Escolha se este é o dispositivo confiável gerando o código ou o novo dispositivo o resgatando.",
+    "showCode": "Mostrar código de emparelhamento",
+    "showCodeDesc": "Este é um dispositivo confiável — gere um código que o novo dispositivo possa escanear ou digitar.",
+    "enterCode": "Inserir código de emparelhamento",
+    "enterCodeDesc": "Este é o novo dispositivo — digite o código exibido em um dispositivo confiável.",
+    "showCodeHint": "Digitalize o código QR ou digite o código no novo dispositivo. Expira em 10 minutos.",
+    "qrAlt": "Código QR de emparelhamento",
+    "expires": "Expira em {{time}}",
+    "enterCodeHint": "Digite o código de 8 caracteres exibido em seu dispositivo confiável.",
+    "confirm": "Emparelhar este dispositivo",
+    "invalidCode": "Código de emparelhamento inválido ou expirado. Tente novamente.",
+    "back": "Voltar"
+  },
+  "enrollment": {
+    "pendingTitle": "Aprovação de sincronização pendente",
+    "pendingDesc": "Este dispositivo está aguardando aprovação antes de poder sincronizar. Em um dispositivo confiável, vá para Configurações → Dispositivos Sincronizados e gere um código de emparelhamento.",
+    "revokedTitle": "Acesso de sincronização revogado",
+    "revokedDesc": "Este dispositivo foi removido do grupo de sincronização. Entre em contato com o proprietário da conta ou emparelhe novamente nas Configurações.",
+    "notRegisteredTitle": "Sincronização não configurada",
+    "notRegisteredDesc": "Este dispositivo ainda não ingressou no grupo de sincronização criptografado."
+  }
+}

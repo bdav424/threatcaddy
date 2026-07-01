@@ -1,0 +1,46 @@
+{
+  "passphraseTitle": "Versleutelde synchronisatie inschakelen",
+  "passphraseSubtitle": "Voer uw synchronisatiewachtwoord in om gegevens te versleutelen voordat deze de server bereiken",
+  "passphraseHint": "U bent aangemeld met een toegangssleutel. Voer het synchronisatiewachtwoord in dat u op uw eerste apparaat hebt ingesteld. Als dit uw eerste apparaat is, kiest u een wachtwoord naar keuze — u hebt het op toekomstige apparaten nodig.",
+  "passphrasePlaceholder": "Synchronisatiewachtwoord",
+  "passphraseSubmit": "Versleuteling inschakelen",
+  "passphraseApplying": "Toepassen…",
+  "passphraseLater": "Later",
+  "passphraseError": "Synchronisatiewachtwoord instellen is mislukt. Probeer het opnieuw.",
+  "passphrasePrivacy": "Het wachtwoord verlaat uw apparaat nooit. Uw gegevens worden lokaal versleuteld voordat ze worden gesynchroniseerd.",
+  "devices": {
+    "thisDevice": "Dit apparaat",
+    "pendingApproval": "In afwachting van goedkeuring",
+    "revoked": "Ingetrokken",
+    "lastSeen": "Laatst gezien {{time}}",
+    "addDevice": "Apparaat toevoegen",
+    "revoke": "Apparaat intrekken",
+    "confirmRevoke": "Intrekking bevestigen",
+    "notConnected": "Maak verbinding met een teamserver om gesynchroniseerde apparaten te beheren.",
+    "loading": "Apparaten laden…",
+    "empty": "Nog geen apparaten geregistreerd."
+  },
+  "pairing": {
+    "title": "Synchronisatieapparaat toevoegen",
+    "chooseModeHint": "Kies of dit het vertrouwde apparaat is dat de code genereert of het nieuwe apparaat dat deze inwisselt.",
+    "showCode": "Koppelingscode weergeven",
+    "showCodeDesc": "Dit is een vertrouwd apparaat — genereer een code die het nieuwe apparaat kan scannen of invoeren.",
+    "enterCode": "Koppelingscode invoeren",
+    "enterCodeDesc": "Dit is het nieuwe apparaat — voer de code in die op een vertrouwd apparaat wordt weergegeven.",
+    "showCodeHint": "Scan de QR-code of voer de code in op het nieuwe apparaat. Verloopt over 10 minuten.",
+    "qrAlt": "QR-code voor koppeling",
+    "expires": "Verloopt op {{time}}",
+    "enterCodeHint": "Voer de code van 8 tekens in die op uw vertrouwde apparaat wordt weergegeven.",
+    "confirm": "Dit apparaat koppelen",
+    "invalidCode": "Koppelingscode ongeldig of verlopen. Probeer het opnieuw.",
+    "back": "Terug"
+  },
+  "enrollment": {
+    "pendingTitle": "Synchronisatiegoedkeuring in behandeling",
+    "pendingDesc": "Dit apparaat wacht op goedkeuring voordat het kan synchroniseren. Ga op een vertrouwd apparaat naar Instellingen → Gesynchroniseerde apparaten en genereer een koppelingscode.",
+    "revokedTitle": "Synchronisatietoegang ingetrokken",
+    "revokedDesc": "Dit apparaat is uit de synchronisatiegroep verwijderd. Neem contact op met de accounteigenaar of koppel opnieuw uit Instellingen.",
+    "notRegisteredTitle": "Synchronisatie niet ingesteld",
+    "notRegisteredDesc": "Dit apparaat is nog niet lid geworden van de versleutelde synchronisatiegroep."
+  }
+}

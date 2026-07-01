@@ -1,0 +1,393 @@
+import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
+import type { TeamUser } from '../types';
+import { authenticateWithPasskey } from '../lib/passkey-client';
+import { deriveSyncKey, generateSyncKeySalt } from '../lib/sync-crypto';
+
+export interface MfaChallenge {
+  mfaRequired: true;
+  challengeToken: string;
+  mfaMethod: 'totp';
+}
+
+interface AuthState {
+  user: TeamUser | null;
+  connected: boolean;
+  serverUrl: string | null;
+  login(email: string, password: string, overrideServerUrl?: string): Promise<MfaChallenge | void>;
+  completeMfaLogin(challengeToken: string, code: string, serverUrl: string): Promise<void>;
+  loginWithPasskey(overrideServerUrl?: string, email?: string): Promise<void>;
+  register(email: string, displayName: string, password: string): Promise<void>;
+  logout(): Promise<void>;
+  getAccessToken(): Promise<string | null>;
+  getSyncKey(): CryptoKey | null;
+  setSyncPassphrase(passphrase: string): Promise<void>;
+  invalidateAccessToken(): void;
+  setServerUrl(url: string | null): void;
+  setReachable(reachable: boolean): void;
+}
+
+const AuthContext = createContext<AuthState>({
+  user: null,
+  connected: false,
+  serverUrl: null,
+  login: async () => {},
+  completeMfaLogin: async () => {},
+  loginWithPasskey: async () => {},
+  register: async () => {},
+  logout: async () => {},
+  getAccessToken: async () => null,
+  getSyncKey: () => null,
+  setSyncPassphrase: async () => {},
+  invalidateAccessToken: () => {},
+  setServerUrl: () => {},
+  setReachable: () => {},
+});
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useAuth(): AuthState {
+  return useContext(AuthContext);
+}
+
+const STORAGE_KEY = 'threatcaddy-auth';
+
+interface StoredAuth {
+  serverUrl: string;
+  accessToken: string;
+  refreshToken: string;
+  user: TeamUser;
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<TeamUser | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [serverUrl, setServerUrlState] = useState<string | null>(null);
+  const accessTokenRef = useRef<string | null>(null);
+  const refreshTokenRef = useRef<string | null>(null);
+  const refreshPromiseRef = useRef<Promise<string | null> | null>(null);
+  const syncKeyRef = useRef<CryptoKey | null>(null);
+  const pendingMfaPasswordRef = useRef<string | null>(null);
+
+  // Restore from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const auth: StoredAuth = JSON.parse(stored);
+        setServerUrlState(auth.serverUrl);
+        setUser(auth.user);
+        accessTokenRef.current = auth.accessToken;
+        refreshTokenRef.current = auth.refreshToken;
+        setConnected(true);
+      }
+    } catch { /* ignore corrupt storage */ }
+  }, []);
+
+  const getSyncKey = useCallback(() => syncKeyRef.current, []);
+
+  const deriveSyncKeyForPassword = useCallback(async (
+    password: string,
+    saltFromServer: string | null,
+    activeServerUrl: string,
+    accessToken: string,
+  ) => {
+    let salt: string = saltFromServer ?? generateSyncKeySalt();
+    if (!saltFromServer) {
+      try {
+        const resp = await fetch(`${activeServerUrl}/api/sync/key-setup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+          body: JSON.stringify({ salt }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (typeof data.syncKeySalt === 'string') salt = data.syncKeySalt;
+        }
+      } catch { /* non-fatal — key derivation continues with locally-generated salt */ }
+    }
+    try {
+      syncKeyRef.current = await deriveSyncKey(password, salt);
+    } catch (err) {
+      console.warn('[auth] sync key derivation failed:', err);
+      syncKeyRef.current = null;
+    }
+  }, []);
+
+  const persist = useCallback((url: string, token: string, refresh: string, u: TeamUser) => {
+    accessTokenRef.current = token;
+    refreshTokenRef.current = refresh;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      serverUrl: url,
+      accessToken: token,
+      refreshToken: refresh,
+      user: u,
+    }));
+  }, []);
+
+  const setReachable = useCallback((reachable: boolean) => {
+    // Only update connection state if we have stored tokens (i.e. user is logged in)
+    if (accessTokenRef.current || refreshTokenRef.current) {
+      setConnected(reachable);
+    }
+  }, []);
+
+  const setServerUrl = useCallback((url: string | null) => {
+    setServerUrlState(url);
+    if (!url) {
+      // Disconnect
+      setUser(null);
+      setConnected(false);
+      accessTokenRef.current = null;
+      refreshTokenRef.current = null;
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, []);
+
+  const login = useCallback(async (email: string, password: string, overrideServerUrl?: string): Promise<MfaChallenge | void> => {
+    const url = overrideServerUrl || serverUrl;
+    if (!url) throw new Error('No server URL configured');
+
+    const loginController = new AbortController();
+    const loginTimer = setTimeout(() => loginController.abort(), 15_000);
+    const resp = await fetch(`${url}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+      signal: loginController.signal,
+    });
+    clearTimeout(loginTimer);
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error || 'Login failed');
+    }
+
+    const data = await resp.json();
+
+    if (data.mfaRequired) {
+      if (overrideServerUrl) setServerUrlState(overrideServerUrl);
+      pendingMfaPasswordRef.current = password;
+      return { mfaRequired: true, challengeToken: data.challengeToken, mfaMethod: data.mfaMethod };
+    }
+
+    const teamUser: TeamUser = {
+      id: data.user.id,
+      email: data.user.email,
+      displayName: data.user.displayName,
+      avatarUrl: data.user.avatarUrl,
+      role: data.user.role,
+    };
+
+    if (overrideServerUrl) {
+      setServerUrlState(overrideServerUrl);
+    }
+    setUser(teamUser);
+    setConnected(true);
+    persist(url, data.accessToken, data.refreshToken, teamUser);
+    // Derive sync key from password + server-supplied salt (fire-and-forget, non-blocking)
+    deriveSyncKeyForPassword(password, data.syncKeySalt ?? null, url, data.accessToken).catch(() => {});
+  }, [serverUrl, persist, deriveSyncKeyForPassword]);
+
+  const completeMfaLogin = useCallback(async (challengeToken: string, code: string, mfaServerUrl: string) => {
+    const url = mfaServerUrl || serverUrl;
+    if (!url) throw new Error('No server URL configured');
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15_000);
+    const resp = await fetch(`${url}/api/auth/mfa/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challengeToken, code }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error || 'MFA verification failed');
+    }
+
+    const data = await resp.json();
+    const teamUser: TeamUser = {
+      id: data.user.id,
+      email: data.user.email,
+      displayName: data.user.displayName,
+      avatarUrl: data.user.avatarUrl,
+      role: data.user.role,
+    };
+    setUser(teamUser);
+    setConnected(true);
+    persist(url, data.accessToken, data.refreshToken, teamUser);
+    const pendingPwd = pendingMfaPasswordRef.current;
+    pendingMfaPasswordRef.current = null;
+    if (pendingPwd) {
+      deriveSyncKeyForPassword(pendingPwd, data.syncKeySalt ?? null, url, data.accessToken).catch(() => {});
+    }
+  }, [serverUrl, persist, deriveSyncKeyForPassword]);
+
+  const loginWithPasskey = useCallback(async (overrideServerUrl?: string, email?: string) => {
+    const url = overrideServerUrl || serverUrl;
+    if (!url) throw new Error('No server URL configured');
+
+    const data = await authenticateWithPasskey(url, email);
+
+    const teamUser: TeamUser = {
+      id: data.user.id,
+      email: data.user.email,
+      displayName: data.user.displayName,
+      avatarUrl: data.user.avatarUrl,
+      role: data.user.role,
+    };
+
+    if (overrideServerUrl) setServerUrlState(overrideServerUrl);
+    setUser(teamUser);
+    setConnected(true);
+    persist(url, data.accessToken, data.refreshToken, teamUser);
+    // syncKey is not derived here — the SyncPassphrasePrompt fires when connected
+    // without a key and lets the user enter their passphrase once per session.
+  }, [serverUrl, persist]);
+
+  const register = useCallback(async (email: string, displayName: string, password: string) => {
+    if (!serverUrl) throw new Error('No server URL configured');
+
+    const regController = new AbortController();
+    const regTimer = setTimeout(() => regController.abort(), 15_000);
+    const resp = await fetch(`${serverUrl}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, displayName, password }),
+      signal: regController.signal,
+    });
+    clearTimeout(regTimer);
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error || 'Registration failed');
+    }
+
+    const data = await resp.json();
+    const teamUser: TeamUser = {
+      id: data.user.id,
+      email: data.user.email,
+      displayName: data.user.displayName,
+      avatarUrl: data.user.avatarUrl,
+      role: data.user.role,
+    };
+
+    setUser(teamUser);
+    setConnected(true);
+    persist(serverUrl, data.accessToken, data.refreshToken, teamUser);
+  }, [serverUrl, persist]);
+
+  const logout = useCallback(async () => {
+    if (serverUrl && refreshTokenRef.current && accessTokenRef.current) {
+      try {
+        const logoutController = new AbortController();
+        setTimeout(() => logoutController.abort(), 5_000);
+        await fetch(`${serverUrl}/api/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessTokenRef.current}`,
+          },
+          body: JSON.stringify({ refreshToken: refreshTokenRef.current }),
+          signal: logoutController.signal,
+        });
+      } catch { /* best effort */ }
+    }
+
+    setUser(null);
+    setConnected(false);
+    accessTokenRef.current = null;
+    refreshTokenRef.current = null;
+    syncKeyRef.current = null;
+    pendingMfaPasswordRef.current = null;
+    localStorage.removeItem(STORAGE_KEY);
+  }, [serverUrl]);
+
+  const invalidateAccessToken = useCallback(() => {
+    accessTokenRef.current = null;
+  }, []);
+
+  const getAccessToken = useCallback(async (): Promise<string | null> => {
+    if (!serverUrl || !refreshTokenRef.current) return null;
+
+    // If we have a token, return it (rely on 401 to trigger refresh in API wrapper)
+    if (accessTokenRef.current) return accessTokenRef.current;
+
+    // If a refresh is already in flight, share the same promise
+    if (refreshPromiseRef.current) return refreshPromiseRef.current;
+
+    // Try to refresh
+    const refreshPromise = (async () => {
+      try {
+        const refreshCtrl = new AbortController();
+        const refreshTimer = setTimeout(() => refreshCtrl.abort(), 10_000);
+        const resp = await fetch(`${serverUrl}/api/auth/refresh`, {
+          method: 'POST',
+          signal: refreshCtrl.signal,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: refreshTokenRef.current }),
+        });
+        clearTimeout(refreshTimer);
+
+        if (!resp.ok) {
+          // Refresh failed — logged out
+          setUser(null);
+          setConnected(false);
+          accessTokenRef.current = null;
+          refreshTokenRef.current = null;
+          localStorage.removeItem(STORAGE_KEY);
+          return null;
+        }
+
+        const data = await resp.json();
+        accessTokenRef.current = data.accessToken;
+        refreshTokenRef.current = data.refreshToken;
+
+        if (user) {
+          persist(serverUrl, data.accessToken, data.refreshToken, user);
+        }
+
+        return data.accessToken as string | null;
+      } catch {
+        // Network error during refresh — don't set connected=false.
+        // The WS client will handle reconnection and restore reachability.
+        return null;
+      } finally {
+        refreshPromiseRef.current = null;
+      }
+    })();
+
+    refreshPromiseRef.current = refreshPromise;
+    return refreshPromise;
+  }, [serverUrl, user, persist]);
+
+  const setSyncPassphrase = useCallback(async (passphrase: string): Promise<void> => {
+    const url = serverUrl;
+    if (!url) return;
+    const token = await getAccessToken();
+    if (!token) return;
+    await deriveSyncKeyForPassword(passphrase, null, url, token);
+  }, [serverUrl, getAccessToken, deriveSyncKeyForPassword]);
+
+  return (
+    <AuthContext.Provider value={{
+      user,
+      connected,
+      serverUrl,
+      login,
+      completeMfaLogin,
+      loginWithPasskey,
+      register,
+      logout,
+      getAccessToken,
+      getSyncKey,
+      setSyncPassphrase,
+      invalidateAccessToken,
+      setServerUrl,
+      setReachable,
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
