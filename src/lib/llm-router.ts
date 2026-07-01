@@ -11,6 +11,7 @@ import {
   estimateLocalPromptChars,
   LOCAL_PROMPT_CHAR_LIMIT,
 } from './llm-prompt-budget';
+import { getLocalLLMAuthHeaders } from './local-llm-auth';
 
 export type LLMRoutingMode = 'extension' | 'server' | 'auto';
 
@@ -194,8 +195,10 @@ export function sendDirectToLocal(
     }));
   }
 
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (request.apiKey && request.apiKey !== 'local') headers['Authorization'] = `Bearer ${request.apiKey}`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...getLocalLLMAuthHeaders(request.apiKey, request.endpoint),
+  };
 
   (async () => {
     try {
