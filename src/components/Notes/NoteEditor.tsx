@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Upload, Briefcase, MessageSquare, Search, Lock, LockOpen, Share2, FileText, Download, AlertTriangle, Check, BookOpen, PlusCircle } from 'lucide-react';
+import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Upload, MessageSquare, Search, Lock, LockOpen, Share2, FileText, Download, AlertTriangle, Check, BookOpen, PlusCircle } from 'lucide-react';
 import type { Note, Task, TimelineEvent, Tag, Folder, EditorMode, Settings, NoteAnnotation } from '../../types';
 import { NOTE_COLORS } from '../../types';
 import { nanoid } from 'nanoid';
@@ -8,6 +8,7 @@ import { extractIOCs, mergeIOCAnalysis } from '../../lib/ioc-extractor';
 import { mergeText, adjustCursor } from '../../lib/text-merge';
 import { markPending, clearPending } from '../../lib/pending-changes';
 import { ClsSelect } from '../Common/ClsSelect';
+import { EntityInvestigationBar } from '../Common/EntityInvestigationBar';
 import { MarkdownPreview } from './MarkdownPreview';
 import { TagInput } from '../Common/TagInput';
 import { IOCPanel } from '../Analysis/IOCPanel';

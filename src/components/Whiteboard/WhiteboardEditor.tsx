@@ -6,14 +6,14 @@ import '@excalidraw/excalidraw/index.css';
 if (typeof window !== 'undefined') {
   (window as unknown as Record<string, unknown>).EXCALIDRAW_ASSET_PATH = '/';
 }
-import { ArrowLeft, Briefcase, Trash2, Image } from 'lucide-react';
+import { ArrowLeft, Trash2, Image } from 'lucide-react';
 import { markPending, clearPending } from '../../lib/pending-changes';
 import type { Whiteboard, Tag, Folder, Settings } from '../../types';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import { TagInput } from '../Common/TagInput';
 import { ClsSelect } from '../Common/ClsSelect';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
-import { cn } from '../../lib/utils';
+import { EntityInvestigationBar } from '../Common/EntityInvestigationBar';
 
 interface WhiteboardEditorProps {
   whiteboard: Whiteboard;
@@ -34,7 +34,6 @@ function pickAppState(appState: Record<string, unknown>): Record<string, unknown
 export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdate, onCreateTag, onBack, onDelete, settings }: WhiteboardEditorProps) {
   const [name, setName] = useState(whiteboard.name);
   const [saved, setSaved] = useState(false);
-  const [showFolderSelect, setShowFolderSelect] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -116,7 +115,6 @@ export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdat
 
   const handleFolderChange = useCallback((folderId?: string) => {
     onUpdate(whiteboard.id, { folderId });
-    setShowFolderSelect(false);
     flashSaved();
   }, [whiteboard.id, onUpdate, flashSaved]);
 
@@ -154,8 +152,6 @@ export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdat
   // Detect theme from document
   const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
 
-  const currentFolder = folders.find((f) => f.id === whiteboard.folderId);
-
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
@@ -173,38 +169,11 @@ export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdat
           className="flex-1 bg-transparent text-gray-200 text-sm font-medium px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-accent"
           placeholder="Whiteboard name"
         />
-        <div className="relative">
-          <button
-            onClick={() => setShowFolderSelect(!showFolderSelect)}
-            className={cn(
-              'flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors',
-              currentFolder ? 'bg-gray-800 text-gray-300' : 'text-gray-500 hover:text-gray-300'
-            )}
-            title="Assign to investigation"
-          >
-            <Briefcase size={14} />
-            <span>{currentFolder?.name || 'No investigation'}</span>
-          </button>
-          {showFolderSelect && (
-            <div className="absolute right-0 top-full mt-1 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 min-w-[160px]">
-              <button
-                onClick={() => handleFolderChange(undefined)}
-                className={cn('w-full text-start px-3 py-1.5 text-xs hover:bg-gray-800', !whiteboard.folderId && 'text-accent')}
-              >
-                No investigation
-              </button>
-              {folders.map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => handleFolderChange(f.id)}
-                  className={cn('w-full text-start px-3 py-1.5 text-xs hover:bg-gray-800', whiteboard.folderId === f.id && 'text-accent')}
-                >
-                  {f.name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <EntityInvestigationBar
+          folders={folders}
+          currentFolderId={whiteboard.folderId}
+          onMove={handleFolderChange}
+        />
         <ClsSelect
           value={whiteboard.clsLevel}
           onChange={(clsLevel) => { onUpdate(whiteboard.id, { clsLevel }); flashSaved(); }}

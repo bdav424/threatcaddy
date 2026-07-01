@@ -63,7 +63,9 @@ export function EntityInvestigationBar({ folders, currentFolderId, onMove, class
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey && event.key === 'z') {
+      // Only claim Ctrl+Z when there's a move to undo — otherwise let the
+      // browser/editor's own undo (e.g. note text editing) proceed untouched.
+      if (event.ctrlKey && event.key === 'z' && undoStackRef.current.length > 0) {
         event.preventDefault();
         handleUndo();
       }
