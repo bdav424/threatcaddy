@@ -1,9 +1,10 @@
 import React from 'react';
-import { ArrowUpDown, FileText, Download, FolderPlus, Pencil, FilePlus, Plus, Pin, BookOpen, ClipboardList, StickyNote, ChevronDown, Upload } from 'lucide-react';
+import { ArrowUpDown, FileText, Download, FolderPlus, Pencil, FilePlus, Plus, Pin, ClipboardList, StickyNote, ChevronDown, Upload } from 'lucide-react';
 import { useTranslation, Trans } from 'react-i18next';
 import type { Note, NoteType, SortOption, IOCType, Folder, NoteTemplate } from '../../types';
 import { cn } from '../../lib/utils';
 import { NoteCard } from './NoteCard';
+import { StickyJotFab } from './StickyJotFab';
 import { IOCFilterBar } from '../Clips/IOCFilterBar';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { formatIOCsJSON, formatIOCsCSV, formatIOCsFlatJSON, formatIOCsFlatCSV } from '../../lib/ioc-export';
@@ -223,7 +224,6 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
               <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-lg border border-border-medium bg-bg-raised shadow-lg">
                 {([
                   ['note', 'Note', FileText],
-                  ['journal', 'Journal', BookOpen],
                   ['definition', 'Definition', ClipboardList],
                   ['sticky', 'Sticky Jot', StickyNote],
                 ] as [NoteType, string, React.ElementType][]).map(([type, label, Icon]) => (
@@ -327,7 +327,7 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
   useWorkspacePanelHeaderAccessory(noteTitlebarAccessory);
 
   return (
-    <div className="w-full border-r border-gray-800 flex flex-col h-full overflow-hidden" data-note-list="true">
+    <div className="relative w-full border-r border-gray-800 flex flex-col h-full overflow-hidden" data-note-list="true">
       <div
         className={cn('flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-800 shrink-0', compactTitlebarMode && 'hidden')}
         data-note-toolbar="true"
@@ -364,7 +364,6 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
                 <div className="absolute left-0 top-full z-50 mt-1 w-40 rounded-lg border border-border-medium bg-bg-raised shadow-lg">
                   {([
                     ['note', 'Note', FileText],
-                    ['journal', 'Journal', BookOpen],
                     ['definition', 'Definition', ClipboardList],
                     ['sticky', 'Sticky Jot', StickyNote],
                   ] as [NoteType, string, React.ElementType][]).map(([type, label, Icon]) => (
@@ -727,6 +726,7 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
         )}
       </div>
 
+      {onCreateTyped && <StickyJotFab onCreate={() => onCreateTyped('sticky')} />}
     </div>
   );
 }

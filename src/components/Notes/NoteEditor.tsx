@@ -1081,19 +1081,12 @@ export function NoteEditor({
           )}
         </div>
 
-        <div className="hidden sm:flex items-center gap-1">
-          <Briefcase size={16} className="text-gray-500" />
-          <select
-            value={note.folderId || ''}
-            onChange={(e) => onUpdate(note.id, { folderId: e.target.value || undefined })}
-            className="bg-transparent text-xs text-gray-300 border-none focus:outline-none cursor-pointer"
-            aria-label={t('editor.assignInvestigation')}
-          >
-            <option value="">{t('editor.noInvestigation')}</option>
-            {folders.map((f) => (
-              <option key={f.id} value={f.id}>{f.name}</option>
-            ))}
-          </select>
+        <div className="hidden sm:flex items-center">
+          <EntityInvestigationBar
+            folders={folders}
+            currentFolderId={note.folderId}
+            onMove={(folderId) => onUpdate(note.id, { folderId })}
+          />
         </div>
 
         <ClsSelect

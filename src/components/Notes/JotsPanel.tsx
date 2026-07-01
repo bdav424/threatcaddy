@@ -17,10 +17,11 @@ export function JotsPanel({ notes, onClose, onCreateJot, onUpdateJot, onTrashJot
   const [index, setIndex] = useState(0);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
-  const [titleDraft, setTitleDraft] = useState('');
   const textRef = useRef<HTMLTextAreaElement>(null);
-  const titleRef = useRef<HTMLInputElement>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [pinned, setPinned] = useState(true);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const dragStartRef = useRef<{ x: number; y: number; origX: number; origY: number } | null>(null);
 
   const current = jots[index] ?? null;
 
@@ -35,8 +36,6 @@ export function JotsPanel({ notes, onClose, onCreateJot, onUpdateJot, onTrashJot
     if (current) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setDraft(current.content);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setTitleDraft(current.title);
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditing(false);
     }
@@ -63,15 +62,59 @@ export function JotsPanel({ notes, onClose, onCreateJot, onUpdateJot, onTrashJot
 
   useEffect(() => () => clearTimeout(saveTimeoutRef.current), []);
 
+  const handleHeaderMouseDown = useCallback((e: React.MouseEvent) => {
+    if (pinned) return;
+    e.preventDefault();
+    dragStartRef.current = { x: e.clientX, y: e.clientY, origX: dragOffset.x, origY: dragOffset.y };
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!dragStartRef.current) return;
+      setDragOffset({
+        x: dragStartRef.current.origX + (moveEvent.clientX - dragStartRef.current.x),
+        y: dragStartRef.current.origY + (moveEvent.clientY - dragStartRef.current.y),
+      });
+    };
+    const handleMouseUp = () => {
+      dragStartRef.current = null;
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [pinned, dragOffset]);
+
+  const togglePinned = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPinned((p) => {
+      const next = !p;
+      if (next) setDragOffset({ x: 0, y: 0 });
+      return next;
+    });
+  }, []);
+
   return (
     <div
       className="fixed bottom-4 right-4 z-50 w-72 rounded-xl border border-border-medium bg-bg-raised shadow-2xl"
+      style={pinned ? undefined : { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}
       data-jots-panel="true"
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border-subtle px-3 py-2">
+      <div
+        className={cn('flex items-center justify-between border-b border-border-subtle px-3 py-2', !pinned && 'cursor-move')}
+        onMouseDown={handleHeaderMouseDown}
+      >
         <div className="flex items-center gap-1.5">
-          <Pin size={13} className="text-accent" />
+          <button
+            type="button"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={togglePinned}
+            className={cn('flex h-5 w-5 items-center justify-center rounded transition-colors', pinned ? 'text-accent' : 'text-text-muted hover:text-accent')}
+            title={pinned ? 'Pinned — click to allow dragging' : 'Unpinned — click to pin in place'}
+            aria-label={pinned ? 'Unpin jots panel' : 'Pin jots panel'}
+            aria-pressed={pinned}
+          >
+            <Pin size={13} fill={pinned ? 'currentColor' : 'none'} />
+          </button>
           <span className="text-xs font-semibold text-text-primary">Jots</span>
           {jots.length > 0 && (
             <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-medium text-accent">
@@ -81,6 +124,7 @@ export function JotsPanel({ notes, onClose, onCreateJot, onUpdateJot, onTrashJot
         </div>
         <div className="flex items-center gap-1">
           <button
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={onCreateJot}
             className="flex h-5 w-5 items-center justify-center rounded text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary"
             title="New jot"
@@ -88,6 +132,7 @@ export function JotsPanel({ notes, onClose, onCreateJot, onUpdateJot, onTrashJot
             <Plus size={12} />
           </button>
           <button
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={onClose}
             className="flex h-5 w-5 items-center justify-center rounded text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary"
             title="Close Jots"
@@ -111,27 +156,6 @@ export function JotsPanel({ notes, onClose, onCreateJot, onUpdateJot, onTrashJot
         </div>
       ) : (
         <div className="relative p-3">
-          {/* Title */}
-          {editing ? (
-            <input
-              ref={titleRef}
-              value={titleDraft}
-              onChange={(e) => {
-                setTitleDraft(e.target.value);
-                if (current) scheduleSave(current.id, { title: e.target.value });
-              }}
-              className="mb-2 w-full rounded border border-border-subtle bg-transparent px-1.5 py-0.5 text-xs font-semibold text-text-primary outline-none focus:border-accent/50"
-              placeholder="Title…"
-            />
-          ) : (
-            <button
-              className={cn('mb-1 block w-full text-left text-xs font-semibold text-text-primary truncate', !current.title && 'text-text-muted')}
-              onClick={() => { setEditing(true); setTimeout(() => textRef.current?.focus(), 50); }}
-            >
-              {current.title || 'Untitled jot'}
-            </button>
-          )}
-
           {/* Content */}
           {editing ? (
             <textarea
@@ -144,14 +168,14 @@ export function JotsPanel({ notes, onClose, onCreateJot, onUpdateJot, onTrashJot
               onKeyDown={(e) => {
                 if (e.key === 'Escape') { e.preventDefault(); setEditing(false); }
               }}
-              className="h-28 w-full resize-none rounded border border-border-subtle bg-bg-surface px-2 py-1.5 text-xs text-text-primary placeholder-text-muted outline-none focus:border-accent/40"
+              className="h-28 w-full resize-none rounded bg-bg-surface px-2 py-1.5 text-xs text-text-primary placeholder-text-muted outline-none"
               placeholder="Write your jot…"
               autoFocus
             />
           ) : (
             <button
               className={cn(
-                'block h-28 w-full overflow-hidden rounded border border-border-subtle bg-bg-surface px-2 py-1.5 text-left text-xs text-text-secondary whitespace-pre-wrap',
+                'block h-28 w-full overflow-hidden rounded bg-bg-surface px-2 py-1.5 text-left text-xs text-text-secondary whitespace-pre-wrap',
                 !draft && 'text-text-muted',
               )}
               onClick={() => setEditing(true)}
