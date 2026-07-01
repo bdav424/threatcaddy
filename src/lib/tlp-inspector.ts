@@ -13,9 +13,41 @@ export interface TlpContributingItem {
 
 const CLS_ORDER = DEFAULT_CLS_LEVELS;
 
+const TYPE_LABELS: Record<TlpContributingItemType, string> = {
+  'note': 'note',
+  'task': 'task',
+  'timeline-event': 'timeline event',
+  'ioc': 'IOC',
+  'evidence': 'evidence item',
+};
+
 export function clsLevelIndex(level: string | undefined): number {
   if (!level) return -1;
   return CLS_ORDER.indexOf(level);
+}
+
+export interface TlpChangeValidation {
+  allowed: boolean;
+  error?: string;
+}
+
+/**
+ * Validates a manual TLP change against the investigation's auto-derived floor.
+ * Raising to (or staying at) the floor is always allowed. Lowering below the
+ * highest classified item is blocked, naming the item holding the floor up so
+ * the user knows what to sanitize or reclassify first.
+ */
+export function validateTlpLevelChange(
+  newLevel: string,
+  contributingItems: TlpContributingItem[],
+): TlpChangeValidation {
+  const newIdx = clsLevelIndex(newLevel);
+  const blocker = contributingItems.find((item) => clsLevelIndex(item.clsLevel) > newIdx);
+  if (!blocker) return { allowed: true };
+  return {
+    allowed: false,
+    error: `Cannot set to ${newLevel || 'None'}: ${TYPE_LABELS[blocker.type]} "${blocker.title}" contains ${blocker.clsLevel}-classified content. Sanitize or reclassify that content first.`,
+  };
 }
 
 export function isClsLevelAtOrBelow(itemLevel: string | undefined, ceiling: string): boolean {

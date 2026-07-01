@@ -9,6 +9,7 @@ import type { Tag } from '../../types';
 import { cn, formatFullDate } from '../../lib/utils';
 import { PlaybookProgress } from '../Playbooks/PlaybookProgress';
 import { useInvestigationClassification } from '../../hooks/useInvestigationClassification';
+import { inspectTlpContributors, validateTlpLevelChange, type TlpContributingItem } from '../../lib/tlp-inspector';
 
 interface InvestigationDetailPanelProps {
   folder: Folder;
@@ -67,12 +68,31 @@ export function InvestigationDetailPanel({
   const [description, setDescription] = useState(folder.description || '');
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const computedClsLevel = useInvestigationClassification(folder.id);
+  const [tlpContributors, setTlpContributors] = useState<TlpContributingItem[]>([]);
+  const [clsLevelError, setClsLevelError] = useState<string | null>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setName(folder.name);
     setDescription(folder.description || '');
   }, [folder.id, folder.name, folder.description]);
+
+  useEffect(() => {
+    setClsLevelError(null);
+    inspectTlpContributors(folder.id)
+      .then(setTlpContributors)
+      .catch(() => setTlpContributors([]));
+  }, [folder.id]);
+
+  const handleClsLevelChange = useCallback((newValue: string) => {
+    const validation = validateTlpLevelChange(newValue, tlpContributors);
+    if (!validation.allowed) {
+      setClsLevelError(validation.error ?? null);
+      return;
+    }
+    setClsLevelError(null);
+    onUpdate(folder.id, { clsLevel: newValue || undefined });
+  }, [folder.id, onUpdate, tlpContributors]);
 
   const handleNameBlur = () => {
     if (name.trim() && name !== folder.name) {
@@ -219,14 +239,20 @@ export function InvestigationDetailPanel({
               <label className="block text-xs font-medium text-gray-400 mb-1">{t('detail.classificationLabel')}</label>
               <select
                 value={folder.clsLevel || computedClsLevel || ''}
-                onChange={(e) => onUpdate(folder.id, { clsLevel: e.target.value || undefined })}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent"
+                onChange={(e) => handleClsLevelChange(e.target.value)}
+                className={cn(
+                  'w-full bg-gray-800 border rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent',
+                  clsLevelError ? 'border-red-500/60' : 'border-gray-700',
+                )}
               >
                 <option value="">None</option>
                 {effectiveClsLevels.map((v) => (
                   <option key={v} value={v}>{v}</option>
                 ))}
               </select>
+              {clsLevelError && (
+                <p className="mt-1 text-xs text-red-400">{clsLevelError}</p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-400 mb-1">{t('detail.papLabel')}</label>
