@@ -2305,6 +2305,7 @@ const AppInner = memo(function AppInner({
       folderName={selectedFolder?.name}
       folderColor={selectedFolder?.color}
       folderStatus={selectedFolder?.status}
+      folderClsLevel={selectedFolder?.clsLevel}
       tagName={selectedTag}
       tagColor={selectedTagObj?.color}
       onClear={() => { setSelectedFolderId(undefined); setSelectedTag(undefined); }}

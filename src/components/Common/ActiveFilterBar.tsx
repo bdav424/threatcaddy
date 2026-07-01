@@ -1,5 +1,7 @@
 import { Briefcase, Tag, Pin } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { ClsBadge } from './ClsBadge';
+import { getTlpBorderColor } from '../../lib/classification';
 import type { InvestigationStatus, PlaybookExecution } from '../../types';
 
 const statusColors: Record<InvestigationStatus, string> = {
@@ -13,6 +15,7 @@ interface ActiveFilterBarProps {
   folderName?: string;
   folderColor?: string;
   folderStatus?: InvestigationStatus;
+  folderClsLevel?: string;
   tagName?: string;
   tagColor?: string;
   onClear: () => void;
@@ -24,21 +27,23 @@ interface ActiveFilterBarProps {
 
 const STATUS_KEYS: Record<InvestigationStatus, string> = { active: 'hub.active', monitoring: 'hub.monitoring', closed: 'hub.closed', archived: 'hub.archived' };
 
-export function ActiveFilterBar({ folderName, folderColor, folderStatus, tagName, tagColor, onClear, onEditFolder, playbookExecution, onOpenJots, jotsCount }: ActiveFilterBarProps) {
+export function ActiveFilterBar({ folderName, folderColor, folderStatus, folderClsLevel, tagName, tagColor, onClear, onEditFolder, playbookExecution, onOpenJots, jotsCount }: ActiveFilterBarProps) {
   const { t } = useTranslation('investigations');
   if (!folderName && !tagName) return null;
 
   const accentColor = folderColor || tagColor || '#6366f1';
+  const tlpBorderColor = getTlpBorderColor(folderClsLevel);
   const pbCompleted = playbookExecution?.steps.filter(s => s.completed).length ?? 0;
   const pbTotal = playbookExecution?.steps.length ?? 0;
   const pbPct = pbTotal > 0 ? Math.round((pbCompleted / pbTotal) * 100) : 0;
 
   return (
     <div
-      className="flex items-center gap-2 px-3 py-1 border-b border-gray-800 text-sm shrink-0"
+      className="flex items-center gap-2 px-3 py-1 border-b-4 text-sm shrink-0"
       style={{
         borderLeftWidth: '3px',
         borderLeftColor: accentColor,
+        borderBottomColor: tlpBorderColor || '#1f2937',
         backgroundColor: `color-mix(in srgb, ${accentColor} 8%, transparent)`,
       }}
     >
@@ -94,6 +99,7 @@ export function ActiveFilterBar({ folderName, folderColor, folderStatus, tagName
           Jots{jotsCount ? ` (${jotsCount})` : ''}
         </button>
       )}
+      {folderClsLevel && <ClsBadge level={folderClsLevel} />}
       <button
         onClick={onClear}
         className="ms-auto px-2 py-0.5 rounded text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-700 transition-colors"

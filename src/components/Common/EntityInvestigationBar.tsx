@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Briefcase, ChevronDown } from 'lucide-react';
-import { useInvestigation } from '../../contexts/InvestigationContext';
+import { ChevronDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { Folder } from '../../types';
 
@@ -21,20 +20,17 @@ interface EntityInvestigationBarProps {
 }
 
 /**
- * Shown inside single-item editors (notes, whiteboards, ...). Splits what used to be one
- * conflated "investigation name → dropdown that reassigns the item" control into two:
- * the name opens investigation-level options (rename/TLP/archive), a separate "Move to"
- * button reassigns this item to a different investigation.
+ * Shown inside single-item editors (notes, whiteboards, ...). Lets the user reassign
+ * this item to a different investigation. The investigation name itself is shown in
+ * the top investigation bar, so it isn't repeated here.
  */
 export function EntityInvestigationBar({ folders, currentFolderId, onMove, className }: EntityInvestigationBarProps) {
-  const { setEditingFolderId } = useInvestigation();
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [annotation, setAnnotation] = useState<{ fromName: string } | null>(null);
   const undoStackRef = useRef<MoveHistoryEntry[]>([]);
   const annotationTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const currentFolder = folders.find((f) => f.id === currentFolderId);
   const otherFolders = folders.filter((f) => f.id !== currentFolderId);
 
   const dismissAnnotationLater = useCallback(() => {
@@ -87,21 +83,6 @@ export function EntityInvestigationBar({ folders, currentFolderId, onMove, class
 
   return (
     <div ref={containerRef} className={cn('relative flex min-w-0 items-center gap-1', className)}>
-      <button
-        type="button"
-        onClick={() => currentFolder && setEditingFolderId(currentFolder.id)}
-        disabled={!currentFolder}
-        className={cn(
-          'flex min-w-0 flex-1 items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors',
-          currentFolder ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'cursor-default text-gray-500',
-        )}
-        title={currentFolder ? `Investigation options for ${currentFolder.name}` : NO_INVESTIGATION_LABEL}
-        aria-label={currentFolder ? `Open investigation options for ${currentFolder.name}` : NO_INVESTIGATION_LABEL}
-      >
-        <Briefcase size={14} className="shrink-0" />
-        <span className="min-w-0 flex-1 truncate">{currentFolder?.name || NO_INVESTIGATION_LABEL}</span>
-      </button>
-
       <div className="relative shrink-0">
         <button
           type="button"
