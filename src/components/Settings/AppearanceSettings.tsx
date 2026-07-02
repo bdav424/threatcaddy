@@ -648,6 +648,8 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
   const fileRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const paletteEditorIdRef = useRef(0);
+  const bgEffectDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pendingBgEffectPattern, setPendingBgEffectPattern] = useState<BackgroundEffectPattern | null>(null);
   const [bgPreview, setBgPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [editingTheme, setEditingTheme] = useState(false);
@@ -682,8 +684,6 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
   const bgOverlayOpacity = clamp(settings.bgImageOpacity ?? 85, 0, 100);
   const bgTransparency = 100 - bgOverlayOpacity;
   const bgBlur = clamp(settings.bgImageBlur ?? 0, 0, 40);
-  const panelTransparency = clamp(settings.windowGlassTransparency ?? 0, 0, 100);
-  const panelBlur = clamp(settings.windowGlassBlur ?? 0, 0, 40);
   const zoom = settings.bgImageZoom ?? 100;
   const posX = settings.bgImagePosX ?? 50;
   const posY = settings.bgImagePosY ?? 50;
@@ -789,13 +789,20 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
   };
 
   const resetPosition = () => onUpdateSettings({ bgImagePosX: 50, bgImagePosY: 50, bgImageZoom: 100 });
-  const resetAmbientMotion = () => onUpdateSettings({
-    bgEffectPattern: 'none',
-    bgEffectColor: undefined,
-    bgEffectIntensity: 60,
-    bgEffectSize: 100,
-    bgGlowIntensity: 50,
-  });
+  const resetAmbientMotion = () => {
+    if (bgEffectDebounceRef.current !== null) {
+      clearTimeout(bgEffectDebounceRef.current);
+      bgEffectDebounceRef.current = null;
+    }
+    setPendingBgEffectPattern(null);
+    onUpdateSettings({
+      bgEffectPattern: 'none',
+      bgEffectColor: undefined,
+      bgEffectIntensity: 60,
+      bgEffectSize: 100,
+      bgGlowIntensity: 50,
+    });
+  };
 
   const startCreateTheme = () => {
     const selectedLabel = 'label' in selectedTheme ? selectedTheme.label : selectedTheme.name;
@@ -864,11 +871,20 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
     onUpdateSettings(updates);
   };
 
-  const selectBackgroundEffect = (pattern: BackgroundEffectPattern) => {
-    onUpdateSettings({
-      bgEffectPattern: pattern,
-      bgEffectColor: getPaletteEffectColor(pattern, runtimeModeColors),
-    });
+  const selectBackgroundEffect = (nextPattern: BackgroundEffectPattern) => {
+    // Show the selection immediately in the UI while debouncing the heavy canvas reset.
+    setPendingBgEffectPattern(nextPattern);
+    if (bgEffectDebounceRef.current !== null) clearTimeout(bgEffectDebounceRef.current);
+    bgEffectDebounceRef.current = setTimeout(() => {
+      bgEffectDebounceRef.current = null;
+      setPendingBgEffectPattern(null);
+      onUpdateSettings({
+        bgEffectPattern: nextPattern,
+        bgEffectColor: getPaletteEffectColor(nextPattern, runtimeModeColors),
+        // Nudge glow to a visible default when it's been zeroed out.
+        ...(nextPattern !== 'none' && bgGlowIntensity === 0 ? { bgGlowIntensity: 40 } : {}),
+      });
+    }, 350);
   };
 
   const applyThemeEffectColor = () => {
@@ -2005,60 +2021,21 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-gray-300">Bordered Panels</h3>
         <div className="space-y-4 rounded-xl border border-gray-700/70 bg-gray-900/40 p-4">
-          <div className="grid gap-3 rounded-lg border border-gray-800/80 bg-black/10 p-3 md:grid-cols-2">
-            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Transparency</div>
-              <div className="mt-1 text-lg font-semibold text-gray-100">{panelTransparency}%</div>
-              <div className="text-[11px] text-gray-500">0% keeps panels solid.</div>
-            </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Blur</div>
-              <div className="mt-1 text-lg font-semibold text-gray-100">{panelBlur}px</div>
-              <div className="text-[11px] text-gray-500">0px keeps panel edges crisp.</div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400">Panel transparency</span>
-                <span className="text-xs tabular-nums text-gray-500">{panelTransparency}%</span>
+          <div className="space-y-3 rounded-lg border border-gray-700/60 bg-black/10 px-3 py-2.5">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs font-medium text-gray-300">Frosted panels</div>
+                <div className="mt-0.5 text-[11px] text-gray-500">Lift panels off the animated background with a glass effect.</div>
               </div>
-              <input type="range" min={0} max={100} value={panelTransparency} onChange={(e) => onUpdateSettings({ windowGlassTransparency: Number(e.target.value) })} className="h-1.5 w-full accent-accent" />
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400">Panel blur</span>
-                <span className="text-xs tabular-nums text-gray-500">{panelBlur}px</span>
-              </div>
-              <input type="range" min={0} max={40} value={panelBlur} onChange={(e) => onUpdateSettings({ windowGlassBlur: Number(e.target.value) })} className="h-1.5 w-full accent-accent" />
-            </div>
-
-            <div className="space-y-3 rounded-lg border border-gray-700/60 bg-black/10 px-3 py-2.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-medium text-gray-300">Frosted panels</div>
-                  <div className="mt-0.5 text-[11px] text-gray-500">Lift panels off the animated background with a glass effect.</div>
-                </div>
-                <label className="relative inline-flex cursor-pointer items-center">
-                  <input
-                    type="checkbox"
-                    checked={settings.frostedPanels ?? false}
-                    onChange={(e) => {
-                      const on = e.target.checked;
-                      onUpdateSettings({
-                        frostedPanels: on,
-                        ...(on && panelTransparency === 0 && panelBlur === 0
-                          ? { windowGlassTransparency: 35, windowGlassBlur: 14 }
-                          : {}),
-                      });
-                    }}
-                    className="sr-only peer"
-                  />
-                  <div className="peer h-5 w-9 rounded-full bg-gray-700 transition-colors peer-checked:bg-accent peer-focus:ring-1 peer-focus:ring-accent/50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-4" />
-                </label>
-              </div>
+              <label className="relative inline-flex cursor-pointer items-center">
+                <input
+                  type="checkbox"
+                  checked={settings.frostedPanels ?? false}
+                  onChange={(e) => onUpdateSettings({ frostedPanels: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="peer h-5 w-9 rounded-full bg-gray-700 transition-colors peer-checked:bg-accent peer-focus:ring-1 peer-focus:ring-accent/50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-4" />
+              </label>
             </div>
           </div>
         </div>
@@ -2087,12 +2064,12 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
                 <div className="mt-1 text-[11px] text-gray-500">Choose any animation independently of the selected ThreatCaddy or Odysseus theme.</div>
               </div>
               <span className="rounded-full border border-gray-700 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-gray-500">
-                {BACKGROUND_EFFECT_LABELS[bgEffectPattern]}
+                {BACKGROUND_EFFECT_LABELS[pendingBgEffectPattern ?? bgEffectPattern]}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
               {BACKGROUND_EFFECT_OPTIONS.map((option) => {
-                const active = option.id === bgEffectPattern;
+                const active = option.id === (pendingBgEffectPattern ?? bgEffectPattern);
                 const previewColor = active
                   ? bgEffectColor
                   : getPaletteEffectColor(option.id, runtimeModeColors) ?? bgEffectColor;
@@ -2259,24 +2236,6 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
             </div>
           </div>
 
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-400">Glow intensity</span>
-              <span className="text-xs tabular-nums text-gray-500">{bgGlowIntensity}%</span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={bgGlowIntensity}
-              onChange={(event) => onUpdateSettings({ bgGlowIntensity: Number(event.target.value) })}
-              aria-label="Glow intensity"
-              className="h-2 w-full accent-accent"
-            />
-            <div className="flex justify-between text-[10px] text-gray-600"><span>Crisp</span><span>Radiant</span></div>
-          </div>
-
           <div className="overflow-hidden rounded-xl border border-gray-800 bg-black/20">
             <div
               className="h-28"
@@ -2296,8 +2255,31 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
             </div>
 
             <div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-black/10 px-3 py-3 text-[11px] text-gray-500">
-              <span>Raise <strong className="text-gray-400">Panel transparency</strong> in the Bordered Panels section above to see this animation through panels.</span>
+              <span>Enable <strong className="text-gray-400">Frosted panels</strong> in the Bordered Panels section above to see this animation through panels.</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-gray-300">Glow</h3>
+        <div className="space-y-3 rounded-xl border border-gray-700/70 bg-gray-900/40 p-4">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-400">Glow intensity</span>
+              <span className="text-xs tabular-nums text-gray-500">{bgGlowIntensity}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={bgGlowIntensity}
+              onChange={(event) => onUpdateSettings({ bgGlowIntensity: Number(event.target.value) })}
+              aria-label="Glow intensity"
+              className="h-2 w-full accent-accent"
+            />
+            <div className="flex justify-between text-[10px] text-gray-600"><span>Crisp</span><span>Radiant</span></div>
           </div>
         </div>
       </div>
@@ -2560,4 +2542,3 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
     </div>
   );
 }
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    

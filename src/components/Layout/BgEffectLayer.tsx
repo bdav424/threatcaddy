@@ -113,17 +113,33 @@ export function BgEffectLayer({
   const intensityRef = useRef(intensity);
   const glowRef = useRef(glowIntensity);
   const themeRef = useRef(theme);
+  // Track pattern and size via refs so switching effects doesn't tear down the canvas.
+  const patternRef = useRef(pattern);
+  const sizeRef = useRef(size);
+  const needsParticleResetRef = useRef(false);
 
+  // Cheap prop sync — never triggers canvas/RAF teardown.
   useEffect(() => {
+    const prevPattern = patternRef.current;
+    const prevSize = sizeRef.current;
     colorRef.current = color;
     intensityRef.current = intensity;
     glowRef.current = glowIntensity;
     themeRef.current = theme;
-  }, [color, intensity, glowIntensity, theme]);
+    patternRef.current = pattern;
+    sizeRef.current = size;
+    if (prevPattern !== pattern || prevSize !== size) {
+      needsParticleResetRef.current = true;
+    }
+  }, [color, intensity, glowIntensity, theme, pattern, size]);
+
+  // Only re-run canvas setup when toggling between 'none' and an active effect.
+  // Switching between two non-none effects is handled via refs — no teardown needed.
+  const isNone = pattern === 'none';
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || pattern === 'none') {
+    if (!canvas || isNone) {
       return;
     }
 
@@ -134,8 +150,6 @@ export function BgEffectLayer({
 
     const reducedMotion = typeof window.matchMedia === 'function'
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const shouldAnimate = !reducedMotion && pattern !== 'dots';
-    const scale = clamp(size / 100, 0.45, 2);
     let frame = 0;
     let width = 0;
     let height = 0;
@@ -144,6 +158,8 @@ export function BgEffectLayer({
     let points: MovingPoint[] = [];
     let petalCount = 0;
     let lastTime = 0;
+    // `scale` is a mutable let updated by initParticles so draw closures always read the current value.
+    let scale = 1;
 
     // Reassigned every frame from the refs above so color/theme/glow updates
     // don't need to tear down and recreate the particle arrays.
@@ -151,6 +167,15 @@ export function BgEffectLayer({
     let alphaBase = clamp(intensityRef.current / 100, 0.08, 1);
     let glowBlur = clamp(glowRef.current, 0, 100) / 5;
     let glowColor = themeRef.current === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.34)';
+
+    // Reinitialise particles/swirls from current refs — cheap, no canvas resize.
+    const initParticles = () => {
+      scale = clamp(sizeRef.current / 100, 0.45, 2);
+      const starDensity = 0.75 + clamp(intensityRef.current / 100, 0.08, 1) * 0.45;
+      swirls = createSwirls(width, height, scale);
+      points = createPoints(width, height, scale, starDensity);
+      petalCount = Math.max(18, Math.round(points.length * 0.55));
+    };
 
     const resize = () => {
       width = window.innerWidth;
@@ -161,10 +186,7 @@ export function BgEffectLayer({
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
       context.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const starDensity = 0.75 + clamp(intensityRef.current / 100, 0.08, 1) * 0.45;
-      swirls = createSwirls(width, height, scale);
-      points = createPoints(width, height, scale, starDensity);
-      petalCount = Math.max(18, Math.round(points.length * 0.55));
+      initParticles();
     };
 
     const stepPoints = (speedMultiplier: number, dt: number) => {
@@ -450,6 +472,13 @@ export function BgEffectLayer({
     };
 
     const render = (time: number) => {
+      // Pattern or size changed — reinitialise particles without touching the canvas.
+      if (needsParticleResetRef.current) {
+        needsParticleResetRef.current = false;
+        initParticles();
+      }
+
+      const currentPattern = patternRef.current;
       const dt = lastTime === 0 ? 1 : clamp((time - lastTime) / (1000 / 60), 0.25, 3);
       lastTime = time;
 
@@ -458,10 +487,15 @@ export function BgEffectLayer({
       glowBlur = clamp(glowRef.current, 0, 100) / 5;
       glowColor = themeRef.current === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.34)';
 
-      context.globalCompositeOperation = 'destination-out';
-      context.fillStyle = `rgba(0,0,0,${TRAIL_FADE_ALPHA})`;
-      context.fillRect(0, 0, width, height);
-      context.globalCompositeOperation = 'source-over';
+      // Dots are redrawn fresh each frame; animated effects use trail-fade for motion blur.
+      if (currentPattern === 'dots') {
+        context.clearRect(0, 0, width, height);
+      } else {
+        context.globalCompositeOperation = 'destination-out';
+        context.fillStyle = `rgba(0,0,0,${TRAIL_FADE_ALPHA})`;
+        context.fillRect(0, 0, width, height);
+        context.globalCompositeOperation = 'source-over';
+      }
 
       const wash = context.createRadialGradient(width * 0.5, height * 0.35, 0, width * 0.5, height * 0.35, Math.max(width, height) * 0.78);
       wash.addColorStop(0, rgba(effectColor, alphaBase * 0.08));
@@ -470,4 +504,84 @@ export function BgEffectLayer({
       context.fillRect(0, 0, width, height);
 
       context.shadowBlur = glowBlur * scale;
-      context.shadowColor = rgba(effectColor, alphaBase * 0.
+      context.shadowColor = rgba(effectColor, alphaBase * 0.22);
+      // Use patternRef so switching effects never requires tearing down the RAF loop.
+      switch (currentPattern) {
+        case 'dots':
+          drawDots();
+          break;
+        case 'synapse':
+          drawSynapse(time);
+          break;
+        case 'rain':
+          drawRain(dt);
+          break;
+        case 'constellations':
+          drawConstellations(time, dt);
+          break;
+        case 'perlin-flow':
+          drawPerlinFlow(time, dt);
+          break;
+        case 'petals':
+          drawPetals(time, dt);
+          break;
+        case 'sparkles':
+          drawSparkles(time, dt);
+          break;
+        case 'embers':
+          drawEmbers(dt);
+          break;
+        case 'swirls':
+        default:
+          drawSwirls(time, dt);
+          break;
+      }
+      context.shadowBlur = 0;
+
+      const vignette = context.createLinearGradient(0, 0, 0, height);
+      vignette.addColorStop(0, glowColor);
+      vignette.addColorStop(0.35, 'rgba(0,0,0,0)');
+      vignette.addColorStop(1, themeRef.current === 'dark' ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.12)');
+      context.fillStyle = vignette;
+      context.fillRect(0, 0, width, height);
+
+      const shouldAnimate = !reducedMotion && currentPattern !== 'dots';
+      if (shouldAnimate) {
+        frame = window.requestAnimationFrame(render);
+      }
+    };
+
+    const handleResize = () => {
+      resize();
+      const p = patternRef.current;
+      const shouldAnimate = !reducedMotion && p !== 'dots';
+      if (!shouldAnimate) render(performance.now());
+    };
+
+    resize();
+    render(performance.now());
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener('resize', handleResize);
+      context.clearRect(0, 0, width, height);
+    };
+  }, [isNone]);
+
+  if (pattern === 'none') {
+    return null;
+  }
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-0 bg-bg-deep">
+      <canvas
+        ref={canvasRef}
+        className="app-window-bg-effect absolute inset-0"
+        style={{ background: 'transparent', willChange: 'transform' }}
+        data-bg-effect-pattern={pattern}
+        aria-hidden
+      />
+    </div>
+  );
+}

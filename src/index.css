@@ -827,6 +827,20 @@ body.tc-desktop-shell-body {
   border-color: var(--tc-panel-glass-border) !important;
 }
 
+/* ─── Semantic surface classes used by workspace panels (Notes, Tasks, Evidence,
+       IOCs, EmailCaddy, CalendarCaddy, CaddyAssistant, etc.) ───────────────── */
+.has-panel-glass [class*="bg-bg-deep"],
+.has-panel-glass [class*="bg-bg-primary"],
+.has-panel-glass [class*="bg-bg-surface"] {
+  background-color: var(--tc-panel-glass-surface) !important;
+  border-color: var(--tc-panel-glass-border) !important;
+}
+
+.has-panel-glass [class*="bg-bg-raised"] {
+  background-color: var(--tc-panel-glass-raised) !important;
+  border-color: var(--tc-panel-glass-border) !important;
+}
+
 .has-panel-glass .bg-gray-900,
 .has-panel-glass .bg-gray-900\/80,
 .has-panel-glass .bg-gray-900\/50,
@@ -836,7 +850,11 @@ body.tc-desktop-shell-body {
 .has-panel-glass .bg-gray-800\/60,
 .has-panel-glass .bg-gray-800\/50,
 .has-panel-glass .bg-gray-800\/40,
-.has-panel-glass .sidebar-glass {
+.has-panel-glass .sidebar-glass,
+.has-panel-glass [class*="bg-bg-deep"],
+.has-panel-glass [class*="bg-bg-primary"],
+.has-panel-glass [class*="bg-bg-surface"],
+.has-panel-glass [class*="bg-bg-raised"] {
   backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%);
   -webkit-backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%);
 }

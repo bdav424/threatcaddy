@@ -160,13 +160,10 @@ export function useSettings() {
   // Apply glass styling only to bordered panels, not the app shell or background image.
   useEffect(() => {
     const root = document.documentElement;
-    const transparency = Math.max(0, Math.min(100, settings.windowGlassTransparency ?? 0));
-    const blur = Math.max(0, Math.min(40, settings.windowGlassBlur ?? 0));
     const frostedPanels = settings.frostedPanels ?? false;
-    // frostedPanels: when enabled with no sliders set, apply a visible frosted preset
-    const slidersActive = transparency > 0 || blur > 0;
-    const effectiveTransparency = !slidersActive && frostedPanels ? 35 : transparency;
-    const effectiveBlur = !slidersActive && frostedPanels ? 14 : blur;
+    // Frost is toggle-only: always apply a preset when enabled, no user-adjustable sliders.
+    const effectiveTransparency = frostedPanels ? 30 : 0;
+    const effectiveBlur = frostedPanels ? 14 : 0;
     const ratio = 1 - effectiveTransparency / 100;
     const panelOpacity = (base: number) => Math.max(0, base * ratio).toFixed(1);
     const enabled = effectiveTransparency > 0 || effectiveBlur > 0;
@@ -197,7 +194,7 @@ export function useSettings() {
         // The desktop wrapper may still be starting up; keep the web UI responsive regardless.
       });
     }
-  }, [isDesktopShell, settings.windowGlassTransparency, settings.windowGlassBlur, settings.frostedPanels]);
+  }, [isDesktopShell, settings.frostedPanels]);
 
   const updateSettings = useCallback((updates: Partial<Settings>) => {
     setSettingsState((prev) => {
