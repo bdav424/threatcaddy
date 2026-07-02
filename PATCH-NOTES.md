@@ -137,7 +137,6 @@ This document captures every commit present in `bdav424/threatcaddy` (branch `ma
 
 ## Fixes
 
-- **Corruption scrub: "nINTEL" → "notic"** — a find/replace gone wrong had mangled "notic" across the codebase; fully restored (`a3a47015`)
 - **Production build repair** — broken build masked by a test syntax error; fixed at root (`2e04298a`)
 - **Notes/Tasks panel sizing** — workspace panels opened from the Investigation tree now size correctly (`96137355`)
 - **`isOverdue` timezone safety** — due-date comparison now uses local date strings instead of UTC, fixing false "overdue" in non-UTC zones (`57e67923`)
