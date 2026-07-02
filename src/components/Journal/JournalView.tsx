@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo, type PointerEvent as ReactPointerEvent, type CSSProperties } from 'react';
-import { BookOpen, Plus, Trash2, Send, Palette, Upload, Pencil, X } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Send, Palette, Upload, Pencil, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useJournalPages } from '../../hooks/useJournalPages';
 import type { JournalPage, JournalPageTheme, JournalPaperStyle, Folder } from '../../types';
 import { cn } from '../../lib/utils';
@@ -24,8 +24,9 @@ function getLegacyThemeClasses(theme: JournalPageTheme): string {
 
 function getPaperPatternStyle(paperStyle: JournalPaperStyle, paperColor: string | 'theme'): CSSProperties {
   const bg = paperColor === 'theme' ? 'var(--color-bg-surface)' : paperColor;
-  // Subtle 15% dark tint for lines/dots — works on any background color.
-  const lineColor = 'rgba(0,0,0,0.15)';
+  // Theme-aware line color: use the CSS variable so it adapts to dark/light mode.
+  // For fixed paper colors, use a subtle dark tint.
+  const lineColor = paperColor === 'theme' ? 'var(--color-border-medium)' : 'rgba(0,0,0,0.15)';
 
   switch (paperStyle) {
     case 'lined':
@@ -286,7 +287,7 @@ function BackgroundPicker({ paperColor, paperStyle, onChangePaperColor, onChange
   return (
     <div
       ref={ref}
-      className="absolute left-0 top-full z-40 mt-1 w-72 rounded-xl border border-border-medium bg-bg-raised shadow-xl"
+      className="absolute left-0 top-full z-50 mt-1 w-72 rounded-xl border border-border-medium bg-bg-raised shadow-xl"
     >
       {/* ── Paper style ── */}
       <div className="border-b border-border-subtle px-3 py-2.5">
@@ -704,4 +705,390 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
         <div className="w-px h-4 bg-border-subtle" />
         <RichToolbar onFormat={handleFormat} />
         <div className="flex-1" />
-      
+        <button
+          onClick={() => setDrawMode((v) => !v)}
+          className={cn(
+            'flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors',
+            drawMode ? 'bg-accent text-white' : 'text-text-muted hover:bg-bg-hover hover:text-text-primary',
+          )}
+          title="Toggle drawing mode"
+        >
+          <Pencil size={12} />
+          Draw
+        </button>
+        <button
+          onClick={onImportMeeting}
+          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-text-muted hover:bg-bg-hover hover:text-text-primary"
+          title="Import meeting notes into this page"
+        >
+          <Upload size={12} />
+          Import
+        </button>
+        <button
+          onClick={onTear}
+          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-accent bg-accent/10 hover:bg-accent/20 transition-colors"
+          title="Send this page to an investigation"
+        >
+          <Send size={12} />
+          Tear to investigation
+        </button>
+        <button
+          onClick={() => setConfirmDelete(true)}
+          className="flex h-6 w-6 items-center justify-center rounded text-text-muted hover:bg-red-500/10 hover:text-red-400"
+          title="Delete page"
+        >
+          <Trash2 size={13} />
+        </button>
+      </div>
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-xs rounded-xl border border-border-medium bg-bg-raised shadow-2xl">
+            <div className="px-4 py-3 border-b border-border-subtle">
+              <span className="text-sm font-semibold text-text-primary">Delete page?</span>
+            </div>
+            <div className="p-4 space-y-4">
+              <p className="text-xs text-text-muted">
+                <strong className="text-text-primary">"{page.title || 'Untitled'}"</strong> will be permanently deleted.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="flex-1 rounded-lg border border-border-subtle px-3 py-2 text-sm text-text-secondary hover:bg-bg-hover"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { setConfirmDelete(false); onDelete(); }}
+                  className="flex-1 rounded-lg bg-red-500 px-3 py-2 text-sm font-medium text-white hover:bg-red-600"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Page surface — background color + paper pattern */}
+      <div className={cn('flex-1 overflow-auto relative', legacyClasses)} style={paperSurfaceStyle}>
+        <div className="mx-auto max-w-3xl px-8 py-6 relative">
+          {/* Linked badge */}
+          {page.linkedInvestigationId && (
+            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-2.5 py-0.5 text-xs text-accent">
+              <Send size={10} />
+              Sent to investigation
+            </div>
+          )}
+          {/* Title */}
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={handleTitleBlur}
+            placeholder="Page title…"
+            className="mb-4 w-full bg-transparent text-2xl font-bold text-inherit placeholder-gray-400 outline-none"
+          />
+          {/* Rich text content */}
+          <div
+            ref={editorRef}
+            contentEditable
+            suppressContentEditableWarning
+            onInput={scheduleContentSave}
+            data-placeholder="Start writing…"
+            className="min-h-[60vh] w-full bg-transparent text-sm leading-7 text-inherit outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 empty:before:pointer-events-none [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5 [&_ul_ul]:list-[circle] [&_ul_ul_ul]:list-[square]"
+          />
+          {/* Read-only drawing overlay — always visible when drawing data exists */}
+          {page.drawingData && !drawMode && (
+            <img
+              src={page.drawingData}
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 h-full w-full"
+              style={{ objectFit: 'fill' }}
+            />
+          )}
+          {/* Interactive drawing canvas overlay — only in draw mode */}
+          {drawMode && (
+            <DrawingCanvas
+              initialData={page.drawingData}
+              onSave={(data) => onUpdate({ drawingData: data || undefined })}
+              onExit={() => setDrawMode(false)}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Page list ─────────────────────────────────────────────────────────────────
+
+interface PageListProps {
+  pages: JournalPage[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onNewPage: () => void;
+  onNewJournal: () => void;
+}
+
+function PageList({ pages, selectedId, onSelect, onNewPage, onNewJournal }: PageListProps) {
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem('journal-list-collapsed') === 'true'; } catch { return false; }
+  });
+
+  const toggleCollapse = () => {
+    setCollapsed((v) => {
+      const next = !v;
+      try { localStorage.setItem('journal-list-collapsed', String(next)); } catch {}
+      return next;
+    });
+  };
+
+  if (collapsed) {
+    return (
+      <div className="flex h-full w-8 shrink-0 flex-col border-r border-border-subtle bg-bg-raised items-center gap-1 pt-2">
+        <button
+          onClick={toggleCollapse}
+          title="Expand pages list"
+          className="flex h-6 w-6 items-center justify-center rounded text-text-muted hover:bg-bg-hover hover:text-text-primary"
+        >
+          <ChevronRight size={14} />
+        </button>
+        <button
+          onClick={onNewPage}
+          title="New blank page"
+          className="flex h-6 w-6 items-center justify-center rounded text-text-muted hover:bg-bg-hover hover:text-text-primary"
+        >
+          <Plus size={13} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full w-56 shrink-0 flex-col border-r border-border-subtle bg-bg-raised">
+      <div className="flex items-center justify-between border-b border-border-subtle px-3 py-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">Pages</span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={toggleCollapse}
+            title="Collapse pages list"
+            className="flex h-5 w-5 items-center justify-center rounded text-text-muted hover:bg-bg-hover hover:text-text-primary"
+          >
+            <ChevronLeft size={12} />
+          </button>
+          <button
+            onClick={onNewJournal}
+            title="New journal entry (today's date)"
+            className="flex h-5 w-5 items-center justify-center rounded text-text-muted hover:bg-bg-hover hover:text-text-primary"
+          >
+            <BookOpen size={12} />
+          </button>
+          <button
+            onClick={onNewPage}
+            title="New blank page"
+            className="flex h-5 w-5 items-center justify-center rounded text-text-muted hover:bg-bg-hover hover:text-text-primary"
+          >
+            <Plus size={13} />
+          </button>
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {pages.length === 0 && (
+          <div className="px-3 py-6 text-center text-xs text-text-muted">
+            No pages yet. Create one with +.
+          </div>
+        )}
+        {pages.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => onSelect(p.id)}
+            className={cn(
+              'flex w-full flex-col items-start px-3 py-2.5 text-left transition-colors hover:bg-bg-hover',
+              selectedId === p.id && 'bg-accent/10 text-accent',
+            )}
+          >
+            <span className={cn('truncate text-sm font-medium', selectedId === p.id ? 'text-accent' : 'text-text-primary')}>
+              {p.title || 'Untitled'}
+            </span>
+            <span className="mt-0.5 text-[10px] text-text-muted">
+              {new Date(p.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              {p.linkedInvestigationId && (
+                <span className="ml-1 text-accent/70">· linked</span>
+              )}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Meeting import modal (lightweight inline version) ─────────────────────────
+
+interface MeetingPasteModalProps {
+  onClose: () => void;
+  onImport: (content: string) => void;
+}
+
+function MeetingPasteModal({ onClose, onImport }: MeetingPasteModalProps) {
+  const [text, setText] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => { const raw = ev.target?.result as string; onImport(raw); onClose(); };
+    reader.readAsText(f);
+  }, [onImport, onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="w-full max-w-md rounded-xl border border-border-medium bg-bg-raised shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border-subtle px-4 py-3">
+          <span className="text-sm font-semibold text-text-primary">Import meeting notes</span>
+        </div>
+        <div className="p-4 space-y-3">
+          {window.threatcaddyNotes ? (
+            <button
+              onClick={async () => {
+                const r = await window.threatcaddyNotes!.pickFile();
+                if (r.ok && r.content) { onImport(r.content); onClose(); }
+              }}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border-medium bg-bg-surface px-4 py-5 text-sm text-text-secondary hover:border-accent/40 hover:text-accent"
+            >
+              <Upload size={16} /> Pick .txt / .vtt / .md file
+            </button>
+          ) : (
+            <>
+              <button onClick={() => fileRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border-medium bg-bg-surface px-4 py-5 text-sm text-text-secondary hover:border-accent/40 hover:text-accent">
+                <Upload size={16} /> Pick .txt / .vtt / .md file
+              </button>
+              <input ref={fileRef} type="file" accept=".txt,.vtt,.md" className="hidden" onChange={handleFile} />
+            </>
+          )}
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Or paste meeting text here…"
+            rows={5}
+            className="w-full resize-none rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-accent/40"
+          />
+          {text.trim() && (
+            <button onClick={() => { onImport(text); onClose(); }} className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90">
+              Import
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main JournalView ──────────────────────────────────────────────────────────
+
+interface JournalViewProps {
+  folders: Folder[];
+  onTearToInvestigation: (pageContent: string, pageTitle: string, investigationId: string) => Promise<void>;
+}
+
+export function JournalView({ folders, onTearToInvestigation }: JournalViewProps) {
+  const { pages, loading, createPage, updatePage, deletePage, linkToInvestigation } = useJournalPages();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [tearingPage, setTearingPage] = useState<JournalPage | null>(null);
+  const [showMeetingModal, setShowMeetingModal] = useState(false);
+
+  const selectedPage = useMemo(() => pages.find((p) => p.id === selectedId) ?? null, [pages, selectedId]);
+
+  // Auto-select first page when pages load
+  useEffect(() => {
+    if (!loading && pages.length > 0 && !selectedId) setSelectedId(pages[0].id);
+  }, [loading, pages, selectedId]);
+
+  const handleNewPage = useCallback(async () => {
+    const p = await createPage();
+    setSelectedId(p.id);
+  }, [createPage]);
+
+  const handleNewJournal = useCallback(async () => {
+    const date = new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const p = await createPage({ title: date, content: `# ${date}\n\n`, theme: 'lined' });
+    setSelectedId(p.id);
+  }, [createPage]);
+
+  const handleDelete = useCallback(async () => {
+    if (!selectedId) return;
+    await deletePage(selectedId);
+    setSelectedId(null);
+  }, [selectedId, deletePage]);
+
+  const handleTear = useCallback(async (investigationId: string) => {
+    if (!tearingPage) return;
+    await onTearToInvestigation(tearingPage.content, tearingPage.title, investigationId);
+    await linkToInvestigation(tearingPage.id, investigationId);
+    setTearingPage(null);
+  }, [tearingPage, onTearToInvestigation, linkToInvestigation]);
+
+  const handleMeetingImport = useCallback((raw: string) => {
+    if (!selectedPage) return;
+    updatePage(selectedPage.id, { content: (selectedPage.content ? selectedPage.content + '\n\n---\n\n' : '') + raw });
+  }, [selectedPage, updatePage]);
+
+  if (loading) {
+    return <div className="flex h-full items-center justify-center text-text-muted text-sm">Loading journal…</div>;
+  }
+
+  return (
+    <div className="flex h-full overflow-hidden">
+      <PageList
+        pages={pages}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        onNewPage={handleNewPage}
+        onNewJournal={handleNewJournal}
+      />
+
+      <div className="flex-1 min-w-0 overflow-hidden">
+        {selectedPage ? (
+          <PageEditor
+            page={selectedPage}
+            onUpdate={(updates) => updatePage(selectedPage.id, updates)}
+            onDelete={handleDelete}
+            onTear={() => setTearingPage(selectedPage)}
+            onImportMeeting={() => setShowMeetingModal(true)}
+            folders={folders}
+          />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-text-muted">
+            <BookOpen size={40} className="opacity-30" />
+            <p className="text-sm">No page selected</p>
+            <button
+              onClick={handleNewPage}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/25"
+            >
+              <Plus size={13} />
+              New page
+            </button>
+          </div>
+        )}
+      </div>
+
+      {tearingPage && (
+        <TearModal
+          page={tearingPage}
+          folders={folders}
+          onTear={handleTear}
+          onClose={() => setTearingPage(null)}
+        />
+      )}
+
+      {showMeetingModal && (
+        <MeetingPasteModal
+          onClose={() => setShowMeetingModal(false)}
+          onImport={handleMeetingImport}
+        />
+      )}
+    </div>
+  );
+}
