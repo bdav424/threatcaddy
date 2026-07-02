@@ -15,13 +15,15 @@ export function useJournalPages() {
 
   useEffect(() => { void reload(); }, [reload]);
 
-  const createPage = useCallback(async (partial?: Partial<Pick<JournalPage, 'title' | 'content' | 'theme'>>): Promise<JournalPage> => {
+  const createPage = useCallback(async (partial?: Partial<Pick<JournalPage, 'title' | 'content' | 'theme' | 'paperColor' | 'paperStyle'>>): Promise<JournalPage> => {
     const now = Date.now();
     const page: JournalPage = {
       id: nanoid(),
       title: partial?.title ?? 'Untitled Page',
       content: partial?.content ?? '',
       theme: partial?.theme ?? 'plain',
+      paperColor: partial?.paperColor ?? 'theme',
+      paperStyle: partial?.paperStyle ?? 'blank',
       createdAt: now,
       updatedAt: now,
     };
@@ -60,4 +62,4 @@ export const JOURNAL_THEME_LABELS: Record<JournalPageTheme, string> = {
   watermark: 'Watermark',
 };
 
-export const JOURNAL_THEMES: JournalPageTheme[] = ['plain', 'paper', 'lined', 'bullet', 'grid', 'cream', 'blue-gray', 'sage', 'watermark'];
+export con

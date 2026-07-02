@@ -1156,12 +1156,21 @@ function sanitizeJournalPage(r: Record<string, unknown>): JournalPage | null {
   if (!id) return null;
   const validThemes: JournalPage['theme'][] = ['plain', 'paper', 'lined', 'bullet', 'grid', 'cream', 'blue-gray', 'sage', 'watermark'];
   const theme = validThemes.includes(r.theme as JournalPage['theme']) ? (r.theme as JournalPage['theme']) : 'plain';
+  const validPaperStyles: JournalPage['paperStyle'][] = ['blank', 'lined', 'dot', 'grid'];
+  const rawPaperStyle = r.paperStyle as JournalPage['paperStyle'];
+  const paperStyle = validPaperStyles.includes(rawPaperStyle) ? rawPaperStyle : 'blank';
+  const rawPaperColor = r.paperColor;
+  const paperColor: JournalPage['paperColor'] = (rawPaperColor === 'theme' || (typeof rawPaperColor === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(rawPaperColor)))
+    ? rawPaperColor as string
+    : 'theme';
   return {
     id,
     title: str(r.title, 'Untitled'),
     content: str(r.content, ''),
     theme,
     themeOptions: r.themeOptions && typeof r.themeOptions === 'object' ? r.themeOptions as JournalPage['themeOptions'] : undefined,
+    paperColor,
+    paperStyle,
     createdAt: num(r.createdAt, 0),
     updatedAt: num(r.updatedAt, 0),
     linkedInvestigationId: r.linkedInvestigationId != null ? str(r.linkedInvestigationId) : undefined,
@@ -1823,20 +1832,4 @@ export async function mergeImportJSON(json: string): Promise<MergeImportResult> 
     await mergeTable('timelineEvents', db.timelineEvents, timelineEvents);
     await mergeTable('timelines', db.timelines, timelines);
     await mergeTable('whiteboards', db.whiteboards, whiteboards);
-    await mergeTable('standaloneIOCs', db.standaloneIOCs, standaloneIOCs);
-    await mergeTable('evidenceItems', db.evidenceItems, evidenceItems);
-    await mergeTable('chatThreads', db.chatThreads, chatThreads);
-  });
-
-  return { added, skipped, updated, tables, noteInvestigations };
-}
-
-export function downloadFile(content: string, filename: string, type: string) {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+    await mergeTable('standaloneIOCs', db.standaloneIOCs, standalon

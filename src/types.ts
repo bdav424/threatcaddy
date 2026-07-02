@@ -311,6 +311,9 @@ export type ViewMode = 'dashboard' | 'workspace' | 'notes' | 'tasks' | 'evidence
 // ── Journal Page ────────────────────────────────────────────────────────────
 export type JournalPageTheme = 'plain' | 'paper' | 'lined' | 'bullet' | 'grid' | 'cream' | 'blue-gray' | 'sage' | 'watermark';
 
+/** New paper style — controls the repeating pattern drawn on top of the background color. */
+export type JournalPaperStyle = 'blank' | 'lined' | 'dot' | 'grid';
+
 export interface JournalPageThemeOptions {
   watermarkText?: string;
   watermarkImageUrl?: string;
@@ -322,6 +325,10 @@ export interface JournalPage {
   content: string;
   theme: JournalPageTheme;
   themeOptions?: JournalPageThemeOptions;
+  /** Background color hex string, or 'theme' to inherit from the active app theme. Defaults to 'theme'. */
+  paperColor?: string | 'theme';
+  /** Paper pattern rendered on top of the background color. Defaults to 'blank'. */
+  paperStyle?: JournalPaperStyle;
   drawingData?: string;
   createdAt: number;
   updatedAt: number;
@@ -443,8 +450,7 @@ export interface Settings {
   bgEffectColor?: string;
   bgEffectIntensity?: number;    // 0–100
   bgEffectSize?: number;         // 40–180
-  particleGlowIntensity?: number; // 0–100; default 50
-  particleTrailLength?: number;   // 0–100; default 30
+  bgGlowIntensity?: number;      // 0–100; canvas particle shadowBlur; default 50
   frostedPanels?: boolean;
   /** Auto-snap floating panels to snapped panel edges within 16 px during move (default true). */
   workspacePanelSnap?: boolean;
@@ -1866,12 +1872,4 @@ export interface AgentMeeting {
   status: 'in-progress' | 'completed' | 'failed';
   roundsCompleted: number;
   maxRounds: number;
-  /** Meeting purpose — drives structured output + prompt. Defaults to 'freeform' for legacy callers. */
-  purpose?: MeetingPurpose;
-  /** Structured artifact produced at the end of a scoped meeting. */
-  structuredOutput?: MeetingStructuredOutput;
-  /** Confidence (1-5) each participant self-reported on their final turn. */
-  participantConfidence?: Record<string, number>;
-  createdAt: number;
-  completedAt?: number;
-}
+  /
