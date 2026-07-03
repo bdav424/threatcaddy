@@ -786,7 +786,7 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
             onChange={(e) => setTitle(e.target.value)}
             onBlur={handleTitleBlur}
             placeholder="Page title…"
-            className="mb-4 w-full bg-transparent text-2xl font-bold text-inherit placeholder-gray-400 outline-none"
+            className="mb-4 w-full bg-transparent text-2xl font-bold text-inherit placeholder-text-muted outline-none"
           />
           {/* Rich text content */}
           <div
@@ -795,7 +795,7 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
             suppressContentEditableWarning
             onInput={scheduleContentSave}
             data-placeholder="Start writing…"
-            className="min-h-[60vh] w-full bg-transparent text-sm leading-7 text-inherit outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 empty:before:pointer-events-none [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5 [&_ul_ul]:list-[circle] [&_ul_ul_ul]:list-[square]"
+            className="min-h-[60vh] w-full bg-transparent text-sm leading-7 text-inherit outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-text-muted empty:before:pointer-events-none [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5 [&_ul_ul]:list-[circle] [&_ul_ul_ul]:list-[square]"
           />
           {/* Read-only drawing overlay — always visible when drawing data exists */}
           {page.drawingData && !drawMode && (

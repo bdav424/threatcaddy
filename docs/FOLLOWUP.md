@@ -101,8 +101,8 @@ However, the `FONT_OPTIONS` in `theme-schemes.ts` and any `@theme` string values
 NOT expressed as CSS variables (e.g. if spacing tokens were added) would not cascade to light
 mode. Keep all theme-switchable tokens as CSS custom properties, not literal `@theme` values.
 
-### 4. `JournalView.tsx` was deleted in working tree
+### 4. `JournalView.tsx` was deleted in working tree ✓ RESOLVED (slice-4)
 
-`git diff --stat` shows `src/components/Journal/JournalView.tsx | 390 --` (deleted).
-If this is intentional (Journal moved elsewhere), confirm no `import` references remain.
-If unintentional, restore from HEAD.
+Working tree had only 704 of 1094 lines — file was truncated mid-JSX (NTFS mount
+write interrupted during a prior session). Restored via `git show HEAD:... > file`.
+Polish applied on top
