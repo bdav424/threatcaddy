@@ -158,3 +158,34 @@ There is no explicit close button for docked panels. Close is only reachable via
 owning route's own UI (e.g., a sidebar toggle). Consider adding a subtle `×` icon
 to docked panel headers for discoverability, guarded by the same `onClose` prop gate
 already used in floating mode.
+
+---
+
+## Slice-6: Appearance settings consistency follow-up items
+
+### 1. Duplicate `frostedPanels` toggle
+
+The frosted-panels toggle appears in two places:
+
+- `src/components/Settings/AppearanceSettings.tsx` — "Bordered Panels" section (the correct home)
+- `src/components/Settings/SystemHygienePanel.tsx` — lines 217–218 (reset and standalone toggle)
+
+The SystemHygienePanel copy is a legacy holdover. It works (both write to the same setting) but is
+confusing. Remove `frostedPanels` from `SystemHygienePanel` in a follow-up — keep it only in
+`AppearanceSettings`.
+
+### 2. Dead `windowGlass*` settings fields
+
+`DEFAULT_SETTINGS` and the `Settings` type carry three fields that are never read by any active code:
+
+- `windowGlassEnabled: false`
+- `windowGlassTransparency: 0`
+- `windowGlassBlur: 0`
+
+`useSettings.ts` does not reference them. The frosted-panel path in `useSettings.ts` (lines 160–197)
+hardcodes `effectiveTransparency` and `effectiveBlur` from `settings.frostedPanels` only.
+
+These appear to be stubs for a native Electron window-glass API that was never fully wired or has
+been superseded by `frostedPanels`. Safe to remove from `DEFAULT_SETTINGS` and the `Settings` type
+in a dedicated cleanup slice — grep first to confirm no other consumers (extension, server, export)
+reference them.

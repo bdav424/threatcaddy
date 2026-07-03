@@ -638,6 +638,7 @@ export const DEFAULT_SETTINGS: Settings = {
   bgEffectPattern: 'none',
   bgEffectIntensity: 60,
   bgEffectSize: 100,
+  bgGlowIntensity: 50,
   frostedPanels: false,
   llmRoutingMode: 'auto',
 };
