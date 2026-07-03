@@ -52,3 +52,57 @@ change to omit the refresh token from the request body (cookie is sent automatic
 pinning (DNS rebinding TOCTOU fix). undici ships with Node ≥ 18, but it is not listed
 in `server/package.json`. Add `undici` as an explicit dependency to prevent silent
 fallback to the un-pinned fetch path if the runtime ever drops the built-in.
+
+---
+
+## Slice-3: Theme token follow-up items
+
+### 1. Repo-wide CRLF contamination
+
+~200 files in the working tree have CRLF line endings (Windows-style `\r\n`).
+The git object store uses LF, so these all show as modified even though content
+is identical. Fix:
+
+```
+# .gitattributes (add to repo root)
+* text=auto eol=lf
+*.ts  text eol=lf
+*.tsx text eol=lf
+*.css text eol=lf
+*.json text eol=lf
+*.md  text eol=lf
+*.mjs text eol=lf
+```
+
+After adding `.gitattributes`, run:
+```sh
+git add --renormalize .
+git commit -m "chore: normalize line endings to LF"
+```
+
+This should be done as a standalone commit before the next feature slice.
+
+### 2. `.light .bg-gray-*` cascade override problem
+
+`src/index.css` contains a large block of `.light .bg-gray-900 { background-color: #ffffff; }` etc.
+overrides. These apply globally to ANY element with a Tailwind gray utility class when in light
+mode, including dark-on-purpose elements (code blocks, terminal panels, dark preview cards).
+
+Recommended fix: add a `.tc-dark-island` utility class that restores dark-mode gray values inside
+a light-mode root. Affected components: code preview panels, terminal output, any "dark card"
+UI element that deliberately uses gray utility classes.
+
+### 3. `@theme` tokens in Tailwind v4 vs CSS cascade for light mode
+
+The `@theme {}` block registers dark mode values as Tailwind design tokens. The `.light {}`
+block overrides them at the CSS variable level. This works correctly via the cascade because
+Tailwind v4 generates utility classes as `background-color: var(--color-bg-deep)` etc.
+However, the `FONT_OPTIONS` in `theme-schemes.ts` and any `@theme` string values that are
+NOT expressed as CSS variables (e.g. if spacing tokens were added) would not cascade to light
+mode. Keep all theme-switchable tokens as CSS custom properties, not literal `@theme` values.
+
+### 4. `JournalView.tsx` was deleted in working tree
+
+`git diff --stat` shows `src/components/Journal/JournalView.tsx | 390 --` (deleted).
+If this is intentional (Journal moved elsewhere), confirm no `import` references remain.
+If unintentional, restore from HEAD.
