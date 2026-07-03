@@ -185,12 +185,37 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          excalidraw: ['@excalidraw/excalidraw'],
-          cytoscape: ['cytoscape', 'cytoscape-cose-bilkent'],
-          leaflet: ['leaflet', 'react-leaflet'],
-          markdown: ['marked', 'dompurify'],
-          compression: ['pako'],
+        manualChunks: (id) => {
+          // Excalidraw whiteboard + its transitive deps (mermaid-to-excalidraw, mermaid, elkjs).
+          // Mermaid's own dynamic imports (flowchart-elk, subset-shared, etc.) still create
+          // separate chunks — this prevents mermaid's static base from landing in index.
+          if (id.includes('@excalidraw/') || id.includes('/mermaid/') || id.includes('/elkjs/')) {
+            return 'excalidraw';
+          }
+          // Cytoscape graph library + cose-bilkent layout plugin.
+          if (id.includes('/cytoscape/') || id.includes('/cytoscape-cose-bilkent/')) {
+            return 'cytoscape';
+          }
+          // Leaflet maps stack.
+          if (id.includes('/leaflet/') || id.includes('/react-leaflet/') || id.includes('/react-leaflet-cluster/')) {
+            return 'leaflet';
+          }
+          // Markdown rendering utilities.
+          if (id.includes('/marked/') || id.includes('/dompurify/')) {
+            return 'markdown';
+          }
+          // Compression (pako — used for standalone locale bundles and backup crypto).
+          if (id.includes('/pako/')) {
+            return 'compression';
+          }
+          // React core — narrow match so react-router, react-i18next, etc. fall through.
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            return 'vendor-react';
+          }
+          // All remaining node_modules vendor code — keeps app code out of index.
+          if (id.includes('node_modules/')) {
+            return 'vendor-misc';
+          }
         },
       },
     },

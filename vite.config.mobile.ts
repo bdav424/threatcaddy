@@ -33,12 +33,28 @@ export default defineConfig({
     outDir: 'dist-mobile',
     rollupOptions: {
       output: {
-        manualChunks: {
-          excalidraw: ['@excalidraw/excalidraw'],
-          cytoscape: ['cytoscape', 'cytoscape-cose-bilkent'],
-          leaflet: ['leaflet', 'react-leaflet'],
-          markdown: ['marked', 'dompurify'],
-          compression: ['pako'],
+        manualChunks: (id) => {
+          if (id.includes('@excalidraw/') || id.includes('/mermaid/') || id.includes('/elkjs/')) {
+            return 'excalidraw';
+          }
+          if (id.includes('/cytoscape/') || id.includes('/cytoscape-cose-bilkent/')) {
+            return 'cytoscape';
+          }
+          if (id.includes('/leaflet/') || id.includes('/react-leaflet/') || id.includes('/react-leaflet-cluster/')) {
+            return 'leaflet';
+          }
+          if (id.includes('/marked/') || id.includes('/dompurify/')) {
+            return 'markdown';
+          }
+          if (id.includes('/pako/')) {
+            return 'compression';
+          }
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            return 'vendor-react';
+          }
+          if (id.includes('node_modules/')) {
+            return 'vendor-misc';
+          }
         },
       },
     },

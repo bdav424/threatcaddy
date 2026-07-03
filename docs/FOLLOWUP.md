@@ -189,3 +189,49 @@ These appear to be stubs for a native Electron window-glass API that was never f
 been superseded by `frostedPanels`. Safe to remove from `DEFAULT_SETTINGS` and the `Settings` type
 in a dedicated cleanup slice — grep first to confirm no other consumers (extension, server, export)
 reference them.
+
+---
+
+## Slice-7: Bundle splitting follow-up items
+
+### 1. cytoscape and excalidraw are static imports (not dynamic)
+
+Both libraries are imported statically at the top of their components:
+
+- `src/components/Graph/GraphCanvas.tsx` — `import cytoscape from 'cytoscape'`
+- `src/components/Whiteboard/WhiteboardEditor.tsx` — `import { Excalidraw, ... } from '@excalidraw/excalidraw'`
+
+However, both parent views (`GraphView`, `WhiteboardView`) ARE lazy-loaded via `React.lazy()` in
+`App.tsx`. This means the libraries DO load lazily at runtime — just not via a dynamic import call
+on the library itself. The `manualChunks` function ensures Rollup puts them in separate named chunks.
+No immediate action required, but if the parent components are ever eagerly imported, these libs
+would land in `index`. Consider wrapping the libraries themselves in dynamic imports inside the
+component files as a more resilient pattern:
+
+```ts
+// GraphCanvas.tsx example
+const [cytoscape, setCytoscape] = useState<typeof import('cytoscape') | null>(null);
+useEffect(() => { import('cytoscape').then(m => setCytoscape(m.default)); }, []);
+```
+
+### 2. mermaid / flowchart-elk / subset-shared chunks are Mermaid-internal
+
+`mermaid@10.9.3` is a transitive dependency via `@excalidraw/mermaid-to-excalidraw`. The chunks
+`flowchart-elk-[hash].js` and `subset-[hash].js` (and `sequenceDiagram-*`, `ganttDiagram-*`, etc.)
+are created by Mermaid's OWN dynamic imports within its source — they cannot be eliminated or
+merged via our `manualChunks`. They'll always be separate lazy files. The only control we have is
+ensuring mermaid's static base lands in the `excalidraw` chunk (done in slice-7) rather than `index`.
+
+### 3. vendor-misc chunk size — consider further splitting
+
+The `vendor-misc` catch-all chunk now contains all remaining node_modules code: `dexie`, `i18next`,
+`react-i18next`, `lucide-react`, `react-router-dom`, `minisearch`, `react-virtuoso`, etc. Depending
+on actual built size, it may still be large (>500 KB). If so, consider splitting further:
+
+```ts
+if (id.includes('/dexie/')) return 'vendor-dexie';
+if (id.includes('/lucide-react/')) return 'vendor-icons';
+if (id.includes('/i18next/') || id.includes('/react-i18next/')) return 'vendor-i18n';
+```
+
+Check the Vite build output for `vendor-misc-[hash].js` size before acting.
