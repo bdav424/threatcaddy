@@ -1832,4 +1832,20 @@ export async function mergeImportJSON(json: string): Promise<MergeImportResult> 
     await mergeTable('timelineEvents', db.timelineEvents, timelineEvents);
     await mergeTable('timelines', db.timelines, timelines);
     await mergeTable('whiteboards', db.whiteboards, whiteboards);
-    await mergeTable('standaloneIOCs', db.standaloneIOCs, standalon
+    await mergeTable('standaloneIOCs', db.standaloneIOCs, standaloneIOCs);
+    await mergeTable('evidenceItems', db.evidenceItems, evidenceItems);
+    await mergeTable('chatThreads', db.chatThreads, chatThreads);
+  });
+
+  return { added, skipped, updated, tables, noteInvestigations };
+}
+
+export function downloadFile(content: string, filename: string, type: string) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}

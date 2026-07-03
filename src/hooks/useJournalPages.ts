@@ -62,4 +62,4 @@ export const JOURNAL_THEME_LABELS: Record<JournalPageTheme, string> = {
   watermark: 'Watermark',
 };
 
-export con
+export const JOURNAL_THEMES: JournalPageTheme[] = ['plain', 'paper', 'lined', 'bullet', 'grid', 'cream', 'blue-gray', 'sage', 'watermark'];

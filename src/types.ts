@@ -1872,4 +1872,12 @@ export interface AgentMeeting {
   status: 'in-progress' | 'completed' | 'failed';
   roundsCompleted: number;
   maxRounds: number;
-  /
+  /** Meeting purpose — drives structured output + prompt. Defaults to 'freeform' for legacy callers. */
+  purpose?: MeetingPurpose;
+  /** Structured artifact produced at the end of a scoped meeting. */
+  structuredOutput?: MeetingStructuredOutput;
+  /** Confidence (1-5) each participant self-reported on their final turn. */
+  participantConfidence?: Record<string, number>;
+  createdAt: number;
+  completedAt?: number;
+}
