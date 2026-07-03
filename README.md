@@ -257,7 +257,7 @@ To send clips to an offline `file://` build, enable **"Allow access to file URLs
 - **21 languages** — UI fully translated into Arabic, Chinese (Simplified), Dutch, English, Farsi, French, German, Hebrew, Hindi, Indonesian, Italian, Japanese, Korean, Polish, Portuguese (Brazil), Russian, Spanish, Thai, Turkish, Ukrainian, and Vietnamese — including full RTL support
 - **Guided tour** — Interactive onboarding walkthrough
 - **Browser navigation** — Back/forward with persistent state across refresh
-- **Standalone HTML** — Offline version (`pnpm build:single`) with the app and locale packs bundled for `file://` use. The standard standalone PR copy is `/Users/brdavies/workspace/threatcaddy-standalone.html`; run `pnpm standard:standalone` to refresh it from the current repo state
+- **Standalone HTML** — Offline version (`pnpm build:single`) with the app and locale packs bundled for `file://` use. The standard standalone PR copy is `../threatcaddy-standalone.html`; run `pnpm standard:standalone` to refresh it from the current repo state
 - **Keyboard shortcuts** — `Ctrl+N` (new note), `Ctrl+O` (open file), `Ctrl+K` (search), `Ctrl+S` (backup), `Ctrl+Shift+T` (new task), `Ctrl+E` (toggle editor mode), `` Ctrl+` `` (toggle preview), `Ctrl+1-4` (switch view), `Ctrl+/` (show shortcuts), `Ctrl+B/I` (bold/italic)
 - **PWA** — Installable progressive web app with offline support via service worker; registers as an OS-level file handler for `.md` and `.txt` files
 - **Accessible UI** — All icon-only buttons carry `title` attributes (and `aria-label` where needed) so screen readers and hover users always know what a control does
@@ -353,7 +353,7 @@ pnpm standard:standalone # Alias for the standard standalone PR copy workflow
 
 ### Standard standalone PR copy
 
-Treat `/Users/brdavies/workspace/threatcaddy-standalone.html` as the canonical file-tree standalone build for this repo. The workflow is:
+Treat `../threatcaddy-standalone.html` as the canonical file-tree standalone build for this repo. The workflow is:
 
 ```bash
 pnpm standard:standalone
@@ -365,7 +365,7 @@ That command rebuilds `dist-single/` and refreshes the sibling workspace artifac
 
 ThreatCaddy stores data in the browser bucket for the exact address that opened it. `http://127.0.0.1:5173`, `http://localhost:5173`, hosted HTTPS, and `file://` standalone files each have separate IndexedDB/localStorage. If notes appear in one address but not another, export from the address where they are visible and merge-import into the address you want to use going forward.
 
-During development, `pnpm dev` serves the latest built standalone at `http://127.0.0.1:5173/threatcaddy-standalone.html` after `pnpm build:single`. That route uses the same `127.0.0.1:5173` storage bucket as the dev app. Opening the standard standalone PR copy at `/Users/brdavies/workspace/threatcaddy-standalone.html` from disk uses a separate `file://` bucket.
+During development, `pnpm dev` serves the latest built standalone at `http://127.0.0.1:5173/threatcaddy-standalone.html` after `pnpm build:single`. That route uses the same `127.0.0.1:5173` storage bucket as the dev app. Opening the standard standalone PR copy at `../threatcaddy-standalone.html` from disk uses a separate `file://` bucket.
 
 ### Local CaddyAI bridge
 

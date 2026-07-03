@@ -1855,8 +1855,9 @@ async function executeDefineSpecialist(inp: Record<string, unknown>, folderId?: 
   if (!name || !systemPrompt) return JSON.stringify({ error: 'name and systemPrompt are required' });
   if (!folderId) return JSON.stringify({ error: 'No active investigation' });
   if (systemPrompt.length > 1000) return JSON.stringify({ error: 'systemPrompt must be under 1000 characters' });
-  // Sanitize prompt to prevent injection of override instructions
-  const sanitizedPrompt = systemPrompt.replace(/\b(IGNORE|OVERRIDE|SYSTEM|INSTRUCTION|PROMPT|DISREGARD)\b/gi, '[REDACTED]');
+  // Keyword redaction removed: regex-based prompt filtering is bypassable and
+  // creates false security confidence. Controls are: tool scope gating +
+  // user confirmation before destructive tool calls.
   const sanitizedName = name.replace(/[*_`#<>[\]]/g, '').substring(0, 50);
 
   // Create profile
@@ -1868,7 +1869,7 @@ async function executeDefineSpecialist(inp: Record<string, unknown>, folderId?: 
     description: reason,
     icon,
     role,
-    systemPrompt: sanitizedPrompt,
+    systemPrompt,
     policy: { autoApproveReads: true, autoApproveEnrich: true, autoApproveFetch: false, autoApproveCreate: false, autoApproveModify: false, intervalMinutes: 5 },
     source: 'user',
     createdBy: 'agent',

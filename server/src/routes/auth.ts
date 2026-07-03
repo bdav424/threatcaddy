@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { eq, asc } from 'drizzle-orm';
 import * as argon2 from 'argon2';
 import { nanoid } from 'nanoid';
+import { createHash } from 'node:crypto';
 import { db } from '../db/index.js';
 import { users, sessions, allowedEmails } from '../db/schema.js';
 import { requireAuth, signAccessToken } from '../middleware/auth.js';
@@ -36,9 +37,16 @@ const updateProfileSchema = z.object({
   avatarUrl: z.string().url().nullish(),
 });
 
+/** Hash a refresh token before DB storage so a DB dump doesn't leak live credentials. */
+function hashRefreshToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
 async function createTokenPair(user: AuthUser, opts?: { tokenFamily?: string; rotationCounter?: number }) {
   const accessToken = await signAccessToken(user);
-  const refreshTokenId = nanoid(32);
+  // Generate plaintext token to return to client; store only its SHA-256 hash.
+  const refreshTokenPlain = nanoid(32);
+  const refreshTokenHash = hashRefreshToken(refreshTokenPlain);
   const tokenFamily = opts?.tokenFamily ?? nanoid(16);
   const rotationCounter = opts?.rotationCounter ?? 0;
 
@@ -63,14 +71,14 @@ async function createTokenPair(user: AuthUser, opts?: { tokenFamily?: string; ro
   }
 
   await db.insert(sessions).values({
-    id: refreshTokenId,
+    id: refreshTokenHash,
     userId: user.id,
     tokenFamily,
     rotationCounter,
     expiresAt,
   });
 
-  return { accessToken, refreshToken: refreshTokenId };
+  return { accessToken, refreshToken: refreshTokenPlain };
 }
 
 // POST /api/auth/register
@@ -262,7 +270,9 @@ app.post('/refresh', async (c) => {
     return c.json({ error: 'Missing refresh token', code: ErrorCodes.INVALID_REFRESH_TOKEN }, 400);
   }
 
-  const session = await db.select().from(sessions).where(eq(sessions.id, refreshToken)).limit(1);
+  // Hash the incoming plaintext token; DB stores only the hash.
+  const refreshTokenHash = hashRefreshToken(refreshToken);
+  const session = await db.select().from(sessions).where(eq(sessions.id, refreshTokenHash)).limit(1);
   if (session.length === 0) {
     // Token not found — check if it belongs to a known family (reuse detection).
     // A replayed token that was already rotated means potential token theft.
@@ -334,7 +344,8 @@ app.post('/logout', requireAuth, async (c) => {
   const body = await c.req.json();
   const { refreshToken } = body;
   if (refreshToken) {
-    await db.delete(sessions).where(eq(sessions.id, refreshToken));
+    // Hash before lookup — DB stores only hashed tokens.
+    await db.delete(sessions).where(eq(sessions.id, hashRefreshToken(refreshToken)));
   }
   await logActivity({ userId: authUser.id, category: 'auth', action: 'logout', detail: 'User logged out' });
   return c.json({ ok: true });

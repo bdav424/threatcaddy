@@ -19,6 +19,7 @@
 
 import { Hono } from 'hono';
 import { nanoid } from 'nanoid';
+import { createHash } from 'node:crypto';
 import { eq, and, asc } from 'drizzle-orm';
 import {
   generateRegistrationOptions,
@@ -243,7 +244,9 @@ app.post('/auth/finish', async (c) => {
   };
 
   const accessToken = await signAccessToken(authUser);
-  const refreshTokenId = nanoid(32);
+  // Generate plaintext token for client; store only its SHA-256 hash in the DB.
+  const refreshTokenPlain = nanoid(32);
+  const refreshTokenHash = createHash('sha256').update(refreshTokenPlain).digest('hex');
 
   const sessionSettings = await getSessionSettings();
   const expiresAt = new Date(Date.now() + sessionSettings.ttlHours * 60 * 60 * 1000);
@@ -264,7 +267,7 @@ app.post('/auth/finish', async (c) => {
   }
 
   await db.insert(sessions).values({
-    id: refreshTokenId,
+    id: refreshTokenHash,
     userId: userRow.id,
     tokenFamily: nanoid(16),
     rotationCounter: 0,
@@ -275,7 +278,7 @@ app.post('/auth/finish', async (c) => {
 
   return c.json({
     accessToken,
-    refreshToken: refreshTokenId,
+    refreshToken: refreshTokenPlain,
     user: { id: userRow.id, email: userRow.email, displayName: userRow.displayName, role: userRow.role, avatarUrl: userRow.avatarUrl },
     syncKeySalt: userRow.syncKeySalt ?? null,
   });

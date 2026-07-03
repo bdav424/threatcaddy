@@ -78,8 +78,13 @@ function isPrivateIP(ip: string): boolean {
   return false;
 }
 
-/** Validate that a URL is safe to fetch (no SSRF), with DNS resolution check */
-async function validateHttpUrl(urlStr: string): Promise<URL> {
+/**
+ * Validate that a URL is safe to fetch (no SSRF), with DNS resolution check.
+ * Returns the parsed URL AND the set of IPs the hostname resolved to, so the
+ * caller can pin the resolved IPs for the actual fetch (preventing DNS-rebinding
+ * TOCTOU: validate resolves to IP A, then fetch re-resolves and gets IP B).
+ */
+async function validateHttpUrl(urlStr: string): Promise<{ url: URL; resolvedIps: string[] }> {
   const url = new URL(urlStr);
   if (!['http:', 'https:'].includes(url.protocol)) {
     throw new Error(`Blocked URL scheme: ${url.protocol} — only HTTP/HTTPS allowed`);
@@ -98,7 +103,10 @@ async function validateHttpUrl(urlStr: string): Promise<URL> {
     throw new Error(`Blocked request to private/internal address: ${host}`);
   }
 
-  // DNS resolution check — prevents DNS rebinding attacks
+  // DNS resolution check — prevents DNS rebinding attacks.
+  // We also return the resolved IPs so the caller can pin them for the actual
+  // fetch, closing the TOCTOU window between validation and connection.
+  const resolvedIps: string[] = [];
   try {
     const dns = await import('node:dns');
     const [ipv4s, ipv6s] = await Promise.all([
@@ -109,6 +117,7 @@ async function validateHttpUrl(urlStr: string): Promise<URL> {
       if (isPrivateIP(ip)) {
         throw new Error(`Blocked request to ${host} — resolves to private IP: ${ip}`);
       }
+      resolvedIps.push(ip);
     }
   } catch (err) {
     if (err instanceof Error && err.message.startsWith('Blocked request')) throw err;
@@ -118,7 +127,56 @@ async function validateHttpUrl(urlStr: string): Promise<URL> {
     }
   }
 
-  return url;
+  return { url, resolvedIps };
+}
+
+/**
+ * Build a fetch function that pins the connection to a pre-resolved IP to
+ * prevent DNS-rebinding TOCTOU attacks (the window between validateHttpUrl's
+ * DNS check and the actual TCP connection).
+ *
+ * Uses undici (bundled with Node.js 18+). Falls back to globalThis.fetch with
+ * a console.warn if undici is unavailable — so the gap is never silent.
+ */
+async function buildPinnedFetch(
+  hostname: string,
+  resolvedIps: string[],
+): Promise<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>> {
+  const fallback = (input: RequestInfo | URL, init?: RequestInit) =>
+    globalThis.fetch(input, { ...init, redirect: 'error' });
+
+  if (resolvedIps.length === 0) return fallback;
+
+  try {
+    // undici is bundled with Node.js 18+ — no package.json entry needed.
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-expect-error — undici types not in @types/node; available at runtime
+    const { Agent, fetch: undiciF } = await import('undici');
+    const pinnedIp = resolvedIps[0];
+    const family = pinnedIp.includes(':') ? 6 : 4;
+    const agent = new Agent({
+      connect: {
+        // Return the pre-validated IP so the OS never re-resolves the hostname.
+        lookup: (_host: string, _opts: unknown, cb: (err: Error | null, addr: string, f: number) => void) => {
+          cb(null, pinnedIp, family);
+        },
+      },
+    });
+    return (input: RequestInfo | URL, init?: RequestInit) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      undiciF(input as string | URL, { ...init, redirect: 'error', dispatcher: agent } as any) as Promise<Response>;
+  } catch {
+    // DNS rebinding TOCTOU: undici unavailable — fetch will re-resolve DNS.
+    // The private-IP blocklist above and domain allowlist below reduce risk,
+    // but a short-TTL rebinding attack between validate and fetch is possible.
+    // Add undici to server/package.json dependencies for full IP pinning.
+    console.warn(
+      `[security] DNS rebinding TOCTOU: could not load undici for IP pinning on ${hostname}.` +
+      ` Fetch will re-resolve DNS. Validated IPs: ${resolvedIps.join(', ')}.` +
+      ` Add undici as a server dependency for full protection.`,
+    );
+    return fallback;
+  }
 }
 
 /**
@@ -429,8 +487,10 @@ export class IntegrationExecutor {
       : {};
     const resolvedBody = step.body != null ? resolveDeep(step.body, context) : undefined;
 
-    // Validate URL before fetching (SSRF protection, including DNS resolution)
-    const url = await validateHttpUrl(resolvedUrl);
+    // Validate URL before fetching (SSRF protection, including DNS resolution).
+    // validateHttpUrl also returns the IPs the hostname resolved to so we can
+    // pin them in the actual fetch, preventing DNS-rebinding TOCTOU.
+    const { url, resolvedIps } = await validateHttpUrl(resolvedUrl);
     for (const [key, value] of Object.entries(resolvedParams)) {
       url.searchParams.set(key, String(value));
     }
@@ -443,10 +503,11 @@ export class IntegrationExecutor {
     const backoffMs = step.retry?.backoffMs ?? 1000;
     let apiCalls = 0;
 
-    // Choose the fetch function: prefer the domain-restricted one from callbacks.
-    // Wrap globalThis.fetch to block redirects (prevents SSRF via open redirect).
-    const fetchFn = callbacks.fetchFn ?? ((input: RequestInfo | URL, init?: RequestInit) =>
-      globalThis.fetch(input, { ...init, redirect: 'error' }));
+    // Choose the fetch function: prefer the domain-restricted one from callbacks
+    // (caller is responsible for its own IP-pinning in that case).
+    // Otherwise build a fetch that pins the DNS-validated IPs to close the
+    // TOCTOU window between validateHttpUrl and the actual TCP connection.
+    const fetchFn = callbacks.fetchFn ?? await buildPinnedFetch(url.hostname, resolvedIps);
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       // Build fetch options

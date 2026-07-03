@@ -50,10 +50,11 @@ export function useAuth(): AuthState {
 
 const STORAGE_KEY = 'threatcaddy-auth';
 
+// Refresh token is NOT persisted to localStorage — it lives only in memory
+// (refreshTokenRef). A localStorage dump must not yield a live credential.
+// Access token is also memory-only (never written to localStorage).
 interface StoredAuth {
   serverUrl: string;
-  accessToken: string;
-  refreshToken: string;
   user: TeamUser;
 }
 
@@ -67,7 +68,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const syncKeyRef = useRef<CryptoKey | null>(null);
   const pendingMfaPasswordRef = useRef<string | null>(null);
 
-  // Restore from localStorage on mount
+  // Restore server URL and user profile from localStorage on mount.
+  // Tokens (access + refresh) are intentionally NOT restored — they are
+  // memory-only. The user will be prompted to re-authenticate after a page
+  // reload. This ensures a localStorage dump never yields live credentials.
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -75,9 +79,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const auth: StoredAuth = JSON.parse(stored);
         setServerUrlState(auth.serverUrl);
         setUser(auth.user);
-        accessTokenRef.current = auth.accessToken;
-        refreshTokenRef.current = auth.refreshToken;
-        setConnected(true);
+        // Tokens not restored — getAccessToken() will attempt a refresh and
+        // redirect to login if no valid session exists server-side.
+        setConnected(false);
       }
     } catch { /* ignore corrupt storage */ }
   }, []);
@@ -113,12 +117,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const persist = useCallback((url: string, token: string, refresh: string, u: TeamUser) => {
+    // Tokens are memory-only — never written to localStorage.
+    // localStorage stores only serverUrl + user profile for UI restoration.
     accessTokenRef.current = token;
     refreshTokenRef.current = refresh;
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       serverUrl: url,
-      accessToken: token,
-      refreshToken: refresh,
       user: u,
     }));
   }, []);

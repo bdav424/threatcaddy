@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from 'react';
-import { renderMarkdown } from '../../lib/markdown';
+import { renderMarkdown, sanitizeHtml } from '../../lib/markdown';
 import type { WikiLinkTarget } from '../../lib/markdown';
 import { extractIOCs, refangToDefanged } from '../../lib/ioc-extractor';
 import type { Note, IOCEntry } from '../../types';
@@ -180,7 +180,10 @@ export function MarkdownPreview({ content, defanged, allNotes, onNavigateToNote,
 
     const rendered = renderMarkdown(src, wikiLinkTargets);
     if (!shouldMirrorSelection) return rendered;
-    return applySelectionMirror(rendered);
+    // applySelectionMirror injects <mark> elements into already-sanitized HTML.
+    // Re-sanitize so DOMPurify.sanitize() is always the last step before
+    // dangerouslySetInnerHTML — correct order: applySelectionMirror → sanitize.
+    return sanitizeHtml(applySelectionMirror(rendered));
   }, [
     content,
     defanged,

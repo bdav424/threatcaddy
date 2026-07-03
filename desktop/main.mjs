@@ -19,6 +19,23 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
+// ── Security: safe shell.openExternal ─────────────────────────────────────
+// Only allow http: and https: URLs. Arbitrary protocol URIs (file:, app:,
+// custom schemes) can execute local code or trigger protocol handlers.
+function safeOpenExternal(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      console.warn('[security] blocked shell.openExternal for protocol:', parsed.protocol, url);
+      return;
+    }
+  } catch {
+    console.warn('[security] blocked shell.openExternal for invalid URL:', url);
+    return;
+  }
+  shell.openExternal(url);
+}
+
 // ── Static file server (loopback) ──────────────────────────────────────────
 // Serves dist/ over HTTP so Vite-built JS modules load correctly.
 // file:// breaks ES module CORS; a loopback server avoids that.
@@ -518,7 +535,7 @@ function createWindow(loopbackPort) {
   });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
+    void safeOpenExternal(url);
     return { action: 'deny' };
   });
 
