@@ -106,3 +106,55 @@ mode. Keep all theme-switchable tokens as CSS custom properties, not literal `@t
 Working tree had only 704 of 1094 lines — file was truncated mid-JSX (NTFS mount
 write interrupted during a prior session). Restored via `git show HEAD:... > file`.
 Polish applied on top
+ placeholder tokens `gray-400` → `text-muted` on title input
+and content editable placeholder.
+
+---
+
+## Slice-5: Workspace panel reconciliation follow-up items
+
+### 1. Content components with hardcoded dark Tailwind colors
+
+The following content components were found to use raw `bg-gray-*`, `border-gray-*`, and
+`text-gray-*` Tailwind utilities instead of CSS token classes. They are out-of-scope for
+slice-5 (which focused on panel chrome and the panel integration menu) but should be
+converted in a follow-up theming pass:
+
+| File | Notes |
+|------|-------|
+| `src/components/Notes/NoteEditor.tsx` | Extensive hardcoded dark colors throughout editor chrome |
+| `src/components/Notes/NoteList.tsx` | Folder/list row backgrounds and borders |
+| `src/components/Analysis/IOCPanel.tsx` | Panel header, row backgrounds, tag chips |
+| `src/components/Analysis/IOCItem.tsx` | Row chrome, confidence badge colors |
+| `src/components/Analysis/BulkEnrichModal.tsx` | Modal background, input borders |
+| `src/components/Analysis/BulkIOCImportModal.tsx` | Modal background, input borders |
+| `src/components/Analysis/IOCDeduplicator.tsx` | Table rows and headers |
+| `src/components/Analysis/AttributionComboInput.tsx` | Dropdown list items |
+| `src/components/Activity/ActivityLogView.tsx` | Log row backgrounds and timestamps |
+| `src/components/Alerts/AlertGlowPanel.tsx` | Toast container (z-[9999]); hardcoded dark glow variants |
+
+Token mapping reference (from slice-3):
+- `bg-gray-900` / `bg-gray-800` → `bg-bg-deep` / `bg-bg-raised`
+- `bg-gray-700` → `bg-bg-hover`
+- `border-gray-700` → `border-border-subtle`
+- `text-gray-300` → `text-text-primary`
+- `text-gray-400` → `text-text-secondary`
+- `text-gray-500` → `text-text-tertiary`
+
+### 2. WorkspacePanelDock stub not implemented
+
+`src/components/WorkspacePanels/WorkspacePanelDock.tsx` renders null. Minimized panels
+currently appear as inline `MinimizedPanelRollup` buttons at the bottom of each route's
+content area. A proper dock bar (bottom or side strip, always-visible) would improve
+discoverability. Tracked here rather than in panel reconciliation because it requires
+a new UX design decision.
+
+### 3. Panel header button inconsistency (minimize vs. close affordance)
+
+In `floating` mode, the panel chrome shows: drag handle → minimize → close.
+In `docked` mode, it shows: accent dot → minimize (no close).
+
+There is no explicit close button for docked panels. Close is only reachable via the
+owning route's own UI (e.g., a sidebar toggle). Consider adding a subtle `×` icon
+to docked panel headers for discoverability, guarded by the same `onClose` prop gate
+already used in floating mode.

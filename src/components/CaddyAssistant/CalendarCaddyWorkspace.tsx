@@ -3110,8 +3110,6 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
           placeholderClassName="shrink-0"
           floatingAriaLabel="CalendarCaddy selected agenda panel"
           resizeLabelBase="selected agenda"
-          popOutLabel="Pop out selected agenda"
-          dockLabel="Dock selected agenda back into UI"
           minimizeLabel="Minimize selected agenda"
           closeLabel="Close selected agenda workspace panel"
           restoreLabel="Restore selected agenda panel"
@@ -3586,6 +3584,4 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
           </div>
         </div>
       )}
-    </section>
-  );
-});
+   

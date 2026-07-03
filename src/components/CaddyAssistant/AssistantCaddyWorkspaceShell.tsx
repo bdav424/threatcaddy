@@ -183,7 +183,6 @@ function EmailCaddyWorkspacePanel({
       onRestore={restore}
       onClose={handleClose}
       active={workspacePanelActive || (routeActive && panel.mode !== 'docked')}
-      showFloatingPlaceholder={false}
       preserveChildrenAcrossModes
       deferMount
       minWidth={680}
@@ -193,8 +192,6 @@ function EmailCaddyWorkspacePanel({
       forceCompact={panel.mode === 'floating'}
       resizeLabelBase="EmailCaddy panel"
       floatingAriaLabel="EmailCaddy panel"
-      popOutLabel="Pop out EmailCaddy"
-      dockLabel="Dock EmailCaddy back into main workspace"
       minimizeLabel="Minimize EmailCaddy"
       closeLabel="Close EmailCaddy workspace panel"
       restoreLabel="Restore EmailCaddy panel"
@@ -254,7 +251,6 @@ function CalendarCaddyWorkspacePanel({
       onRestore={restore}
       onClose={handleClose}
       active={workspacePanelActive || (routeActive && panel.mode !== 'docked')}
-      showFloatingPlaceholder={false}
       preserveChildrenAcrossModes
       deferMount
       minWidth={520}
@@ -263,8 +259,6 @@ function CalendarCaddyWorkspacePanel({
       compactHeight={520}
       resizeLabelBase="CalendarCaddy panel"
       floatingAriaLabel="CalendarCaddy panel"
-      popOutLabel="Pop out CalendarCaddy"
-      dockLabel="Dock CalendarCaddy back into main workspace"
       minimizeLabel="Minimize CalendarCaddy"
       closeLabel="Close CalendarCaddy workspace panel"
       restoreLabel="Restore CalendarCaddy panel"
@@ -342,8 +336,6 @@ function AssistantCaddyOverviewWorkspacePanel({
       compactHeight={500}
       resizeLabelBase="AssistantCaddy panel"
       floatingAriaLabel="AssistantCaddy panel"
-      popOutLabel="Pop out AssistantCaddy"
-      dockLabel="Dock AssistantCaddy back into main workspace"
       minimizeLabel="Minimize AssistantCaddy"
       closeLabel="Close AssistantCaddy workspace panel"
       restoreLabel="Restore AssistantCaddy panel"
@@ -354,10 +346,4 @@ function AssistantCaddyOverviewWorkspacePanel({
     >
       <div
         className="flex min-h-0 flex-1"
-        data-assistantcaddy-shell-pane={workspacePanelActive ? 'active' : 'inactive'}
-      >
-        {children}
-      </div>
-    </WorkspacePanel>
-  );
-}
+        data-assistantcaddy-shell-pane={workspacePanelActive ? '

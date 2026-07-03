@@ -60,8 +60,6 @@ function DockHarness() {
         active
         resizeLabelBase="Notes panel"
         floatingAriaLabel="Notes panel"
-        popOutLabel="Pop out Notes"
-        dockLabel="Dock Notes back into main workspace"
         minimizeLabel="Minimize Notes"
         closeLabel="Close Notes workspace panel"
         restoreLabel="Restore Notes panel"
@@ -81,8 +79,6 @@ function DockHarness() {
         active
         resizeLabelBase="Tasks panel"
         floatingAriaLabel="Tasks panel"
-        popOutLabel="Pop out Tasks"
-        dockLabel="Dock Tasks back into main workspace"
         minimizeLabel="Minimize Tasks"
         closeLabel="Close Tasks workspace panel"
         restoreLabel="Restore Tasks panel"
@@ -128,8 +124,6 @@ function TopClampHarness() {
         active
         resizeLabelBase="Notes panel"
         floatingAriaLabel="Notes panel"
-        popOutLabel="Pop out Notes"
-        dockLabel="Dock Notes back into main workspace"
         minimizeLabel="Minimize Notes"
         closeLabel="Close Notes to workspace dock"
         restoreLabel="Restore Notes panel"
@@ -180,8 +174,6 @@ function DynamicWorkspaceHeaderClampHarness() {
         active={workspaceActive}
         resizeLabelBase="Notes panel"
         floatingAriaLabel="Notes panel"
-        popOutLabel="Pop out Notes"
-        dockLabel="Dock Notes back into main workspace"
         minimizeLabel="Minimize Notes"
         closeLabel="Close Notes to workspace dock"
         restoreLabel="Restore Notes panel"

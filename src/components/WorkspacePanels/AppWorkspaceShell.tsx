@@ -1598,8 +1598,6 @@ function DashboardWorkspacePanel({ routeActive, workspacePanelActive, children }
       compactHeight={520}
       resizeLabelBase="Dashboard panel"
       floatingAriaLabel="Dashboard panel"
-      popOutLabel="Pop out Dashboard"
-      dockLabel="Dock Dashboard back into main workspace"
       minimizeLabel="Minimize Dashboard"
       closeLabel="Close Dashboard workspace panel"
       restoreLabel="Restore Dashboard panel"
@@ -1640,8 +1638,6 @@ function ActivityWorkspacePanel({ routeActive, workspacePanelActive, children }:
       compactHeight={520}
       resizeLabelBase="Activity panel"
       floatingAriaLabel="Activity panel"
-      popOutLabel="Pop out Activity"
-      dockLabel="Dock Activity back into main workspace"
       minimizeLabel="Minimize Activity"
       closeLabel="Close Activity workspace panel"
       restoreLabel="Restore Activity panel"
@@ -1682,8 +1678,6 @@ function ProductsWorkspacePanel({ routeActive, workspacePanelActive, children }:
       compactHeight={540}
       resizeLabelBase="Products panel"
       floatingAriaLabel="Products panel"
-      popOutLabel="Pop out Products"
-      dockLabel="Dock Products back into main workspace"
       minimizeLabel="Minimize Products"
       closeLabel="Close Products workspace panel"
       restoreLabel="Restore Products panel"
@@ -1725,8 +1719,6 @@ function NotesWorkspacePanel({ routeActive, workspacePanelActive, children }: { 
       compactHeight={420}
       resizeLabelBase="Notes panel"
       floatingAriaLabel="Notes panel"
-      popOutLabel="Pop out Notes"
-      dockLabel="Dock Notes back into main workspace"
       minimizeLabel="Minimize Notes"
       closeLabel="Close Notes workspace panel"
       restoreLabel="Restore Notes panel"
@@ -1767,8 +1759,6 @@ function TasksWorkspacePanel({ routeActive, workspacePanelActive, children }: { 
       compactHeight={380}
       resizeLabelBase="Tasks panel"
       floatingAriaLabel="Tasks panel"
-      popOutLabel="Pop out Tasks"
-      dockLabel="Dock Tasks back into main workspace"
       minimizeLabel="Minimize Tasks"
       closeLabel="Close Tasks workspace panel"
       restoreLabel="Restore Tasks panel"
@@ -1808,8 +1798,6 @@ function EvidenceWorkspacePanel({ routeActive, workspacePanelActive, children }:
       compactHeight={560}
       resizeLabelBase="Evidence panel"
       floatingAriaLabel="Evidence panel"
-      popOutLabel="Pop out Evidence"
-      dockLabel="Dock Evidence back into main workspace"
       minimizeLabel="Minimize Evidence"
       closeLabel="Close Evidence workspace panel"
       restoreLabel="Restore Evidence panel"
@@ -1849,8 +1837,6 @@ function TimelineWorkspacePanel({ routeActive, workspacePanelActive, children }:
       compactHeight={560}
       resizeLabelBase="Timeline panel"
       floatingAriaLabel="Timeline panel"
-      popOutLabel="Pop out Timeline"
-      dockLabel="Dock Timeline back into main workspace"
       minimizeLabel="Minimize Timeline"
       closeLabel="Close Timeline workspace panel"
       restoreLabel="Restore Timeline panel"
@@ -1891,8 +1877,6 @@ function WhiteboardsWorkspacePanel({ routeActive, workspacePanelActive, children
       compactHeight={560}
       resizeLabelBase="Whiteboards panel"
       floatingAriaLabel="Whiteboards panel"
-      popOutLabel="Pop out Whiteboards"
-      dockLabel="Dock Whiteboards back into main workspace"
       minimizeLabel="Minimize Whiteboards"
       closeLabel="Close Whiteboards workspace panel"
       restoreLabel="Restore Whiteboards panel"
@@ -1945,8 +1929,6 @@ function GraphWorkspacePanel({
       compactHeight={560}
       resizeLabelBase="Graph panel"
       floatingAriaLabel="Graph panel"
-      popOutLabel="Pop out Graph"
-      dockLabel="Dock Graph back into main workspace"
       minimizeLabel="Minimize Graph"
       closeLabel="Close Graph workspace panel"
       restoreLabel="Restore Graph panel"
@@ -1986,8 +1968,6 @@ function CaddyShackWorkspacePanel({ routeActive, workspacePanelActive, children 
       compactHeight={540}
       resizeLabelBase="CaddyShack panel"
       floatingAriaLabel="CaddyShack panel"
-      popOutLabel="Pop out CaddyShack"
-      dockLabel="Dock CaddyShack back into main workspace"
       minimizeLabel="Minimize CaddyShack"
       closeLabel="Close CaddyShack workspace panel"
       restoreLabel="Restore CaddyShack panel"
@@ -2027,8 +2007,6 @@ function IocsWorkspacePanel({ routeActive, workspacePanelActive, children }: { r
       compactHeight={560}
       resizeLabelBase="IOCs panel"
       floatingAriaLabel="IOCs panel"
-      popOutLabel="Pop out IOCs"
-      dockLabel="Dock IOCs back into main workspace"
       minimizeLabel="Minimize IOCs"
       closeLabel="Close IOCs workspace panel"
       restoreLabel="Restore IOCs panel"
@@ -2068,8 +2046,6 @@ function ExperimentalWorkbenchWorkspacePanel({ routeActive, workspacePanelActive
       compactHeight={560}
       resizeLabelBase="CaddyShack workbench panel"
       floatingAriaLabel="CaddyShack workbench panel"
-      popOutLabel="Pop out CaddyShack workbench"
-      dockLabel="Dock CaddyShack workbench back into main workspace"
       minimizeLabel="Minimize CaddyShack workbench"
       closeLabel="Close CaddyShack workbench workspace panel"
       restoreLabel="Restore CaddyShack workbench panel"
@@ -2109,8 +2085,6 @@ function AgentCaddyWorkspacePanel({ routeActive, workspacePanelActive, children 
       compactHeight={560}
       resizeLabelBase="AgentCaddy panel"
       floatingAriaLabel="AgentCaddy panel"
-      popOutLabel="Pop out AgentCaddy"
-      dockLabel="Dock AgentCaddy back into main workspace"
       minimizeLabel="Minimize AgentCaddy"
       closeLabel="Close AgentCaddy workspace panel"
       restoreLabel="Restore AgentCaddy panel"
@@ -2159,8 +2133,6 @@ function ChatWorkspacePanel({ routeActive, workspacePanelActive, children }: { r
       compactHeight={580}
       resizeLabelBase="CaddyAI panel"
       floatingAriaLabel="CaddyAI panel"
-      popOutLabel="Pop out CaddyAI"
-      dockLabel="Dock CaddyAI back into main workspace"
       minimizeLabel="Minimize CaddyAI"
       closeLabel="Close CaddyAI workspace panel"
       restoreLabel="Restore CaddyAI panel"
@@ -2200,8 +2172,6 @@ function ReportsWorkspacePanel({ routeActive, workspacePanelActive, children }: 
       compactHeight={480}
       resizeLabelBase="Reports panel"
       floatingAriaLabel="Reports panel"
-      popOutLabel="Pop out Reports"
-      dockLabel="Dock Reports back into main workspace"
       minimizeLabel="Minimize Reports"
       closeLabel="Close Reports workspace panel"
       restoreLabel="Restore Reports panel"

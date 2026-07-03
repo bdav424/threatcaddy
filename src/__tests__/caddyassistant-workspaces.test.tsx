@@ -264,7 +264,6 @@ function PreservedMinimizedPanel() {
       preserveChildrenWhenMinimized
       resizeLabelBase="Preserved panel"
       floatingAriaLabel="Preserved panel"
-      popOutLabel="Pop out preserved panel"
       minimizeLabel="Minimize preserved panel"
       restoreLabel="Restore preserved panel"
     >
@@ -298,7 +297,6 @@ function StableModePanel() {
         active
         resizeLabelBase="Stable panel"
         floatingAriaLabel="Stable panel"
-        popOutLabel="Pop out stable panel"
         minimizeLabel="Minimize stable panel"
         restoreLabel="Restore stable panel"
       >

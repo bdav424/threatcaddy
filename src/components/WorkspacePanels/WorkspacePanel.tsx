@@ -70,8 +70,6 @@ interface WorkspacePanelProps {
   bodyClassName?: string;
   floatingAriaLabel?: string;
   resizeLabelBase?: string;
-  popOutLabel?: string;
-  dockLabel?: string;
   minimizeLabel?: string;
   closeLabel?: string;
   restoreLabel?: string;
@@ -79,8 +77,6 @@ interface WorkspacePanelProps {
   preserveChildrenAcrossModes?: boolean;
   /** Skip rendering bodyChildren until the panel is first activated, then keep them mounted. */
   deferMount?: boolean;
-  /** When false, suppresses the FloatingSourcePlaceholder pill shown in the source slot while the panel is floating. */
-  showFloatingPlaceholder?: boolean;
   active?: boolean;
   minWidth?: number;
   minHeight?: number;

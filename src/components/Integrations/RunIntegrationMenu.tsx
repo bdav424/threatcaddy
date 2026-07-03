@@ -254,10 +254,10 @@ export function RunIntegrationMenu({ ioc, investigation, folderId, source, match
       <button
         onClick={() => setOpen((v) => !v)}
         disabled={running}
-        className={`p-1 rounded hover:bg-gray-700 transition-colors disabled:opacity-50 ${
+        className={`p-1 rounded hover:bg-bg-hover transition-colors disabled:opacity-50 ${
           matching.length > 0
             ? 'text-amber-500/70 hover:text-amber-400'
-            : 'text-gray-600 hover:text-gray-400'
+            : 'text-text-tertiary hover:text-text-secondary'
         }`}
         title={matching.length > 0 ? t('run.runIntegration') : t('run.noIntegrationsTitle')}
       >
@@ -271,16 +271,16 @@ export function RunIntegrationMenu({ ioc, investigation, folderId, source, match
       {open && menuRect && typeof document !== 'undefined' && createPortal(
         <div
           ref={dropdownRef}
-          className="fixed z-[260] w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1"
+          className="fixed z-[260] w-56 bg-bg-raised border border-border-subtle rounded-lg shadow-xl py-1"
           style={{ left: menuRect.left, top: menuRect.top }}
         >
-          <div className="px-3 py-1.5 text-[10px] text-gray-500 uppercase tracking-wider font-semibold border-b border-gray-700">
+          <div className="px-3 py-1.5 text-[10px] text-text-tertiary uppercase tracking-wider font-semibold border-b border-border-subtle">
             {t('run.runIntegration')}
           </div>
           {matching.length === 0 ? (
             <button
               onClick={() => { setOpen(false); onOpenSettings?.(); }}
-              className="w-full text-start px-3 py-3 text-xs text-gray-400 hover:bg-gray-700 transition-colors"
+              className="w-full text-start px-3 py-3 text-xs text-text-secondary hover:bg-bg-hover transition-colors"
             >
               <p>{t('run.noIntegrationsForType')}</p>
               <p className="text-amber-500/80 mt-1">{t('run.setupIntegrations')}</p>
@@ -290,7 +290,7 @@ export function RunIntegrationMenu({ ioc, investigation, folderId, source, match
               <button
                 key={installation.id}
                 onClick={() => handleRun(installation.id, template.id)}
-                className="w-full text-start px-3 py-2 text-xs text-gray-300 hover:bg-gray-700 hover:text-gray-100 transition-colors flex items-center gap-2"
+                className="w-full text-start px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors flex items-center gap-2"
               >
                 <div
                   className="w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold text-white shrink-0"
@@ -300,7 +300,7 @@ export function RunIntegrationMenu({ ioc, investigation, folderId, source, match
                 </div>
                 <div className="min-w-0">
                   <div className="truncate">{template.name}</div>
-                  <div className="text-[10px] text-gray-500 truncate">{template.description}</div>
+                  <div className="text-[10px] text-text-tertiary truncate">{template.description}</div>
                 </div>
               </button>
             ))
