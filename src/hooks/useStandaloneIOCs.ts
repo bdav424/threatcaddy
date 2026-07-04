@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import Dexie from 'dexie';
 import { db } from '../db';
 import type { StandaloneIOC } from '../types';
 import { nanoid } from 'nanoid';
@@ -12,11 +13,20 @@ export function useStandaloneIOCs(folderId?: string) {
   const [loading, setLoading] = useState(true);
 
   const loadIOCs = useCallback(async () => {
+    // When scoped to a folder, use the [folderId+createdAt] composite index so the
+    // result comes back newest-first from the index — no JS re-sort needed.
     const all = folderId
-      ? await db.standaloneIOCs.where('folderId').equals(folderId).toArray()
+      ? await db.standaloneIOCs
+          .where('[folderId+createdAt]')
+          .between([folderId, Dexie.minKey], [folderId, Dexie.maxKey])
+          .reverse()
+          .toArray()
       : await db.standaloneIOCs.toArray();
     const remaining = await purgeOldTrash(all, db.standaloneIOCs);
-    setIOCs(remaining.sort((a, b) => b.createdAt - a.createdAt));
+    // Global load is unsorted from the index — sort in JS (same as before).
+    // Per-folder load is already sorted descending by createdAt.
+    if (!folderId) remaining.sort((a, b) => b.createdAt - a.createdAt);
+    setIOCs(remaining);
     setLoading(false);
   }, [folderId]);
 

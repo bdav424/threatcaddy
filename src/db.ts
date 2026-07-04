@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, ReportTemplate, GraphSnapshot, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus, EnrichmentCacheEntry, VirtualCaddyJob, NetworkDevice, NetworkScanJob, SyncAuthSettings, JournalPage } from './types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, ReportTemplate, GraphSnapshot, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus, EnrichmentCacheEntry, VirtualCaddyJob, NetworkDevice, NetworkScanJob, SyncAuthSettings, JournalPage, IOCRecheckDiff } from './types';
 import type { IntegrationTemplate, InstalledIntegration, IntegrationRun } from './types/integration-types';
 import { installEncryptionMiddleware } from './lib/encryptionMiddleware';
 
@@ -34,6 +34,7 @@ const db = new Dexie('ThreatCaddyDB') as Dexie & {
   networkScanJobs: EntityTable<NetworkScanJob, 'id'>;
   syncAuthSettings: EntityTable<SyncAuthSettings, 'id'>;
   journalPages: EntityTable<JournalPage, 'id'>;
+  iocRecheckDiffs: EntityTable<IOCRecheckDiff, 'id'>;
 };
 
 db.version(1).stores({
@@ -356,6 +357,21 @@ db.version(40).stores({
 
 // Version 41: JournalPage.drawingData — canvas drawing stored as base64 PNG.
 db.version(41).stores({});
+
+// Version 42: Composite indexes for missing per-investigation sort patterns.
+// chatThreads + whiteboards gain [folderId+updatedAt] (matching notes/tasks/evidenceItems).
+// standaloneIOCs gains [folderId+createdAt] so sorted per-folder reads avoid a JS re-sort.
+db.version(42).stores({
+  chatThreads: 'id, title, folderId, trashed, archived, createdAt, updatedAt, *tags, createdBy, [folderId+updatedAt]',
+  whiteboards: 'id, name, folderId, trashed, archived, order, createdAt, updatedAt, *tags, createdBy, [folderId+updatedAt]',
+  standaloneIOCs: 'id, type, value, folderId, trashed, archived, createdAt, updatedAt, *tags, createdBy, assigneeId, [folderId+createdAt]',
+});
+
+// Version 43: IOC re-check diffing — records the delta between successive enrichment runs for an IOC.
+// Indexed by iocId and checkedAt (composite index for per-IOC chronological queries).
+db.version(43).stores({
+  iocRecheckDiffs: 'id, iocId, checkedAt, [iocId+checkedAt]',
+});
 
 
 function evidenceKindFromExtension(value: string): EvidenceKind {

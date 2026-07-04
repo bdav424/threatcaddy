@@ -12,22 +12,18 @@ export function useActivityLog() {
   useEffect(() => {
     (async () => {
       const cutoff = Date.now() - RETENTION_DAYS * 86_400_000;
-      // Use toArray() (goes through DBCore query handler → decrypts).
-      // Avoid orderBy().reverse() which may use openCursor and bypass
-      // the encryption middleware's query-level decryption.
-      const all = await db.activityLog.toArray();
-      const kept: ActivityLogEntry[] = [];
-      const expiredIds: string[] = [];
-      for (const entry of all) {
-        if (entry.timestamp >= cutoff) {
-          kept.push(entry);
-        } else {
-          expiredIds.push(entry.id);
-        }
-      }
-      if (expiredIds.length > 0) {
-        await db.activityLog.bulkDelete(expiredIds);
-      }
+      // `timestamp` is NOT in ENCRYPTED_FIELDS so the index stores plaintext values —
+      // IDBKeyRange queries work correctly even when encryption is enabled.
+      //
+      // Step 1: delete expired rows via cursor-delete on the timestamp index.
+      // This avoids loading+decrypting thousands of rows we're going to throw away.
+      await db.activityLog.where('timestamp').below(cutoff).delete();
+      //
+      // Step 2: load only the retained window through the DBCore query handler so
+      // encrypted fields (detail, itemTitle) are decrypted correctly.
+      // We intentionally avoid orderBy().reverse() which uses openCursor and can
+      // bypass the middleware's query-level decryption path.
+      const kept = await db.activityLog.where('timestamp').aboveOrEqual(cutoff).toArray();
       kept.sort((a, b) => b.timestamp - a.timestamp);
       // Cap in-memory entries to prevent excessive state size
       setEntries(kept.length > 5000 ? kept.slice(0, 5000) : kept);

@@ -40,11 +40,15 @@ export function useTags() {
         const oldTag = tags.find((t) => t.id === id);
         if (oldTag && oldTag.name !== updates.name) {
           const newName = updates.name;
-          const notesWithTag = await db.notes.filter((n) => n.tags.includes(oldTag.name)).toArray();
-          const tasksWithTag = await db.tasks.filter((t) => t.tags.includes(oldTag.name)).toArray();
-          const eventsWithTag = await db.timelineEvents.filter((e) => e.tags.includes(oldTag.name)).toArray();
-          const boardsWithTag = await db.whiteboards.filter((w) => w.tags.includes(oldTag.name)).toArray();
-          const evidenceWithTag = await db.evidenceItems.filter((e) => e.tags.includes(oldTag.name)).toArray();
+          // Use MultiEntry index (*tags) — avoids a full table scan on each table.
+          // tags field is NOT in ENCRYPTED_FIELDS so index values are stored plaintext.
+          const [notesWithTag, tasksWithTag, eventsWithTag, boardsWithTag, evidenceWithTag] = await Promise.all([
+            db.notes.where('tags').equals(oldTag.name).toArray(),
+            db.tasks.where('tags').equals(oldTag.name).toArray(),
+            db.timelineEvents.where('tags').equals(oldTag.name).toArray(),
+            db.whiteboards.where('tags').equals(oldTag.name).toArray(),
+            db.evidenceItems.where('tags').equals(oldTag.name).toArray(),
+          ]);
           await Promise.all([
             ...notesWithTag.map((n) =>
               db.notes.update(n.id, { tags: n.tags.map((t) => (t === oldTag.name ? newName : t)) })
@@ -72,12 +76,14 @@ export function useTags() {
     const tag = tags.find((t) => t.id === id);
     if (!tag) return;
     await db.transaction('rw', [db.tags, db.notes, db.tasks, db.timelineEvents, db.whiteboards, db.evidenceItems], async () => {
-      // Remove tag from all tagged entities.
-      const notesWithTag = await db.notes.filter((n) => n.tags.includes(tag.name)).toArray();
-      const tasksWithTag = await db.tasks.filter((t) => t.tags.includes(tag.name)).toArray();
-      const eventsWithTag = await db.timelineEvents.filter((e) => e.tags.includes(tag.name)).toArray();
-      const boardsWithTag = await db.whiteboards.filter((w) => w.tags.includes(tag.name)).toArray();
-      const evidenceWithTag = await db.evidenceItems.filter((e) => e.tags.includes(tag.name)).toArray();
+      // Use MultiEntry index (*tags) — avoids a full table scan on each table.
+      const [notesWithTag, tasksWithTag, eventsWithTag, boardsWithTag, evidenceWithTag] = await Promise.all([
+        db.notes.where('tags').equals(tag.name).toArray(),
+        db.tasks.where('tags').equals(tag.name).toArray(),
+        db.timelineEvents.where('tags').equals(tag.name).toArray(),
+        db.whiteboards.where('tags').equals(tag.name).toArray(),
+        db.evidenceItems.where('tags').equals(tag.name).toArray(),
+      ]);
       await Promise.all([
         ...notesWithTag.map((n) =>
           db.notes.update(n.id, { tags: n.tags.filter((t) => t !== tag.name) })

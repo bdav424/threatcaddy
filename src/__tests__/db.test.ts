@@ -69,8 +69,8 @@ describe('Database schema', () => {
     expect(db.syncAuthSettings).toBeDefined();
   });
 
-  it('is at version 41', () => {
-    expect(db.verno).toBe(41);
+  it('is at version 43', () => {
+    expect(db.verno).toBe(43);
   });
 });
 
