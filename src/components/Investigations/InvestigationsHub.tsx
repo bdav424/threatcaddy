@@ -201,7 +201,23 @@ export function InvestigationsHub({
     ];
     const map = new Map<string, string | undefined>();
     for (const f of localFolders) {
-      map.set(f.id, getInheritedClsLevel(f.id, allEntities) ?? f.clsLevel);
+      const entityLevel = getInheritedClsLevel(f.id, allEntities);
+      const folderLevel = f.clsLevel;
+      // Pick the higher of entity-inherited and folder-set TLP.
+      // Previously `?? f.clsLevel` was used, which only fell back when
+      // getInheritedClsLevel returned undefined (no entities with TLP).
+      // That silently ignored a manually-raised folder clsLevel whenever
+      // any entity carried a TLP — even a lower one — causing the hub
+      // badge to stay stale instead of showing the raised level.
+      let effective: string | undefined;
+      if (!entityLevel) {
+        effective = folderLevel;
+      } else if (!folderLevel) {
+        effective = entityLevel;
+      } else {
+        effective = clsLevelIndex(folderLevel) > clsLevelIndex(entityLevel) ? folderLevel : entityLevel;
+      }
+      map.set(f.id, effective);
     }
     return map;
   }, [localFolders, allNotes, allTasks, allEvents, allIOCs]);
