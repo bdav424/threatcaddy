@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useEffect, useRef, useState, lazy, Suspense, memo, type ReactNode } from 'react';
 import { AppLayout } from './components/Layout/AppLayout';
+import { BottomTabBar } from './components/Layout/BottomTabBar';
 import { Header } from './components/Layout/Header';
 import { Sidebar } from './components/Layout/Sidebar';
 import {
@@ -2845,6 +2846,7 @@ const AppInner = memo(function AppInner({
           />
           </ErrorBoundary>
         }
+        bottomNav={<BottomTabBar />}
       >
         <ErrorBoundary region="main-content">
         <Suspense fallback={<div className="flex-1 flex items-center justify-center text-gray-500">Loading…</div>}>

@@ -116,14 +116,14 @@ export function ActivityLogView({ entries, getFiltered, onClear }: ActivityLogVi
           placeholder={t('searchPlaceholder')}
           className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-accent"
         />
-        <div className="flex items-center gap-1 flex-wrap" role="group" aria-label="Filter activity by category">
+        <div className="flex items-center gap-1 flex-nowrap overflow-x-auto pb-0.5" role="group" aria-label="Filter activity by category">
           <button
             type="button"
             aria-label="Show all activity"
             aria-pressed={!selectedCategory}
             onClick={() => setSelectedCategory(undefined)}
             className={cn(
-              'px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors',
+              'shrink-0 min-h-[44px] md:min-h-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors',
               !selectedCategory
                 ? 'bg-accent/20 text-accent'
                 : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
@@ -141,7 +141,7 @@ export function ActivityLogView({ entries, getFiltered, onClear }: ActivityLogVi
                 aria-pressed={selectedCategory === cat}
                 onClick={() => setSelectedCategory(selectedCategory === cat ? undefined : cat)}
                 className={cn(
-                  'px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors',
+                  'shrink-0 min-h-[44px] md:min-h-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors',
                   selectedCategory === cat
                     ? 'text-white'
                     : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'

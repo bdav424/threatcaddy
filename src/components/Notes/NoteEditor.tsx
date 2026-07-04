@@ -979,13 +979,13 @@ export function NoteEditor({
     <div className="flex flex-col h-full w-full">
       {/* Toolbar */}
       <div
-        className="flex items-center gap-0.5 sm:gap-1 px-2 sm:px-4 py-1.5 sm:py-2 border-b-2 border-gray-800 shrink-0"
+        className="flex flex-wrap items-center gap-0.5 sm:gap-1 px-2 sm:px-4 py-1.5 sm:py-2 border-b-2 border-gray-800 shrink-0"
         style={tlpBorderColor ? { borderBottomColor: tlpBorderColor } : undefined}
       >
         {onBack && (
           <button
             onClick={onBack}
-            className="p-1.5 rounded text-gray-500 hover:text-gray-300 md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="p-2.5 md:p-1.5 rounded text-gray-500 hover:text-gray-300 md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label={t('editor.backToListAria')}
             title={t('editor.backToList')}
           >
@@ -994,7 +994,7 @@ export function NoteEditor({
         )}
         <button
           onClick={() => onEditorModeChange('edit')}
-          className={cn('p-1.5 rounded', editorMode === 'edit' ? 'bg-gray-700 text-gray-200' : 'text-gray-500 hover:text-gray-300')}
+          className={cn('p-2.5 md:p-1.5 rounded', editorMode === 'edit' ? 'bg-gray-700 text-gray-200' : 'text-gray-500 hover:text-gray-300')}
           title={t('editor.editMode')}
           aria-label={t('editor.editMode')}
         >
@@ -1002,7 +1002,7 @@ export function NoteEditor({
         </button>
         <button
           onClick={() => onEditorModeChange('split')}
-          className={cn('p-1.5 rounded hidden sm:block', editorMode === 'split' ? 'bg-gray-700 text-gray-200' : 'text-gray-500 hover:text-gray-300')}
+          className={cn('p-2.5 md:p-1.5 rounded hidden sm:block', editorMode === 'split' ? 'bg-gray-700 text-gray-200' : 'text-gray-500 hover:text-gray-300')}
           title={t('editor.splitMode')}
           aria-label={t('editor.splitMode')}
         >
@@ -1010,7 +1010,7 @@ export function NoteEditor({
         </button>
         <button
           onClick={() => onEditorModeChange('preview')}
-          className={cn('p-1.5 rounded', editorMode === 'preview' ? 'bg-gray-700 text-gray-200' : 'text-gray-500 hover:text-gray-300')}
+          className={cn('p-2.5 md:p-1.5 rounded', editorMode === 'preview' ? 'bg-gray-700 text-gray-200' : 'text-gray-500 hover:text-gray-300')}
           title={t('editor.previewMode')}
           aria-label={t('editor.previewMode')}
         >
@@ -1065,7 +1065,7 @@ export function NoteEditor({
 
         <button
           onClick={() => onTogglePin(note.id)}
-          className={cn('p-1.5 rounded', note.pinned ? 'text-yellow-400' : 'text-gray-500 hover:text-gray-300')}
+          className={cn('p-2.5 md:p-1.5 rounded', note.pinned ? 'text-yellow-400' : 'text-gray-500 hover:text-gray-300')}
           title={note.pinned ? t('editor.unpin') : t('editor.pin')}
           aria-label={note.pinned ? t('editor.unpinAria') : t('editor.pinAria')}
         >
@@ -1073,7 +1073,7 @@ export function NoteEditor({
         </button>
         <button
           onClick={() => onToggleArchive(note.id)}
-          className={cn('p-1.5 rounded', note.archived ? 'text-accent' : 'text-gray-500 hover:text-gray-300')}
+          className={cn('p-2.5 md:p-1.5 rounded', note.archived ? 'text-accent' : 'text-gray-500 hover:text-gray-300')}
           title={note.archived ? t('editor.unarchive') : t('editor.archive')}
           aria-label={note.archived ? t('editor.unarchiveAria') : t('editor.archiveAria')}
         >
@@ -1083,7 +1083,7 @@ export function NoteEditor({
         <div className="relative">
           <button
             onClick={() => setShowColors(!showColors)}
-            className="p-1.5 rounded text-gray-500 hover:text-gray-300"
+            className="p-2.5 md:p-1.5 rounded text-gray-500 hover:text-gray-300"
             title={t('editor.color')}
             aria-label={t('editor.colorAria')}
           >
@@ -1144,7 +1144,7 @@ export function NoteEditor({
             }
             setShowIOCPanel(!showIOCPanel);
           }}
-          className={cn('p-1.5 rounded hidden md:flex items-center gap-1', showIOCPanel ? 'bg-gray-700 text-accent' : 'text-gray-500 hover:text-gray-300')}
+          className={cn('p-2.5 md:p-1.5 rounded hidden md:flex items-center gap-1', showIOCPanel ? 'bg-gray-700 text-accent' : 'text-gray-500 hover:text-gray-300')}
           title={t('editor.iocAnalysis')}
           aria-label={t('editor.iocAnalysisAria')}
         >
@@ -1166,7 +1166,7 @@ export function NoteEditor({
 
         <button
           onClick={() => setShowAnnotations(!showAnnotations)}
-          className={cn('p-1.5 rounded flex items-center gap-1', showAnnotations ? 'bg-gray-700 text-accent' : 'text-gray-500 hover:text-gray-300')}
+          className={cn('p-2.5 md:p-1.5 rounded flex items-center gap-1', showAnnotations ? 'bg-gray-700 text-accent' : 'text-gray-500 hover:text-gray-300')}
           title={t('editor.annotations')}
           aria-label={t('editor.annotationsAria')}
         >
@@ -1181,7 +1181,7 @@ export function NoteEditor({
         {onShareLink && (
           <button
             onClick={() => onShareLink(note)}
-            className="p-1.5 rounded text-gray-500 hover:text-gray-300"
+            className="p-2.5 md:p-1.5 rounded text-gray-500 hover:text-gray-300"
             title={t('editor.shareLink')}
             aria-label={t('editor.shareLinkAria')}
           >
@@ -1192,7 +1192,7 @@ export function NoteEditor({
         {onSaveAsTemplate && !note.trashed && (
           <button
             onClick={() => onSaveAsTemplate(note)}
-            className="p-1.5 rounded text-gray-500 hover:text-gray-300"
+            className="p-2.5 md:p-1.5 rounded text-gray-500 hover:text-gray-300"
             title={t('editor.saveAsTemplate')}
             aria-label={t('editor.saveAsTemplateAria')}
           >
@@ -1206,7 +1206,7 @@ export function NoteEditor({
             const safeTitle = (note.title || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80);
             downloadFile(mdContent, `${safeTitle}.md`, 'text/markdown');
           }}
-          className="p-1.5 rounded text-gray-500 hover:text-gray-300"
+          className="p-2.5 md:p-1.5 rounded text-gray-500 hover:text-gray-300"
           title={t('editor.downloadMarkdown')}
           aria-label={t('editor.downloadMarkdownAria')}
         >
@@ -1226,7 +1226,7 @@ export function NoteEditor({
                 }
               }}
               disabled={cloud.syncing}
-              className="p-1.5 rounded text-gray-500 hover:text-gray-300 disabled:opacity-50"
+              className="p-2.5 md:p-1.5 rounded text-gray-500 hover:text-gray-300 disabled:opacity-50"
               title={t('editor.shareToCloud')}
               aria-label={t('editor.shareToCloudAria')}
             >
@@ -1264,7 +1264,7 @@ export function NoteEditor({
           {note.trashed ? (
             <button
               onClick={() => onRestore(note.id)}
-              className="p-1.5 rounded text-gray-500 hover:text-green-400"
+              className="p-2.5 md:p-1.5 rounded text-gray-500 hover:text-green-400"
               title={t('editor.restore')}
               aria-label={t('editor.restoreAria')}
             >
@@ -1273,7 +1273,7 @@ export function NoteEditor({
           ) : (
             <button
               onClick={() => onTrash(note.id)}
-              className="p-1.5 rounded text-red-500 hover:text-red-400"
+              className="p-2.5 md:p-1.5 rounded text-red-500 hover:text-red-400"
               title={t('editor.moveToTrash')}
               aria-label={t('editor.moveToTrashAria')}
             >
@@ -1281,6 +1281,17 @@ export function NoteEditor({
             </button>
           )}
         </div>
+      </div>
+
+      {/* Mobile tag row — sits just below the toolbar so it stays visible
+          above the soft keyboard instead of being buried in the footer */}
+      <div className="md:hidden px-2 py-1 border-b border-gray-800 shrink-0">
+        <TagInput
+          selectedTags={note.tags}
+          allTags={allTags}
+          onChange={(tags) => onUpdate(note.id, { tags })}
+          onCreateTag={onCreateTag}
+        />
       </div>
 
       {/* Inline conflict banner — shown when 3-way merge fails */}
@@ -1582,7 +1593,8 @@ export function NoteEditor({
 
       {/* Footer */}
       <div className="px-2 sm:px-4 py-1.5 sm:py-2 border-t border-gray-800 flex items-center gap-2 sm:gap-4 text-xs text-gray-500 shrink-0 flex-wrap">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+        {/* Hidden on mobile — the tag input is in the toolbar row above the keyboard */}
+        <div className="hidden md:flex items-center gap-2 flex-1 min-w-0">
           <TagInput
             selectedTags={note.tags}
             allTags={allTags}

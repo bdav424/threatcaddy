@@ -382,6 +382,43 @@ to `chatThreads`, but `useChats` does not use it — the hook is intentionally g
 The index will benefit future callers (e.g., investigation-scoped chat panel, report builder) that
 need only a single investigation's threads sorted by activity.
 
+---
+
+## Mobile Viewport Remediation (feat(mobile): viewport remediation — Android/Capacitor)
+
+### 1. Entity graph bottom sheet — no primitive used
+
+No existing `Drawer` / `BottomSheet` / `SlideOver` primitive was found in the codebase.
+Built a minimal inline bottom sheet directly in `GraphView.tsx`:
+- `fixed bottom-0 left-0 right-0 z-50 max-h-[75vh]` overlay
+- `fixed inset-0 z-40 bg-black/50` backdrop (dismisses on tap)
+- `useIsMobile()` branches `sidebarClass` between desktop-inline and mobile-bottom-sheet
+
+**Future:** if a shared `BottomSheet` primitive is ever introduced, refactor `GraphView.tsx` to use it.
+
+### 2. BottomTabBar — i18n labels hardcoded
+
+`src/components/Layout/BottomTabBar.tsx` uses hardcoded English labels (`Cases`, `Notes`, `Tasks`,
+`Timeline`, `IOCs`). Add to `public/locales/en/common.json` under `bottomNav.*` keys and sync via
+`pnpm translate:sync` (requires `ANTHROPIC_API_KEY`).
+
+### 3. safe-area-inset-bottom — Tailwind utility not wired
+
+`BottomTabBar` has class `safe-area-inset-bottom` but this is not a Tailwind built-in.
+Add to `src/index.css`:
+```css
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-area-inset-bottom { padding-bottom: env(safe-area-inset-bottom); }
+}
+```
+Verify on physical Android device / Capacitor shell with home-indicator bar.
+
+### 4. Floating dialogs and soft keyboard
+
+Several dialogs (`GraphIOCEditDialog`, `QuickCapture`, etc.) are not repositioned for the
+soft keyboard on mobile. If dialogs sit behind the keyboard, add `position: fixed; top: 10%`
+on mobile or adopt the `@capacitor/keyboard` plugin to resize the webview.
+
 ### 5. useActivityLog — encryption middleware cursor note
 
 The `useActivityLog.ts` refactor (slice-9) now uses:

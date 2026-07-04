@@ -7,6 +7,7 @@ import type { BackgroundEffectPattern } from '../../types';
 interface AppLayoutProps {
   header: ReactNode;
   sidebar: ReactNode;
+  bottomNav?: ReactNode;
   children: ReactNode;
   bgImageEnabled?: boolean;
   bgImageOpacity?: number;
@@ -25,6 +26,7 @@ interface AppLayoutProps {
 export function AppLayout({
   header,
   sidebar,
+  bottomNav,
   children,
   bgImageEnabled,
   bgImageOpacity,
@@ -85,6 +87,7 @@ export function AppLayout({
           {children}
         </main>
       </div>
+      {bottomNav}
     </div>
   );
 }

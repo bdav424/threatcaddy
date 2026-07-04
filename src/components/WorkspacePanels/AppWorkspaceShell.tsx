@@ -1552,7 +1552,7 @@ function RoutePanelPopOutSurface({
             aria-label={`${popOutLabel} ${title}`}
             title={`${popOutLabel} ${title}`}
             onClick={onPopOut}
-            className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border-subtle bg-bg-primary/75 px-2.5 text-[10px] font-semibold text-text-secondary shadow-sm transition-colors hover:border-border-medium hover:bg-bg-hover hover:text-text-primary"
+            className="hidden md:inline-flex h-7 items-center gap-1.5 rounded-full border border-border-subtle bg-bg-primary/75 px-2.5 text-[10px] font-semibold text-text-secondary shadow-sm transition-colors hover:border-border-medium hover:bg-bg-hover hover:text-text-primary"
           >
             <Maximize2 size={12} aria-hidden="true" />
             <span>{popOutLabel}</span>

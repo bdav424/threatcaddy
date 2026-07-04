@@ -177,7 +177,13 @@ export function NavigationProvider({
 
   // -- UI state --
   const [sort, setSort] = useState<SortOption>('updatedAt');
-  const [editorMode, setEditorMode] = useState<EditorMode>(initialSettings.editorMode ?? 'edit');
+  const [editorMode, setEditorMode] = useState<EditorMode>(() => {
+    // Default to single-pane edit mode on mobile (<=768px) so split view never
+    // renders as the initial state on small screens / Android/Capacitor.
+    const onMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches;
+    if (onMobile) return 'edit';
+    return initialSettings.editorMode ?? 'edit';
+  });
   const [taskViewMode, setTaskViewMode] = useState<TaskViewMode>(initialSettings.taskViewMode ?? 'list');
   const [graphLayout, setGraphLayout] = useState<LayoutName>('cose-bilkent');
   const [noteListWidth, setNoteListWidth] = useState(288);

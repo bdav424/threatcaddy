@@ -39,6 +39,9 @@ export function DashboardView({ links, onUpdateLinks, onViewChange, folders, all
   const [formOpen, setFormOpen] = useState(false);
   const [editingLink, setEditingLink] = useState<QuickLink | undefined>();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Mobile edit-mode: group-hover is non-functional on touch, so we expose a
+  // toggle button (mobile only) that reveals the per-card edit/delete actions.
+  const [quickLinksEditMode, setQuickLinksEditMode] = useState(false);
 
   const handleAdd = (data: Partial<QuickLink>) => {
     const newLink: QuickLink = {
@@ -101,13 +104,25 @@ export function DashboardView({ links, onUpdateLinks, onViewChange, folders, all
           <span className="text-lg" role="img" aria-label="dashboard">{'\uD83C\uDFE0'}</span>
           <h2 id="dashboard-quick-links-heading" className="text-lg font-semibold text-gray-100">{t('view.quickLinks')}</h2>
         </div>
-        <button
-          onClick={() => setFormOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-accent hover:bg-accent-hover text-white transition-colors"
-        >
-          <Plus size={16} />
-          {t('view.addLink')}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Mobile-only edit-mode toggle — group-hover doesn't fire on touch */}
+          <button
+            onClick={() => setQuickLinksEditMode((p) => !p)}
+            className={`md:hidden p-2.5 rounded-lg transition-colors ${quickLinksEditMode ? 'bg-accent/20 text-accent' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'}`}
+            aria-label="Toggle link edit mode"
+            aria-pressed={quickLinksEditMode}
+            title="Edit quick links"
+          >
+            <Pencil size={16} />
+          </button>
+          <button
+            onClick={() => setFormOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-accent hover:bg-accent-hover text-white transition-colors"
+          >
+            <Plus size={16} />
+            {t('view.addLink')}
+          </button>
+        </div>
       </div>
 
       {/* Grid */}
@@ -128,11 +143,11 @@ export function DashboardView({ links, onUpdateLinks, onViewChange, folders, all
                 background: link.color ? `linear-gradient(135deg, ${link.color}08, transparent)` : undefined,
               }}
             >
-              {/* Hover actions */}
-              <div className="absolute top-2 right-2 flex gap-1 opacity-40 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+              {/* Hover/edit-mode actions */}
+              <div className={`absolute top-2 right-2 flex gap-1 transition-opacity ${quickLinksEditMode ? 'opacity-100' : 'opacity-40 group-hover:opacity-100 group-focus-within:opacity-100'}`}>
                 <button
                   onClick={(e) => { e.stopPropagation(); setEditingLink(link); }}
-                  className="p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300"
+                  className="p-2.5 md:p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300"
                   aria-label={`Edit ${link.title}`}
                   title="Edit link"
                 >
@@ -140,7 +155,7 @@ export function DashboardView({ links, onUpdateLinks, onViewChange, folders, all
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); setDeletingId(link.id); }}
-                  className="p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-red-400"
+                  className="p-2.5 md:p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-red-400"
                   aria-label={`Delete ${link.title}`}
                   title="Delete link"
                 >

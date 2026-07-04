@@ -14,6 +14,7 @@ import { useNavigation } from '../../contexts/NavigationContext';
 import { useInvestigation } from '../../contexts/InvestigationContext';
 import { useGraphSnapshots } from '../../hooks/useGraphSnapshots';
 import { useToast } from '../../contexts/ToastContext';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 const GraphCanvas = React.lazy(() => import('./GraphCanvas'));
 
@@ -61,8 +62,12 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
   const [visibleNodeTypes, setVisibleNodeTypes] = useState<Set<NodeTypeFilter>>(new Set(['ioc', 'note', 'task', 'timeline-event', 'actor']));
   const [visibleIOCTypes, setVisibleIOCTypes] = useState<Set<IOCType>>(new Set(ALL_IOC_TYPES));
   const [visibleEdgeTypes, setVisibleEdgeTypes] = useState<Set<EdgeTypeFilter>>(new Set(['contains-ioc', 'ioc-relationship', 'timeline-link', 'entity-link', 'attribution']));
+  const isMobile = useIsMobile();
   const [editingIOCNode, setEditingIOCNode] = useState<GraphNode | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Default collapsed on mobile so the canvas gets full width on first render.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches,
+  );
   const [linkDialogState, setLinkDialogState] = useState<{ sourceNodeId: string; targetNodeId: string } | null>(null);
   const [fitTrigger, setFitTrigger] = useState(0);
   const [legendOpen, setLegendOpen] = useState(false);
@@ -245,10 +250,27 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
 
   const legendEntries = useMemo(() => getLegendEntries(), []);
 
+  // Compute sidebar class: desktop = inline panel, mobile = bottom sheet overlay
+  const sidebarClass = isMobile
+    ? sidebarCollapsed
+      ? 'hidden'
+      : 'fixed bottom-0 left-0 right-0 z-50 max-h-[75vh] bg-gray-900 border-t border-gray-700 flex flex-col overflow-y-auto'
+    : sidebarCollapsed
+      ? 'hidden'
+      : 'w-52 border-r border-gray-800 bg-gray-900 flex flex-col overflow-y-auto shrink-0';
+
   return (
     <div className="flex flex-1 overflow-hidden h-full relative">
-      {/* Left sidebar — filters (collapsible) */}
-      <div className={`${sidebarCollapsed ? 'hidden' : 'w-52'} border-r border-gray-800 bg-gray-900 flex flex-col overflow-y-auto shrink-0`}>
+      {/* Mobile backdrop when filter sheet is open */}
+      {isMobile && !sidebarCollapsed && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50"
+          onClick={() => setSidebarCollapsed(true)}
+          aria-hidden="true"
+        />
+      )}
+      {/* Filters sidebar — desktop: inline panel; mobile: bottom sheet */}
+      <div className={sidebarClass}>
         <div className="p-3 border-b border-gray-800">
           <div className="flex items-center gap-2 mb-2">
             <Network size={14} className="text-accent" />
@@ -418,7 +440,7 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
         {sidebarCollapsed && (
           <button
             onClick={() => setSidebarCollapsed(false)}
-            className="absolute top-2 left-2 z-10 p-1.5 rounded bg-gray-800 border border-gray-700 text-gray-400 hover:text-gray-200 hover:bg-gray-700 shadow-lg"
+            className="absolute top-2 left-2 z-10 p-2.5 md:p-1.5 rounded bg-gray-800 border border-gray-700 text-gray-400 hover:text-gray-200 hover:bg-gray-700 shadow-lg"
             title={t('view.showFilters')}
             aria-label={t('view.expandSidebar')}
           >

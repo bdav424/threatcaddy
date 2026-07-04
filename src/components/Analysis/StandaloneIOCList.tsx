@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, forwardRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Pencil, Trash2, Archive, RotateCcw, Search, ChevronUp, ChevronDown, X, ListPlus, Clipboard, Tag as TagIcon, GitMerge, Zap, Columns, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, Archive, RotateCcw, Search, ChevronUp, ChevronDown, X, ListPlus, Clipboard, Tag as TagIcon, GitMerge, Zap, Columns, Download, MoreHorizontal } from 'lucide-react';
 import type { StandaloneIOC, Folder, Tag, IOCType, ConfidenceLevel } from '../../types';
 import { IOC_TYPE_LABELS, CONFIDENCE_LEVELS, IOC_STATUS_VALUES, IOC_STATUS_LABELS, IOC_STATUS_COLORS } from '../../types';
 import { db } from '../../db';
@@ -20,6 +20,7 @@ import { exportSTIX21Bundle } from '../../lib/stix';
 import { asTLPLevel, tlpPermitsShare, tlpShareDescription } from '../../lib/tlp';
 import type { TLPLevel } from '../../lib/tlp';
 import { downloadFile } from '../../lib/export';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 const STATUS_COLORS: Record<string, string> = IOC_STATUS_COLORS;
 const STATUS_LABELS: Record<string, string> = IOC_STATUS_LABELS;
@@ -143,6 +144,8 @@ export function StandaloneIOCList({
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [showColumnSizer, setShowColumnSizer] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showMobileOverflow, setShowMobileOverflow] = useState(false);
+  const isMobile = useIsMobile();
   const [showTlpAmberConfirm, setShowTlpAmberConfirm] = useState(false);
   const [pendingDownload, setPendingDownload] = useState<{ content: string; filename: string; mime: string } | null>(null);
 
@@ -415,104 +418,179 @@ export function StandaloneIOCList({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="relative">
-            <button
-              onClick={() => setShowColumnSizer((v) => !v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 text-sm font-medium transition-colors"
-              title="Resize columns"
-            >
-              <Columns size={16} />
-              Columns
-            </button>
-            {showColumnSizer && (
-              <div className="absolute right-0 top-full mt-1 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl p-3 w-72 space-y-2">
-                {Object.entries(STANDALONE_COLUMN_LABELS).map(([key, label]) => (
-                  <label key={key} className="grid grid-cols-[70px_1fr_38px] items-center gap-2 text-xs">
-                    <span className="text-gray-400">{label}</span>
-                    <input
-                      type="range"
-                      min={36}
-                      max={360}
-                      value={columnWidths[key] ?? DEFAULT_STANDALONE_COLUMN_WIDTHS[key]}
-                      onChange={(e) => setColumnWidths((prev) => ({ ...prev, [key]: Number(e.target.value) }))}
-                      className="w-full accent-accent"
-                    />
-                    <span className="text-[10px] text-gray-500 text-end tabular-nums">{columnWidths[key] ?? DEFAULT_STANDALONE_COLUMN_WIDTHS[key]}</span>
-                  </label>
-                ))}
-                <button onClick={() => setColumnWidths(DEFAULT_STANDALONE_COLUMN_WIDTHS)} className="text-[10px] text-gray-500 hover:text-gray-300">
-                  Reset widths
-                </button>
-              </div>
-            )}
-          </div>
-          {iocs.length > 1 && (
-            <button
-              onClick={() => setShowDeduplicator(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 text-sm font-medium transition-colors"
-              title="Find duplicate IOCs"
-            >
-              <GitMerge size={16} />
-              Dedup
-            </button>
-          )}
-          {iocs.length > 0 && (
-            <button
-              onClick={async () => {
-                const text = filteredSortedIOCs.map((i) => i.value).join('\n');
-                try {
-                  await navigator.clipboard.writeText(text);
-                  addToast('success', tt('ioc.copiedToClipboard', { count: filteredSortedIOCs.length }));
-                } catch {
-                  addToast('error', tt('ioc.copyFailed'));
-                }
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 text-sm font-medium transition-colors"
-              title="Copy visible IOC values to clipboard"
-            >
-              <Clipboard size={16} />
-              Copy
-            </button>
-          )}
-          {iocs.length > 0 && (
+          {/* Desktop toolbar — hidden on mobile */}
+          <div className="hidden md:flex items-center gap-2">
             <div className="relative">
               <button
-                onClick={() => setShowExportMenu(v => !v)}
+                onClick={() => setShowColumnSizer((v) => !v)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 text-sm font-medium transition-colors"
-                title="Export IOCs"
+                title="Resize columns"
               >
-                <Download size={16} />
-                Export
+                <Columns size={16} />
+                Columns
               </button>
-              {showExportMenu && (
-                <div className="absolute right-0 top-full mt-1 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 w-52">
-                  <button
-                    onClick={() => { handleSTIXExport(); setShowExportMenu(false); }}
-                    className="w-full px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 text-start"
-                  >
-                    STIX 2.1 bundle
-                  </button>
-                  <button
-                    onClick={() => { handleNavigatorExport(); setShowExportMenu(false); }}
-                    className="w-full px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 text-start"
-                  >
-                    ATT&amp;CK Navigator layer
+              {showColumnSizer && (
+                <div className="absolute right-0 top-full mt-1 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl p-3 w-72 space-y-2">
+                  {Object.entries(STANDALONE_COLUMN_LABELS).map(([key, label]) => (
+                    <label key={key} className="grid grid-cols-[70px_1fr_38px] items-center gap-2 text-xs">
+                      <span className="text-gray-400">{label}</span>
+                      <input
+                        type="range"
+                        min={36}
+                        max={360}
+                        value={columnWidths[key] ?? DEFAULT_STANDALONE_COLUMN_WIDTHS[key]}
+                        onChange={(e) => setColumnWidths((prev) => ({ ...prev, [key]: Number(e.target.value) }))}
+                        className="w-full accent-accent"
+                      />
+                      <span className="text-[10px] text-gray-500 text-end tabular-nums">{columnWidths[key] ?? DEFAULT_STANDALONE_COLUMN_WIDTHS[key]}</span>
+                    </label>
+                  ))}
+                  <button onClick={() => setColumnWidths(DEFAULT_STANDALONE_COLUMN_WIDTHS)} className="text-[10px] text-gray-500 hover:text-gray-300">
+                    Reset widths
                   </button>
                 </div>
               )}
             </div>
+            {iocs.length > 1 && (
+              <button
+                onClick={() => setShowDeduplicator(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 text-sm font-medium transition-colors"
+                title="Find duplicate IOCs"
+              >
+                <GitMerge size={16} />
+                Dedup
+              </button>
+            )}
+            {iocs.length > 0 && (
+              <button
+                onClick={async () => {
+                  const text = filteredSortedIOCs.map((i) => i.value).join('\n');
+                  try {
+                    await navigator.clipboard.writeText(text);
+                    addToast('success', tt('ioc.copiedToClipboard', { count: filteredSortedIOCs.length }));
+                  } catch {
+                    addToast('error', tt('ioc.copyFailed'));
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 text-sm font-medium transition-colors"
+                title="Copy visible IOC values to clipboard"
+              >
+                <Clipboard size={16} />
+                Copy
+              </button>
+            )}
+            {iocs.length > 0 && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowExportMenu(v => !v)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 text-sm font-medium transition-colors"
+                  title="Export IOCs"
+                >
+                  <Download size={16} />
+                  Export
+                </button>
+                {showExportMenu && (
+                  <div className="absolute right-0 top-full mt-1 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 w-52">
+                    <button
+                      onClick={() => { handleSTIXExport(); setShowExportMenu(false); }}
+                      className="w-full px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 text-start"
+                    >
+                      STIX 2.1 bundle
+                    </button>
+                    <button
+                      onClick={() => { handleNavigatorExport(); setShowExportMenu(false); }}
+                      className="w-full px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 text-start"
+                    >
+                      ATT&amp;CK Navigator layer
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            <button
+              onClick={() => setShowBulkImport(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 text-sm font-medium transition-colors"
+              title="Bulk import IOCs from text"
+            >
+              <ListPlus size={16} />
+              Bulk Import
+            </button>
+          </div>
+
+          {/* Mobile overflow menu — shown only on mobile */}
+          {isMobile && (
+            <div className="relative md:hidden">
+              <button
+                onClick={() => setShowMobileOverflow(v => !v)}
+                className="flex items-center justify-center w-10 h-10 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors"
+                title="More actions"
+                aria-label="More actions"
+              >
+                <MoreHorizontal size={18} />
+              </button>
+              {showMobileOverflow && (
+                <div className="absolute right-0 top-full mt-1 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 w-48">
+                  <button
+                    onClick={() => { setShowBulkImport(true); setShowMobileOverflow(false); }}
+                    className="w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-800 text-start flex items-center gap-2"
+                  >
+                    <ListPlus size={15} />
+                    Bulk Import
+                  </button>
+                  {iocs.length > 1 && (
+                    <button
+                      onClick={() => { setShowDeduplicator(true); setShowMobileOverflow(false); }}
+                      className="w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-800 text-start flex items-center gap-2"
+                    >
+                      <GitMerge size={15} />
+                      Dedup
+                    </button>
+                  )}
+                  {iocs.length > 0 && (
+                    <button
+                      onClick={async () => {
+                        const text = filteredSortedIOCs.map((i) => i.value).join('\n');
+                        try {
+                          await navigator.clipboard.writeText(text);
+                          addToast('success', tt('ioc.copiedToClipboard', { count: filteredSortedIOCs.length }));
+                        } catch {
+                          addToast('error', tt('ioc.copyFailed'));
+                        }
+                        setShowMobileOverflow(false);
+                      }}
+                      className="w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-800 text-start flex items-center gap-2"
+                    >
+                      <Clipboard size={15} />
+                      Copy values
+                    </button>
+                  )}
+                  {iocs.length > 0 && (
+                    <>
+                      <button
+                        onClick={() => { handleSTIXExport(); setShowMobileOverflow(false); }}
+                        className="w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-800 text-start flex items-center gap-2"
+                      >
+                        <Download size={15} />
+                        Export STIX
+                      </button>
+                      <button
+                        onClick={() => { handleNavigatorExport(); setShowMobileOverflow(false); }}
+                        className="w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-800 text-start flex items-center gap-2"
+                      >
+                        <Download size={15} />
+                        Export Navigator
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           )}
-          <button
-            onClick={() => setShowBulkImport(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 text-sm font-medium transition-colors"
-            title="Bulk import IOCs from text"
-          >
-            <ListPlus size={16} />
-            Bulk Import
-          </button>
+
+          {/* New IOC — always visible */}
           <button
             onClick={() => { setEditingIOC(undefined); setShowForm(true); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/15 text-accent hover:bg-accent/25 text-sm font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2.5 md:py-1.5 rounded-lg bg-accent/15 text-accent hover:bg-accent/25 text-sm font-medium transition-colors"
           >
             <Plus size={16} />
             New IOC
@@ -597,11 +675,11 @@ export function StandaloneIOCList({
           )}
         </div>
 
-        <div className="flex items-center gap-1 flex-wrap">
-          <span className="text-[10px] text-gray-500 uppercase tracking-wide me-1">{t('iocList.statusFilterLabel')}</span>
+        <div className="flex flex-wrap gap-1">
+          <span className="text-[10px] text-gray-500 uppercase tracking-wide w-full md:w-auto md:me-1 md:self-center">{t('iocList.statusFilterLabel')}</span>
           <button
             onClick={() => setStatusFilter(null)}
-            className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+            className={`text-[10px] px-2 py-2.5 md:py-0.5 rounded-full border transition-colors ${
               statusFilter === null
                 ? 'bg-gray-600/40 border-gray-500 text-gray-200'
                 : 'bg-gray-800/50 border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-600'
@@ -616,7 +694,7 @@ export function StandaloneIOCList({
               <button
                 key={s}
                 onClick={() => setStatusFilter(active ? null : s)}
-                className="text-[10px] px-2 py-0.5 rounded-full border transition-colors"
+                className="text-[10px] px-2 py-2.5 md:py-0.5 rounded-full border transition-colors"
                 style={{
                   backgroundColor: active ? `${color}30` : `${color}10`,
                   borderColor: active ? `${color}60` : `${color}20`,
@@ -629,11 +707,11 @@ export function StandaloneIOCList({
           })}
         </div>
 
-        <div className="flex items-center gap-1 flex-wrap">
-          <span className="text-[10px] text-gray-500 uppercase tracking-wide me-1">{t('iocList.confidenceFilterLabel')}</span>
+        <div className="flex flex-wrap gap-1">
+          <span className="text-[10px] text-gray-500 uppercase tracking-wide w-full md:w-auto md:me-1 md:self-center">{t('iocList.confidenceFilterLabel')}</span>
           <button
             onClick={() => setConfidenceFilter(null)}
-            className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+            className={`text-[10px] px-2 py-2.5 md:py-0.5 rounded-full border transition-colors ${
               confidenceFilter === null
                 ? 'bg-gray-600/40 border-gray-500 text-gray-200'
                 : 'bg-gray-800/50 border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-600'
@@ -648,7 +726,7 @@ export function StandaloneIOCList({
               <button
                 key={c}
                 onClick={() => setConfidenceFilter(active ? null : c)}
-                className="text-[10px] px-2 py-0.5 rounded-full border transition-colors"
+                className="text-[10px] px-2 py-2.5 md:py-0.5 rounded-full border transition-colors"
                 style={{
                   backgroundColor: active ? `${info.color}30` : `${info.color}10`,
                   borderColor: active ? `${info.color}60` : `${info.color}20`,
@@ -661,8 +739,8 @@ export function StandaloneIOCList({
           })}
         </div>
 
-        <div className="flex items-center gap-1 flex-wrap">
-          <span className="text-[10px] text-gray-500 uppercase tracking-wide me-1">{t('iocList.typeFilterLabel')}</span>
+        <div className="flex flex-wrap gap-1">
+          <span className="text-[10px] text-gray-500 uppercase tracking-wide w-full md:w-auto md:me-1 md:self-center">{t('iocList.typeFilterLabel')}</span>
           {ALL_IOC_TYPES.map(type => {
             const info = IOC_TYPE_LABELS[type];
             const active = typeFilter.includes(type);
@@ -670,7 +748,7 @@ export function StandaloneIOCList({
               <button
                 key={type}
                 onClick={() => toggleTypeFilter(type)}
-                className="text-[10px] px-2 py-0.5 rounded-full border transition-colors"
+                className="text-[10px] px-2 py-2.5 md:py-0.5 rounded-full border transition-colors"
                 style={{
                   backgroundColor: active ? `${info.color}30` : `${info.color}10`,
                   borderColor: active ? `${info.color}60` : `${info.color}20`,
