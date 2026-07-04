@@ -102,8 +102,12 @@ function readAllCredentials() {
         const decrypted = safeStorage.decryptString(encBytes);
         const key = `${subdir}/${entry}`;
         credentials[key] = decrypted;
-      } catch {
-        // Skip unreadable / corrupt files — don't abort the whole export
+      } catch (err) {
+        // decryptString throws when the OS Keychain key changes (e.g. after app re-sign).
+        // Delete the orphaned file so it doesn't block future re-auth, then skip — do not
+        // abort the entire export for other credentials that still decrypt correctly.
+        console.warn('[creds-bridge] decryptString failed, clearing orphaned entry:', fullPath, err.message);
+        try { fs.unlinkSync(fullPath); } catch { /* already gone */ }
       }
     }
   }

@@ -58,10 +58,19 @@ function saveCredential(ref, cred) {
 
 function loadCredential(ref) {
   const enc = fs.readFileSync(credPath(ref));
-  return JSON.parse(safeStorage.decryptString(enc));
-  // cred shape: { kind:'imap-smtp', imap:{host,port,secure}, smtp:{host,port,secure},
-  //               authMethod:'basic'|'oauth',
-  //               auth:{ user, pass? } | { user, oauth:{ accessToken } }, from }
+  try {
+    return JSON.parse(safeStorage.decryptString(enc));
+    // cred shape: { kind:'imap-smtp', imap:{host,port,secure}, smtp:{host,port,secure},
+    //               authMethod:'basic'|'oauth',
+    //               auth:{ user, pass? } | { user, oauth:{ accessToken } }, from }
+  } catch (err) {
+    // Signing identity changed (e.g. after app re-sign) — OS Keychain key is no longer
+    // valid. Clear the orphaned file so the renderer gets a clean re-auth prompt on the
+    // next call rather than a cryptic throw on every subsequent operation.
+    console.warn('[mail-bridge] decryptString failed (signing identity change?), clearing entry:', err.message);
+    try { fs.unlinkSync(credPath(ref)); } catch { /* already gone */ }
+    throw new Error('Credential decryption failed — please reconnect your mail account');
+  }
 }
 
 // --- transports ---

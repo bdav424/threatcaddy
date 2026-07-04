@@ -134,7 +134,15 @@ function saveCalCredential(ref, cred) {
 
 function loadCalCredential(ref) {
   const enc = fs.readFileSync(calCredPath(ref));
-  return JSON.parse(safeStorage.decryptString(enc));
+  try {
+    return JSON.parse(safeStorage.decryptString(enc));
+  } catch (err) {
+    // Signing identity changed — OS Keychain key no longer valid. Clear orphaned file so
+    // the next call gets a clean re-auth prompt rather than an infinite decrypt error.
+    console.warn('[calendar] decryptString failed (signing identity change?), clearing entry:', err.message);
+    try { fs.unlinkSync(calCredPath(ref)); } catch { /* already gone */ }
+    throw new Error('Credential decryption failed — please reconnect your calendar account');
+  }
 }
 
 // ── Account registry ───────────────────────────────────────────────────────
@@ -194,7 +202,15 @@ function saveSlackCredential(ref, cred) {
 
 function loadSlackCredential(ref) {
   const enc = fs.readFileSync(slackCredPath(ref));
-  return JSON.parse(safeStorage.decryptString(enc));
+  try {
+    return JSON.parse(safeStorage.decryptString(enc));
+  } catch (err) {
+    // Signing identity changed — OS Keychain key no longer valid. Clear orphaned file so
+    // the next call gets a clean re-auth prompt rather than an infinite decrypt error.
+    console.warn('[slack] decryptString failed (signing identity change?), clearing entry:', err.message);
+    try { fs.unlinkSync(slackCredPath(ref)); } catch { /* already gone */ }
+    throw new Error('Credential decryption failed — please reconnect your Slack account');
+  }
 }
 
 function deleteSlackCredential(ref) {
