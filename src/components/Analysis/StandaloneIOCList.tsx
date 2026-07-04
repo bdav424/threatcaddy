@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect, forwardRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Pencil, Trash2, Archive, RotateCcw, Search, ChevronUp, ChevronDown, X, ListPlus, Clipboard, Tag as TagIcon, GitMerge, Zap, Columns } from 'lucide-react';
+import { Plus, Pencil, Trash2, Archive, RotateCcw, Search, ChevronUp, ChevronDown, X, ListPlus, Clipboard, Tag as TagIcon, GitMerge, Zap, Columns, Download } from 'lucide-react';
 import type { StandaloneIOC, Folder, Tag, IOCType, ConfidenceLevel } from '../../types';
 import { IOC_TYPE_LABELS, CONFIDENCE_LEVELS, IOC_STATUS_VALUES, IOC_STATUS_LABELS, IOC_STATUS_COLORS } from '../../types';
+import { db } from '../../db';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { StandaloneIOCForm } from './StandaloneIOCForm';
 import { BulkIOCImportModal } from './BulkIOCImportModal';
@@ -14,6 +15,11 @@ import { useToast } from '../../contexts/ToastContext';
 import { formatDate } from '../../lib/utils';
 import { EnrichmentLabels } from './EnrichmentLabels';
 import { TableVirtuoso } from 'react-virtuoso';
+import { exportATTACKNavigatorLayer } from '../../lib/attack-navigator';
+import { exportSTIX21Bundle } from '../../lib/stix';
+import { asTLPLevel, tlpPermitsShare, tlpShareDescription } from '../../lib/tlp';
+import type { TLPLevel } from '../../lib/tlp';
+import { downloadFile } from '../../lib/export';
 
 const STATUS_COLORS: Record<string, string> = IOC_STATUS_COLORS;
 const STATUS_LABELS: Record<string, string> = IOC_STATUS_LABELS;
@@ -136,6 +142,19 @@ export function StandaloneIOCList({
   const [showBulkEnrich, setShowBulkEnrich] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [showColumnSizer, setShowColumnSizer] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showTlpAmberConfirm, setShowTlpAmberConfirm] = useState(false);
+  const [pendingDownload, setPendingDownload] = useState<{ content: string; filename: string; mime: string } | null>(null);
+
+  // Track which IOCs have recheck diffs (changed since last enrichment)
+  const [changedIocIds, setChangedIocIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (iocs.length === 0) { setChangedIocIds(new Set()); return; }
+    const ids = iocs.map((i) => i.id);
+    db.iocRecheckDiffs.where('iocId').anyOf(ids).toArray().then((diffs) => {
+      setChangedIocIds(new Set(diffs.map((d) => d.iocId)));
+    }).catch(() => { /* non-fatal */ });
+  }, [iocs]);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(DEFAULT_STANDALONE_COLUMN_WIDTHS);
 
   // Sort state
@@ -216,6 +235,73 @@ export function StandaloneIOCList({
 
   const hasActiveFilters = searchText.trim() !== '' || statusFilter !== null || confidenceFilter !== null || typeFilter.length > 0;
   const hasAnyEnrichment = useMemo(() => iocs.some(i => i.enrichment && Object.keys(i.enrichment).length > 0), [iocs]);
+
+  // ─── Investigation TLP (resolved from folder) ───────────────
+  const investigationTlp = useMemo<TLPLevel | undefined>(() => {
+    if (!currentFolderId) return undefined;
+    const folder = folders.find(f => f.id === currentFolderId);
+    return asTLPLevel(folder?.clsLevel);
+  }, [currentFolderId, folders]);
+
+  // ─── TLP-gated download ─────────────────────────────────────
+  const handleTlpGatedDownload = (content: string, filename: string, mime: string) => {
+    const effectiveTlp = investigationTlp;
+    if (!effectiveTlp || tlpPermitsShare(effectiveTlp, 'TLP:GREEN')) {
+      downloadFile(content, filename, mime);
+      return;
+    }
+    if (effectiveTlp === 'TLP:RED' || effectiveTlp === 'TLP:AMBER+STRICT') {
+      addToast('error', `Export blocked: ${tlpShareDescription(effectiveTlp)}`);
+      return;
+    }
+    // TLP:AMBER — warn but allow with confirmation
+    if (effectiveTlp === 'TLP:AMBER') {
+      setPendingDownload({ content, filename, mime });
+      setShowTlpAmberConfirm(true);
+      return;
+    }
+    downloadFile(content, filename, mime);
+  };
+
+  // ─── ATT&CK Navigator export ────────────────────────────────
+  const handleNavigatorExport = () => {
+    const mitreIOCs = filteredSortedIOCs.filter(i => i.type === 'mitre-attack' && !i.trashed);
+    if (mitreIOCs.length === 0) {
+      addToast('error', 'No MITRE ATT&CK technique IOCs in the current view');
+      return;
+    }
+    const techniques = mitreIOCs.map(i => ({
+      id: i.value,
+      comment: [i.analystNotes, i.attribution].filter(Boolean).join(' | '),
+      score: 1,
+    }));
+    const layer = exportATTACKNavigatorLayer(currentFolderName || 'ThreatCaddy Export', techniques);
+    const slug = (currentFolderName || 'investigation').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    handleTlpGatedDownload(JSON.stringify(layer, null, 2), `${slug}-navigator.json`, 'application/json');
+  };
+
+  // ─── STIX 2.1 export ────────────────────────────────────────
+  const handleSTIXExport = () => {
+    const exportableIOCs = filteredSortedIOCs.filter(i => !i.trashed && !i.archived);
+    if (exportableIOCs.length === 0) {
+      addToast('error', 'No IOCs to export');
+      return;
+    }
+    const effectiveTlp: TLPLevel = investigationTlp ?? 'TLP:CLEAR';
+    const bundle = exportSTIX21Bundle(
+      exportableIOCs.map(i => ({
+        id: i.id,
+        type: i.type,
+        value: i.value,
+        tags: i.tags,
+        tlp: asTLPLevel(i.clsLevel),
+        createdAt: new Date(i.createdAt),
+      })),
+      effectiveTlp,
+    );
+    const slug = (currentFolderName || 'investigation').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    handleTlpGatedDownload(JSON.stringify(bundle, null, 2), `${slug}-stix21.json`, 'application/json');
+  };
   const toggleExpanded = (id: string) => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
@@ -387,6 +473,34 @@ export function StandaloneIOCList({
               <Clipboard size={16} />
               Copy
             </button>
+          )}
+          {iocs.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu(v => !v)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 text-sm font-medium transition-colors"
+                title="Export IOCs"
+              >
+                <Download size={16} />
+                Export
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 top-full mt-1 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 w-52">
+                  <button
+                    onClick={() => { handleSTIXExport(); setShowExportMenu(false); }}
+                    className="w-full px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 text-start"
+                  >
+                    STIX 2.1 bundle
+                  </button>
+                  <button
+                    onClick={() => { handleNavigatorExport(); setShowExportMenu(false); }}
+                    className="w-full px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 text-start"
+                  >
+                    ATT&amp;CK Navigator layer
+                  </button>
+                </div>
+              )}
+            </div>
           )}
           <button
             onClick={() => setShowBulkImport(true)}
@@ -638,6 +752,7 @@ export function StandaloneIOCList({
                 const clsColor = ioc.clsLevel ? CLS_COLORS[ioc.clsLevel] || '#6b7280' : undefined;
                 const details = enrichmentDetails(ioc);
                 const isExpanded = expandedIds.has(ioc.id);
+                const isChanged = changedIocIds.has(ioc.id);
                 return (
                   <>
                     <td className="py-2 pe-1 w-8 border-b border-r border-gray-700/70">
@@ -654,6 +769,15 @@ export function StandaloneIOCList({
                           <span className="text-[10px]">Details</span>
                         </button>
                         <span className="block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap" title={ioc.value}>{ioc.value}</span>
+                        {isChanged && (
+                          <span
+                            className="flex-shrink-0 text-[9px] font-semibold px-1 py-0.5 rounded"
+                            style={{ backgroundColor: '#f59e0b22', color: '#f59e0b' }}
+                            title="Enrichment changed since last check"
+                          >
+                            CHANGED
+                          </span>
+                        )}
                       </div>
                       {isExpanded && (
                         <div className="mt-2 rounded border border-gray-700 bg-gray-950/60 p-2 font-sans text-[11px] text-gray-400 min-w-[440px]">
@@ -814,6 +938,21 @@ export function StandaloneIOCList({
         message="This IOC will be permanently deleted. This cannot be undone."
         confirmLabel="Delete IOC"
         danger
+      />
+
+      <ConfirmDialog
+        open={showTlpAmberConfirm}
+        onClose={() => { setShowTlpAmberConfirm(false); setPendingDownload(null); }}
+        onConfirm={() => {
+          if (pendingDownload) {
+            downloadFile(pendingDownload.content, pendingDownload.filename, pendingDownload.mime);
+          }
+          setShowTlpAmberConfirm(false);
+          setPendingDownload(null);
+        }}
+        title="TLP:AMBER Export Warning"
+        message="This investigation is marked TLP:AMBER. Exported data must be shared only within recipient organizations and must not be released publicly. Proceed with export?"
+        confirmLabel="Export anyway"
       />
 
       <BulkIOCImportModal

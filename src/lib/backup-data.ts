@@ -19,7 +19,7 @@ export async function buildFullBackupPayload(
   const data: BackupPayload['data'] = {};
 
   if (scope === 'all') {
-    const [notes, tasks, folders, tags, timelineEvents, timelines, whiteboards, standaloneIOCs, evidenceItems, chatThreads, agentActions, agentProfiles, agentDeployments, agentMeetings, noteTemplates, playbookTemplates, integrationTemplates, installedIntegrations, customSlashCommands, reportTemplates, graphSnapshots, virtualCaddyJobs, networkDevices, networkScanJobs, journalPages] =
+    const [notes, tasks, folders, tags, timelineEvents, timelines, whiteboards, standaloneIOCs, evidenceItems, chatThreads, agentActions, agentProfiles, agentDeployments, agentMeetings, noteTemplates, playbookTemplates, integrationTemplates, installedIntegrations, customSlashCommands, reportTemplates, graphSnapshots, virtualCaddyJobs, networkDevices, networkScanJobs, journalPages, iocRecheckDiffs] =
       await Promise.all([
         db.notes.toArray(),
         db.tasks.toArray(),
@@ -46,8 +46,9 @@ export async function buildFullBackupPayload(
         db.networkDevices.toArray(),
         db.networkScanJobs.toArray(),
         db.journalPages.toArray(),
+        db.iocRecheckDiffs.toArray(),
       ]);
-    Object.assign(data, { notes, tasks, folders, tags, timelineEvents, timelines, whiteboards, standaloneIOCs, evidenceItems, chatThreads, agentActions, agentProfiles, agentDeployments, agentMeetings, noteTemplates, playbookTemplates, integrationTemplates, installedIntegrations, customSlashCommands, reportTemplates, graphSnapshots, virtualCaddyJobs, networkDevices, networkScanJobs, journalPages });
+    Object.assign(data, { notes, tasks, folders, tags, timelineEvents, timelines, whiteboards, standaloneIOCs, evidenceItems, chatThreads, agentActions, agentProfiles, agentDeployments, agentMeetings, noteTemplates, playbookTemplates, integrationTemplates, installedIntegrations, customSlashCommands, reportTemplates, graphSnapshots, virtualCaddyJobs, networkDevices, networkScanJobs, journalPages, iocRecheckDiffs });
   } else if (scope === 'investigation') {
     if (!scopeId) throw new Error('scopeId required for investigation scope');
     const [folder, notes, tasks, allTags, events, allTimelines, whiteboards, iocs, evidenceItems, chats, agentActions, agentDeployments, agentMeetings, graphSnapshots, virtualCaddyJobs, networkScanJobs, networkDevices] = await Promise.all([
@@ -193,5 +194,6 @@ export function countPayloadEntities(payload: BackupPayload): number {
   if (data.customSlashCommands) count += data.customSlashCommands.length;
   if (data.graphSnapshots) count += data.graphSnapshots.length;
   if ('journalPages' in data && Array.isArray((data as Record<string, unknown>).journalPages)) count += ((data as Record<string, unknown>).journalPages as unknown[]).length;
+  if ('iocRecheckDiffs' in data && Array.isArray((data as Record<string, unknown>).iocRecheckDiffs)) count += ((data as Record<string, unknown>).iocRecheckDiffs as unknown[]).length;
   return count;
 }

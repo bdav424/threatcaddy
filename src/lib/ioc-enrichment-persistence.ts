@@ -2,6 +2,7 @@ import { nanoid } from 'nanoid';
 import { db } from '../db';
 import { IOC_TYPE_LABELS, type ConfidenceLevel, type IOCType, type StandaloneIOC } from '../types';
 import { getCurrentUserName } from './utils';
+import { computeIOCRecheckDiff, saveRecheckDiff } from './ioc-recheck-diff';
 
 export type IOCIntegrationSource =
   | { kind: 'note'; id: string; title?: string }
@@ -126,7 +127,11 @@ export async function persistIOCIntegrationUpdate(
 ): Promise<StandaloneIOC> {
   const now = Date.now();
 
-  return db.transaction('rw', db.standaloneIOCs, async () => {
+  // Diff is computed inside the transaction but saved outside it (iocRecheckDiffs is
+  // not in the standaloneIOCs-scoped transaction, so writes must happen after commit).
+  let pendingDiff: ReturnType<typeof computeIOCRecheckDiff> = null;
+
+  const result = await db.transaction('rw', db.standaloneIOCs, async () => {
     const existing = await findExistingIOC(options.ioc, options.folderId);
     const updates: Partial<StandaloneIOC> = {
       ...sourceLinkPatch(existing || {}, options.source),
@@ -144,6 +149,17 @@ export async function persistIOCIntegrationUpdate(
     if (enrichment) updates.enrichment = enrichment;
 
     if (existing) {
+      // Compute diff (no DB writes) so we can persist it after the transaction commits
+      const incomingEnrichment = normalizeIOCEnrichment(options.fields.enrichment, now, 'integration');
+      if (incomingEnrichment) {
+        pendingDiff = computeIOCRecheckDiff({
+          iocId: existing.id,
+          priorEnrichment: normalizeIOCEnrichment(existing.enrichment, now, 'existing') ?? undefined,
+          newEnrichment: incomingEnrichment,
+          priorStatus: existing.iocStatus,
+          newStatus: updates.iocStatus ?? existing.iocStatus,
+        });
+      }
       await db.standaloneIOCs.update(existing.id, updates);
       return { ...existing, ...updates };
     }
@@ -170,4 +186,9 @@ export async function persistIOCIntegrationUpdate(
     await db.standaloneIOCs.add(created);
     return created;
   });
+
+  // Persist diff outside the transaction (separate table, separate scope)
+  if (pendingDiff) void saveRecheckDiff(pendingDiff);
+
+  return result;
 }

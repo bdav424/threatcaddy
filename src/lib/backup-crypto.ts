@@ -49,6 +49,7 @@ export interface BackupPayload {
     networkDevices?: unknown[];
     networkScanJobs?: unknown[];
     journalPages?: unknown[];
+    iocRecheckDiffs?: unknown[];
   };
   deletedIds?: Record<string, string[]>;
 }
