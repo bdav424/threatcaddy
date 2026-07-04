@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
 import {
   AudioLines,
   Baby,
@@ -19,6 +19,7 @@ import {
   Plus,
   RefreshCw,
   Settings,
+  Upload,
   Stamp,
   Sparkles,
   Stethoscope,
@@ -45,6 +46,7 @@ import { useCalendarSync, type PendingDeletion, type CalendarSyncAccount } from 
 import { useCalendarAccounts } from '../../hooks/useCalendarAccounts';
 import { toSyncAccount } from '../../lib/calendar-accounts';
 import type { CalendarEvent, EventSource } from '../../types';
+import { parseICSContent } from '../../lib/ics-parser';
 
 type CalendarViewMode = 'week' | 'month' | 'year';
 type CalendarDensity = 'condensed' | 'medium' | 'spacious';
@@ -273,6 +275,11 @@ const SOURCE_STYLES: Record<EventSource, { color: string; softBackground: string
     color: '#9fe0c8',
     softBackground: 'rgba(159, 224, 200, 0.16)',
     ring: 'rgba(159, 224, 200, 0.28)',
+  },
+  ICS: {
+    color: '#a78bfa',
+    softBackground: 'rgba(167, 139, 250, 0.16)',
+    ring: 'rgba(167, 139, 250, 0.28)',
   },
 };
 
@@ -1044,6 +1051,7 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [eventContextMenu, setEventContextMenu] = useState<EventContextMenuState | null>(null);
   const assistantInputRef = useRef<HTMLInputElement>(null);
+  const icsFileInputRef = useRef<HTMLInputElement>(null);
   const weekScrollerRef = useRef<HTMLDivElement>(null);
   const selectionAnchorRef = useRef<Date | null>(null);
   const selectionDayRef = useRef<Date | null>(null);
@@ -1216,6 +1224,49 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
     setDraft(getDefaultDraft(date, hour));
     setDrawerOpen(true);
   };
+
+  const handleICSFileChange = useCallback((fileEvent: ChangeEvent<HTMLInputElement>) => {
+    const file = fileEvent.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result;
+      if (typeof text !== 'string') return;
+      try {
+        const parsed = parseICSContent(text);
+        if (parsed.length === 0) {
+          setStatusMessage('No events found in the selected ICS file.');
+          return;
+        }
+        const imported: CalendarEvent[] = parsed.map((ev) => ({
+          id: `ics-${ev.uid}-${ev.start.getTime()}`,
+          title: ev.title,
+          start: ev.start.toISOString(),
+          end: ev.end.toISOString(),
+          allDay: false,
+          source: 'ICS' as EventSource,
+          detail: ev.description ?? '',
+          location: ev.location ?? '',
+          conferenceApp: '',
+          syncState: 'local' as const,
+          updatedAt: Date.now(),
+        }));
+        setEvents((current) => {
+          const existingIds = new Set(current.map((ev) => ev.id));
+          const fresh = imported.filter((ev) => !existingIds.has(ev.id));
+          return sortEvents([...current, ...fresh]);
+        });
+        setStatusMessage(`Imported ${parsed.length} event${parsed.length === 1 ? '' : 's'} from ${file.name}.`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        setStatusMessage(`ICS import failed: ${message}`);
+      } finally {
+        // Reset so the same file can be re-selected
+        if (icsFileInputRef.current) icsFileInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  }, []);
 
   const openEditDrawer = (event: CalendarEvent) => {
     const eventStart = parseEventDate(event.start);
@@ -2886,14 +2937,33 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
               {renderCompactStampStrip()}
 
               {!compactPanel && (
-                <button
-                  type="button"
-                  onClick={() => openCreateDrawer(selectedDate)}
-                  className={cn('inline-flex shrink-0 items-center gap-2 border border-border-subtle bg-bg-raised/80 font-semibold text-text-primary transition-colors hover:border-border-medium hover:bg-bg-hover', density.toolbarButton)}
-                >
-                  <Plus size={density.toolbarIconSize} className="text-accent" />
-                  New event
-                </button>
+                <>
+                  <input
+                    ref={icsFileInputRef}
+                    type="file"
+                    accept=".ics,text/calendar"
+                    className="hidden"
+                    onChange={handleICSFileChange}
+                    aria-label="Import ICS calendar file"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => icsFileInputRef.current?.click()}
+                    title="Import events from an .ics file"
+                    className={cn('inline-flex shrink-0 items-center gap-2 border border-border-subtle bg-bg-raised/80 font-semibold text-text-primary transition-colors hover:border-border-medium hover:bg-bg-hover', density.toolbarButton)}
+                  >
+                    <Upload size={density.toolbarIconSize} className="text-text-muted" />
+                    Import .ics
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openCreateDrawer(selectedDate)}
+                    className={cn('inline-flex shrink-0 items-center gap-2 border border-border-subtle bg-bg-raised/80 font-semibold text-text-primary transition-colors hover:border-border-medium hover:bg-bg-hover', density.toolbarButton)}
+                  >
+                    <Plus size={density.toolbarIconSize} className="text-accent" />
+                    New event
+                  </button>
+                </>
               )}
             </div>
 

@@ -41,7 +41,7 @@ export interface DmAlertItem {
 
 export type EventSource =
   | 'ThreatCaddy Work' | 'Research' | 'Family' | 'Zoom' | 'PTO'
-  | 'Google Calendar' | 'Microsoft 365' | 'CalDAV';
+  | 'Google Calendar' | 'Microsoft 365' | 'CalDAV' | 'ICS';
 
 export interface CalendarEvent {
   id: string;
@@ -927,6 +927,22 @@ export interface StandaloneIOC {
   updatedAt: number;
 }
 
+/** Diff produced when an IOC enrichment check runs against an IOC that was already enriched. */
+export interface IOCRecheckDiff {
+  id: string;
+  iocId: string;
+  checkedAt: number;
+  priorScore?: number;
+  newScore?: number;
+  scoreDelta?: number;
+  priorStatus?: string;
+  newStatus?: string;
+  statusChanged: boolean;
+  newDetections: string[];
+  resolvedDetections: string[];
+  summary: string;
+}
+
 export type EvidenceKind =
   | 'pdf'
   | 'docx'
@@ -1429,6 +1445,7 @@ export interface ExportData {
   networkDevices?: NetworkDevice[];
   networkScanJobs?: NetworkScanJob[];
   journalPages?: JournalPage[];
+  iocRecheckDiffs?: IOCRecheckDiff[];
 }
 
 export const TAG_COLORS = [
