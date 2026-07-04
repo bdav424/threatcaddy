@@ -346,4 +346,10 @@ function AssistantCaddyOverviewWorkspacePanel({
     >
       <div
         className="flex min-h-0 flex-1"
-        data-assistantcaddy-shell-pane={workspacePanelActive ? '
+        data-assistantcaddy-shell-pane={workspacePanelActive ? 'active' : 'inactive'}
+      >
+        {children}
+      </div>
+    </WorkspacePanel>
+  );
+}
