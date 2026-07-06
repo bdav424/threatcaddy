@@ -3656,4 +3656,4 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
       )}
     </section>
   );
-}
+});
