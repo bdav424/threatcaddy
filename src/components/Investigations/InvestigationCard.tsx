@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { liveQuery } from 'dexie';
 import type { InvestigationColorMode } from '../../lib/investigation-color-mode';
 import { useTranslation } from 'react-i18next';
 import {
@@ -101,10 +101,16 @@ export function InvestigationCard({
   const dataModeClasses = DATA_MODE_CLASSES[dataMode];
 
   // Live folder clsLevel from Dexie — reactive to writes from other components/tabs
-  const liveFolderClsLevel = useLiveQuery(
-    () => db.folders.get(folderId).then((f) => f?.clsLevel),
-    [folderId],
-  );
+  const [liveFolderClsLevel, setLiveFolderClsLevel] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    const subscription = liveQuery(() =>
+      db.folders.get(folderId).then((f) => f?.clsLevel),
+    ).subscribe({
+      next: (val) => setLiveFolderClsLevel(val),
+      error: () => setLiveFolderClsLevel(undefined),
+    });
+    return () => subscription.unsubscribe();
+  }, [folderId]);
 
   // Live TLP level from investigation content (notes/IOCs/events)
   const liveClsLevel = useInvestigationClassification(folderId);
