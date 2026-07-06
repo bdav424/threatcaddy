@@ -1,8 +1,10 @@
-import { Briefcase, Tag, Pin } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Briefcase, Maximize2, Tag, Pin } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ClsBadge } from './ClsBadge';
 import { getTlpBorderColor } from '../../lib/classification';
 import type { InvestigationStatus, PlaybookExecution } from '../../types';
+import { subscribeRoutePopOut, type RoutePopOutSignalValue } from '../../lib/route-popout-signal';
 
 const statusColors: Record<InvestigationStatus, string> = {
   active: 'bg-green-500/20 text-green-400',
@@ -29,6 +31,12 @@ const STATUS_KEYS: Record<InvestigationStatus, string> = { active: 'hub.active',
 
 export function ActiveFilterBar({ folderName, folderColor, folderStatus, folderClsLevel, tagName, tagColor, onClear, onEditFolder, playbookExecution, onOpenJots, jotsCount }: ActiveFilterBarProps) {
   const { t } = useTranslation('investigations');
+
+  // Pop-out button for the active route panel (e.g. Notes, Tasks).
+  // Published by RoutePanelPopOutSurface via module-level signal (context can't cross the sibling boundary).
+  const [popOut, setPopOut] = useState<RoutePopOutSignalValue | null>(null);
+  useEffect(() => subscribeRoutePopOut(setPopOut), []);
+
   if (!folderName && !tagName) return null;
 
   const accentColor = folderColor || tagColor || '#6366f1';
@@ -100,6 +108,16 @@ export function ActiveFilterBar({ folderName, folderColor, folderStatus, folderC
         </button>
       )}
       {folderClsLevel && <ClsBadge level={folderClsLevel} />}
+      {popOut && (
+        <button
+          onClick={popOut.onPopOut}
+          className="hidden md:inline-flex p-1 rounded text-gray-400 hover:text-gray-200 hover:bg-gray-700 transition-colors"
+          aria-label={popOut.label}
+          title={popOut.label}
+        >
+          <Maximize2 size={13} />
+        </button>
+      )}
       <button
         onClick={onClear}
         className="ms-auto px-2 py-0.5 rounded text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-700 transition-colors"

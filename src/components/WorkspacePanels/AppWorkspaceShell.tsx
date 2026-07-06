@@ -15,6 +15,7 @@ import {
 import { useNavigation } from '../../contexts/NavigationContext';
 import { useInvestigation } from '../../contexts/InvestigationContext';
 import { RoutePopOutContext } from '../../contexts/RoutePopOutContext';
+import { setRoutePopOut } from '../../lib/route-popout-signal';
 import { downloadFile } from '../../lib/export';
 import { ClsBadge } from '../Common/ClsBadge';
 
@@ -1530,40 +1531,19 @@ function RoutePanelPopOutSurface({
   popOutLabel?: string;
   children: ReactNode;
 }) {
-  const { selectedFolder } = useInvestigation();
-  const tlpGlow = workspaceTlpGlow(selectedFolder?.clsLevel);
+  // Publish the pop-out callback to ActiveFilterBar via module-level signal.
+  // ActiveFilterBar is a sibling above AppWorkspaceShell, so context can't reach it.
+  const onPopOutRef = useRef(onPopOut);
+  onPopOutRef.current = onPopOut;
+
+  useEffect(() => {
+    setRoutePopOut({ label: popOutLabel, onPopOut: () => onPopOutRef.current() });
+    return () => setRoutePopOut(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [popOutLabel, title]);
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col" data-app-route-panel-surface={title.toLowerCase()}>
-      <div
-        className="flex h-10 shrink-0 items-center gap-2 overflow-hidden border-b bg-bg-primary/45 px-3"
-        data-app-route-panel-actions="true"
-        style={{
-          borderBottomColor: tlpGlow.border,
-          boxShadow: `0 4px 14px ${tlpGlow.glow}`,
-        }}
-      >
-        <div className="flex min-w-0 flex-1 items-center overflow-hidden">
-          <span className="truncate text-[11px] font-semibold text-text-secondary">{title}</span>
-        </div>
-        <div className="flex shrink-0 items-center justify-end">
-          <button
-            type="button"
-            aria-label={`${popOutLabel} ${title}`}
-            title={`${popOutLabel} ${title}`}
-            onClick={onPopOut}
-            className="hidden md:inline-flex h-7 items-center gap-1.5 rounded-full border border-border-subtle bg-bg-primary/75 px-2.5 text-[10px] font-semibold text-text-secondary shadow-sm transition-colors hover:border-border-medium hover:bg-bg-hover hover:text-text-primary"
-          >
-            <Maximize2 size={12} aria-hidden="true" />
-            <span>{popOutLabel}</span>
-          </button>
-        </div>
-      </div>
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-[41px] h-px"
-        style={{ background: `linear-gradient(90deg, transparent, ${tlpGlow.border}, transparent)` }}
-      />
       <div className="flex min-h-0 flex-1 flex-col">
         {children}
       </div>

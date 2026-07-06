@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import type { InvestigationColorMode } from '../../lib/investigation-color-mode';
 import { useTranslation } from 'react-i18next';
 import {
@@ -10,6 +11,8 @@ import { formatDate, cn } from '../../lib/utils';
 import { getClsBadgeStyle } from '../../lib/classification';
 import { useInvestigationClassification } from '../../hooks/useInvestigationClassification';
 import { getInvestigationColorMode, tlpToAccentColor } from '../../lib/investigation-color-mode';
+import { clsLevelIndex } from '../../lib/tlp-inspector';
+import { db } from '../../db';
 
 export interface InvestigationCardProps {
   folderId: string;
@@ -97,11 +100,23 @@ export function InvestigationCard({
   const dataModeLabel = t(`card.dataMode.${dataMode}`);
   const dataModeClasses = DATA_MODE_CLASSES[dataMode];
 
-  const effectiveClsLevel = inheritedClsLevel ?? clsLevel;
-  const clsBadgeStyle = effectiveClsLevel ? getClsBadgeStyle(effectiveClsLevel) : null;
+  // Live folder clsLevel from Dexie — reactive to writes from other components/tabs
+  const liveFolderClsLevel = useLiveQuery(
+    () => db.folders.get(folderId).then((f) => f?.clsLevel),
+    [folderId],
+  );
 
-  // Live TLP level from content (notes/IOCs/events) — used for border treatment only
+  // Live TLP level from investigation content (notes/IOCs/events)
   const liveClsLevel = useInvestigationClassification(folderId);
+
+  // Reactive effective level: max of live entity TLP + live folder TLP
+  const effectiveClsLevel = (() => {
+    const folder = liveFolderClsLevel ?? clsLevel;
+    const folderIdx = clsLevelIndex(folder);
+    const entityIdx = clsLevelIndex(liveClsLevel);
+    return entityIdx > folderIdx ? liveClsLevel : folder;
+  })();
+  const clsBadgeStyle = effectiveClsLevel ? getClsBadgeStyle(effectiveClsLevel) : null;
   const tlpOutlineColor = (() => {
     const u = liveClsLevel.toUpperCase();
     if (u.includes('RED')) return '#cc0000';
@@ -178,7 +193,7 @@ export function InvestigationCard({
       style={{
         ...(active
           ? { border: `1.5px solid ${tlpOutlineColor}` }
-          : { boxShadow: `inset 2px 0 0 ${tlpOutlineColor}` }),
+          : { boxShadow: `inset 0 3px 0 0 ${tlpOutlineColor}` }),
         ...(cardBgTint ? { backgroundColor: cardBgTint } : {}),
       }}
     >
