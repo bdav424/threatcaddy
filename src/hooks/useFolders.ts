@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { liveQuery } from 'dexie';
 import { db } from '../db';
 import type { Folder } from '../types';
 import { nanoid } from 'nanoid';
@@ -8,21 +9,30 @@ export function useFolders() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadFolders = useCallback(async () => {
+  // Reactive subscription — picks up any write to db.folders, including
+  // TLP auto-escalation writes that bypass the mutation helpers below.
+  useEffect(() => {
+    const subscription = liveQuery(() => db.folders.toArray()).subscribe({
+      next: (all) => {
+        setFolders(all.sort((a, b) => a.order - b.order));
+        setLoading(false);
+      },
+      error: () => {
+        setLoading(false);
+      },
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Explicit reload kept for backward-compat callers (server sync, etc.)
+  const reload = useCallback(async () => {
     try {
       const all = await db.folders.toArray();
       setFolders(all.sort((a, b) => a.order - b.order));
     } catch (err) {
-      console.error('Failed to load folders:', err);
-    } finally {
-      setLoading(false);
+      console.error('Failed to reload folders:', err);
     }
   }, []);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadFolders();
-  }, [loadFolders]);
 
   const createFolder = useCallback(async (name: string, color?: string, icon?: string, extra?: Partial<Folder>): Promise<Folder> => {
     const maxOrder = folders.reduce((max, f) => Math.max(max, f.order), 0);
@@ -236,6 +246,6 @@ export function useFolders() {
     trashFolderContents,
     archiveFolder,
     unarchiveFolder,
-    reload: loadFolders,
+    reload,
   };
 }

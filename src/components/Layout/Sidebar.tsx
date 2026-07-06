@@ -20,6 +20,7 @@ import { useInvestigation } from '../../contexts/InvestigationContext';
 import { useUIModals } from '../../contexts/UIModalContext';
 import { useInvestigationClassification } from '../../hooks/useInvestigationClassification';
 import { getClsBadgeStyle } from '../../lib/classification';
+import { effectiveTlpLevel } from '../../lib/tlp-inspector';
 import { TlpInspectorModal } from '../Investigation/TlpInspectorModal';
 import {
   WORKSPACE_PANEL_DRAG_TYPE,
@@ -532,9 +533,11 @@ export function Sidebar({
     },
   ];
 
-  // TLP/PAP classification inheritance for the active investigation
+  // TLP/PAP classification inheritance for the active investigation.
+  // effectiveTlpLevel takes the max of folder (authoritative manual value) and
+  // entity-derived TLP — folder always wins when it is more restrictive.
   const inheritedClsLevel = useInvestigationClassification(selectedFolder?.id ?? null);
-  const effectiveClsLevel = inheritedClsLevel !== 'TLP:CLEAR' ? inheritedClsLevel : (selectedFolder?.clsLevel ?? 'TLP:CLEAR');
+  const effectiveClsLevel = effectiveTlpLevel(selectedFolder?.clsLevel, inheritedClsLevel);
   const clsBadgeStyle = getClsBadgeStyle(effectiveClsLevel);
   const tlpIconColor = (() => {
     const u = effectiveClsLevel.toUpperCase();

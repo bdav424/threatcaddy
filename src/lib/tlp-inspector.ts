@@ -97,6 +97,44 @@ export async function inspectTlpContributors(folderId: string): Promise<TlpContr
 }
 
 /**
+ * Computes the effective TLP for display purposes: max of folder-level and entity-derived TLP.
+ * Folder is the authoritative stored value; entities can only raise it, never lower it.
+ * Returns 'TLP:CLEAR' when neither side has a meaningful level.
+ */
+export function effectiveTlpLevel(
+  folderClsLevel: string | undefined,
+  entityClsLevel: string | undefined,
+): string {
+  const folderIdx = clsLevelIndex(folderClsLevel);
+  const entityIdx = clsLevelIndex(entityClsLevel);
+  if (entityIdx > folderIdx) return entityClsLevel!;
+  if (folderIdx >= 0) return folderClsLevel!;
+  return 'TLP:CLEAR';
+}
+
+/**
+ * Checks whether any non-trashed entity in `folderId` carries a TLP more restrictive
+ * than the investigation's stored `clsLevel`, and if so writes the escalated value to DB.
+ * Never downgrades. Safe to call idempotently.
+ */
+export async function maybeEscalateFolderTlp(folderId: string): Promise<void> {
+  const [folder, contributors] = await Promise.all([
+    db.folders.get(folderId),
+    inspectTlpContributors(folderId),
+  ]);
+  if (!folder || contributors.length === 0) return;
+
+  // contributors is already sorted highest-first by inspectTlpContributors
+  const maxEntityCls = contributors[0].clsLevel;
+  const maxEntityIdx = clsLevelIndex(maxEntityCls);
+  const folderIdx = clsLevelIndex(folder.clsLevel);
+
+  if (maxEntityIdx > folderIdx) {
+    await db.folders.update(folderId, { clsLevel: maxEntityCls, updatedAt: Date.now() });
+  }
+}
+
+/**
  * Creates a copy of an investigation, dropping any items classified above `targetClsLevel`.
  * Returns the new folder id.
  */

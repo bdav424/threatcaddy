@@ -39,6 +39,7 @@ import { useStandaloneIOCs } from './hooks/useStandaloneIOCs';
 import { useEvidenceItems } from './hooks/useEvidenceItems';
 import { useChats } from './hooks/useChats';
 import { useFolders } from './hooks/useFolders';
+import { useTlpEscalation } from './hooks/useTlpEscalation';
 import { useTags } from './hooks/useTags';
 import { useSettings } from './hooks/useSettings';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -605,6 +606,10 @@ const AppInner = memo(function AppInner({
     syncingFolderId, confirmUnsyncId, setConfirmUnsyncId,
     handleOpenInvestigation: ctxHandleOpenInvestigation, handleSyncLocally, handleUnsyncConfirmed, handleUnsync,
   } = inv;
+
+  // Auto-escalate folder TLP when any child entity carries a more restrictive
+  // classification. Fires reactively for the currently open investigation.
+  useTlpEscalation(selectedFolderId);
 
   const {
     showSettings, settingsInitialTab, openSettings, closeSettings,

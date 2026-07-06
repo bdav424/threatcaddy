@@ -18,6 +18,8 @@ import { RoutePopOutContext } from '../../contexts/RoutePopOutContext';
 import { setRoutePopOut } from '../../lib/route-popout-signal';
 import { downloadFile } from '../../lib/export';
 import { ClsBadge } from '../Common/ClsBadge';
+import { useInvestigationClassification } from '../../hooks/useInvestigationClassification';
+import { effectiveTlpLevel } from '../../lib/tlp-inspector';
 
 import { ToolbarSelect, type ToolbarSelectOption } from '../Common/ToolbarSelect';
 import {
@@ -1126,9 +1128,15 @@ function WorkspaceLayoutTemplateControls({
   }, [applyLayoutPanels, layoutAllowedPanelIds, onApplied, persistSavedLayouts, savedLayouts]);
 
 
+  // Reactive entity TLP for the active investigation.
+  // effectiveTlpLevel picks max(folder.clsLevel, entity-derived) so the header
+  // always reflects the highest classification regardless of which surface set it.
+  const entityClsLevel = useInvestigationClassification(selectedFolderId ?? null);
+  const resolvedClsLevel = effectiveTlpLevel(selectedFolder?.clsLevel, entityClsLevel);
+
   const investigationLabel = selectedFolder?.name || 'No investigation selected';
-  const tlpLevel = selectedFolder?.clsLevel || 'TLP';
-  const tlpGlow = workspaceTlpGlow(selectedFolder?.clsLevel);
+  const tlpLevel = resolvedClsLevel !== 'TLP:CLEAR' ? resolvedClsLevel : (selectedFolder?.clsLevel || 'TLP');
+  const tlpGlow = workspaceTlpGlow(resolvedClsLevel);
   const investigationOptions = useMemo<Array<ToolbarSelectOption<string>>>(() => [
     { value: '', label: 'No investigation selected' },
     ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
@@ -1155,7 +1163,9 @@ function WorkspaceLayoutTemplateControls({
           className="inline-flex items-center px-1"
           data-workspace-tlp-inspect="true"
         >
-          {selectedFolder?.clsLevel ? (
+          {resolvedClsLevel && resolvedClsLevel !== 'TLP:CLEAR' ? (
+            <ClsBadge level={resolvedClsLevel} />
+          ) : selectedFolder?.clsLevel ? (
             <ClsBadge level={selectedFolder.clsLevel} />
           ) : (
             <span className="inline-flex h-6 items-center rounded-[7px] border border-border-subtle bg-bg-primary/60 px-6 text-[10px] font-semibold uppercase text-text-muted">
