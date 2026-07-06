@@ -451,6 +451,7 @@ export interface Settings {
   bgEffectIntensity?: number;    // 0–100
   bgEffectSize?: number;         // 40–180
   bgGlowIntensity?: number;      // 0–100; canvas particle shadowBlur; default 50
+  bgEffectTrail?: number;        // 0–100; canvas particle motion trail/fade length; default 0 (no trail)
   frostedPanels?: boolean;
   /** Auto-snap floating panels to snapped panel edges within 16 px during move (default true). */
   workspacePanelSnap?: boolean;
@@ -639,6 +640,7 @@ export const DEFAULT_SETTINGS: Settings = {
   bgEffectIntensity: 60,
   bgEffectSize: 100,
   bgGlowIntensity: 50,
+  bgEffectTrail: 0,
   frostedPanels: false,
   llmRoutingMode: 'auto',
 };

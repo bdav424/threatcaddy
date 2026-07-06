@@ -7,6 +7,7 @@ interface BgEffectLayerProps {
   intensity?: number;
   size?: number;
   glowIntensity?: number;
+  trail?: number;
   theme: 'dark' | 'light';
 }
 
@@ -33,9 +34,39 @@ type SwirlSeed = {
 };
 
 const MAX_PARTICLES = 100;
-const TRAIL_FADE_ALPHA = 0.05;
+// Trail slider (0-100) maps to a destination-out erase alpha applied per frame.
+// Lower alpha = slower erase = longer-persisting trail, so the mapping is inverted
+// and eased exponentially so the perceived trail length grows smoothly across the range.
+const TRAIL_FADE_ALPHA_MAX = 0.35;
+const TRAIL_FADE_ALPHA_MIN = 0.015;
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+function trailAmountToFadeAlpha(trailAmount: number) {
+  const t = clamp(trailAmount, 0, 100) / 100;
+  return TRAIL_FADE_ALPHA_MAX * Math.pow(TRAIL_FADE_ALPHA_MIN / TRAIL_FADE_ALPHA_MAX, t);
+}
+
+// Precomputed tileable luminance noise, used to dither large soft gradients so their
+// falloff doesn't quantize into visible 8-bit bands/rings on the canvas.
+function createDitherPattern(context: CanvasRenderingContext2D): CanvasPattern | null {
+  const size = 128;
+  const noiseCanvas = document.createElement('canvas');
+  noiseCanvas.width = size;
+  noiseCanvas.height = size;
+  const noiseCtx = noiseCanvas.getContext('2d');
+  if (!noiseCtx) return null;
+  const imageData = noiseCtx.createImageData(size, size);
+  for (let i = 0; i < imageData.data.length; i += 4) {
+    const value = 128 + (Math.random() - 0.5) * 24;
+    imageData.data[i] = value;
+    imageData.data[i + 1] = value;
+    imageData.data[i + 2] = value;
+    imageData.data[i + 3] = 255;
+  }
+  noiseCtx.putImageData(imageData, 0, 0);
+  return context.createPattern(noiseCanvas, 'repeat');
+}
 
 function normalizeHex(value?: string) {
   if (!value) return null;
@@ -106,12 +137,14 @@ export function BgEffectLayer({
   intensity = 60,
   size = 100,
   glowIntensity = 50,
+  trail = 0,
   theme,
 }: BgEffectLayerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const colorRef = useRef(color);
   const intensityRef = useRef(intensity);
   const glowRef = useRef(glowIntensity);
+  const trailRef = useRef(trail);
   const themeRef = useRef(theme);
   // Track pattern and size via refs so switching effects doesn't tear down the canvas.
   const patternRef = useRef(pattern);
@@ -125,13 +158,14 @@ export function BgEffectLayer({
     colorRef.current = color;
     intensityRef.current = intensity;
     glowRef.current = glowIntensity;
+    trailRef.current = trail;
     themeRef.current = theme;
     patternRef.current = pattern;
     sizeRef.current = size;
     if (prevPattern !== pattern || prevSize !== size) {
       needsParticleResetRef.current = true;
     }
-  }, [color, intensity, glowIntensity, theme, pattern, size]);
+  }, [color, intensity, glowIntensity, trail, theme, pattern, size]);
 
   // Only re-run canvas setup when toggling between 'none' and an active effect.
   // Switching between two non-none effects is handled via refs — no teardown needed.
@@ -165,8 +199,12 @@ export function BgEffectLayer({
     // don't need to tear down and recreate the particle arrays.
     let effectColor = normalizeHex(colorRef.current) || getPaletteFallbackColor(themeRef.current);
     let alphaBase = clamp(intensityRef.current / 100, 0.08, 1);
-    let glowBlur = clamp(glowRef.current, 0, 100) / 5;
-    let glowColor = themeRef.current === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.34)';
+    let glowStrength = clamp(glowRef.current, 0, 100) / 100;
+    let glowBlur = glowStrength * 20;
+    let glowTopAlpha = (themeRef.current === 'dark' ? 0.08 : 0.34) * glowStrength;
+
+    // Static dither pattern to break up 8-bit banding on the large soft gradients below.
+    const ditherPattern = createDitherPattern(context);
 
     // Reinitialise particles/swirls from current refs — cheap, no canvas resize.
     const initParticles = () => {
@@ -484,27 +522,37 @@ export function BgEffectLayer({
 
       effectColor = normalizeHex(colorRef.current) || getPaletteFallbackColor(themeRef.current);
       alphaBase = clamp(intensityRef.current / 100, 0.08, 1);
-      glowBlur = clamp(glowRef.current, 0, 100) / 5;
-      glowColor = themeRef.current === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.34)';
+      glowStrength = clamp(glowRef.current, 0, 100) / 100;
+      glowBlur = glowStrength * 20;
+      glowTopAlpha = (themeRef.current === 'dark' ? 0.08 : 0.34) * glowStrength;
 
-      // Dots are redrawn fresh each frame; animated effects use trail-fade for motion blur.
-      if (currentPattern === 'dots') {
+      // Dots and a 0 trail setting are redrawn fresh each frame (no trail); otherwise a
+      // destination-out fade leaves a decaying trail whose length is set by the slider.
+      const trailAmount = clamp(trailRef.current, 0, 100);
+      if (currentPattern === 'dots' || trailAmount <= 0) {
         context.clearRect(0, 0, width, height);
       } else {
         context.globalCompositeOperation = 'destination-out';
-        context.fillStyle = `rgba(0,0,0,${TRAIL_FADE_ALPHA})`;
+        context.fillStyle = `rgba(0,0,0,${trailAmountToFadeAlpha(trailAmount)})`;
         context.fillRect(0, 0, width, height);
         context.globalCompositeOperation = 'source-over';
       }
 
-      const wash = context.createRadialGradient(width * 0.5, height * 0.35, 0, width * 0.5, height * 0.35, Math.max(width, height) * 0.78);
-      wash.addColorStop(0, rgba(effectColor, alphaBase * 0.08));
-      wash.addColorStop(1, 'rgba(0,0,0,0)');
-      context.fillStyle = wash;
-      context.fillRect(0, 0, width, height);
+      // Glow layer (ambient wash halo + shape shadow blur) is skipped entirely at 0,
+      // not just dimmed, so "Off" truly renders no glow.
+      if (glowStrength > 0) {
+        const wash = context.createRadialGradient(width * 0.5, height * 0.35, 0, width * 0.5, height * 0.35, Math.max(width, height) * 0.78);
+        wash.addColorStop(0, rgba(effectColor, alphaBase * 0.08 * glowStrength));
+        wash.addColorStop(0.25, rgba(effectColor, alphaBase * 0.05 * glowStrength));
+        wash.addColorStop(0.5, rgba(effectColor, alphaBase * 0.026 * glowStrength));
+        wash.addColorStop(0.75, rgba(effectColor, alphaBase * 0.01 * glowStrength));
+        wash.addColorStop(1, 'rgba(0,0,0,0)');
+        context.fillStyle = wash;
+        context.fillRect(0, 0, width, height);
 
-      context.shadowBlur = glowBlur * scale;
-      context.shadowColor = rgba(effectColor, alphaBase * 0.22);
+        context.shadowBlur = glowBlur * scale;
+        context.shadowColor = rgba(effectColor, alphaBase * 0.22 * glowStrength);
+      }
       // Use patternRef so switching effects never requires tearing down the RAF loop.
       switch (currentPattern) {
         case 'dots':
@@ -539,11 +587,25 @@ export function BgEffectLayer({
       context.shadowBlur = 0;
 
       const vignette = context.createLinearGradient(0, 0, 0, height);
-      vignette.addColorStop(0, glowColor);
+      if (glowStrength > 0) {
+        vignette.addColorStop(0, `rgba(255,255,255,${glowTopAlpha})`);
+        vignette.addColorStop(0.18, `rgba(255,255,255,${glowTopAlpha * 0.35})`);
+      }
       vignette.addColorStop(0.35, 'rgba(0,0,0,0)');
+      vignette.addColorStop(0.68, themeRef.current === 'dark' ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)');
       vignette.addColorStop(1, themeRef.current === 'dark' ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.12)');
       context.fillStyle = vignette;
       context.fillRect(0, 0, width, height);
+
+      // Dither the large soft gradients above to break up 8-bit banding (rings/bands).
+      if (ditherPattern) {
+        context.save();
+        context.globalAlpha = 0.05;
+        context.globalCompositeOperation = 'overlay';
+        context.fillStyle = ditherPattern;
+        context.fillRect(0, 0, width, height);
+        context.restore();
+      }
 
       const shouldAnimate = !reducedMotion && currentPattern !== 'dots';
       if (shouldAnimate) {

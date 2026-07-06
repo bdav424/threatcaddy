@@ -695,6 +695,7 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
   const bgEffectIntensity = clamp(settings.bgEffectIntensity ?? 60, 0, 100);
   const bgEffectSize = clamp(settings.bgEffectSize ?? 100, 40, 180);
   const bgGlowIntensity = clamp(settings.bgGlowIntensity ?? 50, 0, 100);
+  const bgEffectTrail = clamp(settings.bgEffectTrail ?? 0, 0, 100);
   const themeEffectColor = getPaletteEffectColor(bgEffectPattern, runtimeModeColors) ?? runtimeModeColors['--color-accent'];
   const bgEffectHsl = hexToHsl(bgEffectColor);
   const fontFamily = settings.appearanceFontFamily || selectedCustom?.fontFamily || FONT_OPTIONS[0].value;
@@ -801,6 +802,7 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
       bgEffectIntensity: 60,
       bgEffectSize: 100,
       bgGlowIntensity: 50,
+      bgEffectTrail: 0,
     });
   };
 
@@ -2198,7 +2200,7 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
             </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-3">
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-400">Intensity</span>
@@ -2233,6 +2235,24 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
                 className="h-2 w-full accent-accent"
               />
               <div className="flex justify-between text-[10px] text-gray-600"><span>Fine</span><span>Large</span></div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">Trail length</span>
+                <span className="text-xs tabular-nums text-gray-500">{bgEffectTrail}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={bgEffectTrail}
+                onChange={(event) => onUpdateSettings({ bgEffectTrail: Number(event.target.value) })}
+                aria-label="Background effect trail length"
+                className="h-2 w-full accent-accent"
+              />
+              <div className="flex justify-between text-[10px] text-gray-600"><span>Off</span><span>Long</span></div>
             </div>
           </div>
 
@@ -2279,7 +2299,7 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
               aria-label="Glow intensity"
               className="h-2 w-full accent-accent"
             />
-            <div className="flex justify-between text-[10px] text-gray-600"><span>Crisp</span><span>Radiant</span></div>
+            <div className="flex justify-between text-[10px] text-gray-600"><span>Off</span><span>Radiant</span></div>
           </div>
         </div>
       </div>
