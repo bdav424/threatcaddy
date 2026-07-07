@@ -9,7 +9,7 @@ import { sql as drizzleSql, lt } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { access, readFile } from 'node:fs/promises';
+import { access, readdir, readFile } from 'node:fs/promises';
 import dns from 'node:dns/promises';
 import net from 'node:net';
 
@@ -329,6 +329,23 @@ adminApp.route('/admin', adminRoutes);
 const port = parseInt(process.env.PORT || '3001', 10);
 const adminPort = parseInt(process.env.ADMIN_PORT || '3002', 10);
 
+// Guards against a migration .sql file existing on disk without a matching
+// _journal.json entry — drizzle's migrator silently skips unjournaled files,
+// which would leave the schema out of sync with no error.
+async function assertMigrationsJournaled(migrationsFolder: string): Promise<void> {
+  const files = await readdir(migrationsFolder);
+  const sqlTags = files.filter((f) => f.endsWith('.sql')).map((f) => f.replace(/\.sql$/, ''));
+  const journalRaw = await readFile(resolve(migrationsFolder, 'meta/_journal.json'), 'utf-8');
+  const journaledTags = new Set(
+    (JSON.parse(journalRaw) as { entries: { tag: string }[] }).entries.map((e) => e.tag),
+  );
+  const unjournaled = sqlTags.filter((tag) => !journaledTags.has(tag));
+  if (unjournaled.length > 0) {
+    logger.error(`Migration file(s) missing from _journal.json: ${unjournaled.join(', ')}`);
+    throw new Error(`Unjournaled migration file(s) found: ${unjournaled.join(', ')}`);
+  }
+}
+
 async function main() {
   // Validate required environment variables
   const requiredEnvVars = ['JWT_PRIVATE_KEY', 'JWT_PUBLIC_KEY', 'DATABASE_URL'] as const;
@@ -350,6 +367,7 @@ async function main() {
   const __dirname = dirname(fileURLToPath(import.meta.url));
   const migrationsFolder = resolve(__dirname, 'db/migrations');
   logger.info(`Starting ThreatCaddy server v${serverVersion}`);
+  await assertMigrationsJournaled(migrationsFolder);
   logger.info('Running database migrations...', { migrationsFolder });
   await migrate(db, { migrationsFolder });
   logger.info('Database migrations complete — schema is up to date');
