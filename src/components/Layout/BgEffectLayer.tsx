@@ -38,7 +38,13 @@ const MAX_PARTICLES = 100;
 // Lower alpha = slower erase = longer-persisting trail, so the mapping is inverted
 // and eased exponentially so the perceived trail length grows smoothly across the range.
 const TRAIL_FADE_ALPHA_MAX = 0.35;
-const TRAIL_FADE_ALPHA_MIN = 0.015;
+// Floor raised from 0.015: 8-bit alpha quantization stalls destination-out fades
+// once pixelAlpha * fadeAlpha < 0.5, leaving permanent ghost smears. 0.03 keeps
+// max trails long while capping the stall floor; the periodic sweep pass in the
+// render loop clears the remaining residue.
+const TRAIL_FADE_ALPHA_MIN = 0.03;
+const TRAIL_SWEEP_INTERVAL_FRAMES = 240; // ~4s at 60fps
+const TRAIL_SWEEP_ALPHA = 0.12; // one stronger erase; drops ghost floor to ~2/255
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
@@ -182,6 +188,17 @@ export function BgEffectLayer({
       return;
     }
 
+    // Particles render onto a persistent offscreen layer so the trail fade only
+    // ever touches particle pixels. The visible canvas is fully cleared every
+    // frame and the static layers (glow wash, vignette, dither) are repainted
+    // fresh — they can no longer accumulate into saturated bands/rings.
+    const trailCanvas = document.createElement('canvas');
+    const pctx = trailCanvas.getContext('2d');
+    if (!pctx) {
+      return;
+    }
+    let framesSinceSweep = 0;
+
     const reducedMotion = typeof window.matchMedia === 'function'
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let frame = 0;
@@ -224,6 +241,9 @@ export function BgEffectLayer({
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
       context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      trailCanvas.width = canvas.width;
+      trailCanvas.height = canvas.height;
+      pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       initParticles();
     };
 
@@ -244,49 +264,49 @@ export function BgEffectLayer({
       stepPoints(reducedMotion ? 0.8 : 1.6, dt);
       for (const point of points) {
         const twinkle = 0.35 + ((Math.sin(time * 0.0015 + point.twinkle) + 1) / 2) * 0.65;
-        context.strokeStyle = rgba(effectColor, alphaBase * 0.22 * twinkle);
-        context.lineWidth = 1;
-        context.beginPath();
-        context.moveTo(point.x - point.radius * 3, point.y);
-        context.lineTo(point.x + point.radius * 3, point.y);
-        context.moveTo(point.x, point.y - point.radius * 3);
-        context.lineTo(point.x, point.y + point.radius * 3);
-        context.stroke();
+        pctx.strokeStyle = rgba(effectColor, alphaBase * 0.22 * twinkle);
+        pctx.lineWidth = 1;
+        pctx.beginPath();
+        pctx.moveTo(point.x - point.radius * 3, point.y);
+        pctx.lineTo(point.x + point.radius * 3, point.y);
+        pctx.moveTo(point.x, point.y - point.radius * 3);
+        pctx.lineTo(point.x, point.y + point.radius * 3);
+        pctx.stroke();
 
-        context.fillStyle = rgba(effectColor, alphaBase * 0.6 * twinkle);
-        context.beginPath();
-        context.arc(point.x, point.y, point.radius, 0, Math.PI * 2);
-        context.fill();
+        pctx.fillStyle = rgba(effectColor, alphaBase * 0.6 * twinkle);
+        pctx.beginPath();
+        pctx.arc(point.x, point.y, point.radius, 0, Math.PI * 2);
+        pctx.fill();
       }
     };
 
     const drawDots = () => {
       const spacing = 20 * scale;
-      context.fillStyle = rgba(effectColor, alphaBase * 0.22);
+      pctx.fillStyle = rgba(effectColor, alphaBase * 0.22);
       for (let y = spacing; y < height; y += spacing) {
         for (let x = spacing; x < width; x += spacing) {
-          context.beginPath();
-          context.arc(x, y, 0.8 * scale, 0, Math.PI * 2);
-          context.fill();
+          pctx.beginPath();
+          pctx.arc(x, y, 0.8 * scale, 0, Math.PI * 2);
+          pctx.fill();
         }
       }
     };
 
     const drawSynapse = (time: number) => {
       const spacing = 24 * scale;
-      context.strokeStyle = rgba(effectColor, alphaBase * 0.08);
-      context.lineWidth = 1;
+      pctx.strokeStyle = rgba(effectColor, alphaBase * 0.08);
+      pctx.lineWidth = 1;
       for (let x = 0; x < width; x += spacing) {
-        context.beginPath();
-        context.moveTo(x, 0);
-        context.lineTo(x, height);
-        context.stroke();
+        pctx.beginPath();
+        pctx.moveTo(x, 0);
+        pctx.lineTo(x, height);
+        pctx.stroke();
       }
       for (let y = 0; y < height; y += spacing) {
-        context.beginPath();
-        context.moveTo(0, y);
-        context.lineTo(width, y);
-        context.stroke();
+        pctx.beginPath();
+        pctx.moveTo(0, y);
+        pctx.lineTo(width, y);
+        pctx.stroke();
       }
 
       const pulseCount = reducedMotion ? 5 : Math.max(10, Math.round(16 * alphaBase));
@@ -297,25 +317,25 @@ export function BgEffectLayer({
         const x = horizontal ? position : line * spacing;
         const y = horizontal ? line * spacing : position;
         const gradient = horizontal
-          ? context.createLinearGradient(x - 28 * scale, y, x + 8 * scale, y)
-          : context.createLinearGradient(x, y - 28 * scale, x, y + 8 * scale);
+          ? pctx.createLinearGradient(x - 28 * scale, y, x + 8 * scale, y)
+          : pctx.createLinearGradient(x, y - 28 * scale, x, y + 8 * scale);
         gradient.addColorStop(0, 'rgba(0,0,0,0)');
         gradient.addColorStop(1, rgba(effectColor, alphaBase * 0.5));
-        context.strokeStyle = gradient;
-        context.lineWidth = 1.2 * scale;
-        context.beginPath();
+        pctx.strokeStyle = gradient;
+        pctx.lineWidth = 1.2 * scale;
+        pctx.beginPath();
         if (horizontal) {
-          context.moveTo(x - 30 * scale, y);
-          context.lineTo(x + 8 * scale, y);
+          pctx.moveTo(x - 30 * scale, y);
+          pctx.lineTo(x + 8 * scale, y);
         } else {
-          context.moveTo(x, y - 30 * scale);
-          context.lineTo(x, y + 8 * scale);
+          pctx.moveTo(x, y - 30 * scale);
+          pctx.lineTo(x, y + 8 * scale);
         }
-        context.stroke();
-        context.fillStyle = rgba(effectColor, alphaBase * 0.55);
-        context.beginPath();
-        context.arc(x, y, 1.6 * scale, 0, Math.PI * 2);
-        context.fill();
+        pctx.stroke();
+        pctx.fillStyle = rgba(effectColor, alphaBase * 0.55);
+        pctx.beginPath();
+        pctx.arc(x, y, 1.6 * scale, 0, Math.PI * 2);
+        pctx.fill();
       }
     };
 
@@ -327,15 +347,15 @@ export function BgEffectLayer({
           point.x = Math.random() * width;
         }
         const length = (26 + point.radius * 11) * scale;
-        const gradient = context.createLinearGradient(point.x, point.y - length, point.x, point.y);
+        const gradient = pctx.createLinearGradient(point.x, point.y - length, point.x, point.y);
         gradient.addColorStop(0, 'rgba(0,0,0,0)');
         gradient.addColorStop(1, rgba(effectColor, alphaBase * 0.44));
-        context.strokeStyle = gradient;
-        context.lineWidth = 1.2 * scale;
-        context.beginPath();
-        context.moveTo(point.x, point.y - length);
-        context.lineTo(point.x, point.y);
-        context.stroke();
+        pctx.strokeStyle = gradient;
+        pctx.lineWidth = 1.2 * scale;
+        pctx.beginPath();
+        pctx.moveTo(point.x, point.y - length);
+        pctx.lineTo(point.x, point.y);
+        pctx.stroke();
       }
     };
 
@@ -360,13 +380,13 @@ export function BgEffectLayer({
         const mag = Math.hypot(stepX, stepY) || 1;
         const dirX = stepX / mag;
         const dirY = stepY / mag;
-        context.strokeStyle = rgba(effectColor, alphaBase * 0.3);
-        context.lineWidth = Math.max(0.4, point.radius * 0.6);
-        context.lineCap = 'round';
-        context.beginPath();
-        context.moveTo(point.x - dirX * segLength, point.y - dirY * segLength);
-        context.lineTo(point.x, point.y);
-        context.stroke();
+        pctx.strokeStyle = rgba(effectColor, alphaBase * 0.3);
+        pctx.lineWidth = Math.max(0.4, point.radius * 0.6);
+        pctx.lineCap = 'round';
+        pctx.beginPath();
+        pctx.moveTo(point.x - dirX * segLength, point.y - dirY * segLength);
+        pctx.lineTo(point.x, point.y);
+        pctx.stroke();
       }
     };
 
@@ -380,14 +400,14 @@ export function BgEffectLayer({
           point.y = -20;
           point.x = Math.random() * width;
         }
-        context.save();
-        context.translate(point.x, point.y);
-        context.rotate(point.twinkle);
-        context.fillStyle = rgba(effectColor, alphaBase * 0.24);
-        context.beginPath();
-        context.ellipse(0, 0, point.radius * 2.2, point.radius * 0.85, 0.35, 0, Math.PI * 2);
-        context.fill();
-        context.restore();
+        pctx.save();
+        pctx.translate(point.x, point.y);
+        pctx.rotate(point.twinkle);
+        pctx.fillStyle = rgba(effectColor, alphaBase * 0.24);
+        pctx.beginPath();
+        pctx.ellipse(0, 0, point.radius * 2.2, point.radius * 0.85, 0.35, 0, Math.PI * 2);
+        pctx.fill();
+        pctx.restore();
       }
     };
 
@@ -401,32 +421,32 @@ export function BgEffectLayer({
           point.x = Math.random() * width;
         }
         const glow = 0.25 + ((Math.sin(point.twinkle) + 1) / 2) * 0.75;
-        context.fillStyle = rgba(effectColor, alphaBase * 0.42 * glow);
+        pctx.fillStyle = rgba(effectColor, alphaBase * 0.42 * glow);
 
         if (point.emberSpark) {
-          context.beginPath();
-          context.arc(point.x, point.y, point.radius * 0.45, 0, Math.PI * 2);
-          context.fill();
+          pctx.beginPath();
+          pctx.arc(point.x, point.y, point.radius * 0.45, 0, Math.PI * 2);
+          pctx.fill();
           continue;
         }
 
         const flakeSize = point.radius * 1.6;
         const rotation = point.emberRot + point.twinkle * 0.4;
-        context.save();
-        context.translate(point.x, point.y);
-        context.rotate(rotation);
-        context.beginPath();
+        pctx.save();
+        pctx.translate(point.x, point.y);
+        pctx.rotate(rotation);
+        pctx.beginPath();
         for (let side = 0; side < point.emberSides; side += 1) {
           const angle = (side / point.emberSides) * Math.PI * 2;
           const radius = side % 2 === 0 ? flakeSize : flakeSize * 0.45;
           const px = Math.cos(angle) * radius;
           const py = Math.sin(angle) * radius * 0.55;
-          if (side === 0) context.moveTo(px, py);
-          else context.lineTo(px, py);
+          if (side === 0) pctx.moveTo(px, py);
+          else pctx.lineTo(px, py);
         }
-        context.closePath();
-        context.fill();
-        context.restore();
+        pctx.closePath();
+        pctx.fill();
+        pctx.restore();
       }
     };
 
@@ -435,10 +455,10 @@ export function BgEffectLayer({
 
       for (let index = 0; index < points.length; index += 1) {
         const point = points[index];
-        context.fillStyle = rgba(effectColor, alphaBase * 0.52);
-        context.beginPath();
-        context.arc(point.x, point.y, point.radius, 0, Math.PI * 2);
-        context.fill();
+        pctx.fillStyle = rgba(effectColor, alphaBase * 0.52);
+        pctx.beginPath();
+        pctx.arc(point.x, point.y, point.radius, 0, Math.PI * 2);
+        pctx.fill();
 
         for (let compareIndex = index + 1; compareIndex < points.length; compareIndex += 1) {
           const compare = points[compareIndex];
@@ -449,25 +469,25 @@ export function BgEffectLayer({
           if (distance > limit) continue;
 
           const distanceAlpha = (1 - distance / limit) * alphaBase * 0.16;
-          context.strokeStyle = rgba(effectColor, distanceAlpha);
-          context.lineWidth = 1;
-          context.beginPath();
-          context.moveTo(point.x, point.y);
-          context.lineTo(compare.x, compare.y);
-          context.stroke();
+          pctx.strokeStyle = rgba(effectColor, distanceAlpha);
+          pctx.lineWidth = 1;
+          pctx.beginPath();
+          pctx.moveTo(point.x, point.y);
+          pctx.lineTo(compare.x, compare.y);
+          pctx.stroke();
         }
       }
 
       const haloX = width * (0.5 + Math.sin(time * 0.00018) * 0.12);
       const haloY = height * (0.42 + Math.cos(time * 0.00014) * 0.1);
       const haloRadius = Math.min(width, height) * (0.18 + scale * 0.08);
-      const gradient = context.createRadialGradient(haloX, haloY, 0, haloX, haloY, haloRadius);
+      const gradient = pctx.createRadialGradient(haloX, haloY, 0, haloX, haloY, haloRadius);
       gradient.addColorStop(0, rgba(effectColor, alphaBase * 0.12));
       gradient.addColorStop(1, 'rgba(0,0,0,0)');
-      context.fillStyle = gradient;
-      context.beginPath();
-      context.arc(haloX, haloY, haloRadius, 0, Math.PI * 2);
-      context.fill();
+      pctx.fillStyle = gradient;
+      pctx.beginPath();
+      pctx.arc(haloX, haloY, haloRadius, 0, Math.PI * 2);
+      pctx.fill();
     };
 
     const drawSwirls = (time: number, dt: number) => {
@@ -477,24 +497,24 @@ export function BgEffectLayer({
       for (const swirl of swirls) {
         const cx = swirl.anchorX + Math.cos(time * rotation * swirl.speed + swirl.phase) * swirl.orbitX * 0.32;
         const cy = swirl.anchorY + Math.sin(time * rotation * swirl.speed * 0.78 + swirl.phase) * swirl.orbitY * 0.24;
-        context.beginPath();
+        pctx.beginPath();
         for (let step = 0; step < 48; step += 1) {
           const stepRatio = step / 47;
           const angle = (time * rotation * (1.6 + swirl.speed)) + swirl.phase + stepRatio * Math.PI * 3.4;
           const radius = baseRadius + stepRatio * (110 * scale);
           const px = cx + Math.cos(angle) * radius;
           const py = cy + Math.sin(angle) * radius * 0.55;
-          if (step === 0) context.moveTo(px, py);
-          else context.lineTo(px, py);
+          if (step === 0) pctx.moveTo(px, py);
+          else pctx.lineTo(px, py);
         }
-        context.strokeStyle = rgba(effectColor, alphaBase * 0.18);
-        context.lineWidth = swirl.width;
-        context.stroke();
+        pctx.strokeStyle = rgba(effectColor, alphaBase * 0.18);
+        pctx.lineWidth = swirl.width;
+        pctx.stroke();
 
-        context.fillStyle = rgba(effectColor, alphaBase * 0.24);
-        context.beginPath();
-        context.arc(cx, cy, 4 * scale, 0, Math.PI * 2);
-        context.fill();
+        pctx.fillStyle = rgba(effectColor, alphaBase * 0.24);
+        pctx.beginPath();
+        pctx.arc(cx, cy, 4 * scale, 0, Math.PI * 2);
+        pctx.fill();
       }
 
       for (const point of points) {
@@ -502,10 +522,10 @@ export function BgEffectLayer({
         const orbit = 14 * scale;
         const px = point.x + Math.cos(point.twinkle) * orbit;
         const py = point.y + Math.sin(point.twinkle * 1.2) * orbit * 0.6;
-        context.fillStyle = rgba(effectColor, alphaBase * 0.22);
-        context.beginPath();
-        context.arc(px, py, point.radius, 0, Math.PI * 2);
-        context.fill();
+        pctx.fillStyle = rgba(effectColor, alphaBase * 0.22);
+        pctx.beginPath();
+        pctx.arc(px, py, point.radius, 0, Math.PI * 2);
+        pctx.fill();
       }
     };
 
@@ -526,32 +546,53 @@ export function BgEffectLayer({
       glowBlur = glowStrength * 20;
       glowTopAlpha = (themeRef.current === 'dark' ? 0.08 : 0.34) * glowStrength;
 
-      // Dots and a 0 trail setting are redrawn fresh each frame (no trail); otherwise a
-      // destination-out fade leaves a decaying trail whose length is set by the slider.
+      // The visible canvas is ALWAYS fully cleared — static layers repaint fresh
+      // each frame and structurally cannot accumulate.
+      context.clearRect(0, 0, width, height);
+
+      // Trails live only on the offscreen particle layer. At 0 (or dots) it is
+      // fully cleared each frame, making trails at 0% impossible by construction.
       const trailAmount = clamp(trailRef.current, 0, 100);
       if (currentPattern === 'dots' || trailAmount <= 0) {
-        context.clearRect(0, 0, width, height);
+        pctx.clearRect(0, 0, width, height);
       } else {
-        context.globalCompositeOperation = 'destination-out';
-        context.fillStyle = `rgba(0,0,0,${trailAmountToFadeAlpha(trailAmount)})`;
-        context.fillRect(0, 0, width, height);
-        context.globalCompositeOperation = 'source-over';
+        pctx.globalCompositeOperation = 'destination-out';
+        pctx.fillStyle = `rgba(0,0,0,${trailAmountToFadeAlpha(trailAmount)})`;
+        pctx.fillRect(0, 0, width, height);
+        // Periodic stronger erase: multiplicative 8-bit fades stall above a
+        // residue floor and would otherwise leave permanent ghost smears.
+        framesSinceSweep += 1;
+        if (framesSinceSweep >= TRAIL_SWEEP_INTERVAL_FRAMES) {
+          framesSinceSweep = 0;
+          pctx.fillStyle = `rgba(0,0,0,${TRAIL_SWEEP_ALPHA})`;
+          pctx.fillRect(0, 0, width, height);
+        }
+        pctx.globalCompositeOperation = 'source-over';
       }
 
       // Glow layer (ambient wash halo + shape shadow blur) is skipped entirely at 0,
       // not just dimmed, so "Off" truly renders no glow.
       if (glowStrength > 0) {
         const wash = context.createRadialGradient(width * 0.5, height * 0.35, 0, width * 0.5, height * 0.35, Math.max(width, height) * 0.78);
-        wash.addColorStop(0, rgba(effectColor, alphaBase * 0.08 * glowStrength));
-        wash.addColorStop(0.25, rgba(effectColor, alphaBase * 0.05 * glowStrength));
-        wash.addColorStop(0.5, rgba(effectColor, alphaBase * 0.026 * glowStrength));
-        wash.addColorStop(0.75, rgba(effectColor, alphaBase * 0.01 * glowStrength));
-        wash.addColorStop(1, 'rgba(0,0,0,0)');
+        // Dense, exponentially-shaped falloff instead of a few evenly-spaced stops.
+        // Light decays continuously (~inverse-square), so hand-picked plateaus read
+        // as cut-paper bands ("Eric Carle sunset"). ~16 stops on an eased curve put
+        // any residual banding below perceptual threshold; the tail approaches zero
+        // asymptotically rather than a hard edge ring.
+        const WASH_STOPS = 16;
+        const washPeak = alphaBase * 0.09 * glowStrength;
+        for (let s = 0; s <= WASH_STOPS; s += 1) {
+          const r = s / WASH_STOPS;
+          // Exponential decay; falloff sharpness tuned so the core reads bright and
+          // the edge fades to nothing well before r=1 (no boundary ring).
+          const falloff = Math.exp(-4.2 * r * r);
+          wash.addColorStop(r, rgba(effectColor, washPeak * falloff));
+        }
         context.fillStyle = wash;
         context.fillRect(0, 0, width, height);
 
-        context.shadowBlur = glowBlur * scale;
-        context.shadowColor = rgba(effectColor, alphaBase * 0.22 * glowStrength);
+        pctx.shadowBlur = glowBlur * scale;
+        pctx.shadowColor = rgba(effectColor, alphaBase * 0.22 * glowStrength);
       }
       // Use patternRef so switching effects never requires tearing down the RAF loop.
       switch (currentPattern) {
@@ -584,7 +625,10 @@ export function BgEffectLayer({
           drawSwirls(time, dt);
           break;
       }
-      context.shadowBlur = 0;
+      pctx.shadowBlur = 0;
+
+      // Composite the particle/trail layer over the glow wash.
+      context.drawImage(trailCanvas, 0, 0, trailCanvas.width, trailCanvas.height, 0, 0, width, height);
 
       const vignette = context.createLinearGradient(0, 0, 0, height);
       if (glowStrength > 0) {
@@ -628,6 +672,7 @@ export function BgEffectLayer({
       if (frame) window.cancelAnimationFrame(frame);
       window.removeEventListener('resize', handleResize);
       context.clearRect(0, 0, width, height);
+      pctx.clearRect(0, 0, width, height);
     };
   }, [isNone]);
 
