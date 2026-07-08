@@ -876,6 +876,30 @@ body.tc-desktop-shell-body {
   -webkit-backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%);
 }
 
+/* Frosted glass character — subtle grain (etched glass, not just gaussian blur)
+   plus a faint diagonal sheen (light catching glass). Layered as background
+   images so panel content stays sharp; only the backdrop blurs. */
+.has-panel-glass .bg-gray-900,
+.has-panel-glass .bg-gray-900\/80,
+.has-panel-glass .bg-gray-900\/50,
+.has-panel-glass .bg-gray-900\/40,
+.has-panel-glass .bg-gray-900\/30,
+.has-panel-glass .bg-gray-800,
+.has-panel-glass .bg-gray-800\/60,
+.has-panel-glass .bg-gray-800\/50,
+.has-panel-glass .bg-gray-800\/40,
+.has-panel-glass .sidebar-glass,
+.has-panel-glass [class*="bg-bg-deep"],
+.has-panel-glass [class*="bg-bg-primary"],
+.has-panel-glass [class*="bg-bg-surface"],
+.has-panel-glass [class*="bg-bg-raised"] {
+  background-image:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0) 72%, rgba(255, 255, 255, 0.05) 100%),
+    url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PGZpbHRlciBpZD0ibiI+PGZlVHVyYnVsZW5jZSB0eXBlPSJmcmFjdGFsTm9pc2UiIGJhc2VGcmVxdWVuY3k9IjAuODUiIG51bU9jdGF2ZXM9IjIiIHN0aXRjaFRpbGVzPSJzdGl0Y2giLz48ZmVDb2xvck1hdHJpeCB0eXBlPSJtYXRyaXgiIHZhbHVlcz0iMCAwIDAgMCAxICAwIDAgMCAwIDEgIDAgMCAwIDAgMSAgMCAwIDAgMC4wNSAwIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI24pIi8+PC9zdmc+") !important;
+  background-repeat: no-repeat, repeat !important;
+  background-blend-mode: normal, overlay !important;
+}
+
 .has-window-glass.light .bg-gray-900 {
   background-color: var(--tc-glass-surface-light) !important;
 }
@@ -1208,9 +1232,12 @@ body.tc-desktop-shell-body {
 }
 
 /* ─── Sidebar glass effect ─── */
+/* Background must be semi-transparent — an opaque background-color leaves
+   backdrop-filter with nothing behind it to blur, rendering as a flat panel. */
 .sidebar-glass {
   backdrop-filter: blur(12px);
-  background: var(--color-bg-surface);
+  -webkit-backdrop-filter: blur(12px);
+  background: color-mix(in srgb, var(--color-bg-surface) 92%, transparent);
 }
 
 .tc-desktop-shell .sidebar-glass {

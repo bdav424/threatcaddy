@@ -4,6 +4,9 @@ import type { BackgroundEffectPattern } from '../../types';
 interface BgEffectLayerProps {
   pattern: BackgroundEffectPattern;
   color?: string;
+  /** Optional distinct color for the ambient glow blooms (enables warm-glow-behind-cool-particles
+   * themes). Falls back to `color` when unset. */
+  glowColor?: string;
   intensity?: number;
   size?: number;
   glowIntensity?: number;
@@ -34,6 +37,16 @@ type SwirlSeed = {
 };
 
 const MAX_PARTICLES = 100;
+
+// Three glow blooms in golden-ratio proportion (radius and screen position),
+// composited additively so overlaps warm naturally instead of flattening into
+// a single centered wash.
+const GLOW_BLOOMS = [
+  { xFrac: 0.30, yFrac: 0.28, radiusMult: 1.0 },
+  { xFrac: 0.72, yFrac: 0.52, radiusMult: 0.618 },
+  { xFrac: 0.40, yFrac: 0.70, radiusMult: 0.382 },
+] as const;
+
 // Trail slider (0-100) maps to a destination-out erase alpha applied per frame.
 // Lower alpha = slower erase = longer-persisting trail, so the mapping is inverted
 // and eased exponentially so the perceived trail length grows smoothly across the range.
@@ -140,6 +153,7 @@ function createPoints(width: number, height: number, scale: number, density: num
 export function BgEffectLayer({
   pattern,
   color,
+  glowColor,
   intensity = 60,
   size = 100,
   glowIntensity = 50,
@@ -148,6 +162,7 @@ export function BgEffectLayer({
 }: BgEffectLayerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const colorRef = useRef(color);
+  const glowColorRef = useRef(glowColor);
   const intensityRef = useRef(intensity);
   const glowRef = useRef(glowIntensity);
   const trailRef = useRef(trail);
@@ -162,6 +177,7 @@ export function BgEffectLayer({
     const prevPattern = patternRef.current;
     const prevSize = sizeRef.current;
     colorRef.current = color;
+    glowColorRef.current = glowColor;
     intensityRef.current = intensity;
     glowRef.current = glowIntensity;
     trailRef.current = trail;
@@ -171,7 +187,7 @@ export function BgEffectLayer({
     if (prevPattern !== pattern || prevSize !== size) {
       needsParticleResetRef.current = true;
     }
-  }, [color, intensity, glowIntensity, trail, theme, pattern, size]);
+  }, [color, glowColor, intensity, glowIntensity, trail, theme, pattern, size]);
 
   // Only re-run canvas setup when toggling between 'none' and an active effect.
   // Switching between two non-none effects is handled via refs — no teardown needed.
@@ -215,6 +231,7 @@ export function BgEffectLayer({
     // Reassigned every frame from the refs above so color/theme/glow updates
     // don't need to tear down and recreate the particle arrays.
     let effectColor = normalizeHex(colorRef.current) || getPaletteFallbackColor(themeRef.current);
+    let glowColor = normalizeHex(glowColorRef.current) || effectColor;
     let alphaBase = clamp(intensityRef.current / 100, 0.08, 1);
     let glowStrength = clamp(glowRef.current, 0, 100) / 100;
     let glowBlur = glowStrength * 20;
@@ -541,6 +558,7 @@ export function BgEffectLayer({
       lastTime = time;
 
       effectColor = normalizeHex(colorRef.current) || getPaletteFallbackColor(themeRef.current);
+      glowColor = normalizeHex(glowColorRef.current) || effectColor;
       alphaBase = clamp(intensityRef.current / 100, 0.08, 1);
       glowStrength = clamp(glowRef.current, 0, 100) / 100;
       glowBlur = glowStrength * 20;
@@ -573,23 +591,36 @@ export function BgEffectLayer({
       // Glow layer (ambient wash halo + shape shadow blur) is skipped entirely at 0,
       // not just dimmed, so "Off" truly renders no glow.
       if (glowStrength > 0) {
-        const wash = context.createRadialGradient(width * 0.5, height * 0.35, 0, width * 0.5, height * 0.35, Math.max(width, height) * 0.78);
-        // Dense, exponentially-shaped falloff instead of a few evenly-spaced stops.
-        // Light decays continuously (~inverse-square), so hand-picked plateaus read
-        // as cut-paper bands ("Eric Carle sunset"). ~16 stops on an eased curve put
-        // any residual banding below perceptual threshold; the tail approaches zero
-        // asymptotically rather than a hard edge ring.
+        // Three golden-ratio blooms instead of one centered wash — reads as
+        // ambient light pooling in a scene rather than a flat film. GLOW drives
+        // peak brightness only; radii/positions are fixed viewport fractions so
+        // they scale with window size without changing spatial spread.
         const WASH_STOPS = 16;
         const washPeak = alphaBase * 0.09 * glowStrength;
-        for (let s = 0; s <= WASH_STOPS; s += 1) {
-          const r = s / WASH_STOPS;
-          // Exponential decay; falloff sharpness tuned so the core reads bright and
-          // the edge fades to nothing well before r=1 (no boundary ring).
-          const falloff = Math.exp(-4.2 * r * r);
-          wash.addColorStop(r, rgba(effectColor, washPeak * falloff));
+        const minDim = Math.min(width, height);
+        context.save();
+        context.globalCompositeOperation = 'lighter';
+        for (const bloom of GLOW_BLOOMS) {
+          const cx = width * bloom.xFrac;
+          const cy = height * bloom.yFrac;
+          const radius = minDim * bloom.radiusMult;
+          const wash = context.createRadialGradient(cx, cy, 0, cx, cy, radius);
+          // Dense, exponentially-shaped falloff instead of a few evenly-spaced stops.
+          // Light decays continuously (~inverse-square), so hand-picked plateaus read
+          // as cut-paper bands ("Eric Carle sunset"). ~16 stops on an eased curve put
+          // any residual banding below perceptual threshold; the tail approaches zero
+          // asymptotically rather than a hard edge ring.
+          for (let s = 0; s <= WASH_STOPS; s += 1) {
+            const r = s / WASH_STOPS;
+            // Exponential decay; falloff sharpness tuned so the core reads bright and
+            // the edge fades to nothing well before r=1 (no boundary ring).
+            const falloff = Math.exp(-4.2 * r * r);
+            wash.addColorStop(r, rgba(glowColor, washPeak * falloff));
+          }
+          context.fillStyle = wash;
+          context.fillRect(0, 0, width, height);
         }
-        context.fillStyle = wash;
-        context.fillRect(0, 0, width, height);
+        context.restore();
 
         pctx.shadowBlur = glowBlur * scale;
         pctx.shadowColor = rgba(effectColor, alphaBase * 0.22 * glowStrength);
