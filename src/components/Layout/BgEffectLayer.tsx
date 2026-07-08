@@ -673,14 +673,16 @@ export function BgEffectLayer({
       context.fillRect(0, 0, width, height);
 
       // Dither the large soft gradients above to break up 8-bit banding (rings/bands).
-      if (ditherPattern) {
+      // Only exists to smooth the glow wash, so skip entirely when glow is off —
+      // otherwise this noise overlay is the "faint film" that lingers at GLOW=0.
+      if (ditherPattern && glowStrength > 0) {
         context.save();
         context.globalAlpha = 0.05;
         context.globalCompositeOperation = 'overlay';
         context.fillStyle = ditherPattern;
         context.fillRect(0, 0, width, height);
         context.restore();
-      }
+      } // glow disabled — skip entirely
 
       const shouldAnimate = !reducedMotion && currentPattern !== 'dots';
       if (shouldAnimate) {
@@ -712,7 +714,7 @@ export function BgEffectLayer({
   }
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-0 bg-bg-deep">
+    <div className="pointer-events-none absolute inset-0 z-0">
       <canvas
         ref={canvasRef}
         className="app-window-bg-effect absolute inset-0"
