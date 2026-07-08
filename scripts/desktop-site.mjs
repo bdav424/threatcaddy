@@ -48,6 +48,25 @@ function createStaticServer() {
   return createServer(async (req, res) => {
     try {
       const requestUrl = new URL(req.url || '/', `http://${host}`);
+
+      // Neutralize any previously-registered PWA service worker: serve a no-op SW that
+      // unregisters itself and clears caches, so a stale SW from an earlier build can't
+      // keep serving old hashed assets after a fresh pnpm build.
+      if (requestUrl.pathname === '/sw.js') {
+        res.writeHead(200, {
+          'Content-Type': 'text/javascript; charset=utf-8',
+          'Cache-Control': 'no-store',
+          'Service-Worker-Allowed': '/',
+        });
+        res.end(
+          "self.addEventListener('install',()=>self.skipWaiting());" +
+          "self.addEventListener('activate',async()=>{" +
+          "try{const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)));}catch{}" +
+          "await self.registration.unregister();" +
+          "const cs=await self.clients.matchAll();cs.forEach(c=>c.navigate(c.url));});"
+        );
+        return;
+      }
       const decodedPath = decodeURIComponent(requestUrl.pathname);
       const cleanPath = decodedPath.replace(/^\/+/, '');
       const targetPath = path.normalize(path.join(distDir, cleanPath || 'index.html'));
@@ -64,7 +83,10 @@ function createStaticServer() {
 
       const ext = path.extname(filePath);
       res.writeHead(200, {
-        'Cache-Control': 'no-cache',
+        // no-store (not no-cache): local preview must never let the browser retain
+        // hashed build assets between builds. no-cache still stores + revalidates,
+        // which let a stale SW serve old chunks. no-store forbids retention outright.
+        'Cache-Control': 'no-store',
         'Content-Type': mimeTypes.get(ext) || 'application/octet-stream',
       });
       createReadStream(filePath).pipe(res);
@@ -104,6 +126,14 @@ const port = await listenOnAvailablePort(server, preferredPort);
 const siteUrl = `http://${host}:${port}/`;
 console.log(`ThreatCaddy desktop site: ${siteUrl}`);
 
+// Browser-only preview: serve the built site on 127.0.0.1:<port> and stop. No Electron.
+if (process.env.TC_DESKTOP_SITE_BROWSER_ONLY === '1') {
+  console.log(`Browser-only preview ready. Open ${siteUrl} (Ctrl+C to stop).`);
+  const shutdown = () => server.close(() => process.exit(0));
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+} else {
+
 const electron = spawn('pnpm', ['desktop:start'], {
   cwd: rootDir,
   stdio: 'inherit',
@@ -126,3 +156,4 @@ electron.on('error', (error) => {
     process.exit(1);
   });
 });
+}

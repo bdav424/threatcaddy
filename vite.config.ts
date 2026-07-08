@@ -196,10 +196,6 @@ export default defineConfig({
           if (id.includes('/cytoscape/') || id.includes('/cytoscape-cose-bilkent/')) {
             return 'cytoscape';
           }
-          // Leaflet maps stack.
-          if (id.includes('/leaflet/') || id.includes('/react-leaflet/') || id.includes('/react-leaflet-cluster/')) {
-            return 'leaflet';
-          }
           // Markdown rendering utilities.
           if (id.includes('/marked/') || id.includes('/dompurify/')) {
             return 'markdown';
@@ -208,13 +204,14 @@ export default defineConfig({
           if (id.includes('/pako/')) {
             return 'compression';
           }
-          // React core — narrow match so react-router, react-i18next, etc. fall through.
-          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
-            return 'vendor-react';
-          }
-          // All remaining node_modules vendor code — keeps app code out of index.
+          // Single shared vendor chunk for React and everything that is NOT a lazy heavy
+          // lib carved out above (excalidraw/mermaid/elkjs, cytoscape, markdown, pako).
+          // Splitting React away from its dependents (react-leaflet, router, i18next,
+          // etc.) creates cross-chunk import cycles that break module init order and
+          // froze production on the loading screen. Keeping the eager vendor graph in one
+          // chunk is the robust fix: no cycle can straddle a chunk boundary.
           if (id.includes('node_modules/')) {
-            return 'vendor-misc';
+            return 'vendor';
           }
         },
       },

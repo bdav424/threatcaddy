@@ -23,6 +23,7 @@
     "desktop:dev:renderer": "vite --host 127.0.0.1 --port 4173",
     "desktop:dev:main": "cross-env TC_DESKTOP_DEV_URL=http://127.0.0.1:4173 electron ./desktop/main.mjs",
     "desktop:site": "node scripts/desktop-site.mjs",
+    "desktop:site:browser": "TC_DESKTOP_SITE_BROWSER_ONLY=1 node scripts/desktop-site.mjs",
     "desktop:start": "electron ./desktop/main.mjs",
     "desktop:package": "pnpm build && electron-builder --dir",
     "desktop:dist": "pnpm build && electron-builder",
