@@ -20,6 +20,9 @@ extension/node_modules
 *.zip
 !extension/threatcaddy-*.zip
 
+# Temp files
+_tmp_*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

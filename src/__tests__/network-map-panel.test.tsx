@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -63,32 +63,36 @@ describe('NetworkMapPanel', () => {
     vi.mocked(getNetmapBridge).mockReturnValue(null);
   });
 
-  it('shows desktop-only fallback when not in Electron', () => {
+  it('shows desktop-only fallback when not in Electron', async () => {
     render(<NetworkMapPanel />);
+    await act(async () => {});
     expect(screen.getByText(/requires the desktop app/i)).toBeDefined();
   });
 
-  it('renders scan button when desktop bridge is available', () => {
+  it('renders scan button when desktop bridge is available', async () => {
     vi.mocked(isDesktopBridge).mockReturnValue(true);
     vi.mocked(getNetmapBridge).mockReturnValue(makeMockBridge());
 
     render(<NetworkMapPanel />);
+    await act(async () => {});
     expect(screen.getByRole('button', { name: /scan network/i })).toBeDefined();
   });
 
-  it('shows LAN-only badge', () => {
+  it('shows LAN-only badge', async () => {
     vi.mocked(isDesktopBridge).mockReturnValue(true);
     vi.mocked(getNetmapBridge).mockReturnValue(makeMockBridge());
 
     render(<NetworkMapPanel />);
+    await act(async () => {});
     expect(screen.getByText(/LAN only/i)).toBeDefined();
   });
 
-  it('shows empty state when no devices are found', () => {
+  it('shows empty state when no devices are found', async () => {
     vi.mocked(isDesktopBridge).mockReturnValue(true);
     vi.mocked(getNetmapBridge).mockReturnValue(makeMockBridge());
 
     render(<NetworkMapPanel />);
+    await act(async () => {});
     expect(screen.getByText(/no scan yet/i)).toBeDefined();
   });
 
@@ -98,6 +102,7 @@ describe('NetworkMapPanel', () => {
     vi.mocked(getNetmapBridge).mockReturnValue(bridge);
 
     render(<NetworkMapPanel />);
+    await act(async () => {});
 
     const scanBtn = screen.getByRole('button', { name: /scan network/i });
     await userEvent.click(scanBtn);
@@ -118,6 +123,7 @@ describe('NetworkMapPanel', () => {
     vi.mocked(getNetmapBridge).mockReturnValue(bridge);
 
     render(<NetworkMapPanel />);
+    await act(async () => {});
     const scanBtn = screen.getByRole('button', { name: /scan network/i });
     await userEvent.click(scanBtn);
 
@@ -125,5 +131,6 @@ describe('NetworkMapPanel', () => {
 
     // Clean up pending promise
     resolveStartScan({ ok: false, error: 'test abort' });
+    await act(async () => {});
   });
 });
