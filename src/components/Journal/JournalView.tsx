@@ -1,9 +1,27 @@
 import { useState, useCallback, useRef, useEffect, useMemo, type PointerEvent as ReactPointerEvent, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
+import DOMPurify from 'dompurify';
 import { BookOpen, Plus, Trash2, Send, Palette, Upload, Pencil, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useJournalPages } from '../../hooks/useJournalPages';
 import type { JournalPage, JournalPageTheme, JournalPaperStyle, Folder } from '../../types';
 import { cn } from '../../lib/utils';
+
+// ── Journal HTML sanitization ─────────────────────────────────────────────────
+// The shared `sanitizeHtml` (lib/markdown.ts) forbids the `style` attribute,
+// which would strip formatting execCommand legitimately emits (colored/sized
+// spans, underline, etc.) — so the journal editor gets its own DOMPurify
+// config that keeps `style`/`class` but still blocks scripts and event
+// handler attributes.
+const JOURNAL_PURIFY_CONFIG = {
+  ALLOWED_TAGS: ['b', 'i', 'u', 'strong', 'em', 'h1', 'h2', 'h3', 'p', 'br', 'ul', 'ol', 'li', 'hr', 'span', 'div'],
+  ALLOWED_ATTR: ['style', 'class'],
+  FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input'],
+  FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'],
+};
+
+function sanitizeJournalHtml(dirty: string): string {
+  return DOMPurify.sanitize(dirty, JOURNAL_PURIFY_CONFIG) as string;
+}
 
 // ── Legacy theme CSS (backwards compat for old pages without paperColor) ──────
 
@@ -800,7 +818,7 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
       lastPageId.current = page.id;
       setTitle(page.title);
       if (editorRef.current) {
-        editorRef.current.innerHTML = page.content || '';
+        editorRef.current.innerHTML = sanitizeJournalHtml(page.content || '');
       }
     }
   }, [page.id, page.content, page.title]);
@@ -830,7 +848,7 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       if (editorRef.current) {
-        onUpdate({ content: editorRef.current.innerHTML });
+        onUpdate({ content: sanitizeJournalHtml(editorRef.current.innerHTML) });
       }
     }, 600);
   }, [onUpdate]);
