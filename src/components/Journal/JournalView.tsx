@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo, type PointerEvent as ReactPointerEvent, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { BookOpen, Plus, Trash2, Send, Palette, Upload, Pencil, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useJournalPages } from '../../hooks/useJournalPages';
 import type { JournalPage, JournalPageTheme, JournalPaperStyle, Folder } from '../../types';
@@ -234,9 +235,10 @@ interface BackgroundPickerProps {
   onChangePaperColor: (color: string | 'theme') => void;
   onChangePaperStyle: (style: JournalPaperStyle) => void;
   onClose: () => void;
+  anchorRef: React.RefObject<HTMLElement | null>;
 }
 
-function BackgroundPicker({ paperColor, paperStyle, onChangePaperColor, onChangePaperStyle, onClose }: BackgroundPickerProps) {
+function BackgroundPicker({ paperColor, paperStyle, onChangePaperColor, onChangePaperStyle, onClose, anchorRef }: BackgroundPickerProps) {
   const ref = useRef<HTMLDivElement>(null);
   const wheelPtrRef = useRef<number | null>(null);
 
@@ -244,6 +246,17 @@ function BackgroundPicker({ paperColor, paperStyle, onChangePaperColor, onChange
   const [wheelPt, setWheelPt] = useState(() =>
     paperColor !== 'theme' ? hslToWheelPoint(hexToHsl(paperColor)) : { x: 50, y: 50 },
   );
+  // Rendered in a body portal so the popover can't be clipped or covered by
+  // ancestor stacking contexts (overlay panels, backdrop-blur effect layers,
+  // overflow-auto containers) — position is computed from the anchor button.
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    const anchor = anchorRef.current;
+    if (!anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    setPos({ top: rect.bottom + 4, left: rect.left });
+  }, [anchorRef]);
 
   useEffect(() => {
     if (paperColor !== 'theme') {
@@ -307,10 +320,13 @@ function BackgroundPicker({ paperColor, paperStyle, onChangePaperColor, onChange
     }
   };
 
-  return (
+  if (!pos) return null;
+
+  return createPortal(
     <div
       ref={ref}
-      className="absolute left-0 top-full z-50 mt-1 w-72 rounded-xl border border-border-medium bg-bg-raised shadow-xl"
+      className="fixed z-[9999] w-72 rounded-xl border border-border-medium bg-bg-raised shadow-xl"
+      style={{ top: pos.top, left: pos.left }}
     >
       {/* ── Paper style ── */}
       <div className="border-b border-border-subtle px-3 py-2.5">
@@ -457,7 +473,8 @@ function BackgroundPicker({ paperColor, paperStyle, onChangePaperColor, onChange
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -502,6 +519,82 @@ function RichToolbar({ onFormat }: { onFormat: (cmd: string, val?: string) => vo
 }
 
 // ── Drawing canvas ────────────────────────────────────────────────────────────
+//
+// Strokes are stored as vectors (JSON), not a raster snapshot. A raster
+// toDataURL()/drawImage() round-trip captures at device-pixel resolution and
+// replays into a context already scaled by devicePixelRatio — the
+// double-scaling creeps the drawing on every toggle/resize. Replaying vector
+// points through the DPR-scaled context each time avoids that entirely.
+
+interface Stroke {
+  color: string;
+  width: number;
+  erase?: boolean;
+  points: { x: number; y: number }[];
+}
+
+function isLegacyRasterDrawing(data: string): boolean {
+  return data.startsWith('data:');
+}
+
+function parseStrokes(data?: string): Stroke[] {
+  if (!data || isLegacyRasterDrawing(data)) return [];
+  try {
+    const parsed = JSON.parse(data);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke) {
+  if (stroke.points.length === 0) return;
+  ctx.beginPath();
+  ctx.lineWidth = stroke.width;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = stroke.color;
+  ctx.globalCompositeOperation = stroke.erase ? 'destination-out' : 'source-over';
+  ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+  for (let i = 1; i < stroke.points.length; i++) ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+  ctx.stroke();
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+// Read-only overlay shown when not in draw mode. Old saves are a PNG data
+// URL (rendered directly as an <img>); new saves are a vector stroke array
+// replayed onto a DPR-scaled canvas so they stay crisp at any size.
+function StaticDrawingCanvas({ data }: { data: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const strokes = parseStrokes(data);
+
+    const draw = () => {
+      const width = canvas.offsetWidth;
+      const height = canvas.offsetHeight;
+      if (width === 0 || height === 0) return;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, width, height);
+      for (const stroke of strokes) drawStroke(ctx, stroke);
+    };
+
+    draw();
+    const ro = new ResizeObserver(draw);
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  }, [data]);
+
+  return <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true" />;
+}
 
 interface DrawingCanvasProps {
   initialData?: string;
@@ -514,6 +607,34 @@ function DrawingCanvas({ initialData, onSave, onExit }: DrawingCanvasProps) {
   const [drawColor, setDrawColor] = useState<DrawColor>('black');
   const isDrawing = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const strokesRef = useRef<Stroke[]>(parseStrokes(initialData));
+  const currentStrokeRef = useRef<Stroke | null>(null);
+  // Legacy raster saves are drawn once as a backdrop trace — not perfect,
+  // but keeps existing drawings visible instead of discarding them outright.
+  const legacyImageRef = useRef<HTMLImageElement | null>(null);
+  const sizeRef = useRef({ width: 0, height: 0 });
+
+  const render = useCallback(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    const { width, height } = sizeRef.current;
+    if (width === 0 || height === 0) return;
+    ctx.clearRect(0, 0, width, height);
+    if (legacyImageRef.current) ctx.drawImage(legacyImageRef.current, 0, 0, width, height);
+    const strokes = currentStrokeRef.current
+      ? [...strokesRef.current, currentStrokeRef.current]
+      : strokesRef.current;
+    for (const stroke of strokes) drawStroke(ctx, stroke);
+  }, []);
+
+  useEffect(() => {
+    if (initialData && isLegacyRasterDrawing(initialData)) {
+      const img = new Image();
+      img.onload = () => { legacyImageRef.current = img; render(); };
+      img.src = initialData;
+    }
+  }, [initialData, render]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -521,47 +642,33 @@ function DrawingCanvas({ initialData, onSave, onExit }: DrawingCanvasProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    let isFirstRun = true;
-
-    // Re-measures the backing store against devicePixelRatio and redraws the
-    // current strokes (or initialData, on the very first run) scaled to fit.
-    // Also runs on resize so a stale backing store doesn't leave old strokes
-    // misaligned after a layout shift.
-    const resizeAndRedraw = () => {
+    // Re-measures the backing store against devicePixelRatio and replays all
+    // strokes from their stored point coordinates — no snapshot, so there's
+    // nothing to double-scale.
+    const resize = () => {
       const width = canvas.offsetWidth;
       const height = canvas.offsetHeight;
       if (width === 0 || height === 0) return;
       const dpr = window.devicePixelRatio || 1;
-
-      // Snapshot before resizing wipes the backing store, so in-progress
-      // (not-yet-saved) strokes survive a resize too.
-      const snapshot = isFirstRun ? initialData : canvas.toDataURL('image/png');
-      isFirstRun = false;
-
+      sizeRef.current = { width, height };
       canvas.width = width * dpr;
       canvas.height = height * dpr;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
-
-      if (snapshot) {
-        const img = new Image();
-        img.onload = () => ctx.drawImage(img, 0, 0, width, height);
-        img.src = snapshot;
-      }
+      render();
     };
 
-    resizeAndRedraw();
+    resize();
 
-    const ro = new ResizeObserver(resizeAndRedraw);
+    const ro = new ResizeObserver(resize);
     ro.observe(canvas);
     return () => ro.disconnect();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [render]);
 
   const scheduleSave = useCallback(() => {
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      const canvas = canvasRef.current;
-      if (canvas) onSave(canvas.toDataURL('image/png'));
+      onSave(strokesRef.current.length > 0 ? JSON.stringify(strokesRef.current) : '');
     }, 800);
   }, [onSave]);
 
@@ -573,40 +680,39 @@ function DrawingCanvas({ initialData, onSave, onExit }: DrawingCanvasProps) {
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     isDrawing.current = true;
     canvasRef.current?.setPointerCapture(e.pointerId);
-    const ctx = canvasRef.current?.getContext('2d');
-    if (!ctx) return;
+    const color = DRAW_COLORS.find((c) => c.key === drawColor)!;
+    const pressure = e.pressure > 0 ? e.pressure : 0.5;
     const { x, y } = getPos(e);
-    ctx.beginPath();
-    ctx.moveTo(x, y);
+    currentStrokeRef.current = {
+      color: color.hex,
+      width: drawColor === 'eraser' ? 24 : pressure * 4,
+      erase: drawColor === 'eraser',
+      points: [{ x, y }],
+    };
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawing.current) return;
-    const ctx = canvasRef.current?.getContext('2d');
-    if (!ctx) return;
-    const color = DRAW_COLORS.find((c) => c.key === drawColor)!;
-    const pressure = e.pressure > 0 ? e.pressure : 0.5;
-    ctx.lineWidth = drawColor === 'eraser' ? 24 : pressure * 4;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = color.hex;
-    ctx.globalCompositeOperation = drawColor === 'eraser' ? 'destination-out' : 'source-over';
+    if (!isDrawing.current || !currentStrokeRef.current) return;
     const { x, y } = getPos(e);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x, y);
+    currentStrokeRef.current.points.push({ x, y });
+    render();
   };
 
   const handlePointerUp = () => {
+    if (!isDrawing.current) return;
     isDrawing.current = false;
+    if (currentStrokeRef.current && currentStrokeRef.current.points.length > 1) {
+      strokesRef.current = [...strokesRef.current, currentStrokeRef.current];
+    }
+    currentStrokeRef.current = null;
+    render();
     scheduleSave();
   };
 
   const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+    strokesRef.current = [];
+    legacyImageRef.current = null;
+    render();
     onSave('');
   };
 
@@ -645,8 +751,7 @@ function DrawingCanvas({ initialData, onSave, onExit }: DrawingCanvasProps) {
           type="button"
           onClick={() => {
             clearTimeout(saveTimer.current);
-            const canvas = canvasRef.current;
-            if (canvas) onSave(canvas.toDataURL('image/png'));
+            onSave(strokesRef.current.length > 0 ? JSON.stringify(strokesRef.current) : '');
             onExit();
           }}
           className="flex items-center gap-1 rounded px-2 py-0.5 text-[10px] text-text-muted hover:bg-bg-hover hover:text-text-primary transition-colors"
@@ -684,6 +789,7 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
   const [confirmDelete, setConfirmDelete] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
+  const bgButtonRef = useRef<HTMLButtonElement>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastPageId = useRef<string>('');
   const [guideMetrics, setGuideMetrics] = useState<GuideMetrics | null>(null);
@@ -731,14 +837,20 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
 
   // Make sure the caret is inside the editor before applying a format command —
   // clicking a toolbar button steals focus otherwise, so formatBlock/bold/etc.
-  // would silently no-op or apply to the wrong place.
+  // would silently no-op or apply to the wrong place. Only reposition the
+  // selection when it's outside the editor entirely — if the user already has
+  // a caret/selection inside, leave it untouched so formatBlock has a real
+  // target instead of always collapsing to the end.
   const ensureSelectionInEditor = useCallback(() => {
     const editor = editorRef.current;
     if (!editor) return;
     const sel = window.getSelection();
-    if (sel && sel.anchorNode && editor.contains(sel.anchorNode)) {
-      editor.focus();
-      return;
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      if (editor.contains(range.commonAncestorContainer)) {
+        editor.focus();
+        return;
+      }
     }
     editor.focus();
     const range = document.createRange();
@@ -771,6 +883,7 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
       <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-2 shrink-0 bg-bg-raised flex-wrap">
         <div className="relative">
           <button
+            ref={bgButtonRef}
             onClick={() => setShowBgPicker((v) => !v)}
             className="flex items-center gap-1 rounded px-2 py-1 text-xs text-text-muted hover:bg-bg-hover hover:text-text-primary"
             title="Change page background"
@@ -787,6 +900,7 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
           </button>
           {showBgPicker && (
             <BackgroundPicker
+              anchorRef={bgButtonRef}
               paperColor={paperColor}
               paperStyle={paperStyle}
               onChangePaperColor={(c) => onUpdate({ paperColor: c })}
@@ -892,13 +1006,17 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
           />
           {/* Read-only drawing overlay — always visible when drawing data exists */}
           {page.drawingData && !drawMode && (
-            <img
-              src={page.drawingData}
-              alt=""
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 h-full w-full"
-              style={{ objectFit: 'fill' }}
-            />
+            isLegacyRasterDrawing(page.drawingData) ? (
+              <img
+                src={page.drawingData}
+                alt=""
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 h-full w-full"
+                style={{ objectFit: 'fill' }}
+              />
+            ) : (
+              <StaticDrawingCanvas data={page.drawingData} />
+            )
           )}
           {/* Interactive drawing canvas overlay — only in draw mode */}
           {drawMode && (
