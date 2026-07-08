@@ -22,19 +22,42 @@ function getLegacyThemeClasses(theme: JournalPageTheme): string {
 
 // ── Paper style → inline CSS background ──────────────────────────────────────
 
-function getPaperPatternStyle(paperStyle: JournalPaperStyle, paperColor: string | 'theme'): CSSProperties {
+interface GuideMetrics {
+  lineHeight: number;
+  offsetTop: number;
+}
+
+// A fixed paper color can be dark (e.g. "Near-black"), independent of the app's
+// light/dark theme — pick a line tint that stays visible against it either way.
+function getGuideLineColor(paperColor: string | 'theme'): string {
+  if (paperColor === 'theme') return 'var(--color-border-medium)';
+  const { l } = hexToHsl(paperColor);
+  return l < 50 ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.15)';
+}
+
+function getPaperPatternStyle(
+  paperStyle: JournalPaperStyle,
+  paperColor: string | 'theme',
+  guideMetrics?: GuideMetrics | null,
+): CSSProperties {
   const bg = paperColor === 'theme' ? 'var(--color-bg-surface)' : paperColor;
-  // Theme-aware line color: use the CSS variable so it adapts to dark/light mode.
-  // For fixed paper colors, use a subtle dark tint.
-  const lineColor = paperColor === 'theme' ? 'var(--color-border-medium)' : 'rgba(0,0,0,0.15)';
+  const lineColor = getGuideLineColor(paperColor);
 
   switch (paperStyle) {
-    case 'lined':
+    case 'lined': {
+      // Read the editor's actual computed line-height at runtime (it shifts with the
+      // user's font-scale setting) so the rule lines land under the text baseline
+      // instead of assuming a fixed 28px row height.
+      const lh = guideMetrics?.lineHeight ?? 28;
+      const offset = guideMetrics?.offsetTop ?? 0;
+      const phase = ((offset % lh) + lh) % lh;
       return {
         backgroundColor: bg,
-        backgroundImage: `repeating-linear-gradient(to bottom, transparent, transparent 27px, ${lineColor} 27px, ${lineColor} 28px)`,
-        backgroundSize: '100% 28px',
+        backgroundImage: `repeating-linear-gradient(to bottom, transparent, transparent ${lh - 1}px, ${lineColor} ${lh - 1}px, ${lineColor} ${lh}px)`,
+        backgroundSize: `100% ${lh}px`,
+        backgroundPositionY: `${phase}px`,
       };
+    }
     case 'dot':
       return {
         backgroundColor: bg,
@@ -463,9 +486,9 @@ function RichToolbar({ onFormat }: { onFormat: (cmd: string, val?: string) => vo
   );
   return (
     <div className="flex items-center gap-0.5 flex-wrap">
-      {btn('H1', 'formatBlock', '<h1>', 'Heading 1')}
-      {btn('H2', 'formatBlock', '<h2>', 'Heading 2')}
-      {btn('H3', 'formatBlock', '<h3>', 'Heading 3')}
+      {btn('H1', 'formatBlock', 'h1', 'Heading 1')}
+      {btn('H2', 'formatBlock', 'h2', 'Heading 2')}
+      {btn('H3', 'formatBlock', 'h3', 'Heading 3')}
       <div className="w-px h-4 bg-border-subtle mx-1" />
       {btn('B', 'bold', undefined, 'Bold')}
       {btn('I', 'italic', undefined, 'Italic')}
@@ -497,13 +520,41 @@ function DrawingCanvas({ initialData, onSave, onExit }: DrawingCanvasProps) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-    if (initialData) {
-      const img = new Image();
-      img.onload = () => ctx.drawImage(img, 0, 0);
-      img.src = initialData;
-    }
+
+    let isFirstRun = true;
+
+    // Re-measures the backing store against devicePixelRatio and redraws the
+    // current strokes (or initialData, on the very first run) scaled to fit.
+    // Also runs on resize so a stale backing store doesn't leave old strokes
+    // misaligned after a layout shift.
+    const resizeAndRedraw = () => {
+      const width = canvas.offsetWidth;
+      const height = canvas.offsetHeight;
+      if (width === 0 || height === 0) return;
+      const dpr = window.devicePixelRatio || 1;
+
+      // Snapshot before resizing wipes the backing store, so in-progress
+      // (not-yet-saved) strokes survive a resize too.
+      const snapshot = isFirstRun ? initialData : canvas.toDataURL('image/png');
+      isFirstRun = false;
+
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+
+      if (snapshot) {
+        const img = new Image();
+        img.onload = () => ctx.drawImage(img, 0, 0, width, height);
+        img.src = snapshot;
+      }
+    };
+
+    resizeAndRedraw();
+
+    const ro = new ResizeObserver(resizeAndRedraw);
+    ro.observe(canvas);
+    return () => ro.disconnect();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const scheduleSave = useCallback(() => {
@@ -632,8 +683,10 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
   const [drawMode, setDrawMode] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastPageId = useRef<string>('');
+  const [guideMetrics, setGuideMetrics] = useState<GuideMetrics | null>(null);
 
   // Sync content into contenteditable when page changes (but not on every keystroke)
   useEffect(() => {
@@ -646,6 +699,27 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
     }
   }, [page.id, page.content, page.title]);
 
+  // Measure the editor's actual rendered line-height + its offset within the
+  // paper-styled surface, so ruled guide lines can be aligned to the real text
+  // baseline (font-scale settings shift this away from any hardcoded value).
+  useEffect(() => {
+    const editor = editorRef.current;
+    const surface = surfaceRef.current;
+    if (!editor || !surface) return;
+
+    const measure = () => {
+      const lineHeight = parseFloat(getComputedStyle(editor).lineHeight);
+      const offsetTop = editor.getBoundingClientRect().top - surface.getBoundingClientRect().top;
+      setGuideMetrics({ lineHeight: Number.isFinite(lineHeight) && lineHeight > 0 ? lineHeight : 28, offsetTop });
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(editor);
+    ro.observe(surface);
+    return () => ro.disconnect();
+  }, [page.id]);
+
   const scheduleContentSave = useCallback(() => {
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
@@ -655,11 +729,30 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
     }, 600);
   }, [onUpdate]);
 
+  // Make sure the caret is inside the editor before applying a format command —
+  // clicking a toolbar button steals focus otherwise, so formatBlock/bold/etc.
+  // would silently no-op or apply to the wrong place.
+  const ensureSelectionInEditor = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const sel = window.getSelection();
+    if (sel && sel.anchorNode && editor.contains(sel.anchorNode)) {
+      editor.focus();
+      return;
+    }
+    editor.focus();
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  }, []);
+
   const handleFormat = useCallback((cmd: string, val?: string) => {
-    editorRef.current?.focus();
+    ensureSelectionInEditor();
     document.execCommand(cmd, false, val);
     scheduleContentSave();
-  }, [scheduleContentSave]);
+  }, [ensureSelectionInEditor, scheduleContentSave]);
 
   const handleTitleBlur = useCallback(() => {
     if (title !== page.title) onUpdate({ title });
@@ -670,7 +763,7 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
   const paperStyle = page.paperStyle ?? 'blank';
   const usingNewStyle = page.paperColor !== undefined;
   const legacyClasses = usingNewStyle ? '' : getLegacyThemeClasses(page.theme);
-  const paperSurfaceStyle = usingNewStyle ? getPaperPatternStyle(paperStyle, paperColor) : {};
+  const paperSurfaceStyle = usingNewStyle ? getPaperPatternStyle(paperStyle, paperColor, guideMetrics) : {};
 
   return (
     <div className="flex flex-col h-full">
@@ -771,7 +864,7 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
       )}
 
       {/* Page surface — background color + paper pattern */}
-      <div className={cn('flex-1 overflow-auto relative', legacyClasses)} style={paperSurfaceStyle}>
+      <div ref={surfaceRef} className={cn('flex-1 overflow-auto relative', legacyClasses)} style={paperSurfaceStyle}>
         <div className="mx-auto max-w-3xl px-8 py-6 relative">
           {/* Linked badge */}
           {page.linkedInvestigationId && (
@@ -786,7 +879,7 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
             onChange={(e) => setTitle(e.target.value)}
             onBlur={handleTitleBlur}
             placeholder="Page title…"
-            className="mb-4 w-full bg-transparent text-2xl font-bold text-inherit placeholder-text-muted outline-none"
+            className="journal-focus-quiet mb-4 w-full border-b-2 border-transparent bg-transparent text-2xl font-bold text-inherit placeholder-text-muted transition-colors focus:border-accent/40"
           />
           {/* Rich text content */}
           <div
@@ -795,7 +888,7 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
             suppressContentEditableWarning
             onInput={scheduleContentSave}
             data-placeholder="Start writing…"
-            className="min-h-[60vh] w-full bg-transparent text-sm leading-7 text-inherit outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-text-muted empty:before:pointer-events-none [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5 [&_ul_ul]:list-[circle] [&_ul_ul_ul]:list-[square]"
+            className="journal-focus-quiet min-h-[60vh] w-full rounded-md bg-transparent text-sm leading-7 text-inherit transition-shadow focus-visible:ring-1 focus-visible:ring-accent/25 empty:before:content-[attr(data-placeholder)] empty:before:text-text-muted empty:before:pointer-events-none [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5 [&_ul_ul]:list-[circle] [&_ul_ul_ul]:list-[square]"
           />
           {/* Read-only drawing overlay — always visible when drawing data exists */}
           {page.drawingData && !drawMode && (

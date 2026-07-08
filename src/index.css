@@ -683,6 +683,16 @@ body.tc-desktop-shell-body {
   outline: none;
 }
 
+/* ─── Journal: quiet focus affordance ───
+   A hard 2px box outline around the full-page journal surface reads as too
+   heavy (and has been reported rendering as an un-themed red rect in some
+   environments). These elements get their own thin accent underline/ring
+   instead — this selector's specificity beats the global rule above. */
+.journal-focus-quiet:focus,
+.journal-focus-quiet:focus-visible {
+  outline: none;
+}
+
 /* ─── Background image mode: make deep surfaces transparent ─── */
 .has-bg-image body,
 .has-bg-image .bg-gray-950 {
