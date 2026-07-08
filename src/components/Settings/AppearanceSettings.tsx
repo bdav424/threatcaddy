@@ -277,18 +277,25 @@ function mixHex(base: string, target: string, ratio: number) {
   });
 }
 
+const FALLBACK_EFFECT_COLOR = '#6366f1';
+
+/** mixHex/hexToRgb only produce a valid hex when both inputs are valid hex — sanitize before mixing so a bad or mid-edit palette color (e.g. draft.dark/light while editingTheme) can never yield "#NaNNaNNaN" or throw. */
+function safeColor(value: string | undefined, fallback: string): string {
+  return isColor(value) ? value : fallback;
+}
+
 function getPaletteEffectColor(
   pattern: BackgroundEffectPattern,
   colors: Record<AppearanceColorVariable, string>,
 ): string | undefined {
   if (pattern === 'none') return undefined;
-  const accent = colors['--color-accent'];
-  const text = colors['--color-text-primary'];
-  const surface = colors['--color-bg-surface'];
-  if (pattern === 'embers') return colors['--color-accent-amber'] || accent;
-  if (pattern === 'sparkles' || pattern === 'petals') return colors['--color-accent-pink'] || accent;
-  if (pattern === 'constellations') return colors['--color-accent-blue'] || mixHex(text, accent, 0.34);
-  if (pattern === 'perlin-flow') return colors['--color-accent-green'] || mixHex(accent, text, 0.28);
+  const accent = safeColor(colors['--color-accent'], FALLBACK_EFFECT_COLOR);
+  const text = safeColor(colors['--color-text-primary'], FALLBACK_EFFECT_COLOR);
+  const surface = safeColor(colors['--color-bg-surface'], FALLBACK_EFFECT_COLOR);
+  if (pattern === 'embers') return safeColor(colors['--color-accent-amber'], accent);
+  if (pattern === 'sparkles' || pattern === 'petals') return safeColor(colors['--color-accent-pink'], accent);
+  if (pattern === 'constellations') return safeColor(colors['--color-accent-blue'], mixHex(text, accent, 0.34));
+  if (pattern === 'perlin-flow') return safeColor(colors['--color-accent-green'], mixHex(accent, text, 0.28));
   if (pattern === 'synapse') return mixHex(accent, text, 0.22);
   if (pattern === 'rain') return mixHex(text, surface, 0.16);
   if (pattern === 'dots') return mixHex(text, accent, 0.18);
@@ -648,8 +655,6 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
   const fileRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const paletteEditorIdRef = useRef(0);
-  const bgEffectDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [pendingBgEffectPattern, setPendingBgEffectPattern] = useState<BackgroundEffectPattern | null>(null);
   const [bgPreview, setBgPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [editingTheme, setEditingTheme] = useState(false);
@@ -681,6 +686,8 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
   const activeModeColors = activeDraft[draftMode];
   const runtimeThemeMode = settings.theme ?? 'dark';
   const runtimeModeColors = activeDraft[runtimeThemeMode];
+  const runtimeModeColorsRef = useRef(runtimeModeColors);
+  runtimeModeColorsRef.current = runtimeModeColors;
   const bgOverlayOpacity = clamp(settings.bgImageOpacity ?? 85, 0, 100);
   const bgTransparency = 100 - bgOverlayOpacity;
   const bgBlur = clamp(settings.bgImageBlur ?? 0, 0, 40);
@@ -791,11 +798,6 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
 
   const resetPosition = () => onUpdateSettings({ bgImagePosX: 50, bgImagePosY: 50, bgImageZoom: 100 });
   const resetAmbientMotion = () => {
-    if (bgEffectDebounceRef.current !== null) {
-      clearTimeout(bgEffectDebounceRef.current);
-      bgEffectDebounceRef.current = null;
-    }
-    setPendingBgEffectPattern(null);
     onUpdateSettings({
       bgEffectPattern: 'none',
       bgEffectColor: undefined,
@@ -874,19 +876,20 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
   };
 
   const selectBackgroundEffect = (nextPattern: BackgroundEffectPattern) => {
-    // Show the selection immediately in the UI while debouncing the heavy canvas reset.
-    setPendingBgEffectPattern(nextPattern);
-    if (bgEffectDebounceRef.current !== null) clearTimeout(bgEffectDebounceRef.current);
-    bgEffectDebounceRef.current = setTimeout(() => {
-      bgEffectDebounceRef.current = null;
-      setPendingBgEffectPattern(null);
-      onUpdateSettings({
-        bgEffectPattern: nextPattern,
-        bgEffectColor: getPaletteEffectColor(nextPattern, runtimeModeColors),
-        // Nudge glow to a visible default when it's been zeroed out.
-        ...(nextPattern !== 'none' && bgGlowIntensity === 0 ? { bgGlowIntensity: 40 } : {}),
-      });
-    }, 350);
+    // Pattern + color commit unconditionally and immediately — a bad/mid-edit palette color must
+    // never block the pattern write (that's what caused the "dots snaps back to solid" bug: the
+    // old debounced commit closed over a stale runtimeModeColors and could drop the whole update).
+    const colors = runtimeModeColorsRef.current;
+    let nextColor = getPaletteEffectColor(nextPattern, colors);
+    if (nextPattern !== 'none' && !isColor(nextColor)) {
+      nextColor = safeColor(colors['--color-text-primary'], safeColor(colors['--color-accent'], FALLBACK_EFFECT_COLOR));
+    }
+    onUpdateSettings({
+      bgEffectPattern: nextPattern,
+      bgEffectColor: nextColor,
+      // Nudge glow to a visible default when it's been zeroed out.
+      ...(nextPattern !== 'none' && bgGlowIntensity === 0 ? { bgGlowIntensity: 40 } : {}),
+    });
   };
 
   const applyThemeEffectColor = () => {
@@ -2066,12 +2069,12 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
                 <div className="mt-1 text-[11px] text-gray-500">Choose any animation independently of the selected ThreatCaddy or Odysseus theme.</div>
               </div>
               <span className="rounded-full border border-gray-700 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-gray-500">
-                {BACKGROUND_EFFECT_LABELS[pendingBgEffectPattern ?? bgEffectPattern]}
+                {BACKGROUND_EFFECT_LABELS[bgEffectPattern]}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
               {BACKGROUND_EFFECT_OPTIONS.map((option) => {
-                const active = option.id === (pendingBgEffectPattern ?? bgEffectPattern);
+                const active = option.id === bgEffectPattern;
                 const previewColor = active
                   ? bgEffectColor
                   : getPaletteEffectColor(option.id, runtimeModeColors) ?? bgEffectColor;
