@@ -1,8 +1,21 @@
-import Docker from 'dockerode';
+import type Docker from 'dockerode';
 import { PassThrough } from 'node:stream';
 import { logger } from '../lib/logger.js';
 
-const docker = new Docker();
+let docker: Docker | null | undefined;
+
+async function getDocker(): Promise<Docker | null> {
+  if (docker === undefined) {
+    try {
+      const { default: DockerCtor } = await import('dockerode');
+      docker = new DockerCtor();
+    } catch (err) {
+      logger.warn(`dockerode unavailable, code sandbox disabled: ${err}`);
+      docker = null;
+    }
+  }
+  return docker;
+}
 
 const MAX_OUTPUT_BYTES = 1024 * 1024; // 1MB per stream
 const DEFAULT_TIMEOUT_S = 30;
@@ -59,7 +72,12 @@ export async function executeCode(
   const timeoutS = Math.min(Math.max(opts?.timeout || DEFAULT_TIMEOUT_S, 1), MAX_TIMEOUT_S);
   const startTime = Date.now();
 
-  const container = await docker.createContainer({
+  const dockerClient = await getDocker();
+  if (!dockerClient) {
+    throw new Error('Docker is unavailable — code sandbox execution is disabled on this server.');
+  }
+
+  const container = await dockerClient.createContainer({
     Image: langConfig.image,
     Cmd: langConfig.cmd(code),
     AttachStdout: true,
@@ -180,12 +198,18 @@ export async function executeCode(
  * Errors are logged but don't prevent startup.
  */
 export async function prePullSandboxImages(): Promise<void> {
+  const dockerClient = await getDocker();
+  if (!dockerClient) {
+    logger.warn('Docker is unavailable — skipping sandbox image pre-pull.');
+    return;
+  }
+
   for (const [lang, config] of Object.entries(LANGUAGE_IMAGES)) {
     try {
       await new Promise<void>((resolve, reject) => {
-        docker.pull(config.image, (err: Error | null, stream: NodeJS.ReadableStream) => {
+        dockerClient.pull(config.image, (err: Error | null, stream: NodeJS.ReadableStream) => {
           if (err) { reject(err); return; }
-          docker.modem.followProgress(stream, (err2: Error | null) => {
+          dockerClient.modem.followProgress(stream, (err2: Error | null) => {
             if (err2) reject(err2); else resolve();
           });
         });
