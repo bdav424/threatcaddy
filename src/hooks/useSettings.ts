@@ -163,12 +163,13 @@ export function useSettings() {
     const frostedPanels = settings.frostedPanels ?? false;
     // Frost is toggle-only: always apply a preset when enabled, no user-adjustable sliders.
     const effectiveTransparency = frostedPanels ? 30 : 0;
-    const effectiveBlur = frostedPanels ? 14 : 0;
+    const effectiveBlur = frostedPanels ? 16 : 0;
     const ratio = 1 - effectiveTransparency / 100;
     const panelOpacity = (base: number) => Math.max(0, base * ratio).toFixed(1);
     const enabled = effectiveTransparency > 0 || effectiveBlur > 0;
 
     root.classList.toggle('has-panel-glass', enabled);
+    root.classList.toggle('has-rgb-borders', settings.rgbBorders ?? false);
     root.classList.remove('has-window-glass', 'has-window-blur');
     root.style.setProperty('--tc-panel-glass-surface', `color-mix(in srgb, var(--color-bg-surface) ${panelOpacity(100)}%, transparent)`);
     root.style.setProperty('--tc-panel-glass-surface-80', `color-mix(in srgb, var(--color-bg-surface) ${panelOpacity(80)}%, transparent)`);

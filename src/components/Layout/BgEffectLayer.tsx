@@ -661,19 +661,17 @@ export function BgEffectLayer({
       // Composite the particle/trail layer over the glow wash.
       context.drawImage(trailCanvas, 0, 0, trailCanvas.width, trailCanvas.height, 0, 0, width, height);
 
-      // Vignette: general edge-darkening/viewport framing, independent of the glow
-      // bloom effect above — it always renders, even at GLOW=0 (Option B: this is not
-      // part of the glow effect, so it isn't gated on glowStrength). The top highlight
-      // stops use glowTopAlpha, which is already glowStrength-scaled to 0 when glow is
-      // off, so they need no separate conditional to disappear.
-      const vignette = context.createLinearGradient(0, 0, 0, height);
-      vignette.addColorStop(0, `rgba(255,255,255,${glowTopAlpha})`);
-      vignette.addColorStop(0.18, `rgba(255,255,255,${glowTopAlpha * 0.35})`);
-      vignette.addColorStop(0.35, 'rgba(0,0,0,0)');
-      vignette.addColorStop(0.68, themeRef.current === 'dark' ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)');
-      vignette.addColorStop(1, themeRef.current === 'dark' ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.12)');
-      context.fillStyle = vignette;
-      context.fillRect(0, 0, width, height);
+      // Vignette is part of the GLOW layer, not general chrome (Option A).
+      if (glowStrength > 0) {
+        const vignette = context.createLinearGradient(0, 0, 0, height);
+        vignette.addColorStop(0, `rgba(255,255,255,${glowTopAlpha})`);
+        vignette.addColorStop(0.18, `rgba(255,255,255,${glowTopAlpha * 0.35})`);
+        vignette.addColorStop(0.35, 'rgba(0,0,0,0)');
+        vignette.addColorStop(0.68, themeRef.current === 'dark' ? `rgba(0,0,0,${0.06 * glowStrength})` : `rgba(255,255,255,${0.05 * glowStrength})`);
+        vignette.addColorStop(1, themeRef.current === 'dark' ? `rgba(0,0,0,${0.14 * glowStrength})` : `rgba(255,255,255,${0.12 * glowStrength})`);
+        context.fillStyle = vignette;
+        context.fillRect(0, 0, width, height);
+      }
 
       // Dither the large soft gradients above to break up 8-bit banding (rings/bands).
       // Only exists to smooth the glow wash, so skip entirely when glow is off —

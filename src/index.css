@@ -1759,3 +1759,49 @@ body.tc-desktop-shell-body {
 .dark .watermark-page::before {
   color: rgba(255, 255, 255, 0.04);
 }
+
+
+/* ─── RGB border mode (morale setting) ────────────────────────────────────────
+   One animated custom property on :root drives every participating border, so
+   the whole effect costs a single CSS animation — no canvas, no rAF. Browsers
+   throttle CSS animations on hidden tabs, and prefers-reduced-motion disables it.
+
+   EXCLUSIONS ARE LOAD-BEARING: borders that encode TLP / PAP / classification or
+   investigation status must never cycle hue. Color is data in this app. Anything
+   added to the allow-list below must be app chrome only. */
+@property --tc-rgb-hue {
+  syntax: '<angle>';
+  inherits: true;
+  initial-value: 0deg;
+}
+
+@keyframes tc-rgb-cycle {
+  to { --tc-rgb-hue: 360deg; }
+}
+
+.has-rgb-borders {
+  animation: tc-rgb-cycle var(--tc-rgb-speed, 8s) linear infinite;
+}
+
+/* Allow-list: app chrome only. Never TLP badges, investigation cards, or any
+   element whose border color carries meaning. */
+.has-rgb-borders .app-window-frame,
+.has-rgb-borders .app-window-sidebar,
+.has-rgb-borders .app-window-titlebar,
+.has-rgb-borders .rgb-border {
+  border-color: hsl(var(--tc-rgb-hue) 90% 60%) !important;
+}
+
+/* Hard stop: classification-bearing surfaces opt out even if a future selector
+   above would otherwise match them. */
+.has-rgb-borders .tlp-clear-badge,
+.has-rgb-borders [class*="tlp-"],
+.has-rgb-borders [data-tlp],
+.has-rgb-borders [data-investigation-status] {
+  border-color: revert !important;
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .has-rgb-borders { animation: none; }
+}

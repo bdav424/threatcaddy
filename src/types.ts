@@ -451,6 +451,8 @@ export interface Settings {
   bgEffectIntensity?: number;    // 0–100
   bgEffectSize?: number;         // 40–180
   bgGlowIntensity?: number;      // 0–100; canvas particle shadowBlur; default 50
+  bgGlowColor?: string;          // optional hex override for the ambient glow blooms; falls back to bgEffectColor
+  rgbBorders?: boolean;          // morale setting: animate app-chrome border hue. Never applies to TLP/status borders.
   bgEffectTrail?: number;        // 0–100; canvas particle motion trail/fade length; default 0 (no trail)
   frostedPanels?: boolean;
   /** Auto-snap floating panels to snapped panel edges within 16 px during move (default true). */

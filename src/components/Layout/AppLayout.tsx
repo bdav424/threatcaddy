@@ -20,6 +20,7 @@ interface AppLayoutProps {
   bgEffectIntensity?: number;
   bgEffectSize?: number;
   bgGlowIntensity?: number;
+  bgGlowColor?: string;
   bgEffectTrail?: number;
   theme?: 'dark' | 'light';
 }
@@ -40,6 +41,7 @@ export function AppLayout({
   bgEffectIntensity,
   bgEffectSize,
   bgGlowIntensity,
+  bgGlowColor,
   bgEffectTrail,
   theme,
 }: AppLayoutProps) {
@@ -77,6 +79,7 @@ export function AppLayout({
         intensity={bgEffectIntensity ?? 60}
         size={bgEffectSize ?? 100}
         glowIntensity={bgGlowIntensity ?? 50}
+        glowColor={bgGlowColor}
         trail={bgEffectTrail ?? 0}
         theme={resolvedTheme}
       />

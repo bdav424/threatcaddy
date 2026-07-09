@@ -2810,6 +2810,7 @@ const AppInner = memo(function AppInner({
         bgEffectIntensity={settings.bgEffectIntensity}
         bgEffectSize={settings.bgEffectSize}
         bgGlowIntensity={settings.bgGlowIntensity}
+        bgGlowColor={settings.bgGlowColor}
         bgEffectTrail={settings.bgEffectTrail}
         theme={settings.theme}
         header={

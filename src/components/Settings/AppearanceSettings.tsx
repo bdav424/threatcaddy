@@ -884,11 +884,11 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
     if (nextPattern !== 'none' && !isColor(nextColor)) {
       nextColor = safeColor(colors['--color-text-primary'], safeColor(colors['--color-accent'], FALLBACK_EFFECT_COLOR));
     }
+    // Do NOT nudge bgGlowIntensity here. Silently resetting a user-chosen glow of 0
+    // back to 40 on every pattern change made "glow off" look permanently broken.
     onUpdateSettings({
       bgEffectPattern: nextPattern,
       bgEffectColor: nextColor,
-      // Nudge glow to a visible default when it's been zeroed out.
-      ...(nextPattern !== 'none' && bgGlowIntensity === 0 ? { bgGlowIntensity: 40 } : {}),
     });
   };
 
