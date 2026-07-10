@@ -24,6 +24,10 @@ type MovingPoint = {
   emberSpark: boolean;
   emberSides: number;
   emberRot: number;
+  /** Ember lifecycle: 1 = freshly lit, 0 = burnt out. */
+  emberLife: number;
+  /** Fuel 0.55–1.0. Correlates with radius: bigger embers burn longer and climb higher. */
+  emberFuel: number;
   /** Ring buffer: interleaved [x0, y0, x1, y1, ...] of past positions. */
   history: Float32Array;
   /** Next write slot (mod TRAIL_MAX_POSITIONS). */
@@ -122,6 +126,9 @@ function createPoints(width: number, height: number, scale: number, density: num
     emberSpark: Math.random() < 0.2,
     emberSides: 3 + Math.floor(Math.random() * 3),
     emberRot: Math.random() * Math.PI * 2,
+    // Staggered so embers don't all ignite and die in lockstep.
+    emberLife: Math.random(),
+    emberFuel: 0.55 + Math.random() * 0.45,
     history: new Float32Array(TRAIL_MAX_POSITIONS * 2),
     histHead: 0,
     histLen: 0,
@@ -640,24 +647,61 @@ export function BgEffectLayer({
 
     const drawEmbers = (dt: number) => {
       for (const point of points) {
-        point.y -= (reducedMotion ? 0.04 : (0.25 + point.radius * 0.08) * scale) * dt;
-        point.x += Math.sin(point.twinkle) * 0.22 * scale * dt;
-        point.twinkle += 0.018 * dt;
-        if (point.y < -20) {
-          point.y = height + 20;
+        // ── Lifecycle drain ──────────────────────────────────────────────────
+        // Less fuel → faster burnout. Clamp dt so a tab-hidden burst doesn't
+        // incinerate the whole field at once.
+        const drainRate = (0.00055 + (1 - point.emberFuel) * 0.0008) * dt;
+        point.emberLife = Math.max(0, point.emberLife - drainRate);
+
+        // Respawn burnt-out embers at the bottom with a fresh lifecycle.
+        if (point.emberLife <= 0) {
           point.x = Math.random() * width;
+          point.y = height + 10 + Math.random() * 30;
+          point.emberLife = 0.75 + Math.random() * 0.25;
+          point.emberFuel = 0.55 + Math.random() * 0.45;
+          point.twinkle = Math.random() * Math.PI * 2;
+          point.emberRot = Math.random() * Math.PI * 2;
         }
-        const glow = 0.25 + ((Math.sin(point.twinkle) + 1) / 2) * 0.75;
-        pctx.fillStyle = rgba(effectColor, alphaBase * 0.42 * glow);
+
+        // ── Heat curve ───────────────────────────────────────────────────────
+        // Embers peak brightness in the first half of life, then cool toward ash.
+        // Using a curve rather than linear so the "hot" phase is long and the
+        // dying fade is rapid — matches how real embers look.
+        const heatCurve = point.emberLife < 0.25
+          ? point.emberLife / 0.25          // fast fade to dark at the end
+          : 0.55 + (point.emberLife - 0.25) * (0.45 / 0.75); // sustained glow
+
+        // ── Buoyancy ─────────────────────────────────────────────────────────
+        // Hot embers rise faster; heavier fuel gives more lift (bigger → climbs higher).
+        const riseSpeed = reducedMotion
+          ? 0.04
+          : (0.18 + point.emberFuel * 0.38 + point.radius * 0.06) * scale * (0.4 + heatCurve * 0.6);
+        point.y -= riseSpeed * dt;
+
+        // ── Turbulence ───────────────────────────────────────────────────────
+        // Two overlapping sine waves at coprime frequencies give pseudo-random drift
+        // without a noise library.
+        point.twinkle += 0.018 * dt;
+        const turbulence = Math.sin(point.twinkle) * 0.22 + Math.sin(point.twinkle * 1.7 + point.emberRot) * 0.12;
+        point.x += turbulence * scale * dt;
+
+        // ── Shrink on death ──────────────────────────────────────────────────
+        // Visual radius shrinks to zero as heatCurve → 0.
+        const liveRadius = point.radius * (0.25 + 0.75 * heatCurve);
+
+        // Flicker: fast sine modulation on top of the heat envelope.
+        const flicker = 0.6 + ((Math.sin(point.twinkle * 2.3) + 1) / 2) * 0.4;
+        const glow = heatCurve * flicker;
+        pctx.fillStyle = rgba(effectColor, alphaBase * 0.52 * glow);
 
         if (point.emberSpark) {
           pctx.beginPath();
-          pctx.arc(point.x, point.y, point.radius * 0.45, 0, Math.PI * 2);
+          pctx.arc(point.x, point.y, Math.max(0.3, liveRadius * 0.45), 0, Math.PI * 2);
           pctx.fill();
           continue;
         }
 
-        const flakeSize = point.radius * 1.6;
+        const flakeSize = liveRadius * 1.6;
         const rotation = point.emberRot + point.twinkle * 0.4;
         pctx.save();
         pctx.translate(point.x, point.y);
@@ -665,9 +709,9 @@ export function BgEffectLayer({
         pctx.beginPath();
         for (let side = 0; side < point.emberSides; side += 1) {
           const angle = (side / point.emberSides) * Math.PI * 2;
-          const radius = side % 2 === 0 ? flakeSize : flakeSize * 0.45;
-          const px = Math.cos(angle) * radius;
-          const py = Math.sin(angle) * radius * 0.55;
+          const r = side % 2 === 0 ? flakeSize : flakeSize * 0.45;
+          const px = Math.cos(angle) * r;
+          const py = Math.sin(angle) * r * 0.55;
           if (side === 0) pctx.moveTo(px, py);
           else pctx.lineTo(px, py);
         }
