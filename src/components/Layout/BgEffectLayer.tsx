@@ -25,9 +25,13 @@ type MovingPoint = {
   emberSpark: boolean;
   emberSides: number;
   emberRot: number;
+  /** Per-particle glow-sprite alpha 0–1. Patterns set this each frame; 1 = full halo. */
+  glowA: number;
+  /** Per-particle glow-sprite radius multiplier. 1 = the sprite's natural size. */
+  glowR: number;
   /** Ember lifecycle: 1 = freshly lit, 0 = burnt out. */
   emberLife: number;
-  /** Fuel 0.55–1.0. Correlates with radius: bigger embers burn longer and climb higher. */
+  /** Fuel 0.15–1.0. Skewed dim via cubic distribution — most embers are cooling, occasional bright sparks. */
   emberFuel: number;
   /** Ring buffer: interleaved [x0, y0, x1, y1, ...] of past positions. */
   history: Float32Array;
@@ -128,8 +132,11 @@ function createPoints(width: number, height: number, scale: number, density: num
     emberSides: 3 + Math.floor(Math.random() * 3),
     emberRot: Math.random() * Math.PI * 2,
     // Staggered so embers don't all ignite and die in lockstep.
+    glowA: 1,
+    glowR: 1,
     emberLife: Math.random(),
-    emberFuel: 0.55 + Math.random() * 0.45,
+    // Cubic distribution: most embers are dim (cooling), rare bright sparks near 1.0.
+    emberFuel: 0.15 + Math.pow(Math.random(), 3) * 0.85,
     history: new Float32Array(TRAIL_MAX_POSITIONS * 2),
     histHead: 0,
     histLen: 0,
@@ -258,7 +265,7 @@ export function BgEffectLayer({
       // Background blooms are driven by GLOW only. alphaBase (the particle Intensity
       // slider) must NOT scale them — Intensity governs particles/lines/dots, glow
       // governs the ambient blooms. Coupling them made Intensity dim the background.
-      const washPeak = 0.14 * glowStrength;
+      const washPeak = 0.24 * glowStrength;
       const minDim = Math.min(width, height);
       bctx.globalCompositeOperation = 'lighter';
       for (const bloom of GLOW_BLOOMS) {
@@ -370,8 +377,10 @@ export function BgEffectLayer({
     const initParticles = () => {
       scale = clamp(sizeRef.current / 100, 0.45, 2);
       const starDensity = 0.75 + clamp(intensityRef.current / 100, 0.08, 1) * 0.45;
+      // Embers get ~1.75× more particles than other patterns without touching MAX_PARTICLES.
+      const emberDensityMultiplier = patternRef.current === 'embers' ? 1.75 : 1;
       swirls = createSwirls(width, height, scale);
-      points = createPoints(width, height, scale, starDensity);
+      points = createPoints(width, height, scale, starDensity * emberDensityMultiplier);
       petalCount = Math.max(18, Math.round(points.length * 0.55));
     };
 
@@ -472,14 +481,25 @@ export function BgEffectLayer({
       if (particleGlowStrength <= 0 || glowSpriteLogical <= 0) return;
       const sw = glowSpriteCanvas.width;
       const sh = glowSpriteCanvas.height;
-      const half = glowSpriteLogical / 2;
       context.globalCompositeOperation = 'lighter';
+      const prevAlpha = context.globalAlpha;
       for (const point of points) {
+        // Halos must track the particle they belong to. Stamping one fixed-size,
+        // fixed-alpha sprite on every particle made every particle an identical
+        // blob AND kept embers glowing at full brightness after their core had
+        // burnt out — the fade was invisible behind a halo that never faded.
+        const a = point.glowA;
+        if (a <= 0.004) continue;
+        const size = glowSpriteLogical * point.glowR;
+        if (size <= 0.5) continue;
+        const h = size / 2;
+        context.globalAlpha = a;
         context.drawImage(
           glowSpriteCanvas, 0, 0, sw, sh,
-          point.x - half, point.y - half, glowSpriteLogical, glowSpriteLogical,
+          point.x - h, point.y - h, size, size,
         );
       }
+      context.globalAlpha = prevAlpha;
       context.globalCompositeOperation = 'source-over';
     };
 
@@ -490,6 +510,9 @@ export function BgEffectLayer({
     const stepPoints = (speedMultiplier: number, dt: number) => {
       const speedScale = speedMultiplier * 0.05 * dt;
       for (const point of points) {
+        // Non-ember patterns use an unmodulated halo.
+        point.glowA = 1;
+        point.glowR = 1;
         point.x += point.vx * speedScale;
         point.y += point.vy * speedScale;
         point.twinkle += speedMultiplier * 0.0015 * dt;
@@ -659,12 +682,21 @@ export function BgEffectLayer({
         const drainRate = (0.00055 + (1 - point.emberFuel) * 0.0008) * dt;
         point.emberLife = Math.max(0, point.emberLife - drainRate);
 
+        // ── Stochastic abrupt extinction ─────────────────────────────────────
+        // Dim embers have a small per-frame chance of winking out instantly,
+        // simulating sparks that cool and die rather than smoothly fading.
+        if (point.emberFuel < 0.3 && Math.random() < 0.006) {
+          point.emberLife = 0;
+        }
+
         // Respawn burnt-out embers at the bottom with a fresh lifecycle.
         if (point.emberLife <= 0) {
           point.x = Math.random() * width;
           point.y = height + 10 + Math.random() * 30;
           point.emberLife = 0.75 + Math.random() * 0.25;
-          point.emberFuel = 0.55 + Math.random() * 0.45;
+          // Cubic distribution on respawn matches the initial createPoints distribution.
+          point.emberFuel = 0.15 + Math.pow(Math.random(), 3) * 0.85;
+          point.vx = 0;
           point.twinkle = Math.random() * Math.PI * 2;
           point.emberRot = Math.random() * Math.PI * 2;
         }
@@ -685,29 +717,39 @@ export function BgEffectLayer({
         point.y -= riseSpeed * dt;
 
         // ── Turbulence ───────────────────────────────────────────────────────
-        // Two overlapping sine waves at coprime frequencies give pseudo-random drift
-        // without a noise library.
+        // Brownian drift: damp vx each frame then apply a small random kick.
+        // This breaks the sine-wave lockstep while keeping motion bounded.
         point.twinkle += 0.018 * dt;
-        const turbulence = Math.sin(point.twinkle) * 0.22 + Math.sin(point.twinkle * 1.7 + point.emberRot) * 0.12;
-        point.x += turbulence * scale * dt;
+        point.vx = point.vx * 0.85 + (Math.random() - 0.5) * 0.10;
+        point.x += point.vx * scale * dt;
 
         // ── Shrink on death ──────────────────────────────────────────────────
         // Visual radius shrinks to zero as heatCurve → 0.
         const liveRadius = point.radius * (0.25 + 0.75 * heatCurve);
+        const shrink = 0.25 + 0.75 * heatCurve;
 
-        // Flicker: fast sine modulation on top of the heat envelope.
-        const flicker = 0.6 + ((Math.sin(point.twinkle * 2.3) + 1) / 2) * 0.4;
+        // Flicker: fast sine modulation on top of the heat envelope (~1.75× higher freq).
+        const flicker = 0.6 + ((Math.sin(point.twinkle * 4.0) + 1) / 2) * 0.4;
         const glow = heatCurve * flicker;
+
+        // Per-particle glow modulation — set BEFORE the spark continue so sparks
+        // also get a correctly faded halo as they burn out.
+        // burnAlpha = heatCurve (the burn state 0-1); glowA = heatCurve * flicker = glow.
+        point.glowA = heatCurve * flicker;
+        point.glowR = shrink * (0.55 + point.radius * 0.16);
+
         pctx.fillStyle = rgba(effectColor, alphaBase * 0.52 * glow);
 
         if (point.emberSpark) {
+          // Tighter core radius (~40% smaller) so the bright dot is a sharp pinpoint.
           pctx.beginPath();
-          pctx.arc(point.x, point.y, Math.max(0.3, liveRadius * 0.45), 0, Math.PI * 2);
+          pctx.arc(point.x, point.y, Math.max(0.3, liveRadius * 0.27), 0, Math.PI * 2);
           pctx.fill();
           continue;
         }
 
-        const flakeSize = liveRadius * 1.6;
+        // Reduced flake size (~40% smaller) for harder, more distinct cores.
+        const flakeSize = liveRadius * 0.96;
         const rotation = point.emberRot + point.twinkle * 0.4;
         pctx.save();
         pctx.translate(point.x, point.y);
