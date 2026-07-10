@@ -230,17 +230,23 @@ export function BgEffectLayer({
 
     /** Pre-render the three φ-seated bloom gradients onto bloomCanvas. */
     const buildBloomCache = () => {
-      const pw = Math.round(width * dpr);
-      const ph = Math.round(height * dpr);
-      bloomCanvas.width = pw;
-      bloomCanvas.height = ph;
+      // Build at ¼ resolution — the bilinear upscale on blit smooths gradient banding
+      // far more cheaply than adding more gradient stops.
+      const bloomScale = 4;
+      const bloomW = Math.ceil(width * dpr / bloomScale);
+      const bloomH = Math.ceil(height * dpr / bloomScale);
+      bloomCanvas.width = bloomW;
+      bloomCanvas.height = bloomH;
       const bctx = bloomCanvas.getContext('2d');
       if (!bctx) return;
-      bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      bctx.setTransform(dpr / bloomScale, 0, 0, dpr / bloomScale, 0, 0);
       bctx.clearRect(0, 0, width, height);
 
       const WASH_STOPS = 16;
-      const washPeak = alphaBase * 0.09 * glowStrength;
+      // Background blooms are driven by GLOW only. alphaBase (the particle Intensity
+      // slider) must NOT scale them — Intensity governs particles/lines/dots, glow
+      // governs the ambient blooms. Coupling them made Intensity dim the background.
+      const washPeak = 0.14 * glowStrength;
       const minDim = Math.min(width, height);
       bctx.globalCompositeOperation = 'lighter';
       for (const bloom of GLOW_BLOOMS) {
@@ -259,6 +265,15 @@ export function BgEffectLayer({
         bctx.fillRect(0, 0, width, height);
       }
       bctx.globalCompositeOperation = 'source-over';
+
+      // Break gradient quantization bands — one-time cost per rebuild.
+      // Perturb only the alpha channel so hue is unaffected.
+      const noiseData = bctx.getImageData(0, 0, bloomW, bloomH);
+      const nd = noiseData.data;
+      for (let i = 3; i < nd.length; i += 4) {
+        nd[i] = Math.min(255, Math.max(0, nd[i] + (Math.random() * 2 - 1)));
+      }
+      bctx.putImageData(noiseData, 0, 0);
     };
 
     /** Pre-render the vignette gradient onto vignetteCanvas. */
@@ -297,12 +312,14 @@ export function BgEffectLayer({
       const maxParticleRadius = 3.8 * scale; // (1.2 + 2.6) * scale
       const extent = maxParticleRadius + glowBlurExtent + 4; // +4 px safety margin
       glowSpriteLogical = Math.ceil(extent * 2);
-      const spritePixels = Math.ceil(glowSpriteLogical * dpr);
+      // Build at half resolution — upscale on blit smooths gradient banding.
+      const spriteScale = 2;
+      const spritePixels = Math.ceil(glowSpriteLogical * dpr / spriteScale);
       glowSpriteCanvas.width = spritePixels;
       glowSpriteCanvas.height = spritePixels;
       const gctx = glowSpriteCanvas.getContext('2d');
       if (!gctx) return;
-      gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      gctx.setTransform(dpr / spriteScale, 0, 0, dpr / spriteScale, 0, 0);
       gctx.clearRect(0, 0, glowSpriteLogical, glowSpriteLogical);
 
       if (glowStrength <= 0) return;
@@ -310,13 +327,26 @@ export function BgEffectLayer({
       const cx = glowSpriteLogical / 2;
       const cy = glowSpriteLogical / 2;
       // Pure soft halo — the circle itself is drawn to pctx per pattern.
+      // 12-stop exponential falloff on exp(-k*r²) reduces gradient quantization bands.
       const grad = gctx.createRadialGradient(cx, cy, 0, cx, cy, extent);
-      grad.addColorStop(0, rgba(effectColor, alphaBase * 0.45 * glowStrength));
-      grad.addColorStop(0.25, rgba(effectColor, alphaBase * 0.20 * glowStrength));
-      grad.addColorStop(0.65, rgba(effectColor, alphaBase * 0.05 * glowStrength));
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      const SPRITE_STOPS = 12;
+      const peakAlpha = alphaBase * 0.45 * glowStrength;
+      for (let s = 0; s <= SPRITE_STOPS; s++) {
+        const r = s / SPRITE_STOPS;
+        const falloff = Math.exp(-3.5 * r * r);
+        grad.addColorStop(r, r === 1 ? 'rgba(0,0,0,0)' : rgba(effectColor, peakAlpha * falloff));
+      }
       gctx.fillStyle = grad;
       gctx.fillRect(0, 0, glowSpriteLogical, glowSpriteLogical);
+
+      // Break gradient quantization bands — one-time cost per sprite rebuild.
+      // Perturb only the alpha channel so hue is unaffected.
+      const noiseData = gctx.getImageData(0, 0, spritePixels, spritePixels);
+      const nd = noiseData.data;
+      for (let i = 3; i < nd.length; i += 4) {
+        nd[i] = Math.min(255, Math.max(0, nd[i] + (Math.random() * 2 - 1)));
+      }
+      gctx.putImageData(noiseData, 0, 0);
     };
 
     // ---------------------------------------------------------------------------
