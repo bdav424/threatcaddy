@@ -491,5 +491,7 @@
   "investigationColorMode.combined": "Combiné",
   "investigationColorMode.manualDesc": "Utiliser le champ couleur de l'investigation",
   "investigationColorMode.tlpDesc": "Dériver la couleur d'accent du niveau TLP",
-  "investigationColorMode.combinedDesc": "Bordure TLP + teinte de fond manuelle"
+  "investigationColorMode.combinedDesc": "Bordure TLP + teinte de fond manuelle",
+  "particleGlowLabel": "Particle glow",
+  "radiant": "Radiant"
 }

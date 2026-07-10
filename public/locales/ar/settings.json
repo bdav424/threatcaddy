@@ -491,5 +491,7 @@
   "investigationColorMode.combined": "مدمج",
   "investigationColorMode.manualDesc": "استخدام حقل اللون للتحقيق",
   "investigationColorMode.tlpDesc": "اشتقاق لون التمييز من مستوى تصنيف TLP",
-  "investigationColorMode.combinedDesc": "معالجة حدود TLP + صبغة خلفية يدوية"
+  "investigationColorMode.combinedDesc": "معالجة حدود TLP + صبغة خلفية يدوية",
+  "particleGlowLabel": "Particle glow",
+  "radiant": "Radiant"
 }

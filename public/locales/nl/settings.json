@@ -491,5 +491,7 @@
   "investigationColorMode.combined": "Gecombineerd",
   "investigationColorMode.manualDesc": "Het kleurveld van het onderzoek gebruiken",
   "investigationColorMode.tlpDesc": "Kaartaccent afleiden van TLP-classificatieniveau",
-  "investigationColorMode.combinedDesc": "TLP-randbehandeling + handmatige achtergrondtint"
+  "investigationColorMode.combinedDesc": "TLP-randbehandeling + handmatige achtergrondtint",
+  "particleGlowLabel": "Particle glow",
+  "radiant": "Radiant"
 }

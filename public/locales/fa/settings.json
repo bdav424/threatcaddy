@@ -491,5 +491,7 @@
   "investigationColorMode.combined": "ترکیبی",
   "investigationColorMode.manualDesc": "استفاده از فیلد رنگ تحقیق",
   "investigationColorMode.tlpDesc": "استخراج لهجه رنگی کارت از سطح TLP",
-  "investigationColorMode.combinedDesc": "پردازش حاشیه TLP + رنگ پس‌زمینه دستی"
+  "investigationColorMode.combinedDesc": "پردازش حاشیه TLP + رنگ پس‌زمینه دستی",
+  "particleGlowLabel": "Particle glow",
+  "radiant": "Radiant"
 }

@@ -491,5 +491,7 @@
   "investigationColorMode.combined": "혼합",
   "investigationColorMode.manualDesc": "조사의 색상 필드 사용",
   "investigationColorMode.tlpDesc": "TLP 분류 수준에서 카드 강조 색상 파생",
-  "investigationColorMode.combinedDesc": "TLP 테두리 처리 + 수동 배경 색조"
+  "investigationColorMode.combinedDesc": "TLP 테두리 처리 + 수동 배경 색조",
+  "particleGlowLabel": "Particle glow",
+  "radiant": "Radiant"
 }

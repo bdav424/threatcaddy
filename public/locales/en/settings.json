@@ -468,7 +468,6 @@
   "integrations.cacheTtl": "Cache TTL",
   "integrations.cacheTtlValue": "{{hours}}h",
   "integrations.cacheDisabled": "Disabled",
-
   "syncAuth.title": "Sync Auth (Desktop MFA)",
   "syncAuth.noMfa": "No MFA configured for sync auth",
   "syncAuth.totpActive": "Authenticator app (TOTP) active",
@@ -492,12 +491,13 @@
   "syncAuth.verifying": "Verifying...",
   "syncAuth.cancel": "Cancel",
   "syncAuth.copy": "Copy",
-
   "investigationColorMode.label": "Investigation card colors",
   "investigationColorMode.manual": "Manual",
   "investigationColorMode.tlp": "TLP",
   "investigationColorMode.combined": "Combined",
   "investigationColorMode.manualDesc": "Use the investigation's color field",
   "investigationColorMode.tlpDesc": "Derive card accent from TLP classification level",
-  "investigationColorMode.combinedDesc": "TLP border treatment + manual background tint"
+  "investigationColorMode.combinedDesc": "TLP border treatment + manual background tint",
+  "particleGlowLabel": "Particle glow",
+  "radiant": "Radiant"
 }

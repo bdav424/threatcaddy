@@ -491,5 +491,7 @@
   "investigationColorMode.combined": "Совмещённый",
   "investigationColorMode.manualDesc": "Использовать поле цвета расследования",
   "investigationColorMode.tlpDesc": "Получить цвет акцента карточки из уровня TLP",
-  "investigationColorMode.combinedDesc": "Граница TLP + ручной оттенок фона"
+  "investigationColorMode.combinedDesc": "Граница TLP + ручной оттенок фона",
+  "particleGlowLabel": "Particle glow",
+  "radiant": "Radiant"
 }

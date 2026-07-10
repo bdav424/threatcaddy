@@ -491,5 +491,7 @@
   "investigationColorMode.combined": "Kết hợp",
   "investigationColorMode.manualDesc": "Sử dụng trường màu của điều tra",
   "investigationColorMode.tlpDesc": "Suy ra màu nhấn thẻ từ cấp TLP",
-  "investigationColorMode.combinedDesc": "Xử lý viền TLP + màu nền thủ công"
+  "investigationColorMode.combinedDesc": "Xử lý viền TLP + màu nền thủ công",
+  "particleGlowLabel": "Particle glow",
+  "radiant": "Radiant"
 }

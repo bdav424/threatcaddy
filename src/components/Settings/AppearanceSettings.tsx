@@ -713,6 +713,7 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
   const bgEffectIntensity = clamp(settings.bgEffectIntensity ?? 60, 0, 100);
   const bgEffectSize = clamp(settings.bgEffectSize ?? 100, 40, 180);
   const bgGlowIntensity = clamp(settings.bgGlowIntensity ?? 50, 0, 100);
+  const bgParticleGlow = clamp(settings.bgParticleGlow ?? 45, 0, 100);
   const bgEffectTrail = clamp(settings.bgEffectTrail ?? 0, 0, 100);
   // Resolved glow color: explicit override when set, fallback to effect color.
   const resolvedBgGlowColor = isColor(settings.bgGlowColor) ? settings.bgGlowColor : bgEffectColor;
@@ -823,6 +824,7 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
       bgEffectIntensity: 60,
       bgEffectSize: 100,
       bgGlowIntensity: 50,
+      bgParticleGlow: 45,
       bgEffectTrail: 0,
     });
   };
@@ -2316,6 +2318,24 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
                 className="h-2 w-full accent-accent"
               />
               <div className="flex justify-between text-[10px] text-gray-600"><span>Off</span><span>Long</span></div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">Particle glow</span>
+                <span className="text-xs tabular-nums text-gray-500">{bgParticleGlow}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={bgParticleGlow}
+                onChange={(event) => onUpdateSettings({ bgParticleGlow: Number(event.target.value) })}
+                aria-label="Particle glow strength"
+                className="h-2 w-full accent-accent"
+              />
+              <div className="flex justify-between text-[10px] text-gray-600"><span>Off</span><span>Radiant</span></div>
             </div>
           </div>
 

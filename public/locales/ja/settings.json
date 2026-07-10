@@ -491,5 +491,7 @@
   "investigationColorMode.combined": "複合",
   "investigationColorMode.manualDesc": "調査のカラーフィールドを使用",
   "investigationColorMode.tlpDesc": "TLP分類レベルからカードのアクセントカラーを導出",
-  "investigationColorMode.combinedDesc": "TLPボーダー処理 + 手動の背景ティント"
+  "investigationColorMode.combinedDesc": "TLPボーダー処理 + 手動の背景ティント",
+  "particleGlowLabel": "Particle glow",
+  "radiant": "Radiant"
 }

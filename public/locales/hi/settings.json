@@ -491,5 +491,7 @@
   "investigationColorMode.combined": "संयुक्त",
   "investigationColorMode.manualDesc": "जाँच के रंग फ़ील्ड का उपयोग करें",
   "investigationColorMode.tlpDesc": "TLP वर्गीकरण स्तर से कार्ड एक्सेंट प्राप्त करें",
-  "investigationColorMode.combinedDesc": "TLP सीमा उपचार + मैन्युअल पृष्ठभूमि रंग"
+  "investigationColorMode.combinedDesc": "TLP सीमा उपचार + मैन्युअल पृष्ठभूमि रंग",
+  "particleGlowLabel": "Particle glow",
+  "radiant": "Radiant"
 }

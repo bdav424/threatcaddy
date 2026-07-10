@@ -491,5 +491,7 @@
   "investigationColorMode.combined": "Kombiniert",
   "investigationColorMode.manualDesc": "Farbfeld der Untersuchung verwenden",
   "investigationColorMode.tlpDesc": "Kartenakzent aus TLP-Klassifizierung ableiten",
-  "investigationColorMode.combinedDesc": "TLP-Rahmenbehandlung + manueller Hintergrundton"
+  "investigationColorMode.combinedDesc": "TLP-Rahmenbehandlung + manueller Hintergrundton",
+  "particleGlowLabel": "Particle glow",
+  "radiant": "Radiant"
 }

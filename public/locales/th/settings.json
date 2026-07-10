@@ -491,5 +491,7 @@
   "investigationColorMode.combined": "รวมกัน",
   "investigationColorMode.manualDesc": "ใช้ฟิลด์สีของการสืบสวน",
   "investigationColorMode.tlpDesc": "ดึงสีเน้นการ์ดจากระดับ TLP",
-  "investigationColorMode.combinedDesc": "การจัดการเส้นขอบ TLP + โทนสีพื้นหลังแบบกำหนดเอง"
+  "investigationColorMode.combinedDesc": "การจัดการเส้นขอบ TLP + โทนสีพื้นหลังแบบกำหนดเอง",
+  "particleGlowLabel": "Particle glow",
+  "radiant": "Radiant"
 }

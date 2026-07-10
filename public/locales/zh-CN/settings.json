@@ -491,5 +491,7 @@
   "investigationColorMode.combined": "组合",
   "investigationColorMode.manualDesc": "使用调查的颜色字段",
   "investigationColorMode.tlpDesc": "从 TLP 分类级别派生卡片强调色",
-  "investigationColorMode.combinedDesc": "TLP 边框处理 + 手动背景色调"
+  "investigationColorMode.combinedDesc": "TLP 边框处理 + 手动背景色调",
+  "particleGlowLabel": "Particle glow",
+  "radiant": "Radiant"
 }

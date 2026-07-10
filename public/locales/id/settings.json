@@ -491,5 +491,7 @@
   "investigationColorMode.combined": "Gabungan",
   "investigationColorMode.manualDesc": "Gunakan bidang warna investigasi",
   "investigationColorMode.tlpDesc": "Turunkan warna aksen kartu dari level TLP",
-  "investigationColorMode.combinedDesc": "Perlakuan batas TLP + tint latar belakang manual"
+  "investigationColorMode.combinedDesc": "Perlakuan batas TLP + tint latar belakang manual",
+  "particleGlowLabel": "Particle glow",
+  "radiant": "Radiant"
 }

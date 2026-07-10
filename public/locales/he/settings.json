@@ -491,5 +491,7 @@
   "investigationColorMode.combined": "משולב",
   "investigationColorMode.manualDesc": "השתמש בשדה הצבע של החקירה",
   "investigationColorMode.tlpDesc": "גזור צבע דגש מרמת TLP",
-  "investigationColorMode.combinedDesc": "טיפול גבול TLP + גוון רקע ידני"
+  "investigationColorMode.combinedDesc": "טיפול גבול TLP + גוון רקע ידני",
+  "particleGlowLabel": "Particle glow",
+  "radiant": "Radiant"
 }

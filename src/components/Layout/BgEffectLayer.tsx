@@ -10,6 +10,7 @@ interface BgEffectLayerProps {
   intensity?: number;
   size?: number;
   glowIntensity?: number;
+  particleGlow?: number;
   trail?: number;
   theme: 'dark' | 'light';
 }
@@ -142,6 +143,7 @@ export function BgEffectLayer({
   intensity = 60,
   size = 100,
   glowIntensity = 50,
+  particleGlow = 45,
   trail = 0,
   theme,
 }: BgEffectLayerProps) {
@@ -150,6 +152,7 @@ export function BgEffectLayer({
   const glowColorRef = useRef(glowColor);
   const intensityRef = useRef(intensity);
   const glowRef = useRef(glowIntensity);
+  const particleGlowRef = useRef(particleGlow);
   const trailRef = useRef(trail);
   const themeRef = useRef(theme);
   // Track pattern and size via refs so switching effects doesn't tear down the canvas.
@@ -165,6 +168,7 @@ export function BgEffectLayer({
     glowColorRef.current = glowColor;
     intensityRef.current = intensity;
     glowRef.current = glowIntensity;
+    particleGlowRef.current = particleGlow;
     trailRef.current = trail;
     themeRef.current = theme;
     patternRef.current = pattern;
@@ -172,7 +176,7 @@ export function BgEffectLayer({
     if (prevPattern !== pattern || prevSize !== size) {
       needsParticleResetRef.current = true;
     }
-  }, [color, glowColor, intensity, glowIntensity, trail, theme, pattern, size]);
+  }, [color, glowColor, intensity, glowIntensity, particleGlow, trail, theme, pattern, size]);
 
   // Only re-run canvas setup when toggling between 'none' and an active effect.
   // Switching between two non-none effects is handled via refs — no teardown needed.
@@ -223,6 +227,7 @@ export function BgEffectLayer({
     let glowColorValue = normalizeHex(glowColorRef.current) || effectColor;
     let alphaBase = clamp(intensityRef.current / 100, 0.08, 1);
     let glowStrength = clamp(glowRef.current, 0, 100) / 100;
+    let particleGlowStrength = clamp(particleGlowRef.current, 0, 100) / 100;
     let glowTopAlpha = (themeRef.current === 'dark' ? 0.08 : 0.34) * glowStrength;
 
     // Logical-pixel size of the glow sprite square; updated by buildGlowSprite().
@@ -315,7 +320,8 @@ export function BgEffectLayer({
      */
     const buildGlowSprite = () => {
       // Size the sprite to contain the full glow extent at current scale/strength.
-      const glowBlurExtent = glowStrength * 20 * scale;
+      // Uses particleGlowStrength (independent of background bloom glowStrength).
+      const glowBlurExtent = particleGlowStrength * 20 * scale;
       const maxParticleRadius = 3.8 * scale; // (1.2 + 2.6) * scale
       const extent = maxParticleRadius + glowBlurExtent + 4; // +4 px safety margin
       glowSpriteLogical = Math.ceil(extent * 2);
@@ -329,7 +335,7 @@ export function BgEffectLayer({
       gctx.setTransform(dpr / spriteScale, 0, 0, dpr / spriteScale, 0, 0);
       gctx.clearRect(0, 0, glowSpriteLogical, glowSpriteLogical);
 
-      if (glowStrength <= 0) return;
+      if (particleGlowStrength <= 0) return;
 
       const cx = glowSpriteLogical / 2;
       const cy = glowSpriteLogical / 2;
@@ -337,7 +343,7 @@ export function BgEffectLayer({
       // 12-stop exponential falloff on exp(-k*r²) reduces gradient quantization bands.
       const grad = gctx.createRadialGradient(cx, cy, 0, cx, cy, extent);
       const SPRITE_STOPS = 12;
-      const peakAlpha = alphaBase * 0.45 * glowStrength;
+      const peakAlpha = alphaBase * 0.45 * particleGlowStrength;
       for (let s = 0; s <= SPRITE_STOPS; s++) {
         const r = s / SPRITE_STOPS;
         const falloff = Math.exp(-3.5 * r * r);
@@ -463,7 +469,7 @@ export function BgEffectLayer({
      * Only called for patterns that use the points[] array as particle heads.
      */
     const drawGlowSprites = () => {
-      if (glowStrength <= 0 || glowSpriteLogical <= 0) return;
+      if (particleGlowStrength <= 0 || glowSpriteLogical <= 0) return;
       const sw = glowSpriteCanvas.width;
       const sh = glowSpriteCanvas.height;
       const half = glowSpriteLogical / 2;
@@ -820,10 +826,11 @@ export function BgEffectLayer({
       glowColorValue = normalizeHex(glowColorRef.current) || effectColor;
       alphaBase = clamp(intensityRef.current / 100, 0.08, 1);
       glowStrength = clamp(glowRef.current, 0, 100) / 100;
+      particleGlowStrength = clamp(particleGlowRef.current, 0, 100) / 100;
       glowTopAlpha = (themeRef.current === 'dark' ? 0.08 : 0.34) * glowStrength;
 
       // Rebuild offscreen caches when any of their inputs change.
-      const newCacheKey = `${width}x${height}|${dpr}|${effectColor}|${glowColorValue}|${glowStrength.toFixed(3)}|${alphaBase.toFixed(3)}|${themeRef.current}|${scale.toFixed(3)}`;
+      const newCacheKey = `${width}x${height}|${dpr}|${effectColor}|${glowColorValue}|${glowStrength.toFixed(3)}|${particleGlowStrength.toFixed(3)}|${alphaBase.toFixed(3)}|${themeRef.current}|${scale.toFixed(3)}`;
       if (newCacheKey !== cacheKey) {
         cacheKey = newCacheKey;
         if (glowStrength > 0) {

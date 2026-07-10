@@ -491,5 +491,7 @@
   "investigationColorMode.combined": "Połączony",
   "investigationColorMode.manualDesc": "Użyj pola koloru dochodzenia",
   "investigationColorMode.tlpDesc": "Wyprowadź kolor akcentu karty z poziomu TLP",
-  "investigationColorMode.combinedDesc": "Obramowanie TLP + ręczny odcień tła"
+  "investigationColorMode.combinedDesc": "Obramowanie TLP + ręczny odcień tła",
+  "particleGlowLabel": "Particle glow",
+  "radiant": "Radiant"
 }

@@ -491,5 +491,7 @@
   "investigationColorMode.combined": "Birleşik",
   "investigationColorMode.manualDesc": "Soruşturmanın renk alanını kullan",
   "investigationColorMode.tlpDesc": "TLP sınıflandırma düzeyinden kart vurgu rengini türet",
-  "investigationColorMode.combinedDesc": "TLP kenarlık işlemi + manuel arka plan tonu"
+  "investigationColorMode.combinedDesc": "TLP kenarlık işlemi + manuel arka plan tonu",
+  "particleGlowLabel": "Particle glow",
+  "radiant": "Radiant"
 }

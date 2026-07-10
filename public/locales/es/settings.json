@@ -491,5 +491,7 @@
   "investigationColorMode.combined": "Combinado",
   "investigationColorMode.manualDesc": "Usar el campo de color de la investigación",
   "investigationColorMode.tlpDesc": "Derivar el acento de la tarjeta del nivel de clasificación TLP",
-  "investigationColorMode.combinedDesc": "Tratamiento de borde TLP + tinte de fondo manual"
+  "investigationColorMode.combinedDesc": "Tratamiento de borde TLP + tinte de fondo manual",
+  "particleGlowLabel": "Particle glow",
+  "radiant": "Radiant"
 }

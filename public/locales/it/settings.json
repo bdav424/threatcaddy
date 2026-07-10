@@ -491,5 +491,7 @@
   "investigationColorMode.combined": "Combinato",
   "investigationColorMode.manualDesc": "Usa il campo colore dell'investigazione",
   "investigationColorMode.tlpDesc": "Derivi il colore d'accento dalla classificazione TLP",
-  "investigationColorMode.combinedDesc": "Bordo TLP + tinta sfondo manuale"
+  "investigationColorMode.combinedDesc": "Bordo TLP + tinta sfondo manuale",
+  "particleGlowLabel": "Particle glow",
+  "radiant": "Radiant"
 }
