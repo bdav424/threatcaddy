@@ -61,7 +61,7 @@
   "appearance.backgroundImage": "Gambar Latar",
   "appearance.removeImage": "Hapus gambar",
   "appearance.enableBackground": "Aktifkan latar",
-  "appearance.transparency": "Transparansi",
+  "appearance.overlayOpacity": "Transparansi",
   "appearance.subtle": "Halus",
   "appearance.vivid": "Mencolok",
   "appearance.zoom": "Zoom",

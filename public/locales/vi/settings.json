@@ -61,7 +61,7 @@
   "appearance.backgroundImage": "Ảnh nền",
   "appearance.removeImage": "Xóa ảnh",
   "appearance.enableBackground": "Bật nền",
-  "appearance.transparency": "Độ trong suốt",
+  "appearance.overlayOpacity": "Độ trong suốt",
   "appearance.subtle": "Tinh tế",
   "appearance.vivid": "Sống động",
   "appearance.zoom": "Thu phóng",

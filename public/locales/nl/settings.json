@@ -61,7 +61,7 @@
   "appearance.backgroundImage": "Achtergrondafbeelding",
   "appearance.removeImage": "Afbeelding verwijderen",
   "appearance.enableBackground": "Achtergrond inschakelen",
-  "appearance.transparency": "Transparantie",
+  "appearance.overlayOpacity": "Transparantie",
   "appearance.subtle": "Subtiel",
   "appearance.vivid": "Levendig",
   "appearance.zoom": "Zoom",

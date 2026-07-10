@@ -250,6 +250,16 @@ function normalizeHexInput(value: string) {
   return trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
 }
 
+/** Accepts 3- or 6-digit hex with or without '#', returns a #rrggbb string.
+ *  Three-digit shorthand is expanded: abc → #aabbcc. */
+function normalizeGlowHex(value: string): string {
+  const stripped = value.trim().replace(/^#/, '');
+  if (/^[0-9a-f]{3}$/i.test(stripped)) {
+    return `#${stripped[0]}${stripped[0]}${stripped[1]}${stripped[1]}${stripped[2]}${stripped[2]}`;
+  }
+  return `#${stripped}`;
+}
+
 function clampChannel(value: number) {
   return Math.max(0, Math.min(255, Math.round(value)));
 }
@@ -673,6 +683,7 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
   const [appearanceLabTab, setAppearanceLabTab] = useState<'themes' | 'customize'>('themes');
   const [showAdvancedColors, setShowAdvancedColors] = useState(false);
   const [selectedHarmonyId, setSelectedHarmonyId] = useState<string>('complementary');
+  const [glowColorInputText, setGlowColorInputText] = useState<string>(() => settings.bgGlowColor ?? '');
   const [harmonyAccentHex, setHarmonyAccentHex] = useState('#6366f1');
   const [harmonyMode, setHarmonyMode] = useState<HarmonyMode>(settings.theme ?? 'dark');
 
@@ -688,8 +699,8 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
   const runtimeModeColors = activeDraft[runtimeThemeMode];
   const runtimeModeColorsRef = useRef(runtimeModeColors);
   runtimeModeColorsRef.current = runtimeModeColors;
-  const bgOverlayOpacity = clamp(settings.bgImageOpacity ?? 85, 0, 100);
-  const bgTransparency = 100 - bgOverlayOpacity;
+  // 0 = no scrim (image fully visible); 100 = fully opaque colour overlay.
+  const bgOverlayOpacity = clamp(settings.bgImageOpacity ?? 0, 0, 100);
   const bgBlur = clamp(settings.bgImageBlur ?? 0, 0, 40);
   const zoom = settings.bgImageZoom ?? 100;
   const posX = settings.bgImagePosX ?? 50;
@@ -703,6 +714,8 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
   const bgEffectSize = clamp(settings.bgEffectSize ?? 100, 40, 180);
   const bgGlowIntensity = clamp(settings.bgGlowIntensity ?? 50, 0, 100);
   const bgEffectTrail = clamp(settings.bgEffectTrail ?? 0, 0, 100);
+  // Resolved glow color: explicit override when set, fallback to effect color.
+  const resolvedBgGlowColor = isColor(settings.bgGlowColor) ? settings.bgGlowColor : bgEffectColor;
   const themeEffectColor = getPaletteEffectColor(bgEffectPattern, runtimeModeColors) ?? runtimeModeColors['--color-accent'];
   const bgEffectHsl = hexToHsl(bgEffectColor);
   const fontFamily = settings.appearanceFontFamily || selectedCustom?.fontFamily || FONT_OPTIONS[0].value;
@@ -756,6 +769,12 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
   useEffect(() => {
     setHarmonyAccentHex(activeModeColors['--color-accent']);
   }, [activeModeColors['--color-accent']]);
+
+  // Keep the glow color text input in sync when bgGlowColor changes externally
+  // (e.g. on load from Dexie or when the user clicks "Use effect color").
+  useEffect(() => {
+    setGlowColorInputText(settings.bgGlowColor ?? '');
+  }, [settings.bgGlowColor]);
 
   const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2043,6 +2062,47 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
               </label>
             </div>
           </div>
+
+          {/* S4 — RGB borders toggle */}
+          <div className="space-y-3 rounded-lg border border-gray-700/60 bg-black/10 px-3 py-2.5">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs font-medium text-gray-300">RGB borders</div>
+                <div className="mt-0.5 text-[11px] text-gray-500">Animate app chrome border hue.</div>
+              </div>
+              <label className="relative inline-flex cursor-pointer items-center">
+                <input
+                  type="checkbox"
+                  checked={settings.rgbBorders ?? false}
+                  onChange={(e) => onUpdateSettings({ rgbBorders: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="peer h-5 w-9 rounded-full bg-gray-700 transition-colors peer-checked:bg-accent peer-focus:ring-1 peer-focus:ring-accent/50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-4" />
+              </label>
+            </div>
+            {(settings.rgbBorders ?? false) && (
+              <div className="flex items-center gap-3 pt-1">
+                <span className="text-[11px] text-gray-500">Speed</span>
+                <div className="flex gap-1">
+                  {(['slow', 'normal', 'fast'] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => onUpdateSettings({ rgbBorderSpeed: s })}
+                      className={cn(
+                        'rounded-md border px-2.5 py-1 text-[11px] capitalize transition-colors',
+                        (settings.rgbBorderSpeed ?? 'normal') === s
+                          ? 'border-accent bg-accent/10 text-accent'
+                          : 'border-gray-700 text-gray-400 hover:bg-gray-800',
+                      )}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -2304,6 +2364,89 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
             />
             <div className="flex justify-between text-[10px] text-gray-600"><span>Off</span><span>Radiant</span></div>
           </div>
+
+          {/* S3 — Glow color picker */}
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+            <div className="space-y-3 rounded-lg border border-gray-800 bg-black/10 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-xs font-medium text-gray-300">Glow color</div>
+                  <div className="mt-1 text-[11px] text-gray-500">Override the bloom hue for a warm-glow-behind-cool-particles layered look.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onUpdateSettings({ bgGlowColor: undefined })}
+                  className="rounded-md border border-gray-700 px-2.5 py-1.5 text-xs text-gray-300 transition-colors hover:bg-gray-800"
+                >
+                  Use effect color
+                </button>
+              </div>
+              <div className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-950 px-3 py-2">
+                <input
+                  type="color"
+                  aria-label="Glow color"
+                  value={resolvedBgGlowColor}
+                  onChange={(e) => {
+                    setGlowColorInputText(e.target.value);
+                    onUpdateSettings({ bgGlowColor: e.target.value });
+                  }}
+                  className="h-8 w-8 shrink-0 rounded border border-gray-700 bg-transparent"
+                />
+                <input
+                  type="text"
+                  aria-label="Glow color hex"
+                  value={glowColorInputText}
+                  placeholder={bgEffectColor}
+                  onChange={(e) => setGlowColorInputText(e.target.value)}
+                  onBlur={() => {
+                    if (!glowColorInputText.trim()) return;
+                    const n = normalizeGlowHex(glowColorInputText);
+                    if (isColor(n)) {
+                      onUpdateSettings({ bgGlowColor: n });
+                    } else {
+                      setGlowColorInputText(settings.bgGlowColor ?? '');
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const n = normalizeGlowHex(glowColorInputText);
+                      if (isColor(n)) {
+                        onUpdateSettings({ bgGlowColor: n });
+                      } else {
+                        setGlowColorInputText(settings.bgGlowColor ?? '');
+                      }
+                    }
+                  }}
+                  className="min-w-0 flex-1 bg-transparent font-mono text-sm text-gray-300 placeholder:text-gray-600 focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="rounded-lg border border-gray-800 bg-black/10 p-3">
+              {settings.bgGlowColor === undefined ? (
+                <>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">Derived from effect color</div>
+                  <div className="mt-3 flex items-center gap-3">
+                    <span className="h-10 w-10 shrink-0 rounded-lg border border-white/15" style={{ backgroundColor: bgEffectColor }} />
+                    <div className="min-w-0">
+                      <div className="font-mono text-xs text-gray-300">{bgEffectColor}</div>
+                      <div className="mt-1 text-[11px] leading-4 text-gray-500">Glow uses the effect color. Set a custom glow to split them.</div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">Custom glow</div>
+                  <div className="mt-3 flex items-center gap-3">
+                    <span className="h-10 w-10 shrink-0 rounded-lg border border-white/15" style={{ backgroundColor: settings.bgGlowColor }} />
+                    <div className="min-w-0">
+                      <div className="font-mono text-xs text-gray-300">{settings.bgGlowColor}</div>
+                      <div className="mt-1 text-[11px] leading-4 text-gray-500">Bloom uses this color; particles keep the effect color above.</div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2351,10 +2494,11 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400">{t('appearance.transparency')}</span>
-                <span className="text-xs tabular-nums text-gray-500">{bgTransparency}%</span>
+                <span className="text-xs text-gray-400">{t('appearance.overlayOpacity')}</span>
+                <span className="text-xs tabular-nums text-gray-500">{bgOverlayOpacity}%</span>
               </div>
-              <input type="range" min={0} max={100} value={bgTransparency} onChange={(e) => onUpdateSettings({ bgImageOpacity: 100 - Number(e.target.value) })} className="h-1.5 w-full accent-accent" />
+              {/* 0 = no scrim (image fully visible), 100 = solid colour overlay */}
+              <input type="range" min={0} max={100} value={bgOverlayOpacity} onChange={(e) => onUpdateSettings({ bgImageOpacity: Number(e.target.value) })} className="h-1.5 w-full accent-accent" />
             </div>
 
             <div className="space-y-1">

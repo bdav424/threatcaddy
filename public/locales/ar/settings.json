@@ -61,7 +61,7 @@
   "appearance.backgroundImage": "صورة الخلفية",
   "appearance.removeImage": "إزالة الصورة",
   "appearance.enableBackground": "تفعيل الخلفية",
-  "appearance.transparency": "الشفافية",
+  "appearance.overlayOpacity": "الشفافية",
   "appearance.subtle": "خفيف",
   "appearance.vivid": "حيوي",
   "appearance.zoom": "التكبير",

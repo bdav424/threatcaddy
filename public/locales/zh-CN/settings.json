@@ -61,7 +61,7 @@
   "appearance.backgroundImage": "背景图片",
   "appearance.removeImage": "移除图片",
   "appearance.enableBackground": "启用背景",
-  "appearance.transparency": "透明度",
+  "appearance.overlayOpacity": "透明度",
   "appearance.subtle": "细腻",
   "appearance.vivid": "鲜明",
   "appearance.zoom": "缩放",

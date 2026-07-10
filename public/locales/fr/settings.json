@@ -61,7 +61,7 @@
   "appearance.backgroundImage": "Image de fond",
   "appearance.removeImage": "Supprimer l'image",
   "appearance.enableBackground": "Activer le fond",
-  "appearance.transparency": "Transparence",
+  "appearance.overlayOpacity": "Transparence",
   "appearance.subtle": "Subtil",
   "appearance.vivid": "Vif",
   "appearance.zoom": "Zoom",

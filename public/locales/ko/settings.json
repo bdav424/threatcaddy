@@ -61,7 +61,7 @@
   "appearance.backgroundImage": "배경 이미지",
   "appearance.removeImage": "이미지 제거",
   "appearance.enableBackground": "배경 활성화",
-  "appearance.transparency": "투명도",
+  "appearance.overlayOpacity": "투명도",
   "appearance.subtle": "은은하게",
   "appearance.vivid": "선명하게",
   "appearance.zoom": "확대/축소",

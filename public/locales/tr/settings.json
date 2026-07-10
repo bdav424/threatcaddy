@@ -61,7 +61,7 @@
   "appearance.backgroundImage": "Arka Plan Görüntüsü",
   "appearance.removeImage": "Görüntüyü kaldır",
   "appearance.enableBackground": "Arka planı etkinleştir",
-  "appearance.transparency": "Şeffaflık",
+  "appearance.overlayOpacity": "Şeffaflık",
   "appearance.subtle": "Hafif",
   "appearance.vivid": "Canlı",
   "appearance.zoom": "Yakınlaştırma",

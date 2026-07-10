@@ -64,9 +64,28 @@ export function AppLayout({
       >
         {t('skipToMainContent')}
       </a>
+      {/*
+       * BgImageLayer renders the wallpaper then stacks a colour scrim on top:
+       *   rgba(0,0,0, opacity/100)  — dark theme
+       *   rgba(255,255,255, opacity/100) — light theme
+       *
+       * Default is 0 (no scrim) so a first-time user sees their image immediately.
+       * The old default of 85 painted an 85%-black rectangle over the image and
+       * made it appear as if the feature was broken.
+       *
+       * Frost-on / frost-off asymmetry (expected behaviour, not a bug):
+       * When Settings is open, the SettingsPanel fills app-window-main.  All
+       * surface panels inside it use the bg-gray-900 Tailwind class, which the
+       * token bridge maps to var(--color-bg-surface) -- fully opaque by default.
+       * When frostedPanels is enabled, .has-panel-glass .bg-gray-900 overrides
+       * that to var(--tc-panel-glass-surface) (70% opacity via color-mix), making
+       * every panel translucent and revealing the background image beneath them.
+       * With frost off the same panels are solid slabs that cover the image --
+       * that is the intended behaviour, not a bug requiring a fix.
+       */}
       <BgImageLayer
         enabled={bgImageEnabled ?? false}
-        opacity={bgImageOpacity ?? 85}
+        opacity={bgImageOpacity ?? 0}
         posX={bgImagePosX ?? 50}
         posY={bgImagePosY ?? 50}
         zoom={bgImageZoom ?? 100}

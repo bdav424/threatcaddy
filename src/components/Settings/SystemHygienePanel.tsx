@@ -88,7 +88,7 @@ export function SystemHygienePanel({
       windowGlassTransparency: 0,
       windowGlassBlur: 0,
       bgImageEnabled: false,
-      bgImageOpacity: 85,
+      bgImageOpacity: 0,
       bgImagePosX: 50,
       bgImagePosY: 50,
       bgImageZoom: 100,

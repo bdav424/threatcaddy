@@ -441,7 +441,7 @@ export interface Settings {
   appearanceFontScale?: number;
   sidebarAccentStyle?: SidebarAccentStyle;
   bgImageEnabled?: boolean;      // whether background image is active
-  bgImageOpacity?: number;       // overlay opacity 0–100; default 85
+  bgImageOpacity?: number;       // scrim overlay opacity 0–100 (0 = no scrim, 100 = solid colour); default 0
   bgImagePosX?: number;          // horizontal position 0–100; default 50
   bgImagePosY?: number;          // vertical position 0–100; default 50
   bgImageZoom?: number;          // zoom scale 50–200; default 100
@@ -453,6 +453,7 @@ export interface Settings {
   bgGlowIntensity?: number;      // 0–100; canvas particle shadowBlur; default 50
   bgGlowColor?: string;          // optional hex override for the ambient glow blooms; falls back to bgEffectColor
   rgbBorders?: boolean;          // morale setting: animate app-chrome border hue. Never applies to TLP/status borders.
+  rgbBorderSpeed?: 'slow' | 'normal' | 'fast'; // hue-cycle speed: slow=12s, normal=8s (default), fast=4s
   bgEffectTrail?: number;        // 0–100; canvas particle motion trail/fade length; default 0 (no trail)
   frostedPanels?: boolean;
   /** Auto-snap floating panels to snapped panel edges within 16 px during move (default true). */

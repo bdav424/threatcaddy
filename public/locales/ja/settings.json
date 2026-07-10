@@ -61,7 +61,7 @@
   "appearance.backgroundImage": "背景画像",
   "appearance.removeImage": "画像を削除",
   "appearance.enableBackground": "背景を有効化",
-  "appearance.transparency": "透明度",
+  "appearance.overlayOpacity": "透明度",
   "appearance.subtle": "控えめ",
   "appearance.vivid": "鮮やか",
   "appearance.zoom": "ズーム",

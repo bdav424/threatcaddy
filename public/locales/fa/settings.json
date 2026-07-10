@@ -61,7 +61,7 @@
   "appearance.backgroundImage": "تصویر پس‌زمینه",
   "appearance.removeImage": "حذف تصویر",
   "appearance.enableBackground": "فعال کردن پس‌زمینه",
-  "appearance.transparency": "شفافیت",
+  "appearance.overlayOpacity": "شفافیت",
   "appearance.subtle": "ظریف",
   "appearance.vivid": "پرنگ",
   "appearance.zoom": "زوم",

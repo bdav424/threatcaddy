@@ -61,7 +61,7 @@
   "appearance.backgroundImage": "पृष्ठभूमि छवि",
   "appearance.removeImage": "छवि हटाएं",
   "appearance.enableBackground": "पृष्ठभूमि सक्षम करें",
-  "appearance.transparency": "पारदर्शिता",
+  "appearance.overlayOpacity": "पारदर्शिता",
   "appearance.subtle": "सूक्ष्म",
   "appearance.vivid": "जीवंत",
   "appearance.zoom": "ज़ूम",

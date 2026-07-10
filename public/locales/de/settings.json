@@ -61,7 +61,7 @@
   "appearance.backgroundImage": "Hintergrundbild",
   "appearance.removeImage": "Bild entfernen",
   "appearance.enableBackground": "Hintergrund aktivieren",
-  "appearance.transparency": "Transparenz",
+  "appearance.overlayOpacity": "Transparenz",
   "appearance.subtle": "Dezent",
   "appearance.vivid": "Lebhaft",
   "appearance.zoom": "Zoom",

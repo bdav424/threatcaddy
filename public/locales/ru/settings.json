@@ -61,7 +61,7 @@
   "appearance.backgroundImage": "Фоновое изображение",
   "appearance.removeImage": "Удалить изображение",
   "appearance.enableBackground": "Включить фон",
-  "appearance.transparency": "Прозрачность",
+  "appearance.overlayOpacity": "Прозрачность",
   "appearance.subtle": "Тонкий",
   "appearance.vivid": "Яркий",
   "appearance.zoom": "Масштаб",

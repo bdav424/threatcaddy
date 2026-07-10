@@ -61,7 +61,7 @@
   "appearance.backgroundImage": "ภาพพื้นหลัง",
   "appearance.removeImage": "ลบภาพ",
   "appearance.enableBackground": "เปิดใช้งานพื้นหลัง",
-  "appearance.transparency": "ความโปร่งใส",
+  "appearance.overlayOpacity": "ความโปร่งใส",
   "appearance.subtle": "เบาๆ",
   "appearance.vivid": "สดใส",
   "appearance.zoom": "ซูม",

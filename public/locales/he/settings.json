@@ -61,7 +61,7 @@
   "appearance.backgroundImage": "תמונת רקע",
   "appearance.removeImage": "הסר תמונה",
   "appearance.enableBackground": "הפעל רקע",
-  "appearance.transparency": "שקיפות",
+  "appearance.overlayOpacity": "שקיפות",
   "appearance.subtle": "עדין",
   "appearance.vivid": "עז",
   "appearance.zoom": "זום",

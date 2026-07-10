@@ -61,7 +61,7 @@
   "appearance.backgroundImage": "Obraz tła",
   "appearance.removeImage": "Usuń obraz",
   "appearance.enableBackground": "Włącz tło",
-  "appearance.transparency": "Przezroczystość",
+  "appearance.overlayOpacity": "Przezroczystość",
   "appearance.subtle": "Subtelny",
   "appearance.vivid": "Żywy",
   "appearance.zoom": "Powiększenie",
