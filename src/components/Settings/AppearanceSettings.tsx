@@ -2396,7 +2396,7 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
         <div className="space-y-3 rounded-xl border border-gray-700/70 bg-gray-900/40 p-4">
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-400">Glow intensity</span>
+              <span className="text-xs text-gray-400">Bloom intensity</span>
               <span className="text-xs tabular-nums text-gray-500">{bgGlowIntensity}%</span>
             </div>
             <input
@@ -2406,7 +2406,7 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
               step={1}
               value={bgGlowIntensity}
               onChange={(event) => onUpdateSettings({ bgGlowIntensity: Number(event.target.value) })}
-              aria-label="Glow intensity"
+              aria-label="Bloom intensity"
               className="h-2 w-full accent-accent"
             />
             <div className="flex justify-between text-[10px] text-gray-600"><span>Off</span><span>Radiant</span></div>

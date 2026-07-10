@@ -119,7 +119,7 @@ body,
   font-family: var(--tc-font-family);
 }
 
-body {
+html {
   font-size: calc(16px * var(--tc-font-scale));
 }
 
@@ -137,6 +137,9 @@ body {
   height: 100dvh;
 }
 
+.has-bg-enabled .app-window-shell,
+.has-bg-enabled .app-window-frame,
+.has-bg-enabled .app-window-main,
 .has-bg-image .app-window-shell,
 .has-bg-image .app-window-frame,
 .has-bg-image .app-window-main,
@@ -144,7 +147,7 @@ body {
 .has-bg-effect .app-window-frame,
 .has-bg-effect .app-window-main,
 .has-window-glass .app-window-main {
-  background: transparent;
+  background: transparent !important;
 }
 
 .app-window-bg-effect {
