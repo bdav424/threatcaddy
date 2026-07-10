@@ -872,13 +872,20 @@ body.tc-desktop-shell-body {
 .has-panel-glass [class*="bg-bg-primary"],
 .has-panel-glass [class*="bg-bg-surface"],
 .has-panel-glass [class*="bg-bg-raised"] {
-  backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%);
-  -webkit-backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%);
+  backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%) brightness(var(--tc-panel-glass-brightness, 1.28));
+  -webkit-backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%) brightness(var(--tc-panel-glass-brightness, 1.28));
 }
 
-/* Frosted glass character — subtle grain (etched glass, not just gaussian blur)
-   plus a faint diagonal sheen (light catching glass). Layered as background
-   images so panel content stays sharp; only the backdrop blurs. */
+/* Frosted glass: GRAIN only (etched-glass surface texture). The specular SHEEN
+   is no longer painted per panel — see .app-window-sheen below.
+
+   Why: a highlight is not a property of the glass, it is a property of where the
+   glass sits relative to the light. Painting it per element meant every element
+   got its own highlight in its own coordinate space — which is why the sheen
+   tiled once per day-cell in CalendarCaddy's month grid. It also cost N gradient
+   paints + N `overlay` blend passes.
+
+   Grain legitimately IS a surface property, so it stays on the panel. */
 .has-panel-glass .bg-gray-900,
 .has-panel-glass .bg-gray-900\/80,
 .has-panel-glass .bg-gray-900\/50,
@@ -894,10 +901,57 @@ body.tc-desktop-shell-body {
 .has-panel-glass [class*="bg-bg-surface"],
 .has-panel-glass [class*="bg-bg-raised"] {
   background-image:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.1) 37%, rgba(255, 255, 255, 0) 55%, rgba(255, 255, 255, 0) 72%, rgba(255, 255, 255, 0.05) 100%),
     url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PGZpbHRlciBpZD0ibiI+PGZlVHVyYnVsZW5jZSB0eXBlPSJmcmFjdGFsTm9pc2UiIGJhc2VGcmVxdWVuY3k9IjAuODUiIG51bU9jdGF2ZXM9IjIiIHN0aXRjaFRpbGVzPSJzdGl0Y2giLz48ZmVDb2xvck1hdHJpeCB0eXBlPSJtYXRyaXgiIHZhbHVlcz0iMCAwIDAgMCAxICAwIDAgMCAwIDEgIDAgMCAwIDAgMSAgMCAwIDAgMC4wNSAwIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI24pIi8+PC9zdmc+") !important;
-  background-repeat: no-repeat, repeat !important;
-  background-blend-mode: normal, overlay !important;
+  background-repeat: repeat !important;
+  background-blend-mode: overlay !important;
+}
+
+/* ─── World-space specular sheen ──────────────────────────────────────────────
+   Two-to-three diagonal light streaks fixed in VIEWPORT space, sitting behind
+   the panels. Frosted panels sample them through their existing backdrop-filter,
+   so the streak appears to be caught by the glass. Because the streaks are fixed
+   and the panels scroll, a panel moving vertically crosses a diagonal streak at a
+   point that travels horizontally across it — the highlight sweeps side to side
+   as you scroll. That is how real glass behaves.
+
+   Performance: one composited fixed layer that never repaints on scroll, instead
+   of N per-panel gradients plus N `overlay` blend passes. Do NOT reimplement this
+   with `background-attachment: fixed` on the panels — that anchors the gradient to
+   the viewport but forces every such element to repaint on every scroll frame.
+
+   The layer is deliberately faint on its own; the panels' backdrop `brightness()`
+   is what makes it read as a highlight through the glass. (Pure CSS cannot reveal
+   a fully invisible backdrop — backdrop-filter amplifies what is there, it cannot
+   conjure it. Low-but-nonzero + amplification is the honest version of "hidden
+   except on frost".) */
+.app-window-sheen {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+  background-image: linear-gradient(
+    var(--tc-sheen-angle, 115deg),
+    transparent 6%,
+    rgba(255, 255, 255, 0.085) 12%,
+    rgba(255, 255, 255, 0) 19%,
+    transparent 41%,
+    rgba(255, 255, 255, 0.06) 47%,
+    rgba(255, 255, 255, 0) 53%,
+    transparent 76%,
+    rgba(255, 255, 255, 0.045) 82%,
+    rgba(255, 255, 255, 0) 88%
+  );
+}
+
+/* Only exists when frosted panels are on — nothing to catch the light otherwise. */
+.has-panel-glass .app-window-sheen {
+  opacity: var(--tc-sheen-opacity, 0.55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-window-sheen { transition: none; }
 }
 
 .has-window-glass.light .bg-gray-900 {
@@ -1761,47 +1815,84 @@ body.tc-desktop-shell-body {
 }
 
 
-/* ─── RGB border mode (morale setting) ────────────────────────────────────────
-   One animated custom property on :root drives every participating border, so
-   the whole effect costs a single CSS animation — no canvas, no rAF. Browsers
-   throttle CSS animations on hidden tabs, and prefers-reduced-motion disables it.
+/* ─── RGB border mode (morale setting — S3 rebuild) ───────────────────────────
+   Traveling conic-gradient ring via ::before pseudo-element. One CSS animation
+   per element; no canvas, no rAF. Browsers throttle on hidden tabs.
 
-   EXCLUSIONS ARE LOAD-BEARING: borders that encode TLP / PAP / classification or
-   investigation status must never cycle hue. Color is data in this app. Anything
-   added to the allow-list below must be app chrome only. */
-@property --tc-rgb-hue {
+   EXCLUSIONS ARE LOAD-BEARING: borders encoding TLP / PAP / classification or
+   investigation status must NEVER animate hue. Color is data in this app.
+   Allow-list = app chrome only. Never add TLP badges, investigation cards, or
+   any element whose border color carries meaning. */
+
+@property --tc-rgb-angle {
   syntax: '<angle>';
-  inherits: true;
+  inherits: false;
   initial-value: 0deg;
 }
 
-@keyframes tc-rgb-cycle {
-  to { --tc-rgb-hue: 360deg; }
+@keyframes tc-rgb-rotate {
+  to { --tc-rgb-angle: 360deg; }
 }
 
-.has-rgb-borders {
-  animation: tc-rgb-cycle var(--tc-rgb-speed, 8s) linear infinite;
-}
-
-/* Allow-list: app chrome only. Never TLP badges, investigation cards, or any
-   element whose border color carries meaning. */
-.has-rgb-borders .app-window-frame,
-.has-rgb-borders .app-window-sidebar,
-.has-rgb-borders .app-window-titlebar,
+/* Element carrying the ring must establish a stacking context for z-index: -1 */
 .has-rgb-borders .rgb-border {
-  border-color: hsl(var(--tc-rgb-hue) 90% 60%) !important;
+  position: relative;
 }
 
-/* Hard stop: classification-bearing surfaces opt out even if a future selector
-   above would otherwise match them. */
-.has-rgb-borders .tlp-clear-badge,
-.has-rgb-borders [class*="tlp-"],
-.has-rgb-borders [data-tlp],
-.has-rgb-borders [data-investigation-status] {
-  border-color: revert !important;
-  animation: none;
+/* Traveling conic-gradient ring — 1.5 px ring punched with CSS mask */
+.has-rgb-borders .rgb-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  z-index: -1;
+  pointer-events: none;
+  background: repeating-conic-gradient(
+    from var(--tc-rgb-angle, 0deg),
+    oklch(70% 0.25 0) 0deg,
+    oklch(70% 0.25 360) calc(360deg / var(--tc-rgb-repeats, 1))
+  );
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  padding: 1.5px;
+  animation: tc-rgb-rotate var(--tc-rgb-speed, 3s) linear infinite;
+}
+
+/* Bloom glow layer */
+.has-rgb-borders .rgb-border::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  z-index: -2;
+  pointer-events: none;
+  background: repeating-conic-gradient(
+    from var(--tc-rgb-angle, 0deg),
+    oklch(70% 0.25 0) 0deg,
+    oklch(70% 0.25 360) calc(360deg / var(--tc-rgb-repeats, 1))
+  );
+  filter: blur(8px);
+  opacity: 0.35;
+  animation: tc-rgb-rotate var(--tc-rgb-speed, 3s) linear infinite;
+}
+
+/* LOAD-BEARING: classification-bearing surfaces always opt out — even if a
+   future allow-list selector above would otherwise match them.
+   Color is data. These exclusions must never be removed. */
+.rgb-border:is([class*="tlp-"], [data-tlp], [data-investigation-status], .tlp-clear-badge)::before,
+.rgb-border:is([class*="tlp-"], [data-tlp], [data-investigation-status], .tlp-clear-badge)::after {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .has-rgb-borders { animation: none; }
+  .has-rgb-borders .rgb-border::before,
+  .has-rgb-borders .rgb-border::after {
+    animation: none;
+  }
 }

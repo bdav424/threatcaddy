@@ -1514,6 +1514,7 @@ export function WorkspacePanel({
           aria-label={mode === 'floating' ? floatingAriaLabel || `${title} popout` : undefined}
           aria-hidden={!visible && mode === 'docked' ? true : undefined}
           className={cn(
+            'rgb-border',
             mode === 'floating'
               ? 'fixed z-[120] flex min-h-0 flex-col overflow-visible rounded-[18px] border border-border-subtle/45 bg-bg-raised/96 text-text-primary shadow-[8px_12px_24px_rgba(0,0,0,0.34)] backdrop-blur-xl'
               : 'min-w-0 overflow-hidden rounded-[14px] border border-border-subtle/35 bg-bg-primary/60',
@@ -1632,7 +1633,7 @@ export function WorkspacePanel({
             role="dialog"
             aria-label={floatingAriaLabel || `${title} popout`}
             className={cn(
-              'fixed z-[120] flex min-h-0 flex-col overflow-visible rounded-[18px] border border-border-subtle/45 bg-bg-raised/96 text-text-primary shadow-[8px_12px_24px_rgba(0,0,0,0.34)] backdrop-blur-xl',
+              'rgb-border fixed z-[120] flex min-h-0 flex-col overflow-visible rounded-[18px] border border-border-subtle/45 bg-bg-raised/96 text-text-primary shadow-[8px_12px_24px_rgba(0,0,0,0.34)] backdrop-blur-xl',
               !active && 'hidden',
               activeResizeEdge && !(snapped && sharedSeamEdge) && 'border-accent/45',
               snapped && 'rounded-[2px] border-border-subtle/60 bg-bg-primary/94 shadow-none backdrop-blur-none',
@@ -1702,7 +1703,7 @@ export function WorkspacePanel({
     <section
       hidden={!active}
       aria-hidden={!active}
-      className={cn('min-w-0 overflow-hidden rounded-[14px] border border-border-subtle/35 bg-bg-primary/60', !active && 'hidden', dockedClassName)}
+      className={cn('rgb-border min-w-0 overflow-hidden rounded-[14px] border border-border-subtle/35 bg-bg-primary/60', !active && 'hidden', dockedClassName)}
       data-workspace-panel={id}
       data-workspace-panel-state="docked"
     >

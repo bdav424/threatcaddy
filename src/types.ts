@@ -455,6 +455,8 @@ export interface Settings {
   bgParticleGlow?: number;          // optional hex override for the ambient glow blooms; falls back to bgEffectColor
   rgbBorders?: boolean;          // morale setting: animate app-chrome border hue. Never applies to TLP/status borders.
   rgbBorderSpeed?: 'slow' | 'normal' | 'fast'; // hue-cycle speed: slow=12s, normal=8s (default), fast=4s
+  rgbSpeed?: number;      // traveling spectrum ring speed in seconds (1–6); overrides rgbBorderSpeed
+  rgbRepeats?: number;    // how many full spectrums repeat around the ring (1–8; default 1)
   bgEffectTrail?: number;        // 0–100; canvas particle motion trail/fade length; default 0 (no trail)
   frostedPanels?: boolean;
   /** Auto-snap floating panels to snapped panel edges within 16 px during move (default true). */

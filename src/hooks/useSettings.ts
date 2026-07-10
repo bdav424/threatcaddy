@@ -170,8 +170,13 @@ export function useSettings() {
 
     root.classList.toggle('has-panel-glass', enabled);
     root.classList.toggle('has-rgb-borders', settings.rgbBorders ?? false);
+    // Numeric rgbSpeed (1–6 s) takes precedence over the legacy slow/normal/fast enum.
     const rgbSpeedValues = { slow: '12s', normal: '8s', fast: '4s' } as const;
-    root.style.setProperty('--tc-rgb-speed', rgbSpeedValues[settings.rgbBorderSpeed ?? 'normal']);
+    const rgbSpeed = settings.rgbSpeed != null
+      ? `${settings.rgbSpeed}s`
+      : rgbSpeedValues[settings.rgbBorderSpeed ?? 'normal'];
+    root.style.setProperty('--tc-rgb-speed', rgbSpeed);
+    root.style.setProperty('--tc-rgb-repeats', String(settings.rgbRepeats ?? 1));
     root.classList.remove('has-window-glass', 'has-window-blur');
     root.style.setProperty('--tc-panel-glass-surface', `color-mix(in srgb, var(--color-bg-surface) ${panelOpacity(100)}%, transparent)`);
     root.style.setProperty('--tc-panel-glass-surface-80', `color-mix(in srgb, var(--color-bg-surface) ${panelOpacity(80)}%, transparent)`);
@@ -197,7 +202,7 @@ export function useSettings() {
         // The desktop wrapper may still be starting up; keep the web UI responsive regardless.
       });
     }
-  }, [isDesktopShell, settings.frostedPanels, settings.rgbBorders, settings.rgbBorderSpeed]);
+  }, [isDesktopShell, settings.frostedPanels, settings.rgbBorders, settings.rgbBorderSpeed, settings.rgbSpeed, settings.rgbRepeats]);
 
   const updateSettings = useCallback((updates: Partial<Settings>) => {
     setSettingsState((prev) => {

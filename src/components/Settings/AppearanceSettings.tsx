@@ -2083,24 +2083,51 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
               </label>
             </div>
             {(settings.rgbBorders ?? false) && (
-              <div className="flex items-center gap-3 pt-1">
-                <span className="text-[11px] text-gray-500">Speed</span>
-                <div className="flex gap-1">
-                  {(['slow', 'normal', 'fast'] as const).map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => onUpdateSettings({ rgbBorderSpeed: s })}
-                      className={cn(
-                        'rounded-md border px-2.5 py-1 text-[11px] capitalize transition-colors',
-                        (settings.rgbBorderSpeed ?? 'normal') === s
-                          ? 'border-accent bg-accent/10 text-accent'
-                          : 'border-gray-700 text-gray-400 hover:bg-gray-800',
-                      )}
-                    >
-                      {s}
-                    </button>
-                  ))}
+              <div className="space-y-3 pt-1">
+                {/* Speed slider: 1 s (fast) ↔ 6 s (slow) — value stored as seconds */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-gray-500">Speed</span>
+                    <div className="flex gap-2 text-[10px] text-gray-600">
+                      <span>Slow</span>
+                      <span>·</span>
+                      <span>Fast</span>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={6}
+                    step={0.5}
+                    value={settings.rgbSpeed ?? 3}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      document.documentElement.style.setProperty('--tc-rgb-speed', `${val}s`);
+                      onUpdateSettings({ rgbSpeed: val });
+                    }}
+                    className="w-full accent-accent"
+                    style={{ direction: 'rtl' }}
+                  />
+                </div>
+                {/* Repeats slider: 1–8 full spectrums around the ring */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-gray-500">Repeats</span>
+                    <span className="text-[10px] text-gray-600">{settings.rgbRepeats ?? 1}×</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={8}
+                    step={1}
+                    value={settings.rgbRepeats ?? 1}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      document.documentElement.style.setProperty('--tc-rgb-repeats', String(val));
+                      onUpdateSettings({ rgbRepeats: val });
+                    }}
+                    className="w-full accent-accent"
+                  />
                 </div>
               </div>
             )}
