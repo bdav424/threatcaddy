@@ -24,6 +24,12 @@ type MovingPoint = {
   emberSpark: boolean;
   emberSides: number;
   emberRot: number;
+  /** Ring buffer: interleaved [x0, y0, x1, y1, ...] of past positions. */
+  history: Float32Array;
+  /** Next write slot (mod TRAIL_MAX_POSITIONS). */
+  histHead: number;
+  /** Valid entry count, capped at TRAIL_MAX_POSITIONS. */
+  histLen: number;
 };
 
 type SwirlSeed = {
@@ -38,6 +44,13 @@ type SwirlSeed = {
 
 const MAX_PARTICLES = 100;
 
+/**
+ * Maximum trail positions per particle stored in the ring buffer.
+ * trail slider 0 → N=0 (no trail), trail=100 → N=TRAIL_MAX_POSITIONS.
+ * Tuned so trail=100 gives ~0.5–0.6 s of history at 60 fps.
+ */
+const TRAIL_MAX_POSITIONS = 35;
+
 // Three glow blooms in golden-ratio proportion (radius and screen position),
 // composited additively so overlaps warm naturally instead of flattening into
 // a single centered wash.
@@ -47,45 +60,7 @@ const GLOW_BLOOMS = [
   { xFrac: 0.40, yFrac: 0.70, radiusMult: 0.382 },
 ] as const;
 
-// Trail slider (0-100) maps to a destination-out erase alpha applied per frame.
-// Lower alpha = slower erase = longer-persisting trail, so the mapping is inverted
-// and eased exponentially so the perceived trail length grows smoothly across the range.
-const TRAIL_FADE_ALPHA_MAX = 0.35;
-// Floor raised from 0.015: 8-bit alpha quantization stalls destination-out fades
-// once pixelAlpha * fadeAlpha < 0.5, leaving permanent ghost smears. 0.03 keeps
-// max trails long while capping the stall floor; the periodic sweep pass in the
-// render loop clears the remaining residue.
-const TRAIL_FADE_ALPHA_MIN = 0.03;
-const TRAIL_SWEEP_INTERVAL_FRAMES = 240; // ~4s at 60fps
-const TRAIL_SWEEP_ALPHA = 0.12; // one stronger erase; drops ghost floor to ~2/255
-
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-
-function trailAmountToFadeAlpha(trailAmount: number) {
-  const t = clamp(trailAmount, 0, 100) / 100;
-  return TRAIL_FADE_ALPHA_MAX * Math.pow(TRAIL_FADE_ALPHA_MIN / TRAIL_FADE_ALPHA_MAX, t);
-}
-
-// Precomputed tileable luminance noise, used to dither large soft gradients so their
-// falloff doesn't quantize into visible 8-bit bands/rings on the canvas.
-function createDitherPattern(context: CanvasRenderingContext2D): CanvasPattern | null {
-  const size = 128;
-  const noiseCanvas = document.createElement('canvas');
-  noiseCanvas.width = size;
-  noiseCanvas.height = size;
-  const noiseCtx = noiseCanvas.getContext('2d');
-  if (!noiseCtx) return null;
-  const imageData = noiseCtx.createImageData(size, size);
-  for (let i = 0; i < imageData.data.length; i += 4) {
-    const value = 128 + (Math.random() - 0.5) * 24;
-    imageData.data[i] = value;
-    imageData.data[i + 1] = value;
-    imageData.data[i + 2] = value;
-    imageData.data[i + 3] = 255;
-  }
-  noiseCtx.putImageData(imageData, 0, 0);
-  return context.createPattern(noiseCanvas, 'repeat');
-}
 
 function normalizeHex(value?: string) {
   if (!value) return null;
@@ -147,6 +122,9 @@ function createPoints(width: number, height: number, scale: number, density: num
     emberSpark: Math.random() < 0.2,
     emberSides: 3 + Math.floor(Math.random() * 3),
     emberRot: Math.random() * Math.PI * 2,
+    history: new Float32Array(TRAIL_MAX_POSITIONS * 2),
+    histHead: 0,
+    histLen: 0,
   } satisfies MovingPoint));
 }
 
@@ -204,16 +182,20 @@ export function BgEffectLayer({
       return;
     }
 
-    // Particles render onto a persistent offscreen layer so the trail fade only
-    // ever touches particle pixels. The visible canvas is fully cleared every
-    // frame and the static layers (glow wash, vignette, dither) are repainted
-    // fresh — they can no longer accumulate into saturated bands/rings.
+    // Particles render onto a persistent offscreen layer.
+    // Cleared every frame — ring buffers own the trail history.
     const trailCanvas = document.createElement('canvas');
     const pctx = trailCanvas.getContext('2d');
     if (!pctx) {
       return;
     }
-    let framesSinceSweep = 0;
+
+    // Offscreen caches for expensive static layers.
+    // Rebuilt only when their inputs change, then blitted each frame.
+    const bloomCanvas = document.createElement('canvas');
+    const vignetteCanvas = document.createElement('canvas');
+    // Single glow halo sprite stamped at each particle head per frame.
+    const glowSpriteCanvas = document.createElement('canvas');
 
     const reducedMotion = typeof window.matchMedia === 'function'
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -231,14 +213,115 @@ export function BgEffectLayer({
     // Reassigned every frame from the refs above so color/theme/glow updates
     // don't need to tear down and recreate the particle arrays.
     let effectColor = normalizeHex(colorRef.current) || getPaletteFallbackColor(themeRef.current);
-    let glowColor = normalizeHex(glowColorRef.current) || effectColor;
+    let glowColorValue = normalizeHex(glowColorRef.current) || effectColor;
     let alphaBase = clamp(intensityRef.current / 100, 0.08, 1);
     let glowStrength = clamp(glowRef.current, 0, 100) / 100;
-    let glowBlur = glowStrength * 20;
     let glowTopAlpha = (themeRef.current === 'dark' ? 0.08 : 0.34) * glowStrength;
 
-    // Static dither pattern to break up 8-bit banding on the large soft gradients below.
-    const ditherPattern = createDitherPattern(context);
+    // Logical-pixel size of the glow sprite square; updated by buildGlowSprite().
+    let glowSpriteLogical = 0;
+
+    // Cache key — any change triggers offscreen canvas rebuilds.
+    let cacheKey = '';
+
+    // ---------------------------------------------------------------------------
+    // Offscreen cache builders — called at most once per unique input combination.
+    // ---------------------------------------------------------------------------
+
+    /** Pre-render the three φ-seated bloom gradients onto bloomCanvas. */
+    const buildBloomCache = () => {
+      const pw = Math.round(width * dpr);
+      const ph = Math.round(height * dpr);
+      bloomCanvas.width = pw;
+      bloomCanvas.height = ph;
+      const bctx = bloomCanvas.getContext('2d');
+      if (!bctx) return;
+      bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      bctx.clearRect(0, 0, width, height);
+
+      const WASH_STOPS = 16;
+      const washPeak = alphaBase * 0.09 * glowStrength;
+      const minDim = Math.min(width, height);
+      bctx.globalCompositeOperation = 'lighter';
+      for (const bloom of GLOW_BLOOMS) {
+        const cx = width * bloom.xFrac;
+        const cy = height * bloom.yFrac;
+        const radius = minDim * bloom.radiusMult;
+        const wash = bctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+        // Dense exponentially-shaped falloff — ~16 stops on an eased curve put
+        // any residual banding below perceptual threshold.
+        for (let s = 0; s <= WASH_STOPS; s++) {
+          const r = s / WASH_STOPS;
+          const falloff = Math.exp(-4.2 * r * r);
+          wash.addColorStop(r, rgba(glowColorValue, washPeak * falloff));
+        }
+        bctx.fillStyle = wash;
+        bctx.fillRect(0, 0, width, height);
+      }
+      bctx.globalCompositeOperation = 'source-over';
+    };
+
+    /** Pre-render the vignette gradient onto vignetteCanvas. */
+    const buildVignetteCache = () => {
+      const pw = Math.round(width * dpr);
+      const ph = Math.round(height * dpr);
+      vignetteCanvas.width = pw;
+      vignetteCanvas.height = ph;
+      const vctx = vignetteCanvas.getContext('2d');
+      if (!vctx) return;
+      vctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      vctx.clearRect(0, 0, width, height);
+
+      const isDark = themeRef.current === 'dark';
+      const vignette = vctx.createLinearGradient(0, 0, 0, height);
+      vignette.addColorStop(0, `rgba(255,255,255,${glowTopAlpha})`);
+      vignette.addColorStop(0.18, `rgba(255,255,255,${glowTopAlpha * 0.35})`);
+      vignette.addColorStop(0.35, 'rgba(0,0,0,0)');
+      vignette.addColorStop(0.68, isDark
+        ? `rgba(0,0,0,${0.06 * glowStrength})`
+        : `rgba(255,255,255,${0.05 * glowStrength})`);
+      vignette.addColorStop(1, isDark
+        ? `rgba(0,0,0,${0.14 * glowStrength})`
+        : `rgba(255,255,255,${0.12 * glowStrength})`);
+      vctx.fillStyle = vignette;
+      vctx.fillRect(0, 0, width, height);
+    };
+
+    /**
+     * Pre-render a soft radial glow halo onto glowSpriteCanvas.
+     * Stamped at each particle head via drawImage — replaces per-particle shadowBlur.
+     */
+    const buildGlowSprite = () => {
+      // Size the sprite to contain the full glow extent at current scale/strength.
+      const glowBlurExtent = glowStrength * 20 * scale;
+      const maxParticleRadius = 3.8 * scale; // (1.2 + 2.6) * scale
+      const extent = maxParticleRadius + glowBlurExtent + 4; // +4 px safety margin
+      glowSpriteLogical = Math.ceil(extent * 2);
+      const spritePixels = Math.ceil(glowSpriteLogical * dpr);
+      glowSpriteCanvas.width = spritePixels;
+      glowSpriteCanvas.height = spritePixels;
+      const gctx = glowSpriteCanvas.getContext('2d');
+      if (!gctx) return;
+      gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      gctx.clearRect(0, 0, glowSpriteLogical, glowSpriteLogical);
+
+      if (glowStrength <= 0) return;
+
+      const cx = glowSpriteLogical / 2;
+      const cy = glowSpriteLogical / 2;
+      // Pure soft halo — the circle itself is drawn to pctx per pattern.
+      const grad = gctx.createRadialGradient(cx, cy, 0, cx, cy, extent);
+      grad.addColorStop(0, rgba(effectColor, alphaBase * 0.45 * glowStrength));
+      grad.addColorStop(0.25, rgba(effectColor, alphaBase * 0.20 * glowStrength));
+      grad.addColorStop(0.65, rgba(effectColor, alphaBase * 0.05 * glowStrength));
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      gctx.fillStyle = grad;
+      gctx.fillRect(0, 0, glowSpriteLogical, glowSpriteLogical);
+    };
+
+    // ---------------------------------------------------------------------------
+    // Particle / scene helpers
+    // ---------------------------------------------------------------------------
 
     // Reinitialise particles/swirls from current refs — cheap, no canvas resize.
     const initParticles = () => {
@@ -262,7 +345,104 @@ export function BgEffectLayer({
       trailCanvas.height = canvas.height;
       pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       initParticles();
+      // Force offscreen cache rebuild on next frame (dimensions changed).
+      cacheKey = '';
     };
+
+    /**
+     * Record each particle's current position into its ring buffer.
+     * Called once per frame BEFORE the pattern draw function moves particles.
+     * Detects wrap-around teleports and resets history to avoid cross-screen trail lines.
+     */
+    const recordPositions = () => {
+      for (const point of points) {
+        // Teleport detection: large position jump means the particle wrapped the screen.
+        // Reset history so the trail doesn't draw a line across the canvas.
+        if (point.histLen > 0) {
+          const prevIdx = ((point.histHead - 1) % TRAIL_MAX_POSITIONS + TRAIL_MAX_POSITIONS) % TRAIL_MAX_POSITIONS;
+          const dx = point.x - point.history[prevIdx * 2];
+          const dy = point.y - point.history[prevIdx * 2 + 1];
+          if (Math.abs(dx) > 150 || Math.abs(dy) > 150) {
+            point.histLen = 0;
+            point.histHead = 0;
+          }
+        }
+        const idx = point.histHead;
+        point.history[idx * 2] = point.x;
+        point.history[idx * 2 + 1] = point.y;
+        point.histHead = (idx + 1) % TRAIL_MAX_POSITIONS;
+        if (point.histLen < TRAIL_MAX_POSITIONS) point.histLen++;
+      }
+    };
+
+    /**
+     * Draw per-particle trail polylines onto pctx from the ring buffer.
+     * Alpha ramps 1 → 0 (head → tail). No shadow — glow applied separately
+     * via drawGlowSprites() on the main canvas to avoid O(r²) × particle-count cost.
+     */
+    const drawTrails = (trailAmount: number) => {
+      if (trailAmount <= 0) return;
+      const nPositions = Math.min(
+        Math.round(TRAIL_MAX_POSITIONS * trailAmount / 100),
+        TRAIL_MAX_POSITIONS,
+      );
+      if (nPositions < 1) return;
+
+      pctx.lineCap = 'round';
+
+      for (const point of points) {
+        const count = Math.min(nPositions, point.histLen);
+        if (count < 1) continue;
+
+        // Walk from most-recent history entry (just behind head) toward oldest.
+        // prevX/Y starts at the current particle position so segment 0 connects
+        // the visible head to the most-recently-recorded position.
+        let prevX = point.x;
+        let prevY = point.y;
+
+        for (let i = 0; i < count; i++) {
+          const ringIdx =
+            ((point.histHead - 1 - i) % TRAIL_MAX_POSITIONS + TRAIL_MAX_POSITIONS)
+            % TRAIL_MAX_POSITIONS;
+          const hx = point.history[ringIdx * 2];
+          const hy = point.history[ringIdx * 2 + 1];
+          // i=0 is full alpha (near head), i=count-1 approaches 0 (tail).
+          const alpha = 1 - i / count;
+          pctx.strokeStyle = rgba(effectColor, alphaBase * 0.55 * alpha);
+          pctx.lineWidth = point.radius * (0.8 + 0.4 * alpha);
+          pctx.beginPath();
+          pctx.moveTo(prevX, prevY);
+          pctx.lineTo(hx, hy);
+          pctx.stroke();
+          prevX = hx;
+          prevY = hy;
+        }
+      }
+    };
+
+    /**
+     * Stamp the pre-rendered glow sprite at each particle head on the main canvas.
+     * Uses 'lighter' blend so halos add light without clipping.
+     * Only called for patterns that use the points[] array as particle heads.
+     */
+    const drawGlowSprites = () => {
+      if (glowStrength <= 0 || glowSpriteLogical <= 0) return;
+      const sw = glowSpriteCanvas.width;
+      const sh = glowSpriteCanvas.height;
+      const half = glowSpriteLogical / 2;
+      context.globalCompositeOperation = 'lighter';
+      for (const point of points) {
+        context.drawImage(
+          glowSpriteCanvas, 0, 0, sw, sh,
+          point.x - half, point.y - half, glowSpriteLogical, glowSpriteLogical,
+        );
+      }
+      context.globalCompositeOperation = 'source-over';
+    };
+
+    // ---------------------------------------------------------------------------
+    // Pattern draw functions — write to pctx, also move particles this frame.
+    // ---------------------------------------------------------------------------
 
     const stepPoints = (speedMultiplier: number, dt: number) => {
       const speedScale = speedMultiplier * 0.05 * dt;
@@ -546,11 +726,16 @@ export function BgEffectLayer({
       }
     };
 
+    // ---------------------------------------------------------------------------
+    // Main render loop
+    // ---------------------------------------------------------------------------
+
     const render = (time: number) => {
       // Pattern or size changed — reinitialise particles without touching the canvas.
       if (needsParticleResetRef.current) {
         needsParticleResetRef.current = false;
         initParticles();
+        cacheKey = '';
       }
 
       const currentPattern = patternRef.current;
@@ -558,74 +743,48 @@ export function BgEffectLayer({
       lastTime = time;
 
       effectColor = normalizeHex(colorRef.current) || getPaletteFallbackColor(themeRef.current);
-      glowColor = normalizeHex(glowColorRef.current) || effectColor;
+      glowColorValue = normalizeHex(glowColorRef.current) || effectColor;
       alphaBase = clamp(intensityRef.current / 100, 0.08, 1);
       glowStrength = clamp(glowRef.current, 0, 100) / 100;
-      glowBlur = glowStrength * 20;
       glowTopAlpha = (themeRef.current === 'dark' ? 0.08 : 0.34) * glowStrength;
 
-      // The visible canvas is ALWAYS fully cleared — static layers repaint fresh
-      // each frame and structurally cannot accumulate.
+      // Rebuild offscreen caches when any of their inputs change.
+      const newCacheKey = `${width}x${height}|${dpr}|${effectColor}|${glowColorValue}|${glowStrength.toFixed(3)}|${alphaBase.toFixed(3)}|${themeRef.current}|${scale.toFixed(3)}`;
+      if (newCacheKey !== cacheKey) {
+        cacheKey = newCacheKey;
+        if (glowStrength > 0) {
+          buildBloomCache();
+          buildVignetteCache();
+        }
+        buildGlowSprite();
+      }
+
+      // Visible canvas: fully cleared every frame.
       context.clearRect(0, 0, width, height);
 
-      // Trails live only on the offscreen particle layer. At 0 (or dots) it is
-      // fully cleared each frame, making trails at 0% impossible by construction.
-      const trailAmount = clamp(trailRef.current, 0, 100);
-      if (currentPattern === 'dots' || trailAmount <= 0) {
-        pctx.clearRect(0, 0, width, height);
-      } else {
-        pctx.globalCompositeOperation = 'destination-out';
-        pctx.fillStyle = `rgba(0,0,0,${trailAmountToFadeAlpha(trailAmount)})`;
-        pctx.fillRect(0, 0, width, height);
-        // Periodic stronger erase: multiplicative 8-bit fades stall above a
-        // residue floor and would otherwise leave permanent ghost smears.
-        framesSinceSweep += 1;
-        if (framesSinceSweep >= TRAIL_SWEEP_INTERVAL_FRAMES) {
-          framesSinceSweep = 0;
-          pctx.fillStyle = `rgba(0,0,0,${TRAIL_SWEEP_ALPHA})`;
-          pctx.fillRect(0, 0, width, height);
-        }
-        pctx.globalCompositeOperation = 'source-over';
-      }
+      // Trail/particle canvas: cleared every frame — ring buffers hold the history.
+      // No destination-out, no sweep pass, no fade floor artifacts.
+      pctx.clearRect(0, 0, width, height);
 
-      // Glow layer (ambient wash halo + shape shadow blur) is skipped entirely at 0,
-      // not just dimmed, so "Off" truly renders no glow.
-      if (glowStrength > 0) {
-        // Three golden-ratio blooms instead of one centered wash — reads as
-        // ambient light pooling in a scene rather than a flat film. GLOW drives
-        // peak brightness only; radii/positions are fixed viewport fractions so
-        // they scale with window size without changing spatial spread.
-        const WASH_STOPS = 16;
-        const washPeak = alphaBase * 0.09 * glowStrength;
-        const minDim = Math.min(width, height);
+      // Ambient glow wash — single blit of pre-rendered bloom cache.
+      if (glowStrength > 0 && bloomCanvas.width > 0) {
         context.save();
         context.globalCompositeOperation = 'lighter';
-        for (const bloom of GLOW_BLOOMS) {
-          const cx = width * bloom.xFrac;
-          const cy = height * bloom.yFrac;
-          const radius = minDim * bloom.radiusMult;
-          const wash = context.createRadialGradient(cx, cy, 0, cx, cy, radius);
-          // Dense, exponentially-shaped falloff instead of a few evenly-spaced stops.
-          // Light decays continuously (~inverse-square), so hand-picked plateaus read
-          // as cut-paper bands ("Eric Carle sunset"). ~16 stops on an eased curve put
-          // any residual banding below perceptual threshold; the tail approaches zero
-          // asymptotically rather than a hard edge ring.
-          for (let s = 0; s <= WASH_STOPS; s += 1) {
-            const r = s / WASH_STOPS;
-            // Exponential decay; falloff sharpness tuned so the core reads bright and
-            // the edge fades to nothing well before r=1 (no boundary ring).
-            const falloff = Math.exp(-4.2 * r * r);
-            wash.addColorStop(r, rgba(glowColor, washPeak * falloff));
-          }
-          context.fillStyle = wash;
-          context.fillRect(0, 0, width, height);
-        }
+        context.drawImage(bloomCanvas, 0, 0, bloomCanvas.width, bloomCanvas.height, 0, 0, width, height);
         context.restore();
-
-        pctx.shadowBlur = glowBlur * scale;
-        pctx.shadowColor = rgba(effectColor, alphaBase * 0.22 * glowStrength);
       }
-      // Use patternRef so switching effects never requires tearing down the RAF loop.
+
+      // Record positions before movement (ring buffer step), then draw trail segments.
+      const trailAmount = clamp(trailRef.current, 0, 100);
+      const wantsTrail = currentPattern !== 'dots' && trailAmount > 0;
+      if (wantsTrail) {
+        recordPositions();
+      }
+      if (currentPattern !== 'dots') {
+        drawTrails(trailAmount);
+      }
+
+      // Draw particle heads (also advances particle positions this frame).
       switch (currentPattern) {
         case 'dots':
           drawDots();
@@ -656,34 +815,22 @@ export function BgEffectLayer({
           drawSwirls(time, dt);
           break;
       }
-      pctx.shadowBlur = 0;
 
       // Composite the particle/trail layer over the glow wash.
       context.drawImage(trailCanvas, 0, 0, trailCanvas.width, trailCanvas.height, 0, 0, width, height);
 
-      // Vignette is part of the GLOW layer, not general chrome (Option A).
-      if (glowStrength > 0) {
-        const vignette = context.createLinearGradient(0, 0, 0, height);
-        vignette.addColorStop(0, `rgba(255,255,255,${glowTopAlpha})`);
-        vignette.addColorStop(0.18, `rgba(255,255,255,${glowTopAlpha * 0.35})`);
-        vignette.addColorStop(0.35, 'rgba(0,0,0,0)');
-        vignette.addColorStop(0.68, themeRef.current === 'dark' ? `rgba(0,0,0,${0.06 * glowStrength})` : `rgba(255,255,255,${0.05 * glowStrength})`);
-        vignette.addColorStop(1, themeRef.current === 'dark' ? `rgba(0,0,0,${0.14 * glowStrength})` : `rgba(255,255,255,${0.12 * glowStrength})`);
-        context.fillStyle = vignette;
-        context.fillRect(0, 0, width, height);
+      // Per-particle glow sprites at head positions.
+      // Skipped for patterns whose "heads" aren't stored in points[] (synapse, dots).
+      if (currentPattern !== 'dots' && currentPattern !== 'synapse') {
+        drawGlowSprites();
       }
 
-      // Dither the large soft gradients above to break up 8-bit banding (rings/bands).
-      // Only exists to smooth the glow wash, so skip entirely when glow is off —
-      // otherwise this noise overlay is the "faint film" that lingers at GLOW=0.
-      if (ditherPattern && glowStrength > 0) {
-        context.save();
-        context.globalAlpha = 0.05;
-        context.globalCompositeOperation = 'overlay';
-        context.fillStyle = ditherPattern;
-        context.fillRect(0, 0, width, height);
-        context.restore();
-      } // glow disabled — skip entirely
+      // Vignette — single blit of pre-rendered cache.
+      if (glowStrength > 0 && vignetteCanvas.width > 0) {
+        context.drawImage(
+          vignetteCanvas, 0, 0, vignetteCanvas.width, vignetteCanvas.height, 0, 0, width, height,
+        );
+      }
 
       const shouldAnimate = !reducedMotion && currentPattern !== 'dots';
       if (shouldAnimate) {
