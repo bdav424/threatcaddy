@@ -350,7 +350,7 @@ export function BgEffectLayer({
       // 12-stop exponential falloff on exp(-k*r²) reduces gradient quantization bands.
       const grad = gctx.createRadialGradient(cx, cy, 0, cx, cy, extent);
       const SPRITE_STOPS = 12;
-      const peakAlpha = alphaBase * 0.45 * particleGlowStrength;
+      const peakAlpha = 0.5 * particleGlowStrength;
       for (let s = 0; s <= SPRITE_STOPS; s++) {
         const r = s / SPRITE_STOPS;
         const falloff = Math.exp(-3.5 * r * r);
@@ -872,7 +872,7 @@ export function BgEffectLayer({
       glowTopAlpha = (themeRef.current === 'dark' ? 0.08 : 0.34) * glowStrength;
 
       // Rebuild offscreen caches when any of their inputs change.
-      const newCacheKey = `${width}x${height}|${dpr}|${effectColor}|${glowColorValue}|${glowStrength.toFixed(3)}|${particleGlowStrength.toFixed(3)}|${alphaBase.toFixed(3)}|${themeRef.current}|${scale.toFixed(3)}`;
+      const newCacheKey = `${width}x${height}|${dpr}|${effectColor}|${glowColorValue}|${glowStrength.toFixed(3)}|${particleGlowStrength.toFixed(3)}|${themeRef.current}|${scale.toFixed(3)}`;
       if (newCacheKey !== cacheKey) {
         cacheKey = newCacheKey;
         if (glowStrength > 0) {

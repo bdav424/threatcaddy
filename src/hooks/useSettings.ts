@@ -163,7 +163,7 @@ export function useSettings() {
     const frostedPanels = settings.frostedPanels ?? false;
     // Frost is toggle-only: always apply a preset when enabled, no user-adjustable sliders.
     const effectiveTransparency = frostedPanels ? 30 : 0;
-    const effectiveBlur = frostedPanels ? 16 : 0;
+    const effectiveBlur = frostedPanels ? 2 : 0;
     const ratio = 1 - effectiveTransparency / 100;
     const panelOpacity = (base: number) => Math.max(0, base * ratio).toFixed(1);
     const enabled = effectiveTransparency > 0 || effectiveBlur > 0;

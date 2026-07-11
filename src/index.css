@@ -875,8 +875,8 @@ body.tc-desktop-shell-body {
 .has-panel-glass [class*="bg-bg-primary"],
 .has-panel-glass [class*="bg-bg-surface"],
 .has-panel-glass [class*="bg-bg-raised"] {
-  backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%) brightness(var(--tc-panel-glass-brightness, 1.28));
-  -webkit-backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%) brightness(var(--tc-panel-glass-brightness, 1.28));
+  backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%);
 }
 
 /* Frosted glass: GRAIN only (etched-glass surface texture). The specular SHEEN
