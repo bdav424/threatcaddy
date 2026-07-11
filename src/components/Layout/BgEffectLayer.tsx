@@ -55,10 +55,10 @@ const MAX_PARTICLES = 100;
 
 /**
  * Maximum trail positions per particle stored in the ring buffer.
- * trail slider 0 → N=0 (no trail), trail=100 → N=TRAIL_MAX_POSITIONS.
- * Tuned so trail=100 gives ~0.5–0.6 s of history at 60 fps.
+ * Sized to support the 500% slider max: Math.round(12 * (500/100)) = 60 positions.
+ * At 60 fps that gives ~1 s of history at full trail; at 100% slider ~0.2 s.
  */
-const TRAIL_MAX_POSITIONS = 35;
+const TRAIL_MAX_POSITIONS = 60;
 
 // Three glow blooms in golden-ratio proportion (radius and screen position),
 // composited additively so overlaps warm naturally instead of flattening into
@@ -376,7 +376,13 @@ export function BgEffectLayer({
     // Reinitialise particles/swirls from current refs — cheap, no canvas resize.
     const initParticles = () => {
       scale = clamp(sizeRef.current / 100, 0.45, 2);
-      const starDensity = 0.75 + clamp(intensityRef.current / 100, 0.08, 1) * 0.45;
+      const rawIntensity = clamp(intensityRef.current / 100, 0.08, 1);
+      // S4a: Embers get 2× density headroom — 50% slider = current 100% density, 100% = 2× max.
+      // Other patterns use rawIntensity unchanged.
+      const emberEffectiveIntensity = patternRef.current === 'embers'
+        ? Math.min(rawIntensity * 2.0, 2.0)
+        : rawIntensity;
+      const starDensity = 0.75 + emberEffectiveIntensity * 0.45;
       // Embers get ~1.75× more particles than other patterns without touching MAX_PARTICLES.
       const emberDensityMultiplier = patternRef.current === 'embers' ? 1.75 : 1;
       swirls = createSwirls(width, height, scale);
@@ -434,8 +440,9 @@ export function BgEffectLayer({
      */
     const drawTrails = (trailAmount: number) => {
       if (trailAmount <= 0) return;
+      // Scale: 12 positions at 100%, 60 positions at 500% (slider max).
       const nPositions = Math.min(
-        Math.round(TRAIL_MAX_POSITIONS * trailAmount / 100),
+        Math.round(12 * (trailAmount / 100)),
         TRAIL_MAX_POSITIONS,
       );
       if (nPositions < 1) return;
@@ -572,6 +579,9 @@ export function BgEffectLayer({
         pctx.stroke();
       }
 
+      const { r: nr, g: ng, b: nb } = hexToRgb(effectColor);
+      const nodeAlpha = alphaBase * 0.55;
+
       const pulseCount = reducedMotion ? 5 : Math.max(10, Math.round(16 * alphaBase));
       for (let index = 0; index < pulseCount; index += 1) {
         const horizontal = index % 2 === 0;
@@ -595,10 +605,13 @@ export function BgEffectLayer({
           pctx.lineTo(x, y + 8 * scale);
         }
         pctx.stroke();
-        pctx.fillStyle = rgba(effectColor, alphaBase * 0.55);
+        // S5: clean filled circle — no shadow blur blob, just a sharp 2.5 px dot.
+        pctx.save();
         pctx.beginPath();
-        pctx.arc(x, y, 1.6 * scale, 0, Math.PI * 2);
+        pctx.arc(x, y, 2.5, 0, Math.PI * 2);
+        pctx.fillStyle = `rgba(${nr}, ${ng}, ${nb}, ${nodeAlpha})`;
         pctx.fill();
+        pctx.restore();
       }
     };
 
@@ -623,7 +636,6 @@ export function BgEffectLayer({
     };
 
     const drawPerlinFlow = (time: number, dt: number) => {
-      const segLength = Math.max(6, scale * 14);
       for (const point of points) {
         const angle = Math.sin(point.x * 0.006 + time * 0.0007) * Math.PI
           + Math.cos(point.y * 0.005 + time * 0.00045);
@@ -640,16 +652,11 @@ export function BgEffectLayer({
           continue;
         }
 
-        const mag = Math.hypot(stepX, stepY) || 1;
-        const dirX = stepX / mag;
-        const dirY = stepY / mag;
-        pctx.strokeStyle = rgba(effectColor, alphaBase * 0.3);
-        pctx.lineWidth = Math.max(0.4, point.radius * 0.6);
-        pctx.lineCap = 'round';
+        // S6: filled dot head — tail is drawn by the shared drawTrails() ring-buffer path.
         pctx.beginPath();
-        pctx.moveTo(point.x - dirX * segLength, point.y - dirY * segLength);
-        pctx.lineTo(point.x, point.y);
-        pctx.stroke();
+        pctx.arc(point.x, point.y, 2, 0, Math.PI * 2);
+        pctx.fillStyle = rgba(effectColor, alphaBase * 0.6);
+        pctx.fill();
       }
     };
 
@@ -732,13 +739,22 @@ export function BgEffectLayer({
         const flicker = 0.6 + ((Math.sin(point.twinkle * 4.0) + 1) / 2) * 0.4;
         const glow = heatCurve * flicker;
 
+        // S4b: End-of-life fade — smooth out the pop-out when particles expire.
+        // Over the last 12% of life (relative to fuel) the alpha ramps to 0.
+        const lifeRatio = point.emberLife / point.emberFuel;
+        const eolFade = lifeRatio < 0.12 ? lifeRatio / 0.12 : 1.0;
+
+        // S4c: Spawn fade-in over first 5% of life consumed — eliminates pop-in on birth.
+        const spawnProgress = 1.0 - lifeRatio;
+        const spawnFade = spawnProgress < 0.05 ? Math.max(0, spawnProgress) / 0.05 : 1.0;
+
         // Per-particle glow modulation — set BEFORE the spark continue so sparks
         // also get a correctly faded halo as they burn out.
-        // burnAlpha = heatCurve (the burn state 0-1); glowA = heatCurve * flicker = glow.
-        point.glowA = heatCurve * flicker;
+        point.glowA = heatCurve * flicker * eolFade * spawnFade;
         point.glowR = shrink * (0.55 + point.radius * 0.16);
 
-        pctx.fillStyle = rgba(effectColor, alphaBase * 0.52 * glow);
+        const burnAlpha = alphaBase * 0.52 * glow * eolFade * spawnFade;
+        pctx.fillStyle = rgba(effectColor, burnAlpha);
 
         if (point.emberSpark) {
           // Tighter core radius (~40% smaller) so the bright dot is a sharp pinpoint.
@@ -898,7 +914,7 @@ export function BgEffectLayer({
       }
 
       // Record positions before movement (ring buffer step), then draw trail segments.
-      const trailAmount = clamp(trailRef.current, 0, 100);
+      const trailAmount = clamp(trailRef.current, 0, 500);
       const wantsTrail = currentPattern !== 'dots' && trailAmount > 0;
       if (wantsTrail) {
         recordPositions();

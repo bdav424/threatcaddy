@@ -957,6 +957,29 @@ body.tc-desktop-shell-body {
   .app-window-sheen { transition: none; }
 }
 
+/* ─── S3: Panel glass scrim — light theme contrast ────────────────────────────
+   When frosted panels are enabled on a light theme, the 70%-opaque surfaces can
+   wash out against the bright app background, making text hard to read. An inset
+   box-shadow overlay renders above the glass background but below content,
+   adding a subtle dark underlay that restores readability without touching
+   backdrop-filter, colors, or TLP/classification exclusions. */
+.light.has-panel-glass .bg-gray-900,
+.light.has-panel-glass .bg-gray-900\/80,
+.light.has-panel-glass .bg-gray-900\/50,
+.light.has-panel-glass .bg-gray-900\/40,
+.light.has-panel-glass .bg-gray-900\/30,
+.light.has-panel-glass .bg-gray-800,
+.light.has-panel-glass .bg-gray-800\/60,
+.light.has-panel-glass .bg-gray-800\/50,
+.light.has-panel-glass .bg-gray-800\/40,
+.light.has-panel-glass .sidebar-glass,
+.light.has-panel-glass [class*="bg-bg-deep"],
+.light.has-panel-glass [class*="bg-bg-primary"],
+.light.has-panel-glass [class*="bg-bg-surface"],
+.light.has-panel-glass [class*="bg-bg-raised"] {
+  box-shadow: inset 0 0 0 9999px rgba(0, 0, 0, 0.10) !important;
+}
+
 .has-window-glass.light .bg-gray-900 {
   background-color: var(--tc-glass-surface-light) !important;
 }
@@ -1837,18 +1860,20 @@ body.tc-desktop-shell-body {
   to { --tc-rgb-angle: 360deg; }
 }
 
-/* Element carrying the ring must establish a stacking context for z-index: -1 */
+/* Element carrying the ring must be a positioning parent */
 .has-rgb-borders .rgb-border {
   position: relative;
 }
 
-/* Traveling conic-gradient ring — 1.5 px ring punched with CSS mask */
+/* Traveling conic-gradient ring — 1.5 px inset ring punched with CSS mask.
+   z-index: 1 keeps the ring above the element's own background;
+   inset: 0 prevents clipping by overflow: hidden on panel roots. */
 .has-rgb-borders .rgb-border::before {
   content: '';
   position: absolute;
-  inset: -1px;
+  inset: 0;
   border-radius: inherit;
-  z-index: -1;
+  z-index: 1;
   pointer-events: none;
   background: repeating-conic-gradient(
     from var(--tc-rgb-angle, 0deg),
@@ -1883,6 +1908,15 @@ body.tc-desktop-shell-body {
   filter: blur(8px);
   opacity: 0.35;
   animation: tc-rgb-rotate var(--tc-rgb-speed, 3s) linear infinite;
+}
+
+/* Panel header and body must sit above the ring (z-index: 1) so content is
+   never obscured. Overlay elements (EdgeIndicator, resize handles, etc.) use
+   absolute positioning with explicit z-index > 2, so they are unaffected. */
+.has-rgb-borders .rgb-border > [data-workspace-panel-header],
+.has-rgb-borders .rgb-border > [data-workspace-panel-body] {
+  position: relative;
+  z-index: 2;
 }
 
 /* LOAD-BEARING: classification-bearing surfaces always opt out — even if a
