@@ -1841,14 +1841,12 @@ body.tc-desktop-shell-body {
 }
 
 
-/* ─── RGB border mode (morale setting — S3 rebuild) ───────────────────────────
-   Traveling conic-gradient ring via ::before pseudo-element. One CSS animation
-   per element; no canvas, no rAF. Browsers throttle on hidden tabs.
+/* ─── RGB border mode (sibling span approach) ─────────────────────────────────
+   A .rgb-ring <span> is rendered by React when rgbBorders is enabled.
+   The parent section must be position:relative and overflow:visible.
 
    EXCLUSIONS ARE LOAD-BEARING: borders encoding TLP / PAP / classification or
-   investigation status must NEVER animate hue. Color is data in this app.
-   Allow-list = app chrome only. Never add TLP badges, investigation cards, or
-   any element whose border color carries meaning. */
+   investigation status must NEVER animate hue. Color is data in this app. */
 
 @property --tc-rgb-angle {
   syntax: '<angle>';
@@ -1860,76 +1858,53 @@ body.tc-desktop-shell-body {
   to { --tc-rgb-angle: 360deg; }
 }
 
-/* Element carrying the ring must be a positioning parent */
+/* Fallback positioning context (also set inline via `relative` Tailwind class). */
 .has-rgb-borders .rgb-border {
   position: relative;
 }
 
-/* Traveling conic-gradient ring — 1.5 px inset ring punched with CSS mask.
-   z-index: 1 keeps the ring above the element's own background;
-   inset: 0 prevents clipping by overflow: hidden on panel roots. */
-.has-rgb-borders .rgb-border::before {
-  content: '';
+/* Traveling conic-gradient ring — 1.5 px ring punched with CSS mask.
+   inset: -1.5px pushes the span outside the parent boundary so overflow:visible
+   is required on the parent (docked sections switch from overflow-hidden). */
+.rgb-ring {
   position: absolute;
-  inset: 0;
+  inset: -1.5px;
   border-radius: inherit;
-  z-index: 1;
   pointer-events: none;
-  background: repeating-conic-gradient(
+  z-index: 10;
+  padding: 1.5px;
+  background: conic-gradient(
     from var(--tc-rgb-angle, 0deg),
-    oklch(70% 0.25 0) 0deg,
-    oklch(70% 0.25 360) calc(360deg / var(--tc-rgb-repeats, 1))
+    hsl(0, 100%, 65%),
+    hsl(60, 100%, 65%),
+    hsl(120, 100%, 65%),
+    hsl(180, 100%, 65%),
+    hsl(240, 100%, 65%),
+    hsl(300, 100%, 65%),
+    hsl(360, 100%, 65%)
   );
   mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
   mask-composite: exclude;
   -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
-  padding: 1.5px;
   animation: tc-rgb-rotate var(--tc-rgb-speed, 3s) linear infinite;
 }
 
-/* Bloom glow layer */
-.has-rgb-borders .rgb-border::after {
-  content: '';
-  position: absolute;
-  inset: -4px;
-  border-radius: inherit;
-  z-index: -2;
-  pointer-events: none;
-  background: repeating-conic-gradient(
-    from var(--tc-rgb-angle, 0deg),
-    oklch(70% 0.25 0) 0deg,
-    oklch(70% 0.25 360) calc(360deg / var(--tc-rgb-repeats, 1))
-  );
-  filter: blur(8px);
-  opacity: 0.35;
-  animation: tc-rgb-rotate var(--tc-rgb-speed, 3s) linear infinite;
-}
-
-/* Panel header and body must sit above the ring (z-index: 1) so content is
-   never obscured. Overlay elements (EdgeIndicator, resize handles, etc.) use
-   absolute positioning with explicit z-index > 2, so they are unaffected. */
-.has-rgb-borders .rgb-border > [data-workspace-panel-header],
-.has-rgb-borders .rgb-border > [data-workspace-panel-body] {
-  position: relative;
-  z-index: 2;
-}
-
-/* LOAD-BEARING: classification-bearing surfaces always opt out — even if a
-   future allow-list selector above would otherwise match them.
+/* LOAD-BEARING: classification-bearing surfaces always opt out.
    Color is data. These exclusions must never be removed. */
-.rgb-border:is([class*="tlp-"], [data-tlp], [data-investigation-status], .tlp-clear-badge)::before,
-.rgb-border:is([class*="tlp-"], [data-tlp], [data-investigation-status], .tlp-clear-badge)::after {
+[class*="tlp-"] .rgb-ring,
+[data-tlp] .rgb-ring,
+[data-investigation-status] .rgb-ring,
+.tlp-clear-badge .rgb-ring {
   display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .has-rgb-borders .rgb-border::before,
-  .has-rgb-borders .rgb-border::after {
+  .rgb-ring {
     animation: none;
   }
 }

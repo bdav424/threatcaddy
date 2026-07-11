@@ -605,10 +605,14 @@ export function BgEffectLayer({
           pctx.lineTo(x, y + 8 * scale);
         }
         pctx.stroke();
-        // S5: clean filled circle — no shadow blur blob, just a sharp 2.5 px dot.
+        // S5: clean filled circle at the HEAD of the trail (the bright leading tip).
+        // The stroke runs from -30*scale (tail) to +8*scale (head), so the dot must
+        // be placed at the +8*scale end — not at x,y which is behind the head.
+        const dotX = horizontal ? x + 8 * scale : x;
+        const dotY = horizontal ? y : y + 8 * scale;
         pctx.save();
         pctx.beginPath();
-        pctx.arc(x, y, 2.5, 0, Math.PI * 2);
+        pctx.arc(dotX, dotY, 2.5, 0, Math.PI * 2);
         pctx.fillStyle = `rgba(${nr}, ${ng}, ${nb}, ${nodeAlpha})`;
         pctx.fill();
         pctx.restore();
@@ -682,6 +686,8 @@ export function BgEffectLayer({
     };
 
     const drawEmbers = (dt: number) => {
+      // At lower intensity fewer particles spread out — compensate with slightly larger radius.
+      const emberSizeFactor = 1.0 + (1.0 - alphaBase) * 0.5;
       for (const point of points) {
         // ── Lifecycle drain ──────────────────────────────────────────────────
         // Less fuel → faster burnout. Clamp dt so a tab-hidden burst doesn't
@@ -759,13 +765,14 @@ export function BgEffectLayer({
         if (point.emberSpark) {
           // Tighter core radius (~40% smaller) so the bright dot is a sharp pinpoint.
           pctx.beginPath();
-          pctx.arc(point.x, point.y, Math.max(0.3, liveRadius * 0.27), 0, Math.PI * 2);
+          pctx.arc(point.x, point.y, Math.max(0.3, liveRadius * 0.81 * emberSizeFactor), 0, Math.PI * 2);
           pctx.fill();
           continue;
         }
 
-        // Reduced flake size (~40% smaller) for harder, more distinct cores.
-        const flakeSize = liveRadius * 0.96;
+        // Flake size scaled 3× from original for visible embers; intensity factor adds slight size
+        // boost at lower density so sparse embers remain readable.
+        const flakeSize = liveRadius * 2.88 * emberSizeFactor;
         const rotation = point.emberRot + point.twinkle * 0.4;
         pctx.save();
         pctx.translate(point.x, point.y);
