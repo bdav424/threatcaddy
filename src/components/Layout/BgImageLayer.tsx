@@ -48,6 +48,13 @@ export function BgImageLayer({ enabled, opacity, theme, posX, posY, zoom, blur }
   }, [enabled]);
 
   useEffect(() => {
+    document.documentElement.classList.toggle('has-bg-enabled', enabled);
+    return () => {
+      document.documentElement.classList.remove('has-bg-enabled');
+    };
+  }, [enabled]);
+
+  useEffect(() => {
     document.documentElement.classList.toggle('has-bg-image', enabled && !!url);
     return () => {
       document.documentElement.classList.remove('has-bg-image');

@@ -75,15 +75,11 @@ export function AppLayout({
        * The old default of 85 painted an 85%-black rectangle over the image and
        * made it appear as if the feature was broken.
        *
-       * Frost-on / frost-off asymmetry (expected behaviour, not a bug):
-       * When Settings is open, the SettingsPanel fills app-window-main.  All
-       * surface panels inside it use the bg-gray-900 Tailwind class, which the
-       * token bridge maps to var(--color-bg-surface) -- fully opaque by default.
-       * When frostedPanels is enabled, .has-panel-glass .bg-gray-900 overrides
-       * that to var(--tc-panel-glass-surface) (70% opacity via color-mix), making
-       * every panel translucent and revealing the background image beneath them.
-       * With frost off the same panels are solid slabs that cover the image --
-       * that is the intended behaviour, not a bug requiring a fix.
+       * Panel opacity: bg-gray-900/800/700 (and the bg-bg-* semantic classes)
+       * always render as rgba(--tc-panel-bg-rgb, --tc-panel-glass-opacity) --
+       * controlled by the Panel opacity slider, independent of frost. Frost
+       * (.has-panel-glass) only adds backdrop blur, grain texture, and the
+       * tinted border on top of that opacity.
        */}
       <BgImageLayer
         enabled={bgImageEnabled ?? false}
@@ -106,6 +102,10 @@ export function AppLayout({
         theme={resolvedTheme}
       />
       <div className="app-window-ambient pointer-events-none absolute inset-0 z-0" />
+      {/* World-space specular sheen: fixed diagonal light streaks behind the panels.
+          Frosted panels catch them via their existing backdrop-filter, so the
+          highlight sweeps across a panel as it scrolls through the streak. */}
+      <div className="app-window-sheen" aria-hidden="true" />
       {header}
       <div className="app-window-frame relative z-20 flex flex-1 overflow-hidden min-h-0">
         <div className="app-window-sidebar hidden md:block shrink-0">

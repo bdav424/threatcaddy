@@ -453,6 +453,7 @@ export interface Settings {
   bgGlowIntensity?: number;      // 0–100; canvas particle shadowBlur; default 50
   bgGlowColor?: string;
   bgParticleGlow?: number;          // optional hex override for the ambient glow blooms; falls back to bgEffectColor
+  panelTransparency?: number;
   rgbBorders?: boolean;          // morale setting: animate app-chrome border hue. Never applies to TLP/status borders.
   rgbBorderSpeed?: 'slow' | 'normal' | 'fast'; // hue-cycle speed: slow=12s, normal=8s (default), fast=4s
   rgbSpeed?: number;      // traveling spectrum ring speed in seconds (1–6); overrides rgbBorderSpeed
@@ -647,6 +648,7 @@ export const DEFAULT_SETTINGS: Settings = {
   bgEffectSize: 100,
   bgGlowIntensity: 50,
   bgParticleGlow: 45,
+  panelTransparency: 30,
   bgEffectTrail: 0,
   frostedPanels: false,
   llmRoutingMode: 'auto',
