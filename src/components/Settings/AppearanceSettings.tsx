@@ -714,7 +714,7 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
   const bgEffectSize = clamp(settings.bgEffectSize ?? 100, 40, 180);
   const bgGlowIntensity = clamp(settings.bgGlowIntensity ?? 50, 0, 100);
   const bgParticleGlow = clamp(settings.bgParticleGlow ?? 45, 0, 100);
-  const bgEffectTrail = clamp(settings.bgEffectTrail ?? 0, 0, 100);
+  const bgEffectTrail = clamp(settings.bgEffectTrail ?? 0, 0, 500);
   // Resolved glow color: explicit override when set, fallback to effect color.
   const resolvedBgGlowColor = isColor(settings.bgGlowColor) ? settings.bgGlowColor : bgEffectColor;
   const themeEffectColor = getPaletteEffectColor(bgEffectPattern, runtimeModeColors) ?? runtimeModeColors['--color-accent'];
@@ -2063,6 +2063,23 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
                 <div className="peer h-5 w-9 rounded-full bg-gray-700 transition-colors peer-checked:bg-accent peer-focus:ring-1 peer-focus:ring-accent/50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-4" />
               </label>
             </div>
+            {(settings.frostedPanels ?? false) && (
+              <div className="space-y-1 pt-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-gray-500">Glass opacity</span>
+                  <span className="text-[10px] text-gray-600">{settings.panelTransparency ?? 30}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={settings.panelTransparency ?? 30}
+                  onChange={(e) => onUpdateSettings({ panelTransparency: parseInt(e.target.value, 10) })}
+                  className="w-full accent-accent"
+                />
+              </div>
+            )}
           </div>
 
           {/* S4 — RGB borders toggle */}
@@ -2337,14 +2354,14 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
               <input
                 type="range"
                 min={0}
-                max={100}
+                max={500}
                 step={5}
                 value={bgEffectTrail}
                 onChange={(event) => onUpdateSettings({ bgEffectTrail: Number(event.target.value) })}
                 aria-label="Background effect trail length"
                 className="h-2 w-full accent-accent"
               />
-              <div className="flex justify-between text-[10px] text-gray-600"><span>Off</span><span>Long</span></div>
+              <div className="flex justify-between text-[10px] text-gray-600"><span>Off</span><span>500%</span></div>
             </div>
 
             <div className="space-y-1">
