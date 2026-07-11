@@ -735,9 +735,23 @@ function DrawingCanvas({ initialData, onSave, onExit }: DrawingCanvasProps) {
   };
 
   return (
-    <div className="absolute inset-0 z-10 flex flex-col">
+    <div className="absolute inset-0 z-10">
+      {/* Canvas fills the same inset-0 frame as StaticDrawingCanvas — the toolbar
+          below floats over it instead of pushing it down, so recorded stroke
+          points stay in the same coordinate space before and after exiting
+          draw mode (a shrink-0 toolbar above the canvas used to offset every
+          saved drawing upward by the toolbar's height once it was replayed by
+          the toolbar-less static overlay). */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 h-full w-full cursor-crosshair"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+      />
       {/* Draw toolbar */}
-      <div className="flex items-center gap-2 shrink-0 bg-bg-raised/95 backdrop-blur border-b border-border-subtle px-3 py-1.5">
+      <div className="absolute top-0 left-0 right-0 flex items-center gap-2 bg-bg-raised/95 backdrop-blur border-b border-border-subtle px-3 py-1.5">
         <span className="text-[11px] font-semibold text-text-muted">Draw mode</span>
         <div className="flex items-center gap-1">
           {DRAW_COLORS.map(({ key, hex, label }) => (
@@ -777,14 +791,6 @@ function DrawingCanvas({ initialData, onSave, onExit }: DrawingCanvasProps) {
           <X size={11} /> Exit draw
         </button>
       </div>
-      <canvas
-        ref={canvasRef}
-        className="flex-1 w-full cursor-crosshair"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-      />
     </div>
   );
 }
@@ -896,9 +902,11 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
   const paperSurfaceStyle = usingNewStyle ? getPaperPatternStyle(paperStyle, paperColor, guideMetrics) : {};
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Top toolbar */}
-      <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-2 shrink-0 bg-bg-raised flex-wrap">
+    <div className="relative h-full">
+      {/* Top toolbar — floats over the page surface instead of shrinking the
+          editor height; the surface below adds matching top padding so
+          content doesn't start out hidden underneath it. */}
+      <div className="absolute top-0 left-0 right-0 z-20 flex items-center gap-2 border-b border-border-subtle px-4 py-2 bg-bg-raised/95 backdrop-blur flex-wrap">
         <div className="relative">
           <button
             ref={bgButtonRef}
@@ -996,7 +1004,7 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
       )}
 
       {/* Page surface — background color + paper pattern */}
-      <div ref={surfaceRef} className={cn('flex-1 overflow-auto relative', legacyClasses)} style={paperSurfaceStyle}>
+      <div ref={surfaceRef} className={cn('absolute inset-0 overflow-auto pt-12', legacyClasses)} style={paperSurfaceStyle}>
         <div className="mx-auto max-w-3xl px-8 py-6 relative">
           {/* Linked badge */}
           {page.linkedInvestigationId && (
