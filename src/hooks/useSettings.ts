@@ -161,14 +161,15 @@ export function useSettings() {
   useEffect(() => {
     const root = document.documentElement;
     const frostedPanels = settings.frostedPanels ?? false;
-    // Frost is toggle-only: always apply a preset when enabled, no user-adjustable sliders.
-    const effectiveTransparency = frostedPanels ? 30 : 0;
-    const effectiveBlur = frostedPanels ? 2 : 0;
-    const ratio = 1 - effectiveTransparency / 100;
-    const panelOpacity = (base: number) => Math.max(0, base * ratio).toFixed(1);
-    const enabled = effectiveTransparency > 0 || effectiveBlur > 0;
+    // Panel background opacity — always active, not gated on frostedPanels
+    const panelBgOpacity = (settings.panelTransparency ?? 30) / 100;
+    root.style.setProperty('--tc-panel-glass-opacity', String(panelBgOpacity));
 
-    root.classList.toggle('has-panel-glass', enabled);
+    // Blur — only when frosted
+    const effectiveBlur = frostedPanels ? 2 : 0;
+    root.style.setProperty('--tc-panel-glass-blur', `${effectiveBlur}px`);
+
+    root.classList.toggle('has-panel-glass', frostedPanels);
     root.classList.toggle('has-rgb-borders', settings.rgbBorders ?? false);
     // Numeric rgbSpeed (1–6 s) takes precedence over the legacy slow/normal/fast enum.
     const rgbSpeedValues = { slow: '12s', normal: '8s', fast: '4s' } as const;
@@ -178,21 +179,6 @@ export function useSettings() {
     root.style.setProperty('--tc-rgb-speed', rgbSpeed);
     root.style.setProperty('--tc-rgb-repeats', String(settings.rgbRepeats ?? 1));
     root.classList.remove('has-window-glass', 'has-window-blur');
-    root.style.setProperty('--tc-panel-glass-surface', `color-mix(in srgb, var(--color-bg-surface) ${panelOpacity(100)}%, transparent)`);
-    root.style.setProperty('--tc-panel-glass-surface-80', `color-mix(in srgb, var(--color-bg-surface) ${panelOpacity(80)}%, transparent)`);
-    root.style.setProperty('--tc-panel-glass-surface-50', `color-mix(in srgb, var(--color-bg-surface) ${panelOpacity(50)}%, transparent)`);
-    root.style.setProperty('--tc-panel-glass-surface-40', `color-mix(in srgb, var(--color-bg-surface) ${panelOpacity(40)}%, transparent)`);
-    root.style.setProperty('--tc-panel-glass-surface-30', `color-mix(in srgb, var(--color-bg-surface) ${panelOpacity(30)}%, transparent)`);
-    root.style.setProperty('--tc-panel-glass-raised', `color-mix(in srgb, var(--color-bg-raised) ${panelOpacity(100)}%, transparent)`);
-    root.style.setProperty('--tc-panel-glass-raised-60', `color-mix(in srgb, var(--color-bg-raised) ${panelOpacity(60)}%, transparent)`);
-    root.style.setProperty('--tc-panel-glass-raised-50', `color-mix(in srgb, var(--color-bg-raised) ${panelOpacity(50)}%, transparent)`);
-    root.style.setProperty('--tc-panel-glass-raised-40', `color-mix(in srgb, var(--color-bg-raised) ${panelOpacity(40)}%, transparent)`);
-    root.style.setProperty('--tc-panel-glass-active', `color-mix(in srgb, var(--color-bg-active) ${panelOpacity(100)}%, transparent)`);
-    root.style.setProperty('--tc-panel-glass-active-50', `color-mix(in srgb, var(--color-bg-active) ${panelOpacity(50)}%, transparent)`);
-    root.style.setProperty('--tc-panel-glass-active-30', `color-mix(in srgb, var(--color-bg-active) ${panelOpacity(30)}%, transparent)`);
-    root.style.setProperty('--tc-panel-glass-sidebar', `color-mix(in srgb, var(--color-bg-surface) ${panelOpacity(100)}%, transparent)`);
-    root.style.setProperty('--tc-panel-glass-border', `color-mix(in srgb, var(--color-border-medium) ${Math.max(22, 100 - effectiveTransparency * 0.45).toFixed(1)}%, transparent)`);
-    root.style.setProperty('--tc-panel-glass-blur', `${effectiveBlur}px`);
     root.style.setProperty('--tc-window-ambient-opacity', '0');
     root.style.setProperty('--tc-window-frost-strength', '0');
     root.style.setProperty('--tc-window-blur', '0px');
@@ -202,7 +188,7 @@ export function useSettings() {
         // The desktop wrapper may still be starting up; keep the web UI responsive regardless.
       });
     }
-  }, [isDesktopShell, settings.frostedPanels, settings.rgbBorders, settings.rgbBorderSpeed, settings.rgbSpeed, settings.rgbRepeats]);
+  }, [isDesktopShell, settings.frostedPanels, settings.panelTransparency, settings.rgbBorders, settings.rgbBorderSpeed, settings.rgbSpeed, settings.rgbRepeats]);
 
   const updateSettings = useCallback((updates: Partial<Settings>) => {
     setSettingsState((prev) => {

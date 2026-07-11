@@ -2063,23 +2063,22 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
                 <div className="peer h-5 w-9 rounded-full bg-gray-700 transition-colors peer-checked:bg-accent peer-focus:ring-1 peer-focus:ring-accent/50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-4" />
               </label>
             </div>
-            {(settings.frostedPanels ?? false) && (
-              <div className="space-y-1 pt-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-gray-500">Glass opacity</span>
-                  <span className="text-[10px] text-gray-600">{settings.panelTransparency ?? 30}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={5}
-                  value={settings.panelTransparency ?? 30}
-                  onChange={(e) => onUpdateSettings({ panelTransparency: parseInt(e.target.value, 10) })}
-                  className="w-full accent-accent"
-                />
+            <div className="space-y-1 pt-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-gray-500">Panel opacity</span>
+                <span className="text-[10px] text-gray-600">{settings.panelTransparency ?? 30}%</span>
               </div>
-            )}
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={settings.panelTransparency ?? 30}
+                onChange={(e) => onUpdateSettings({ panelTransparency: parseInt(e.target.value, 10) })}
+                className="w-full accent-accent"
+              />
+              <p className="text-[10px] text-gray-600">0 = transparent · 100 = solid</p>
+            </div>
           </div>
 
           {/* S4 — RGB borders toggle */}

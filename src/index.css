@@ -41,6 +41,7 @@
   --color-text-secondary: #5f5878;
   --color-text-muted: #716b88;
   --color-purple: #6d5ce0;
+  --tc-panel-bg-rgb: 240, 238, 248;
 }
 
 /* ─── CaddyShack semantic tokens (dark) ─── */
@@ -62,20 +63,9 @@
   --tc-window-blur: 18px;
   --tc-window-ambient-opacity: 1;
   --tc-window-frost-strength: 0;
-  --tc-panel-glass-surface: var(--color-bg-surface);
-  --tc-panel-glass-surface-80: color-mix(in srgb, var(--color-bg-surface) 80%, transparent);
-  --tc-panel-glass-surface-50: color-mix(in srgb, var(--color-bg-surface) 50%, transparent);
-  --tc-panel-glass-surface-40: color-mix(in srgb, var(--color-bg-surface) 40%, transparent);
-  --tc-panel-glass-surface-30: color-mix(in srgb, var(--color-bg-surface) 30%, transparent);
-  --tc-panel-glass-raised: var(--color-bg-raised);
-  --tc-panel-glass-raised-60: color-mix(in srgb, var(--color-bg-raised) 60%, transparent);
-  --tc-panel-glass-raised-50: color-mix(in srgb, var(--color-bg-raised) 50%, transparent);
-  --tc-panel-glass-raised-40: color-mix(in srgb, var(--color-bg-raised) 40%, transparent);
-  --tc-panel-glass-active: var(--color-bg-active);
-  --tc-panel-glass-active-50: color-mix(in srgb, var(--color-bg-active) 50%, transparent);
-  --tc-panel-glass-active-30: color-mix(in srgb, var(--color-bg-active) 30%, transparent);
-  --tc-panel-glass-sidebar: var(--color-bg-surface);
   --tc-panel-glass-border: var(--color-border-medium);
+  --tc-panel-bg-rgb: 10, 12, 20;
+  --tc-panel-glass-opacity: 0.3;
   --tc-panel-glass-blur: 0px;
   --tc-control-popup-bg: var(--color-bg-raised);
   --tc-control-popup-fg: var(--color-text-primary);
@@ -781,83 +771,45 @@ body.tc-desktop-shell-body {
   background-color: transparent !important;
 }
 
-/* ─── Panel glass: scoped to bordered surfaces only ─── */
-.has-panel-glass .bg-gray-900 {
-  background-color: var(--tc-panel-glass-surface) !important;
-  border-color: var(--tc-panel-glass-border) !important;
+/* ─── Panel glass: background opacity is always active (not gated on frost);
+       border tint remains frost-only. Scoped to bordered panel surfaces. ─── */
+.bg-gray-900,
+.bg-gray-900\/80,
+.bg-gray-900\/50,
+.bg-gray-900\/40,
+.bg-gray-900\/30,
+.bg-gray-800,
+.bg-gray-800\/60,
+.bg-gray-800\/50,
+.bg-gray-800\/40,
+.bg-gray-700,
+.bg-gray-700\/50,
+.bg-gray-700\/30,
+.sidebar-glass,
+[class*="bg-bg-deep"],
+[class*="bg-bg-primary"],
+[class*="bg-bg-surface"],
+[class*="bg-bg-raised"] {
+  background-color: rgba(var(--tc-panel-bg-rgb, 10, 12, 20), var(--tc-panel-glass-opacity, 0.3)) !important;
 }
 
-.has-panel-glass .bg-gray-900\/80 {
-  background-color: var(--tc-panel-glass-surface-80) !important;
-  border-color: var(--tc-panel-glass-border) !important;
-}
-
-.has-panel-glass .bg-gray-900\/50 {
-  background-color: var(--tc-panel-glass-surface-50) !important;
-  border-color: var(--tc-panel-glass-border) !important;
-}
-
-.has-panel-glass .bg-gray-900\/40 {
-  background-color: var(--tc-panel-glass-surface-40) !important;
-  border-color: var(--tc-panel-glass-border) !important;
-}
-
-.has-panel-glass .bg-gray-900\/30 {
-  background-color: var(--tc-panel-glass-surface-30) !important;
-  border-color: var(--tc-panel-glass-border) !important;
-}
-
-.has-panel-glass .bg-gray-800 {
-  background-color: var(--tc-panel-glass-raised) !important;
-  border-color: var(--tc-panel-glass-border) !important;
-}
-
-.has-panel-glass .bg-gray-800\/60 {
-  background-color: var(--tc-panel-glass-raised-60) !important;
-  border-color: var(--tc-panel-glass-border) !important;
-}
-
-.has-panel-glass .bg-gray-800\/50 {
-  background-color: var(--tc-panel-glass-raised-50) !important;
-  border-color: var(--tc-panel-glass-border) !important;
-}
-
-.has-panel-glass .bg-gray-800\/40 {
-  background-color: var(--tc-panel-glass-raised-40) !important;
-  border-color: var(--tc-panel-glass-border) !important;
-}
-
-.has-panel-glass .bg-gray-700 {
-  background-color: var(--tc-panel-glass-active) !important;
-  border-color: var(--tc-panel-glass-border) !important;
-}
-
-.has-panel-glass .bg-gray-700\/50 {
-  background-color: var(--tc-panel-glass-active-50) !important;
-  border-color: var(--tc-panel-glass-border) !important;
-}
-
-.has-panel-glass .bg-gray-700\/30 {
-  background-color: var(--tc-panel-glass-active-30) !important;
-  border-color: var(--tc-panel-glass-border) !important;
-}
-
-.has-panel-glass .sidebar-glass {
-  background: var(--tc-panel-glass-sidebar) !important;
-  border-color: var(--tc-panel-glass-border) !important;
-}
-
-/* ─── Semantic surface classes used by workspace panels (Notes, Tasks, Evidence,
-       IOCs, EmailCaddy, CalendarCaddy, CaddyAssistant, etc.) ───────────────── */
+.has-panel-glass .bg-gray-900,
+.has-panel-glass .bg-gray-900\/80,
+.has-panel-glass .bg-gray-900\/50,
+.has-panel-glass .bg-gray-900\/40,
+.has-panel-glass .bg-gray-900\/30,
+.has-panel-glass .bg-gray-800,
+.has-panel-glass .bg-gray-800\/60,
+.has-panel-glass .bg-gray-800\/50,
+.has-panel-glass .bg-gray-800\/40,
+.has-panel-glass .bg-gray-700,
+.has-panel-glass .bg-gray-700\/50,
+.has-panel-glass .bg-gray-700\/30,
+.has-panel-glass .sidebar-glass,
 .has-panel-glass [class*="bg-bg-deep"],
 .has-panel-glass [class*="bg-bg-primary"],
-.has-panel-glass [class*="bg-bg-surface"] {
-  background-color: var(--tc-panel-glass-surface) !important;
-  border-color: var(--tc-panel-glass-border) !important;
-}
-
+.has-panel-glass [class*="bg-bg-surface"],
 .has-panel-glass [class*="bg-bg-raised"] {
-  background-color: var(--tc-panel-glass-raised) !important;
   border-color: var(--tc-panel-glass-border) !important;
 }
 
