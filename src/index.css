@@ -44,6 +44,17 @@
   --tc-panel-bg-rgb: 240, 238, 248;
 }
 
+/* Dark-mode counterpart to .light's --tc-panel-bg-rgb above. This used to live
+   inside the giant :root block further down instead — same specificity as
+   .light (both single class-ish selectors), but :root's declaration came
+   *later* in the file, so it silently won the cascade even while `.light` was
+   active, and every frosted panel in light mode tinted dark navy underneath
+   its own light theme. Keeping both light/dark values for this token next to
+   each other, like --color-bg-deep etc. already are, avoids repeating that. */
+.dark {
+  --tc-panel-bg-rgb: 10, 12, 20;
+}
+
 /* ─── CaddyShack semantic tokens (dark) ─── */
 :root {
   --tc-font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -64,7 +75,6 @@
   --tc-window-ambient-opacity: 1;
   --tc-window-frost-strength: 0;
   --tc-panel-glass-border: var(--color-border-medium);
-  --tc-panel-bg-rgb: 10, 12, 20;
   --tc-panel-glass-opacity: 0.3;
   --tc-panel-glass-blur: 0px;
   --tc-control-popup-bg: var(--color-bg-raised);
@@ -1922,6 +1932,102 @@ body.tc-desktop-shell-body {
 
 @media (prefers-reduced-motion: reduce) {
   .app-window-chrome-ring {
+    animation: none;
+  }
+}
+
+/* ─── Per-panel RGB rings (morale/fun feature — "most panels if possible") ───
+   Reuses the exact class list the frost-coverage fix above targets (same
+   bg-gray-900/800/700 + bg-bg-* panel surfaces), so anywhere a panel gets
+   frosted it also gets a ring — one shared notion of "this is a panel."
+   ::before instead of a rendered sibling <span>: these are 150+ plain divs
+   with no shared wrapper component, so a CSS-only approach that needs zero
+   JSX changes is the only one that scales. inset:0 (not the -1.5px used by
+   .rgb-ring) means the ring sits ON the box edge rather than outside it, so
+   overflow:hidden panels don't clip it — no overflow-visible opt-in needed.
+
+   `position: relative` is forced via :where() (zero specificity) so it never
+   outranks an element's own `absolute`/`fixed`/`sticky` Tailwind utility —
+   those already carry real specificity and must keep winning; :where() only
+   fills in `position` for the (default: static) elements that don't set it.
+
+   Interactive chrome (buttons, links, form controls) is excluded so this
+   doesn't paint a spinning ring on every small badge/pill — "most panels",
+   not "most elements". TLP/status-classification exclusion is load-bearing,
+   same as .rgb-ring above: color is data in this app. */
+:where(
+  .has-rgb-borders .bg-gray-900,
+  .has-rgb-borders .bg-gray-900\/80,
+  .has-rgb-borders .bg-gray-900\/50,
+  .has-rgb-borders .bg-gray-900\/40,
+  .has-rgb-borders .bg-gray-900\/30,
+  .has-rgb-borders .bg-gray-800,
+  .has-rgb-borders .bg-gray-800\/60,
+  .has-rgb-borders .bg-gray-800\/50,
+  .has-rgb-borders .bg-gray-800\/40,
+  .has-rgb-borders .bg-gray-700,
+  .has-rgb-borders .bg-gray-700\/50,
+  .has-rgb-borders .bg-gray-700\/30,
+  .has-rgb-borders .sidebar-glass,
+  .has-rgb-borders [class*="bg-bg-deep"],
+  .has-rgb-borders [class*="bg-bg-primary"],
+  .has-rgb-borders [class*="bg-bg-surface"],
+  .has-rgb-borders [class*="bg-bg-raised"]
+):not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status]) {
+  position: relative;
+}
+
+.has-rgb-borders .bg-gray-900:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-900\/80:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-900\/50:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-900\/40:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-900\/30:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-800:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-800\/60:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-800\/50:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-800\/40:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-700:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-700\/50:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-700\/30:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .sidebar-glass:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders [class*="bg-bg-deep"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders [class*="bg-bg-primary"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders [class*="bg-bg-surface"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders [class*="bg-bg-raised"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--tc-rgb-angle, 0deg),
+    hsl(0, 100%, 65%),
+    hsl(60, 100%, 65%),
+    hsl(120, 100%, 65%),
+    hsl(180, 100%, 65%),
+    hsl(240, 100%, 65%),
+    hsl(300, 100%, 65%),
+    hsl(360, 100%, 65%)
+  );
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: tc-rgb-rotate var(--tc-rgb-speed, 3s) linear infinite;
+  opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .has-rgb-borders .bg-gray-900::before,
+  .has-rgb-borders .bg-gray-800::before,
+  .has-rgb-borders .bg-gray-700::before,
+  .has-rgb-borders .sidebar-glass::before,
+  .has-rgb-borders [class*="bg-bg-deep"]::before,
+  .has-rgb-borders [class*="bg-bg-primary"]::before,
+  .has-rgb-borders [class*="bg-bg-surface"]::before,
+  .has-rgb-borders [class*="bg-bg-raised"]::before {
     animation: none;
   }
 }

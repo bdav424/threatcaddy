@@ -393,10 +393,33 @@ export function applyColorScheme(
   root.style.setProperty('--tc-font-family', fontFamily || FONT_OPTIONS[0].value);
   root.style.setProperty('--tc-font-scale', String((fontScale ?? 100) / 100));
 
-  if (!scheme) return; // default indigo — no overrides
+  if (!scheme) {
+    // Default indigo — no overrides. Also drop any --tc-panel-bg-rgb override left
+    // by a previously-selected scheme so the frosted-panel tint falls back to the
+    // stylesheet's own indigo default instead of staying stuck on the last scheme.
+    root.style.removeProperty('--tc-panel-bg-rgb');
+    return;
+  }
   const vars = theme === 'dark' ? scheme.dark : scheme.light;
   for (const { key } of APPEARANCE_COLOR_VARIABLES) {
     const value = vars[key];
     if (isAppearanceColor(value)) root.style.setProperty(key, value.trim());
+  }
+
+  // Frosted panels tint through rgba(var(--tc-panel-bg-rgb), opacity) — see
+  // .has-panel-glass in index.css. That variable was hardcoded to one fixed
+  // dark-navy / light-lavender pair and never followed the selected scheme, so
+  // picking Ocean/Emerald/Rose/Amber/Slate (or an Odysseus theme) still tinted
+  // every frosted panel the same navy-grey underneath the scheme's real colors —
+  // a wash that only read as "fixed" once a background image's own color
+  // dominated the panel's 30%-opacity overlay enough to hide the mismatch.
+  // Deriving it from the scheme's own --color-bg-deep keeps the frost tint
+  // in the same family as the rest of the theme regardless of what's behind it.
+  const panelTint = vars['--color-bg-deep'];
+  if (isAppearanceColor(panelTint)) {
+    const { r, g, b } = hexToRgb(panelTint);
+    root.style.setProperty('--tc-panel-bg-rgb', `${r}, ${g}, ${b}`);
+  } else {
+    root.style.removeProperty('--tc-panel-bg-rgb');
   }
 }
