@@ -166,6 +166,13 @@ export function BgEffectLayer({
   const patternRef = useRef(pattern);
   const sizeRef = useRef(size);
   const needsParticleResetRef = useRef(false);
+  // The RAF loop intentionally stops scheduling itself for static patterns (dots) or
+  // reduced-motion. Switching to an animated pattern afterward only flips patternRef —
+  // it doesn't run any code — so without this, the loop stays dead until something
+  // else (resize, mount) happens to kick it. These let the prop-sync effect below
+  // restart the loop itself when the pattern changes out of a stopped state.
+  const loopAliveRef = useRef(false);
+  const restartLoopRef = useRef<(() => void) | null>(null);
 
   // Cheap prop sync — never triggers canvas/RAF teardown.
   useEffect(() => {
@@ -182,6 +189,13 @@ export function BgEffectLayer({
     sizeRef.current = size;
     if (prevPattern !== pattern || prevSize !== size) {
       needsParticleResetRef.current = true;
+    }
+    // The loop stops scheduling itself for static patterns (dots) or reduced-motion.
+    // Any prop change while stopped — not just a pattern change — needs a fresh
+    // single frame or the canvas silently keeps showing stale color/intensity/glow
+    // values (e.g. tweaking Intensity while on Dots never repaints).
+    if (!loopAliveRef.current) {
+      restartLoopRef.current?.();
     }
   }, [color, glowColor, intensity, glowIntensity, particleGlow, trail, theme, pattern, size]);
 
@@ -981,6 +995,9 @@ export function BgEffectLayer({
       const shouldAnimate = !reducedMotion && currentPattern !== 'dots';
       if (shouldAnimate) {
         frame = window.requestAnimationFrame(render);
+        loopAliveRef.current = true;
+      } else {
+        loopAliveRef.current = false;
       }
     };
 
@@ -989,6 +1006,18 @@ export function BgEffectLayer({
       const p = patternRef.current;
       const shouldAnimate = !reducedMotion && p !== 'dots';
       if (!shouldAnimate) render(performance.now());
+    };
+
+    // Lets the prop-sync effect force a fresh frame after the loop stopped itself
+    // for a static pattern (dots) or reduced-motion, without tearing down the
+    // canvas. render() reads current ref values, paints once, and — via its own
+    // shouldAnimate check — reschedules itself only if the (possibly just-changed)
+    // pattern actually warrants continuous animation. So this correctly handles
+    // both "pattern changed to something animated" (loop resumes) and "some other
+    // prop changed while stuck on dots/reduced-motion" (one repaint, stays stopped).
+    restartLoopRef.current = () => {
+      if (loopAliveRef.current) return;
+      render(performance.now());
     };
 
     resize();
@@ -1000,6 +1029,8 @@ export function BgEffectLayer({
       window.removeEventListener('resize', handleResize);
       context.clearRect(0, 0, width, height);
       pctx.clearRect(0, 0, width, height);
+      loopAliveRef.current = false;
+      restartLoopRef.current = null;
     };
   }, [isNone]);
 

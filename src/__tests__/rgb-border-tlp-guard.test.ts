@@ -2,9 +2,11 @@
  * rgb-border-tlp-guard.test.ts
  *
  * Asserts that the RGB border animation in index.css never touches TLP/status
- * borders.  TLP badge colors carry semantic meaning; hue-cycling them would
- * destroy that signal.  These selectors must be present and must use revert +
- * animation:none overrides inside the .has-rgb-borders rule-set.
+ * borders. TLP badge colors carry semantic meaning; hue-cycling them would
+ * destroy that signal. RGB borders render as a `.rgb-ring` sibling <span>
+ * (not a border-color animation) so the exclusion works by hiding that
+ * sibling ring inside any TLP/status-bearing element, rather than by
+ * reverting an animated border-color.
  */
 
 import { readFileSync } from 'node:fs';
@@ -14,33 +16,27 @@ import { describe, it, expect } from 'vitest';
 const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8');
 
 describe('RGB border TLP guard', () => {
-  it('defines the .has-rgb-borders rule with allowed chrome selectors', () => {
-    expect(css).toMatch(/\.has-rgb-borders\s+\.app-window-frame/);
+  it('defines the traveling ring gated behind .has-rgb-borders', () => {
+    expect(css).toMatch(/\.has-rgb-borders\s+\.rgb-border/);
+    expect(css).toMatch(/\.has-rgb-borders\s+\.app-window-chrome-ring/);
   });
 
-  it('hard-stops TLP badge borders with revert !important', () => {
-    // The exclusion block must cover tlp-clear-badge and the generic tlp- class wildcard
-    expect(css).toMatch(/\.has-rgb-borders\s+\.tlp-clear-badge/);
-    expect(css).toMatch(/\.has-rgb-borders\s+\[class\*="tlp-"\]/);
-    // Must explicitly revert border-color so TLP colors are restored
-    expect(css).toMatch(/border-color\s*:\s*revert\s*!important/);
+  it('hard-stops TLP badge rings by hiding the sibling ring element', () => {
+    expect(css).toMatch(/\[class\*="tlp-"\]\s+\.rgb-ring/);
+    expect(css).toMatch(/\.tlp-clear-badge\s+\.rgb-ring/);
+    expect(css).toMatch(/display\s*:\s*none\s*;/);
   });
 
-  it('hard-stops data-tlp attribute borders', () => {
-    expect(css).toMatch(/\.has-rgb-borders\s+\[data-tlp\]/);
+  it('hard-stops data-tlp attribute rings', () => {
+    expect(css).toMatch(/\[data-tlp\]\s+\.rgb-ring/);
   });
 
-  it('hard-stops investigation-status attribute borders', () => {
-    expect(css).toMatch(/\.has-rgb-borders\s+\[data-investigation-status\]/);
+  it('hard-stops investigation-status attribute rings', () => {
+    expect(css).toMatch(/\[data-investigation-status\]\s+\.rgb-ring/);
   });
 
-  it('cancels animation on all excluded TLP/status selectors', () => {
-    // animation: none must appear in the exclusion block
-    expect(css).toMatch(/animation\s*:\s*none/);
-  });
-
-  it('respects prefers-reduced-motion', () => {
-    expect(css).toMatch(/@media\s*\(prefers-reduced-motion\s*:\s*reduce\)/);
-    expect(css).toMatch(/\.has-rgb-borders\s*\{[^}]*animation\s*:\s*none/);
+  it('respects prefers-reduced-motion for both the panel ring and the chrome ring', () => {
+    expect(css).toMatch(/@media\s*\(prefers-reduced-motion\s*:\s*reduce\)\s*\{\s*\.rgb-ring\s*\{\s*animation\s*:\s*none/);
+    expect(css).toMatch(/@media\s*\(prefers-reduced-motion\s*:\s*reduce\)\s*\{\s*\.app-window-chrome-ring\s*\{\s*animation\s*:\s*none/);
   });
 });

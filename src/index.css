@@ -789,7 +789,10 @@ body.tc-desktop-shell-body {
 [class*="bg-bg-deep"],
 [class*="bg-bg-primary"],
 [class*="bg-bg-surface"],
-[class*="bg-bg-raised"] {
+[class*="bg-bg-raised"],
+[class*="bg-bg-hover"],
+[class*="bg-bg-active"],
+[class*="bg-bg-base"] {
   background-color: rgba(var(--tc-panel-bg-rgb, 10, 12, 20), var(--tc-panel-glass-opacity, 0.3)) !important;
 }
 
@@ -809,7 +812,10 @@ body.tc-desktop-shell-body {
 .has-panel-glass [class*="bg-bg-deep"],
 .has-panel-glass [class*="bg-bg-primary"],
 .has-panel-glass [class*="bg-bg-surface"],
-.has-panel-glass [class*="bg-bg-raised"] {
+.has-panel-glass [class*="bg-bg-raised"],
+.has-panel-glass [class*="bg-bg-hover"],
+.has-panel-glass [class*="bg-bg-active"],
+.has-panel-glass [class*="bg-bg-base"] {
   border-color: var(--tc-panel-glass-border) !important;
 }
 
@@ -826,7 +832,10 @@ body.tc-desktop-shell-body {
 .has-panel-glass [class*="bg-bg-deep"],
 .has-panel-glass [class*="bg-bg-primary"],
 .has-panel-glass [class*="bg-bg-surface"],
-.has-panel-glass [class*="bg-bg-raised"] {
+.has-panel-glass [class*="bg-bg-raised"],
+.has-panel-glass [class*="bg-bg-hover"],
+.has-panel-glass [class*="bg-bg-active"],
+.has-panel-glass [class*="bg-bg-base"] {
   backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%);
   -webkit-backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%);
 }
@@ -854,7 +863,10 @@ body.tc-desktop-shell-body {
 .has-panel-glass [class*="bg-bg-deep"],
 .has-panel-glass [class*="bg-bg-primary"],
 .has-panel-glass [class*="bg-bg-surface"],
-.has-panel-glass [class*="bg-bg-raised"] {
+.has-panel-glass [class*="bg-bg-raised"],
+.has-panel-glass [class*="bg-bg-hover"],
+.has-panel-glass [class*="bg-bg-active"],
+.has-panel-glass [class*="bg-bg-base"] {
   background-image:
     url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PGZpbHRlciBpZD0ibiI+PGZlVHVyYnVsZW5jZSB0eXBlPSJmcmFjdGFsTm9pc2UiIGJhc2VGcmVxdWVuY3k9IjAuODUiIG51bU9jdGF2ZXM9IjIiIHN0aXRjaFRpbGVzPSJzdGl0Y2giLz48ZmVDb2xvck1hdHJpeCB0eXBlPSJtYXRyaXgiIHZhbHVlcz0iMCAwIDAgMCAxICAwIDAgMCAwIDEgIDAgMCAwIDAgMSAgMCAwIDAgMC4wNSAwIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI24pIi8+PC9zdmc+") !important;
   background-repeat: repeat !important;
@@ -1835,14 +1847,21 @@ body.tc-desktop-shell-body {
     hsl(300, 100%, 65%),
     hsl(360, 100%, 65%)
   );
+  /* Punches a content-box hole out of the padding-box fill so only the ring
+     remains. IMPORTANT: do not also declare a `-webkit-mask: <shorthand>`
+     here — in current Chromium `-webkit-mask` is the same underlying
+     property as `mask`, so re-declaring the shorthand resets mask-composite
+     back to its `add` default, and `xor` is not a legal value for the
+     unprefixed property (the old WebKit composite keyword set), so a
+     trailing `-webkit-mask-composite: xor` silently fails to parse and
+     never restores it. Net effect: the "ring" renders as a solid filled
+     shape, not a border — this shipped broken for a while before. One
+     `mask` shorthand + one `mask-composite: exclude` is correct and
+     sufficient in current engines. */
   mask:
     linear-gradient(#fff 0 0) content-box,
     linear-gradient(#fff 0 0);
   mask-composite: exclude;
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
   animation: tc-rgb-rotate var(--tc-rgb-speed, 3s) linear infinite;
 }
 
@@ -1857,6 +1876,52 @@ body.tc-desktop-shell-body {
 
 @media (prefers-reduced-motion: reduce) {
   .rgb-ring {
+    animation: none;
+  }
+}
+
+/* ─── App chrome ring ──────────────────────────────────────────────────────
+   The Settings toggle promises "Animate app chrome border hue," but .rgb-ring
+   above is only wired into WorkspacePanel — a specific dockable-panel feature
+   most sessions never open. A user on Notes/Tasks/Dashboard (the common case)
+   would enable the toggle and see nothing. This ring outlines the whole app
+   window instead, so the effect is visible regardless of which view is open.
+
+   position:fixed sidesteps the earlier z-index/overflow-hidden clipping bug
+   entirely — its containing block is the viewport, not app-window-shell
+   (which is overflow-hidden), so there is no ancestor box to be clipped by. */
+.app-window-chrome-ring {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  padding: 2px;
+  opacity: 0;
+  background: conic-gradient(
+    from var(--tc-rgb-angle, 0deg),
+    hsl(0, 100%, 65%),
+    hsl(60, 100%, 65%),
+    hsl(120, 100%, 65%),
+    hsl(180, 100%, 65%),
+    hsl(240, 100%, 65%),
+    hsl(300, 100%, 65%),
+    hsl(360, 100%, 65%)
+  );
+  /* See the .rgb-ring comment above: one mask shorthand + mask-composite,
+     no redundant -webkit-mask shorthand or invalid `xor` value. */
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: tc-rgb-rotate var(--tc-rgb-speed, 3s) linear infinite;
+}
+
+.has-rgb-borders .app-window-chrome-ring {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-window-chrome-ring {
     animation: none;
   }
 }
