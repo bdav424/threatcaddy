@@ -5,6 +5,7 @@ import { BookOpen, Plus, Trash2, Send, Palette, Upload, Pencil, X, ChevronLeft, 
 import { useJournalPages } from '../../hooks/useJournalPages';
 import type { JournalPage, JournalPageTheme, JournalPaperStyle, Folder } from '../../types';
 import { cn } from '../../lib/utils';
+import { FONT_OPTIONS } from '../../lib/theme-schemes';
 
 // ── Journal HTML sanitization ─────────────────────────────────────────────────
 // The shared `sanitizeHtml` (lib/markdown.ts) forbids the `style` attribute,
@@ -58,8 +59,12 @@ function getPaperPatternStyle(
   paperStyle: JournalPaperStyle,
   paperColor: string | 'theme',
   guideMetrics?: GuideMetrics | null,
+  paperOpacity = 100,
 ): CSSProperties {
-  const bg = paperColor === 'theme' ? 'var(--color-bg-surface)' : paperColor;
+  const solid = paperColor === 'theme' ? 'var(--color-bg-surface)' : paperColor;
+  // color-mix works for both the theme CSS variable and a plain hex string, so the
+  // opacity slider doesn't need separate handling for 'theme' vs a custom color.
+  const bg = paperOpacity >= 100 ? solid : `color-mix(in srgb, ${solid} ${clamp(paperOpacity, 0, 100)}%, transparent)`;
   const lineColor = getGuideLineColor(paperColor);
 
   switch (paperStyle) {
@@ -250,13 +255,15 @@ function TearModal({ page, folders, onTear, onClose }: TearModalProps) {
 interface BackgroundPickerProps {
   paperColor: string | 'theme';
   paperStyle: JournalPaperStyle;
+  paperOpacity: number;
   onChangePaperColor: (color: string | 'theme') => void;
   onChangePaperStyle: (style: JournalPaperStyle) => void;
+  onChangePaperOpacity: (opacity: number) => void;
   onClose: () => void;
   anchorRef: React.RefObject<HTMLElement | null>;
 }
 
-function BackgroundPicker({ paperColor, paperStyle, onChangePaperColor, onChangePaperStyle, onClose, anchorRef }: BackgroundPickerProps) {
+function BackgroundPicker({ paperColor, paperStyle, paperOpacity, onChangePaperColor, onChangePaperStyle, onChangePaperOpacity, onClose, anchorRef }: BackgroundPickerProps) {
   const ref = useRef<HTMLDivElement>(null);
   const wheelPtrRef = useRef<number | null>(null);
 
@@ -372,6 +379,23 @@ function BackgroundPicker({ paperColor, paperStyle, onChangePaperColor, onChange
             </button>
           ))}
         </div>
+      </div>
+
+      {/* ── Paper opacity ── */}
+      <div className="border-b border-border-subtle px-3 py-2.5">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Paper opacity</p>
+          <span className="text-[10px] text-text-muted">{paperOpacity}%</span>
+        </div>
+        <input
+          type="range"
+          min={10}
+          max={100}
+          value={paperOpacity}
+          onChange={(e) => onChangePaperOpacity(Number(e.target.value))}
+          className="w-full accent-accent"
+        />
+        <p className="mt-1 text-[9px] text-text-muted">Lower this to let the animated background show through the page.</p>
       </div>
 
       {/* ── Background color ── */}
@@ -536,6 +560,127 @@ function RichToolbar({ onFormat }: { onFormat: (cmd: string, val?: string) => vo
   );
 }
 
+// ── Draw color picker ─────────────────────────────────────────────────────────
+// Same color-wheel technique as BackgroundPicker (reuses its hexToHsl/hslToHex/
+// hslToWheelPoint/pointerToWheelHsl helpers) but scoped to picking a pen color
+// instead of a paper color — no "theme" option, since a stroke's color is
+// always a concrete value, never inherited.
+
+interface DrawColorPickerProps {
+  color: string;
+  onChange: (hex: string) => void;
+  onClose: () => void;
+  anchorRef: React.RefObject<HTMLElement | null>;
+}
+
+function DrawColorPicker({ color, onChange, onClose, anchorRef }: DrawColorPickerProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const wheelPtrRef = useRef<number | null>(null);
+  const [hexInput, setHexInput] = useState(color);
+  const [wheelPt, setWheelPt] = useState(() => hslToWheelPoint(hexToHsl(color)));
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    const anchor = anchorRef.current;
+    if (!anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    setPos({ top: rect.bottom + 4, left: rect.left });
+  }, [anchorRef]);
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [onClose]);
+
+  const applyHex = useCallback((hex: string) => {
+    if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+      onChange(hex);
+      setWheelPt(hslToWheelPoint(hexToHsl(hex)));
+    }
+  }, [onChange]);
+
+  const handleWheelPointer = useCallback((e: ReactPointerEvent<HTMLElement>) => {
+    if (wheelPtrRef.current !== null && e.pointerId !== wheelPtrRef.current) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    wheelPtrRef.current = e.pointerId;
+    const { hsl, point } = pointerToWheelHsl(e);
+    const hex = hslToHex(hsl);
+    setWheelPt(point);
+    setHexInput(hex);
+    onChange(hex);
+  }, [onChange]);
+
+  const releaseWheel = useCallback(() => { wheelPtrRef.current = null; }, []);
+
+  const hsl = hexToHsl(color);
+
+  if (!pos) return null;
+
+  return createPortal(
+    <div
+      ref={ref}
+      className="fixed z-[9999] w-56 rounded-xl border border-border-medium bg-bg-raised p-3 shadow-xl"
+      style={{ top: pos.top, left: pos.left }}
+    >
+      <div className="flex justify-center">
+        <div
+          className="relative h-32 w-32 touch-none rounded-full border border-white/20 shadow-inner cursor-crosshair"
+          style={{ background: COLOR_WHEEL_BG }}
+          onPointerDown={handleWheelPointer}
+          onPointerMove={(e) => { if (wheelPtrRef.current !== null) handleWheelPointer(e); }}
+          onPointerUp={releaseWheel}
+          onPointerCancel={releaseWheel}
+          role="application"
+          aria-label="Color wheel"
+        >
+          <span
+            className="pointer-events-none absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_2px_rgba(0,0,0,0.55)]"
+            style={{ left: `${wheelPt.x}%`, top: `${wheelPt.y}%`, backgroundColor: color }}
+          />
+        </div>
+      </div>
+      <div className="mt-2 space-y-1">
+        {(['h', 's', 'l'] as const).map((ch) => {
+          const labels = { h: 'Hue', s: 'Saturation', l: 'Lightness' };
+          const maxes = { h: 359, s: 100, l: 100 };
+          return (
+            <label key={ch} className="flex items-center gap-2">
+              <span className="w-14 shrink-0 text-[9px] text-text-muted">{labels[ch]}</span>
+              <input
+                type="range"
+                min={0}
+                max={maxes[ch]}
+                value={hsl[ch]}
+                onChange={(e) => {
+                  const updated = { ...hsl, [ch]: Number(e.target.value) };
+                  const hex = hslToHex(updated);
+                  setHexInput(hex);
+                  setWheelPt(hslToWheelPoint(updated));
+                  onChange(hex);
+                }}
+                className="flex-1 accent-accent"
+              />
+            </label>
+          );
+        })}
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <div className="h-6 w-6 shrink-0 rounded border border-border-subtle" style={{ backgroundColor: color }} />
+        <input
+          value={hexInput}
+          placeholder="#ffffff"
+          onChange={(e) => { setHexInput(e.target.value); applyHex(e.target.value); }}
+          className="flex-1 rounded border border-border-subtle bg-bg-surface px-2 py-1 font-mono text-[11px] text-text-primary focus:border-accent/40 focus:outline-none"
+        />
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 // ── Drawing canvas ────────────────────────────────────────────────────────────
 //
 // Strokes are stored as vectors (JSON), not a raster snapshot. A raster
@@ -622,7 +767,16 @@ interface DrawingCanvasProps {
 
 function DrawingCanvas({ initialData, onSave, onExit }: DrawingCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [drawColor, setDrawColor] = useState<DrawColor>('black');
+  // Pen color is a plain hex string (not tied to the preset swatch list) so a
+  // custom color from the picker below is just as first-class as a preset.
+  // Defaults to a light pen in dark mode — black-on-black was nearly invisible
+  // on the default dark paper and had to be manually switched every time.
+  const [drawColor, setDrawColor] = useState<string>(
+    () => (document.documentElement.classList.contains('dark') ? '#f5f5f5' : '#1a1a1a'),
+  );
+  const [isEraser, setIsEraser] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const colorButtonRef = useRef<HTMLButtonElement>(null);
   const isDrawing = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const strokesRef = useRef<Stroke[]>(parseStrokes(initialData));
@@ -698,13 +852,12 @@ function DrawingCanvas({ initialData, onSave, onExit }: DrawingCanvasProps) {
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     isDrawing.current = true;
     canvasRef.current?.setPointerCapture(e.pointerId);
-    const color = DRAW_COLORS.find((c) => c.key === drawColor)!;
     const pressure = e.pressure > 0 ? e.pressure : 0.5;
     const { x, y } = getPos(e);
     currentStrokeRef.current = {
-      color: color.hex,
-      width: drawColor === 'eraser' ? 24 : pressure * 4,
-      erase: drawColor === 'eraser',
+      color: drawColor,
+      width: isEraser ? 24 : pressure * 4,
+      erase: isEraser,
       points: [{ x, y }],
     };
   };
@@ -750,26 +903,62 @@ function DrawingCanvas({ initialData, onSave, onExit }: DrawingCanvasProps) {
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
       />
-      {/* Draw toolbar */}
-      <div className="absolute top-0 left-0 right-0 flex items-center gap-2 bg-bg-raised/95 backdrop-blur border-b border-border-subtle px-3 py-1.5">
+      {/* Draw toolbar — sticky, not absolute: this canvas overlay spans the full
+          (possibly tall/scrollable) page, so an absolute top-0 toolbar was
+          anchored to the top of the *content*, not the viewport. Scrolling down
+          to draw on a lower part of a long page scrolled the color picker and
+          Exit button out of reach; exiting then required scrolling back up
+          first, which read as "the drawing moved" even though only the
+          viewport had. Sticky keeps it pinned to the visible top while drawing
+          anywhere on the page. */}
+      <div className="sticky top-0 z-20 flex items-center gap-2 bg-bg-raised/95 backdrop-blur border-b border-border-subtle px-3 py-1.5">
         <span className="text-[11px] font-semibold text-text-muted">Draw mode</span>
         <div className="flex items-center gap-1">
-          {DRAW_COLORS.map(({ key, hex, label }) => (
+          {DRAW_COLORS.filter(({ key }) => key !== 'eraser').map(({ key, hex, label }) => (
             <button
               key={key}
               type="button"
-              onClick={() => setDrawColor(key)}
+              onClick={() => { setDrawColor(hex); setIsEraser(false); }}
               title={label}
               className={cn(
                 'h-5 w-5 rounded-full border-2 transition-transform',
-                drawColor === key ? 'scale-125 border-text-primary' : 'border-transparent hover:scale-110',
-                key === 'eraser' && 'border-border-subtle bg-bg-surface',
+                !isEraser && drawColor === hex ? 'scale-125 border-text-primary' : 'border-transparent hover:scale-110',
               )}
-              style={key !== 'eraser' ? { backgroundColor: hex } : undefined}
-            >
-              {key === 'eraser' && <span className="text-[9px] text-text-muted">✕</span>}
-            </button>
+              style={{ backgroundColor: hex }}
+            />
           ))}
+          <button
+            ref={colorButtonRef}
+            type="button"
+            onClick={() => setShowColorPicker((v) => !v)}
+            title="Custom color"
+            className={cn(
+              'h-5 w-5 rounded-full border-2 transition-transform',
+              !isEraser && !DRAW_COLORS.some((c) => c.hex === drawColor)
+                ? 'scale-125 border-text-primary'
+                : 'border-border-subtle hover:scale-110',
+            )}
+            style={{ background: 'conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)' }}
+          />
+          {showColorPicker && (
+            <DrawColorPicker
+              anchorRef={colorButtonRef}
+              color={drawColor}
+              onChange={(hex) => { setDrawColor(hex); setIsEraser(false); }}
+              onClose={() => setShowColorPicker(false)}
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => setIsEraser(true)}
+            title="Eraser"
+            className={cn(
+              'flex h-5 w-5 items-center justify-center rounded-full border-2 bg-bg-surface transition-transform',
+              isEraser ? 'scale-125 border-text-primary' : 'border-border-subtle hover:scale-110',
+            )}
+          >
+            <span className="text-[9px] text-text-muted">✕</span>
+          </button>
         </div>
         <button
           type="button"
@@ -897,9 +1086,14 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
   // Resolve effective paper color + style, with backwards-compat for old theme-only pages
   const paperColor = page.paperColor ?? 'theme';
   const paperStyle = page.paperStyle ?? 'blank';
+  const paperOpacity = page.paperOpacity ?? 100;
+  const paperFont = page.paperFont;
   const usingNewStyle = page.paperColor !== undefined;
   const legacyClasses = usingNewStyle ? '' : getLegacyThemeClasses(page.theme);
-  const paperSurfaceStyle = usingNewStyle ? getPaperPatternStyle(paperStyle, paperColor, guideMetrics) : {};
+  const paperSurfaceStyle: CSSProperties = {
+    ...(usingNewStyle ? getPaperPatternStyle(paperStyle, paperColor, guideMetrics, paperOpacity) : {}),
+    ...(paperFont ? { fontFamily: paperFont } : {}),
+  };
 
   return (
     <div className="relative h-full">
@@ -929,12 +1123,26 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
               anchorRef={bgButtonRef}
               paperColor={paperColor}
               paperStyle={paperStyle}
+              paperOpacity={paperOpacity}
               onChangePaperColor={(c) => onUpdate({ paperColor: c })}
               onChangePaperStyle={(s) => onUpdate({ paperStyle: s })}
+              onChangePaperOpacity={(o) => onUpdate({ paperOpacity: o })}
               onClose={() => setShowBgPicker(false)}
             />
           )}
         </div>
+        <div className="w-px h-4 bg-border-subtle" />
+        <select
+          value={paperFont ?? ''}
+          onChange={(e) => onUpdate({ paperFont: e.target.value || undefined })}
+          title="Page font"
+          className="rounded px-1.5 py-0.5 text-[11px] font-medium text-text-secondary bg-transparent hover:bg-bg-hover hover:text-text-primary transition-colors focus:outline-none"
+        >
+          <option value="">Theme font</option>
+          {FONT_OPTIONS.map((f) => (
+            <option key={f.id} value={f.value}>{f.label}</option>
+          ))}
+        </select>
         <div className="w-px h-4 bg-border-subtle" />
         <RichToolbar onFormat={handleFormat} />
         <div className="flex-1" />
@@ -1005,10 +1213,10 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
 
       {/* Page surface — background color + paper pattern */}
       <div ref={surfaceRef} className={cn('absolute inset-0 overflow-auto pt-12', legacyClasses)} style={paperSurfaceStyle}>
-        <div className="mx-auto max-w-3xl px-8 py-6 relative">
+        <div className="mx-auto flex min-h-full max-w-3xl flex-col px-8 py-6 relative">
           {/* Linked badge */}
           {page.linkedInvestigationId && (
-            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-2.5 py-0.5 text-xs text-accent">
+            <div className="mb-3 inline-flex items-center gap-1.5 self-start rounded-full border border-accent/30 bg-accent/10 px-2.5 py-0.5 text-xs text-accent">
               <Send size={10} />
               Sent to investigation
             </div>
@@ -1019,16 +1227,18 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
             onChange={(e) => setTitle(e.target.value)}
             onBlur={handleTitleBlur}
             placeholder="Page title…"
-            className="journal-focus-quiet mb-4 w-full border-b-2 border-transparent bg-transparent text-2xl font-bold text-inherit placeholder-text-muted transition-colors focus:border-accent/40"
+            className="journal-focus-quiet mb-4 w-full shrink-0 border-b-2 border-transparent bg-transparent text-2xl font-bold text-inherit placeholder-text-muted transition-colors focus:border-accent/40"
           />
-          {/* Rich text content */}
+          {/* Rich text content — flex-1 so the focus-ring box fills the rest of the
+              panel instead of stopping at a fixed min-height with dead space below
+              it on tall viewports. */}
           <div
             ref={editorRef}
             contentEditable
             suppressContentEditableWarning
             onInput={scheduleContentSave}
             data-placeholder="Start writing…"
-            className="journal-focus-quiet min-h-[60vh] w-full rounded-md bg-transparent text-sm leading-7 text-inherit transition-shadow focus-visible:ring-1 focus-visible:ring-accent/25 empty:before:content-[attr(data-placeholder)] empty:before:text-text-muted empty:before:pointer-events-none [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5 [&_ul_ul]:list-[circle] [&_ul_ul_ul]:list-[square]"
+            className="journal-focus-quiet w-full flex-1 rounded-md bg-transparent text-sm leading-7 text-inherit transition-shadow focus-visible:ring-1 focus-visible:ring-accent/25 empty:before:content-[attr(data-placeholder)] empty:before:text-text-muted empty:before:pointer-events-none [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5 [&_ul_ul]:list-[circle] [&_ul_ul_ul]:list-[square] [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-2 [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1"
           />
           {/* Read-only drawing overlay — always visible when drawing data exists */}
           {page.drawingData && !drawMode && (

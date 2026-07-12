@@ -329,6 +329,11 @@ export interface JournalPage {
   paperColor?: string | 'theme';
   /** Paper pattern rendered on top of the background color. Defaults to 'blank'. */
   paperStyle?: JournalPaperStyle;
+  /** Paper background opacity, 0-100. Defaults to 100 (opaque). Lets the animated
+   * background/frost effects show through the page instead of a solid paper. */
+  paperOpacity?: number;
+  /** CSS font-family stack applied to the title + rich text content. Undefined = theme default. */
+  paperFont?: string;
   drawingData?: string;
   createdAt: number;
   updatedAt: number;
