@@ -32,6 +32,8 @@ type MovingPoint = {
   emberFuel: number;
   /** Remaining fast burnout fade in ms, 0 = alive or fully dead. Set once emberLife hits 0. */
   emberFadeMs: number;
+  /** X the ember's swirl spirals around; drifts slightly but doesn't accumulate drift like x does. */
+  emberAnchorX: number;
   /** Ring buffer: interleaved [x0, y0, x1, y1, ...] of past positions. */
   history: Float32Array;
   /** Next write slot (mod TRAIL_MAX_POSITIONS). */
@@ -120,24 +122,28 @@ function createSwirls(width: number, height: number, scale: number) {
 
 function createPoints(width: number, height: number, scale: number, density: number) {
   const count = Math.min(MAX_PARTICLES, Math.max(18, Math.round(((width * height) / 65000) * density)));
-  return Array.from({ length: count }, () => ({
-    x: Math.random() * width,
-    y: Math.random() * height,
-    vx: (Math.random() - 0.5) * 0.18 * scale,
-    vy: (Math.random() - 0.5) * 0.18 * scale,
-    radius: (1.2 + Math.random() * 2.6) * scale,
-    twinkle: Math.random() * Math.PI * 2,
-    // Staggered so embers don't all ignite and die in lockstep.
-    glowA: 1,
-    glowR: 1,
-    emberLife: Math.random(),
-    // Cubic distribution: most embers are dim (cooling), rare bright sparks near 1.0.
-    emberFuel: 0.15 + Math.pow(Math.random(), 3) * 0.85,
-    emberFadeMs: 0,
-    history: new Float32Array(TRAIL_MAX_POSITIONS * 2),
-    histHead: 0,
-    histLen: 0,
-  } satisfies MovingPoint));
+  return Array.from({ length: count }, () => {
+    const x = Math.random() * width;
+    return {
+      x,
+      y: Math.random() * height,
+      vx: (Math.random() - 0.5) * 0.18 * scale,
+      vy: (Math.random() - 0.5) * 0.18 * scale,
+      radius: (1.2 + Math.random() * 2.6) * scale,
+      twinkle: Math.random() * Math.PI * 2,
+      // Staggered so embers don't all ignite and die in lockstep.
+      glowA: 1,
+      glowR: 1,
+      emberLife: Math.random(),
+      // Cubic distribution: most embers are dim (cooling), rare bright sparks near 1.0.
+      emberFuel: 0.15 + Math.pow(Math.random(), 3) * 0.85,
+      emberFadeMs: 0,
+      emberAnchorX: x,
+      history: new Float32Array(TRAIL_MAX_POSITIONS * 2),
+      histHead: 0,
+      histLen: 0,
+    } satisfies MovingPoint;
+  });
 }
 
 export function BgEffectLayer({
@@ -784,6 +790,7 @@ export function BgEffectLayer({
           if (point.emberFadeMs <= 0) {
             // Respawn burnt-out embers at the bottom with a fresh lifecycle.
             point.x = Math.random() * width;
+            point.emberAnchorX = point.x;
             point.y = height + 10 + Math.random() * 30;
             point.emberLife = 0.75 + Math.random() * 0.25;
             point.emberFuel = 0.15 + Math.pow(Math.random(), 3) * 0.85;
@@ -807,19 +814,13 @@ export function BgEffectLayer({
           continue;
         }
 
-        // ── Vortex rise ──────────────────────────────────────────────────────
-        // Bigger/hotter embers climb faster and farther; small ones drift lazily
-        // and burn out before gaining much altitude. A tightening spiral (vortex
-        // radius shrinks with height) rides on top of the straight-up buoyancy,
-        // like a heat plume rather than a straight column.
         // ── Ambient draft ────────────────────────────────────────────────────
         // A handful of invisible updrafts (reusing the same anchor points
         // drawSwirls seeds) are spread across the screen. Spin direction is
         // decided by which side of the nearest draft an ember sits on —
         // anticlockwise to its left, clockwise to its right — the way smoke
-        // curls around a rising thermal, instead of every ember independently
-        // picking its own random spin. Embers near a draft center also get an
-        // extra upward push, tapering off with distance.
+        // curls around a rising thermal. Embers near a draft center also get
+        // an extra upward push, tapering off with distance.
         let nearestDraft = swirls[0];
         let nearestDraftDist = Infinity;
         for (const draft of swirls) {
@@ -829,25 +830,42 @@ export function BgEffectLayer({
         const draftPull = clamp(1 - nearestDraftDist / (260 * scale), 0, 1);
         const spinDir = point.x >= nearestDraft.anchorX ? 1 : -1;
 
-        const riseSpeed = reducedMotion
-          ? 0.03
-          : (0.09 + sizeFrac * 0.5 + point.emberFuel * 0.14 + draftPull * 0.12) * scale;
+        const lifeRatio = point.emberLife / point.emberFuel;
+        const climbProgress = clamp(1 - lifeRatio, 0, 1);
+
+        // ── Swirl once or twice, then climb straight ────────────────────────
+        // The spiral is driven directly off climbProgress (not accumulated
+        // per-frame) so it completes a fixed angle and then genuinely stops —
+        // a continuous per-frame increment never settles, it just keeps
+        // wobbling for the ember's whole life. Real draft-driven smoke spins
+        // once or twice right where it ignites, then escapes upward straight.
+        const SWIRL_FRACTION = 0.3;
+        const swirlT = clamp(climbProgress / SWIRL_FRACTION, 0, 1);
+        const spinLoops = 1 + draftPull; // 1–2 full loops — more loops the closer to a draft
+        const vortexAngle = spinDir * spinLoops * Math.PI * 2 * swirlT;
+        const vortexRadius = (3 + sizeFrac * 6) * scale * (0.4 + draftPull * 0.6);
+        const envelope = 1 - swirlT; // spiral tightens back onto the anchor as the swirl finishes
+        point.emberAnchorX += (Math.random() - 0.5) * 0.05 * scale * dt;
+        point.x = point.emberAnchorX + Math.cos(vortexAngle) * vortexRadius * envelope;
+
+        // ── Rise, gaining a little momentum as it climbs ────────────────────
+        const riseBase = (0.09 + sizeFrac * 0.5 + point.emberFuel * 0.14 + draftPull * 0.12) * scale;
+        const riseSpeed = reducedMotion ? 0.03 : riseBase * (1 + climbProgress * 0.7);
         point.y -= riseSpeed * dt;
 
-        point.twinkle += spinDir * (0.014 + sizeFrac * 0.01 + draftPull * 0.02) * dt;
-        const vortexRadius = (2 + sizeFrac * 5) * scale * clamp(point.emberLife * 1.6, 0.15, 1) * (0.5 + draftPull * 0.5);
-        point.vx = point.vx * 0.9 + Math.cos(point.twinkle) * 0.05;
-        point.x += (point.vx + Math.sin(point.twinkle) * 0.05) * vortexRadius * dt;
+        // Flicker phase is independent of the swirl angle now that the swirl
+        // is progress-driven rather than accumulated — it keeps ticking for
+        // the ember's whole life instead of freezing once the swirl ends.
+        point.twinkle += 0.03 * dt;
 
         // ── Near-constant glow while alive ──────────────────────────────────
-        // The dramatic brightness swing now lives entirely in the death fade
+        // The dramatic brightness swing lives entirely in the death fade
         // above — while alive the ember just flickers gently, it doesn't ramp
         // up and back down on its own.
         const flicker = 0.82 + ((Math.sin(point.twinkle * 4.2) + 1) / 2) * 0.18;
 
         // Spawn fade-in over the first 6% of life consumed — avoids pop-in.
-        const lifeRatio = point.emberLife / point.emberFuel;
-        const spawnProgress = 1.0 - lifeRatio;
+        const spawnProgress = climbProgress;
         const spawnFade = spawnProgress < 0.06 ? Math.max(0, spawnProgress) / 0.06 : 1.0;
 
         point.glowA = flicker * spawnFade * (0.7 + sizeFrac * 0.3);
