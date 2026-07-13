@@ -38,8 +38,8 @@ const defaultSelectedAgendaPanelGeometry: WorkspacePanelGeometry = {
 const defaultEmailCaddyPanelGeometry: WorkspacePanelGeometry = {
   x: 260,
   y: 68,
-  width: 1040,
-  height: 700,
+  width: 820,
+  height: 560,
 };
 
 const defaultCalendarCaddyPanelGeometry: WorkspacePanelGeometry = {
@@ -83,8 +83,8 @@ export const ASSISTANT_WORKSPACE_PANEL_LAUNCH_DESCRIPTORS = {
     title: 'EmailCaddy',
     defaultWidth: defaultEmailCaddyPanelGeometry.width,
     defaultHeight: defaultEmailCaddyPanelGeometry.height,
-    minWidth: 680,
-    minHeight: 500,
+    minWidth: 480,
+    minHeight: 380,
   },
   calendar: {
     panelId: CALENDARCADDY_WORKSPACE_PANEL_ID,
