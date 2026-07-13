@@ -148,20 +148,19 @@ export default defineConfig({
           if (id.includes('/cytoscape/') || id.includes('/cytoscape-cose-bilkent/')) {
             return 'cytoscape';
           }
-          if (id.includes('/leaflet/') || id.includes('/react-leaflet/') || id.includes('/react-leaflet-cluster/')) {
-            return 'leaflet';
-          }
           if (id.includes('/marked/') || id.includes('/dompurify/')) {
             return 'markdown';
           }
           if (id.includes('/pako/')) {
             return 'compression';
           }
-          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
-            return 'vendor-react';
-          }
+          // Single shared vendor chunk for React and everything that is NOT a lazy heavy
+          // lib carved out above. Splitting React away from its dependents (react-leaflet,
+          // router, i18next, etc. — react-leaflet was in a separate 'leaflet' chunk here)
+          // creates cross-chunk import cycles that break module init order and freeze the
+          // app on the loading screen. Matches the fix already applied in vite.config.ts.
           if (id.includes('node_modules/')) {
-            return 'vendor-misc';
+            return 'vendor';
           }
         },
       },
