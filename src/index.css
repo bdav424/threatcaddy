@@ -2020,32 +2020,32 @@ body.tc-desktop-shell-body {
   .has-rgb-borders [class*="bg-bg-base"],
   .has-rgb-borders [class*="--color-surface"],
   .has-rgb-borders [class*="--color-input-bg"]
-):not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .fixed, .absolute, .sticky) {
+):not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .fixed, .absolute, .sticky, .app-window-sidebar, .app-window-sidebar *) {
   position: relative;
 }
 
-.has-rgb-borders .bg-gray-900:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders .bg-gray-900\/80:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders .bg-gray-900\/50:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders .bg-gray-900\/40:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders .bg-gray-900\/30:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders .bg-gray-800:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders .bg-gray-800\/60:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders .bg-gray-800\/50:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders .bg-gray-800\/40:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders .bg-gray-700:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders .bg-gray-700\/50:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders .bg-gray-700\/30:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders .sidebar-glass:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders [class*="bg-bg-deep"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders [class*="bg-bg-primary"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders [class*="bg-bg-surface"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders [class*="bg-bg-raised"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders [class*="bg-bg-hover"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders [class*="bg-bg-active"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders [class*="bg-bg-base"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders [class*="--color-surface"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
-.has-rgb-borders [class*="--color-input-bg"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before {
+.has-rgb-borders .bg-gray-900:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders .bg-gray-900\/80:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders .bg-gray-900\/50:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders .bg-gray-900\/40:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders .bg-gray-900\/30:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders .bg-gray-800:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders .bg-gray-800\/60:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders .bg-gray-800\/50:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders .bg-gray-800\/40:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders .bg-gray-700:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders .bg-gray-700\/50:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders .bg-gray-700\/30:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders .sidebar-glass:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders [class*="bg-bg-deep"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders [class*="bg-bg-primary"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders [class*="bg-bg-surface"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders [class*="bg-bg-raised"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders [class*="bg-bg-hover"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders [class*="bg-bg-active"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders [class*="bg-bg-base"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders [class*="--color-surface"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before,
+.has-rgb-borders [class*="--color-input-bg"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .app-window-sidebar, .app-window-sidebar *)::before {
   content: '';
   position: absolute;
   inset: 0;
