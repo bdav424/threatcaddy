@@ -653,6 +653,56 @@ export function BgEffectLayer({
       }
     };
 
+    // Rain's trail idea, but radial: streaks fly outward from center instead of
+    // falling straight down, accelerating and lengthening as they approach the
+    // edge — the classic hyperspace-jump/warp-speed starfield read. Direction is
+    // recomputed from each point's current position relative to center every
+    // frame (not stored), so a point always continues along the same radial line
+    // it's already on regardless of how it got there — no separate spawn-angle
+    // field needed on MovingPoint.
+    const drawWarp = (dt: number) => {
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const maxDist = Math.hypot(centerX, centerY) || 1;
+      for (const point of points) {
+        const dx = point.x - centerX;
+        const dy = point.y - centerY;
+        const dist = Math.hypot(dx, dy) || 0.0001;
+        const angle = Math.atan2(dy, dx);
+        const radiusFrac = clamp(dist / maxDist, 0, 1);
+
+        if (point.x < -60 || point.x > width + 60 || point.y < -60 || point.y > height + 60) {
+          const spawnAngle = Math.random() * Math.PI * 2;
+          const spawnRadius = Math.random() * 18 * scale;
+          point.x = centerX + Math.cos(spawnAngle) * spawnRadius;
+          point.y = centerY + Math.sin(spawnAngle) * spawnRadius;
+          continue;
+        }
+
+        const speed = (reducedMotion ? 0.15 : 0.5 + radiusFrac * radiusFrac * 3.4) * scale * dt;
+        point.x += Math.cos(angle) * speed;
+        point.y += Math.sin(angle) * speed;
+
+        const streakLength = (14 + radiusFrac * 52) * scale;
+        const tailX = point.x - Math.cos(angle) * streakLength;
+        const tailY = point.y - Math.sin(angle) * streakLength;
+        const gradient = pctx.createLinearGradient(tailX, tailY, point.x, point.y);
+        gradient.addColorStop(0, 'rgba(0,0,0,0)');
+        gradient.addColorStop(1, rgba(effectColor, alphaBase * (0.32 + radiusFrac * 0.4)));
+        pctx.strokeStyle = gradient;
+        pctx.lineWidth = Math.max(1, (1.1 + radiusFrac * 1.6) * scale);
+        pctx.beginPath();
+        pctx.moveTo(tailX, tailY);
+        pctx.lineTo(point.x, point.y);
+        pctx.stroke();
+
+        pctx.beginPath();
+        pctx.arc(point.x, point.y, (1 + radiusFrac * 1.5) * scale, 0, Math.PI * 2);
+        pctx.fillStyle = rgba(effectColor, alphaBase * (0.55 + radiusFrac * 0.35));
+        pctx.fill();
+      }
+    };
+
     const drawPerlinFlow = (time: number, dt: number) => {
       for (const point of points) {
         const angle = Math.sin(point.x * 0.006 + time * 0.0007) * Math.PI
@@ -954,6 +1004,9 @@ export function BgEffectLayer({
           break;
         case 'rain':
           drawRain(dt);
+          break;
+        case 'warp':
+          drawWarp(dt);
           break;
         case 'constellations':
           drawConstellations(time, dt);

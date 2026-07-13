@@ -145,6 +145,7 @@ const BACKGROUND_EFFECT_OPTIONS: { id: BackgroundEffectPattern; label: string; d
   { id: 'dots', label: 'Dots', description: 'A quiet Odysseus-style dotted field.' },
   { id: 'synapse', label: 'Synapse', description: 'Grid pulses inspired by the Odysseus synapse background.' },
   { id: 'rain', label: 'Rain', description: 'Thin falling streaks with adjustable intensity.' },
+  { id: 'warp', label: 'Warp', description: 'Streaks fly outward from center, like jumping to hyperspace.' },
   { id: 'constellations', label: 'Constellations', description: 'Floating nodes with subtle connective lines.' },
   { id: 'perlin-flow', label: 'Perlin Flow', description: 'Soft drifting particle streams.' },
   { id: 'petals', label: 'Petals', description: 'Gentle falling petal shapes.' },
@@ -338,6 +339,9 @@ function getEffectPreviewBackground(pattern: BackgroundEffectPattern, color: str
   }
   if (pattern === 'rain') {
     return `repeating-linear-gradient(100deg, transparent 0 18px, ${color}33 19px, transparent 21px), linear-gradient(135deg, ${color}10, transparent 58%, ${color}16)`;
+  }
+  if (pattern === 'warp') {
+    return `linear-gradient(115deg, transparent 46%, ${color}45 50%, transparent 54%), linear-gradient(65deg, transparent 42%, ${color}30 50%, transparent 58%), linear-gradient(155deg, transparent 44%, ${color}38 50%, transparent 56%), radial-gradient(circle at 50% 50%, ${color}70 0, ${color}20 12%, transparent 40%)`;
   }
   if (pattern === 'constellations') {
     return `radial-gradient(circle at 22% 26%, ${color}44 0, transparent 8%), radial-gradient(circle at 70% 36%, ${color}33 0, transparent 7%), radial-gradient(circle at 46% 68%, ${color}2c 0, transparent 6%), linear-gradient(135deg, ${color}12, transparent 55%, ${color}18)`;

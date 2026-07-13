@@ -303,7 +303,7 @@ export interface CustomAppearanceTheme {
 
 export type AppearanceTypographyTarget = 'interface' | 'headings' | 'body' | 'controls' | 'navigation' | 'code';
 export type SidebarAccentStyle = 'default' | 'color-chips';
-export type BackgroundEffectPattern = 'none' | 'dots' | 'synapse' | 'rain' | 'constellations' | 'perlin-flow' | 'petals' | 'sparkles' | 'embers' | 'swirls';
+export type BackgroundEffectPattern = 'none' | 'dots' | 'synapse' | 'rain' | 'constellations' | 'perlin-flow' | 'petals' | 'sparkles' | 'embers' | 'swirls' | 'warp';
 
 /** Top-level view/page the user can navigate to. */
 export type ViewMode = 'dashboard' | 'workspace' | 'notes' | 'tasks' | 'evidence' | 'products' | 'experimental' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat' | 'caddyassistant' | 'cademail' | 'calendarcaddy' | 'caddyshack' | 'agent' | 'investigations' | 'reports' | 'virtualcaddy' | 'netmap' | 'journal';
