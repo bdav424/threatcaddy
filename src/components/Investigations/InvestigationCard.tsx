@@ -189,6 +189,7 @@ export function InvestigationCard({
   return (
     <button
       onClick={() => onOpen(folderId)}
+      data-tlp={effectiveClsLevel || undefined}
       className={cn(
         'relative w-full text-start rounded-lg border transition-all duration-200 cursor-pointer',
         'hover:scale-[1.01] hover:shadow-lg',
@@ -199,7 +200,7 @@ export function InvestigationCard({
       style={{
         ...(active
           ? { border: `1.5px solid ${tlpOutlineColor}` }
-          : { boxShadow: `inset 0 3px 0 0 ${tlpOutlineColor}` }),
+          : { boxShadow: `inset 0 3px 0 0 ${tlpOutlineColor}, inset 0 -3px 0 0 ${tlpOutlineColor}` }),
         ...(cardBgTint ? { backgroundColor: cardBgTint } : {}),
       }}
     >

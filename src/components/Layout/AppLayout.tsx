@@ -106,6 +106,7 @@ export function AppLayout({
           Frosted panels catch them via their existing backdrop-filter, so the
           highlight sweeps across a panel as it scrolls through the streak. */}
       <div className="app-window-sheen" aria-hidden="true" />
+      <div className="app-window-chrome-ring" aria-hidden="true" />
       {header}
       <div className="app-window-frame relative z-20 flex flex-1 overflow-hidden min-h-0">
         <div className="app-window-sidebar hidden md:block shrink-0">

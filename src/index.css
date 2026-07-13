@@ -44,6 +44,17 @@
   --tc-panel-bg-rgb: 240, 238, 248;
 }
 
+/* Dark-mode counterpart to .light's --tc-panel-bg-rgb above. This used to live
+   inside the giant :root block further down instead — same specificity as
+   .light (both single class-ish selectors), but :root's declaration came
+   *later* in the file, so it silently won the cascade even while `.light` was
+   active, and every frosted panel in light mode tinted dark navy underneath
+   its own light theme. Keeping both light/dark values for this token next to
+   each other, like --color-bg-deep etc. already are, avoids repeating that. */
+.dark {
+  --tc-panel-bg-rgb: 10, 12, 20;
+}
+
 /* ─── CaddyShack semantic tokens (dark) ─── */
 :root {
   --tc-font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -64,7 +75,6 @@
   --tc-window-ambient-opacity: 1;
   --tc-window-frost-strength: 0;
   --tc-panel-glass-border: var(--color-border-medium);
-  --tc-panel-bg-rgb: 10, 12, 20;
   --tc-panel-glass-opacity: 0.3;
   --tc-panel-glass-blur: 0px;
   --tc-control-popup-bg: var(--color-bg-raised);
@@ -789,7 +799,12 @@ body.tc-desktop-shell-body {
 [class*="bg-bg-deep"],
 [class*="bg-bg-primary"],
 [class*="bg-bg-surface"],
-[class*="bg-bg-raised"] {
+[class*="bg-bg-raised"],
+[class*="bg-bg-hover"],
+[class*="bg-bg-active"],
+[class*="bg-bg-base"],
+[class*="--color-surface"],
+[class*="--color-input-bg"] {
   background-color: rgba(var(--tc-panel-bg-rgb, 10, 12, 20), var(--tc-panel-glass-opacity, 0.3)) !important;
 }
 
@@ -809,7 +824,12 @@ body.tc-desktop-shell-body {
 .has-panel-glass [class*="bg-bg-deep"],
 .has-panel-glass [class*="bg-bg-primary"],
 .has-panel-glass [class*="bg-bg-surface"],
-.has-panel-glass [class*="bg-bg-raised"] {
+.has-panel-glass [class*="bg-bg-raised"],
+.has-panel-glass [class*="bg-bg-hover"],
+.has-panel-glass [class*="bg-bg-active"],
+.has-panel-glass [class*="bg-bg-base"],
+.has-panel-glass [class*="--color-surface"],
+.has-panel-glass [class*="--color-input-bg"] {
   border-color: var(--tc-panel-glass-border) !important;
 }
 
@@ -826,7 +846,12 @@ body.tc-desktop-shell-body {
 .has-panel-glass [class*="bg-bg-deep"],
 .has-panel-glass [class*="bg-bg-primary"],
 .has-panel-glass [class*="bg-bg-surface"],
-.has-panel-glass [class*="bg-bg-raised"] {
+.has-panel-glass [class*="bg-bg-raised"],
+.has-panel-glass [class*="bg-bg-hover"],
+.has-panel-glass [class*="bg-bg-active"],
+.has-panel-glass [class*="bg-bg-base"],
+.has-panel-glass [class*="--color-surface"],
+.has-panel-glass [class*="--color-input-bg"] {
   backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%);
   -webkit-backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%);
 }
@@ -854,7 +879,12 @@ body.tc-desktop-shell-body {
 .has-panel-glass [class*="bg-bg-deep"],
 .has-panel-glass [class*="bg-bg-primary"],
 .has-panel-glass [class*="bg-bg-surface"],
-.has-panel-glass [class*="bg-bg-raised"] {
+.has-panel-glass [class*="bg-bg-raised"],
+.has-panel-glass [class*="bg-bg-hover"],
+.has-panel-glass [class*="bg-bg-active"],
+.has-panel-glass [class*="bg-bg-base"],
+.has-panel-glass [class*="--color-surface"],
+.has-panel-glass [class*="--color-input-bg"] {
   background-image:
     url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PGZpbHRlciBpZD0ibiI+PGZlVHVyYnVsZW5jZSB0eXBlPSJmcmFjdGFsTm9pc2UiIGJhc2VGcmVxdWVuY3k9IjAuODUiIG51bU9jdGF2ZXM9IjIiIHN0aXRjaFRpbGVzPSJzdGl0Y2giLz48ZmVDb2xvck1hdHJpeCB0eXBlPSJtYXRyaXgiIHZhbHVlcz0iMCAwIDAgMCAxICAwIDAgMCAwIDEgIDAgMCAwIDAgMSAgMCAwIDAgMC4wNSAwIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI24pIi8+PC9zdmc+") !important;
   background-repeat: repeat !important;
@@ -928,7 +958,12 @@ body.tc-desktop-shell-body {
 .light.has-panel-glass [class*="bg-bg-deep"],
 .light.has-panel-glass [class*="bg-bg-primary"],
 .light.has-panel-glass [class*="bg-bg-surface"],
-.light.has-panel-glass [class*="bg-bg-raised"] {
+.light.has-panel-glass [class*="bg-bg-raised"],
+.light.has-panel-glass [class*="bg-bg-hover"],
+.light.has-panel-glass [class*="bg-bg-active"],
+.light.has-panel-glass [class*="bg-bg-base"],
+.light.has-panel-glass [class*="--color-surface"],
+.light.has-panel-glass [class*="--color-input-bg"] {
   box-shadow: inset 0 0 0 9999px rgba(0, 0, 0, 0.10) !important;
 }
 
@@ -1810,8 +1845,16 @@ body.tc-desktop-shell-body {
   to { --tc-rgb-angle: 360deg; }
 }
 
-/* Fallback positioning context (also set inline via `relative` Tailwind class). */
-.has-rgb-borders .rgb-border {
+/* Fallback positioning context for elements that don't already manage their
+   own — NOT a specificity fallback (see the long explainer on the per-panel
+   :where() rule further down for why: Tailwind's utilities live in
+   `@layer utilities`, this stylesheet is unlayered, and an unlayered rule
+   beats a layered one regardless of specificity). Floating WorkspacePanels
+   carry both `.rgb-border` and Tailwind's `.fixed` — without this exclusion,
+   this rule silently downgraded them to `position: relative`, corrupting
+   their viewport-coordinate `left`/`top` inline styles into flow-relative
+   offsets and rendering them in the wrong place, effectively unusable. */
+.has-rgb-borders .rgb-border:not(.fixed, .absolute, .sticky) {
   position: relative;
 }
 
@@ -1825,7 +1868,13 @@ body.tc-desktop-shell-body {
   pointer-events: none;
   z-index: 10;
   padding: 1.5px;
+  /* Interpolating in OKLCH (perceptually uniform) instead of the default sRGB
+     space is what actually matters here — sRGB interpolation between hue-spaced
+     hsl() stops speeds through some hue ranges and crawls through others, which
+     reads as hard "seams" at yellow/cyan/blue and a smooth stretch through green.
+     OKLCH interpolation moves through hue at a constant perceptual rate. */
   background: conic-gradient(
+    in oklch,
     from var(--tc-rgb-angle, 0deg),
     hsl(0, 100%, 65%),
     hsl(60, 100%, 65%),
@@ -1835,14 +1884,21 @@ body.tc-desktop-shell-body {
     hsl(300, 100%, 65%),
     hsl(360, 100%, 65%)
   );
+  /* Punches a content-box hole out of the padding-box fill so only the ring
+     remains. IMPORTANT: do not also declare a `-webkit-mask: <shorthand>`
+     here — in current Chromium `-webkit-mask` is the same underlying
+     property as `mask`, so re-declaring the shorthand resets mask-composite
+     back to its `add` default, and `xor` is not a legal value for the
+     unprefixed property (the old WebKit composite keyword set), so a
+     trailing `-webkit-mask-composite: xor` silently fails to parse and
+     never restores it. Net effect: the "ring" renders as a solid filled
+     shape, not a border — this shipped broken for a while before. One
+     `mask` shorthand + one `mask-composite: exclude` is correct and
+     sufficient in current engines. */
   mask:
     linear-gradient(#fff 0 0) content-box,
     linear-gradient(#fff 0 0);
   mask-composite: exclude;
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
   animation: tc-rgb-rotate var(--tc-rgb-speed, 3s) linear infinite;
 }
 
@@ -1857,6 +1913,186 @@ body.tc-desktop-shell-body {
 
 @media (prefers-reduced-motion: reduce) {
   .rgb-ring {
+    animation: none;
+  }
+}
+
+/* ─── App chrome ring ──────────────────────────────────────────────────────
+   The Settings toggle promises "Animate app chrome border hue," but .rgb-ring
+   above is only wired into WorkspacePanel — a specific dockable-panel feature
+   most sessions never open. A user on Notes/Tasks/Dashboard (the common case)
+   would enable the toggle and see nothing. This ring outlines the whole app
+   window instead, so the effect is visible regardless of which view is open.
+
+   position:fixed sidesteps the earlier z-index/overflow-hidden clipping bug
+   entirely — its containing block is the viewport, not app-window-shell
+   (which is overflow-hidden), so there is no ancestor box to be clipped by. */
+.app-window-chrome-ring {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  padding: 2px;
+  opacity: 0;
+  /* Interpolating in OKLCH (perceptually uniform) instead of the default sRGB
+     space is what actually matters here — sRGB interpolation between hue-spaced
+     hsl() stops speeds through some hue ranges and crawls through others, which
+     reads as hard "seams" at yellow/cyan/blue and a smooth stretch through green.
+     OKLCH interpolation moves through hue at a constant perceptual rate. */
+  background: conic-gradient(
+    in oklch,
+    from var(--tc-rgb-angle, 0deg),
+    hsl(0, 100%, 65%),
+    hsl(60, 100%, 65%),
+    hsl(120, 100%, 65%),
+    hsl(180, 100%, 65%),
+    hsl(240, 100%, 65%),
+    hsl(300, 100%, 65%),
+    hsl(360, 100%, 65%)
+  );
+  /* See the .rgb-ring comment above: one mask shorthand + mask-composite,
+     no redundant -webkit-mask shorthand or invalid `xor` value. */
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: tc-rgb-rotate var(--tc-rgb-speed, 3s) linear infinite;
+}
+
+.has-rgb-borders .app-window-chrome-ring {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-window-chrome-ring {
+    animation: none;
+  }
+}
+
+/* ─── Per-panel RGB rings (morale/fun feature — "most panels if possible") ───
+   Reuses the exact class list the frost-coverage fix above targets (same
+   bg-gray-900/800/700 + bg-bg-* panel surfaces), so anywhere a panel gets
+   frosted it also gets a ring — one shared notion of "this is a panel."
+   ::before instead of a rendered sibling <span>: these are 150+ plain divs
+   with no shared wrapper component, so a CSS-only approach that needs zero
+   JSX changes is the only one that scales. inset:0 (not the -1.5px used by
+   .rgb-ring) means the ring sits ON the box edge rather than outside it, so
+   overflow:hidden panels don't clip it — no overflow-visible opt-in needed.
+
+   `position: relative` is forced via :where() so it only fills in `position`
+   for the (default: static) elements that don't already manage their own —
+   NOT because :where()'s zero specificity loses to a Tailwind utility class.
+   It doesn't: `@import "tailwindcss"` puts Tailwind's utilities inside
+   `@layer utilities`, and this stylesheet's custom rules are unlayered.
+   Per the cascade-layers spec, ANY unlayered rule beats ANY layered rule
+   regardless of specificity — so an unlayered zero-specificity :where() still
+   overrides a layered `.fixed { position: fixed }`. That silently downgraded
+   floating WorkspacePanels (which are `.fixed` + inline `left`/`top` in
+   viewport coordinates) to `position: relative`, turning `left`/`top` into an
+   offset from wherever the panel landed in normal flow instead of a viewport
+   coordinate — panels rendered off in the wrong place, effectively immovable
+   and impossible to find. `.fixed`/`.absolute`/`.sticky` elements already are
+   a positioning context on their own, so the exclusion below costs nothing —
+   the ::before ring rule further down still applies to them.
+
+   Interactive chrome (buttons, links, form controls) is excluded so this
+   doesn't paint a spinning ring on every small badge/pill — "most panels",
+   not "most elements". TLP/status-classification exclusion is load-bearing,
+   same as .rgb-ring above: color is data in this app. */
+:where(
+  .has-rgb-borders .bg-gray-900,
+  .has-rgb-borders .bg-gray-900\/80,
+  .has-rgb-borders .bg-gray-900\/50,
+  .has-rgb-borders .bg-gray-900\/40,
+  .has-rgb-borders .bg-gray-900\/30,
+  .has-rgb-borders .bg-gray-800,
+  .has-rgb-borders .bg-gray-800\/60,
+  .has-rgb-borders .bg-gray-800\/50,
+  .has-rgb-borders .bg-gray-800\/40,
+  .has-rgb-borders .bg-gray-700,
+  .has-rgb-borders .bg-gray-700\/50,
+  .has-rgb-borders .bg-gray-700\/30,
+  .has-rgb-borders .sidebar-glass,
+  .has-rgb-borders [class*="bg-bg-deep"],
+  .has-rgb-borders [class*="bg-bg-primary"],
+  .has-rgb-borders [class*="bg-bg-surface"],
+  .has-rgb-borders [class*="bg-bg-raised"],
+  .has-rgb-borders [class*="bg-bg-hover"],
+  .has-rgb-borders [class*="bg-bg-active"],
+  .has-rgb-borders [class*="bg-bg-base"],
+  .has-rgb-borders [class*="--color-surface"],
+  .has-rgb-borders [class*="--color-input-bg"]
+):not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status], .fixed, .absolute, .sticky) {
+  position: relative;
+}
+
+.has-rgb-borders .bg-gray-900:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-900\/80:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-900\/50:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-900\/40:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-900\/30:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-800:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-800\/60:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-800\/50:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-800\/40:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-700:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-700\/50:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .bg-gray-700\/30:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders .sidebar-glass:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders [class*="bg-bg-deep"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders [class*="bg-bg-primary"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders [class*="bg-bg-surface"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders [class*="bg-bg-raised"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders [class*="bg-bg-hover"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders [class*="bg-bg-active"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders [class*="bg-bg-base"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders [class*="--color-surface"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before,
+.has-rgb-borders [class*="--color-input-bg"]:not(input, select, textarea, [class*="tlp-"], [data-tlp], [data-investigation-status])::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+  padding: 1px;
+  /* Interpolating in OKLCH (perceptually uniform) instead of the default sRGB
+     space is what actually matters here — sRGB interpolation between hue-spaced
+     hsl() stops speeds through some hue ranges and crawls through others, which
+     reads as hard "seams" at yellow/cyan/blue and a smooth stretch through green.
+     OKLCH interpolation moves through hue at a constant perceptual rate. */
+  background: conic-gradient(
+    in oklch,
+    from var(--tc-rgb-angle, 0deg),
+    hsl(0, 100%, 65%),
+    hsl(60, 100%, 65%),
+    hsl(120, 100%, 65%),
+    hsl(180, 100%, 65%),
+    hsl(240, 100%, 65%),
+    hsl(300, 100%, 65%),
+    hsl(360, 100%, 65%)
+  );
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: tc-rgb-rotate var(--tc-rgb-speed, 3s) linear infinite;
+  opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .has-rgb-borders .bg-gray-900::before,
+  .has-rgb-borders .bg-gray-800::before,
+  .has-rgb-borders .bg-gray-700::before,
+  .has-rgb-borders .sidebar-glass::before,
+  .has-rgb-borders [class*="bg-bg-deep"]::before,
+  .has-rgb-borders [class*="bg-bg-primary"]::before,
+  .has-rgb-borders [class*="bg-bg-surface"]::before,
+  .has-rgb-borders [class*="bg-bg-raised"]::before,
+  .has-rgb-borders [class*="bg-bg-hover"]::before,
+  .has-rgb-borders [class*="bg-bg-active"]::before,
+  .has-rgb-borders [class*="bg-bg-base"]::before,
+  .has-rgb-borders [class*="--color-surface"]::before,
+  .has-rgb-borders [class*="--color-input-bg"]::before {
     animation: none;
   }
 }
