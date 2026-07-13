@@ -292,7 +292,6 @@ samp,
   border-color: rgba(255, 255, 255, 0.28) !important;
   color: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 /* Light mode: blue glass tinge */
 .light .tlp-clear-badge {
@@ -300,7 +299,6 @@ samp,
   border-color: rgba(80, 100, 180, 0.35) !important;
   color: rgba(40, 55, 120, 0.9);
   backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
 /* ─── Appearance token bridge for existing Tailwind utility surfaces ─── */
@@ -488,7 +486,6 @@ body.tc-desktop-shell-body {
   overflow: hidden;
   background: var(--tc-desktop-header-bg-dark) !important;
   backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
 }
 
 .tc-desktop-shell.light .app-window-titlebar {
@@ -540,7 +537,6 @@ body.tc-desktop-shell-body {
 
 .has-window-blur.has-window-glass:not(.tc-desktop-shell) .app-window-shell {
   backdrop-filter: blur(calc(var(--tc-window-blur) * 0.55)) saturate(150%);
-  -webkit-backdrop-filter: blur(calc(var(--tc-window-blur) * 0.55)) saturate(150%);
 }
 
 .has-window-glass.light .app-window-shell {
@@ -554,7 +550,6 @@ body.tc-desktop-shell-body {
 .tc-desktop-shell.has-window-glass .app-window-shell,
 .tc-desktop-shell.has-window-glass.light .app-window-shell {
   backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 .tc-desktop-shell .app-window-shell::after {
@@ -598,7 +593,6 @@ body.tc-desktop-shell-body {
   background: var(--tc-desktop-main-bg-dark);
   box-shadow: none;
   backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 .tc-desktop-shell.has-window-glass.light .app-window-frame {
@@ -646,7 +640,6 @@ body.tc-desktop-shell-body {
 .tc-desktop-shell.has-window-glass .app-window-shell,
 .tc-desktop-shell.has-window-glass .app-window-frame {
   backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
 }
 
 .has-window-glass .app-window-frame {
@@ -661,7 +654,6 @@ body.tc-desktop-shell-body {
 
 .has-window-blur.has-window-glass:not(.tc-desktop-shell) .app-window-frame {
   backdrop-filter: blur(calc(var(--tc-window-blur) * 0.7)) saturate(155%);
-  -webkit-backdrop-filter: blur(calc(var(--tc-window-blur) * 0.7)) saturate(155%);
 }
 
 .has-window-glass.light .app-window-frame {
@@ -724,7 +716,6 @@ body.tc-desktop-shell-body {
 
 .has-window-blur.has-window-glass:not(.tc-desktop-shell) .bg-gray-900 {
   backdrop-filter: blur(calc(var(--tc-window-blur) * 0.45)) saturate(140%);
-  -webkit-backdrop-filter: blur(calc(var(--tc-window-blur) * 0.45)) saturate(140%);
 }
 
 .has-bg-image .bg-gray-900\/50 {
@@ -750,7 +741,6 @@ body.tc-desktop-shell-body {
 .has-window-blur.has-window-glass:not(.tc-desktop-shell) .bg-gray-800\/50,
 .has-window-blur.has-window-glass:not(.tc-desktop-shell) .bg-gray-800\/40 {
   backdrop-filter: blur(calc(var(--tc-window-blur) * 0.4)) saturate(135%);
-  -webkit-backdrop-filter: blur(calc(var(--tc-window-blur) * 0.4)) saturate(135%);
 }
 
 .has-window-glass .bg-gray-800,
@@ -773,7 +763,6 @@ body.tc-desktop-shell-body {
 
 .has-window-blur.has-window-glass:not(.tc-desktop-shell) .sidebar-glass {
   backdrop-filter: blur(calc(var(--tc-window-blur) * 0.9)) saturate(155%) !important;
-  -webkit-backdrop-filter: blur(calc(var(--tc-window-blur) * 0.9)) saturate(155%) !important;
 }
 
 .has-bg-image.light body,
@@ -833,6 +822,19 @@ body.tc-desktop-shell-body {
   border-color: var(--tc-panel-glass-border) !important;
 }
 
+/* Deliberately no `-webkit-backdrop-filter` twin here (or anywhere else this
+   file uses backdrop-filter) — this was the actual bug behind "frost doesn't
+   affect main-area cards". This rule's selector list is byte-identical to the
+   grain rule below it, so the build's CSS minifier merges the two source
+   rules into one. When the source had both `backdrop-filter: X;` and
+   `-webkit-backdrop-filter: X;`, the minifier's duplicate-declaration
+   dedup kept only the LAST-declared one (the -webkit- spelling) and dropped
+   the standard property from the merged rule. In current Chromium
+   `-webkit-backdrop-filter` alone is NOT an alias for `backdrop-filter` (unlike
+   `-webkit-mask`/`mask`, see the ring comment above) — it's inert on its own,
+   so every element matching this selector rendered with backdrop-filter:
+   none, opacity/grain still visible, blur silently missing. Standard property
+   only, full stop. */
 .has-panel-glass .bg-gray-900,
 .has-panel-glass .bg-gray-900\/80,
 .has-panel-glass .bg-gray-900\/50,
@@ -853,7 +855,6 @@ body.tc-desktop-shell-body {
 .has-panel-glass [class*="--color-surface"],
 .has-panel-glass [class*="--color-input-bg"] {
   backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%);
-  -webkit-backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%);
 }
 
 /* Frosted glass: GRAIN only (etched-glass surface texture). The specular SHEEN
@@ -1303,13 +1304,11 @@ body.tc-desktop-shell-body {
    backdrop-filter with nothing behind it to blur, rendering as a flat panel. */
 .sidebar-glass {
   backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
   background: color-mix(in srgb, var(--color-bg-surface) 92%, transparent);
 }
 
 .tc-desktop-shell .sidebar-glass {
   backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 .light .sidebar-glass {
@@ -1872,16 +1871,24 @@ body.tc-desktop-shell-body {
      space is what actually matters here — sRGB interpolation between hue-spaced
      hsl() stops speeds through some hue ranges and crawls through others, which
      reads as hard "seams" at yellow/cyan/blue and a smooth stretch through green.
-     OKLCH interpolation moves through hue at a constant perceptual rate. */
-  background: conic-gradient(
+     OKLCH interpolation moves through hue at a constant perceptual rate.
+
+     repeating-conic-gradient, not conic-gradient: the stops below define ONE
+     hue cycle spanning 100%/var(--tc-rgb-repeats) of the ring (100% = 360deg
+     for a conic gradient), and repeating-conic-gradient tiles that pattern
+     around the remaining circle automatically. --tc-rgb-repeats is set by
+     the Settings "Repeats" slider; previously nothing in this file actually
+     read that variable, so the ring always rendered exactly one rainbow lap
+     no matter what the slider said. */
+  background: repeating-conic-gradient(
     in oklch from var(--tc-rgb-angle, 0deg),
-    hsl(0, 100%, 65%),
-    hsl(60, 100%, 65%),
-    hsl(120, 100%, 65%),
-    hsl(180, 100%, 65%),
-    hsl(240, 100%, 65%),
-    hsl(300, 100%, 65%),
-    hsl(360, 100%, 65%)
+    hsl(0, 100%, 65%) 0%,
+    hsl(60, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 1),
+    hsl(120, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 2),
+    hsl(180, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 3),
+    hsl(240, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 4),
+    hsl(300, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 5),
+    hsl(360, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1))
   );
   /* Punches a content-box hole out of the padding-box fill so only the ring
      remains. IMPORTANT: do not also declare a `-webkit-mask: <shorthand>`
@@ -1937,16 +1944,24 @@ body.tc-desktop-shell-body {
      space is what actually matters here — sRGB interpolation between hue-spaced
      hsl() stops speeds through some hue ranges and crawls through others, which
      reads as hard "seams" at yellow/cyan/blue and a smooth stretch through green.
-     OKLCH interpolation moves through hue at a constant perceptual rate. */
-  background: conic-gradient(
+     OKLCH interpolation moves through hue at a constant perceptual rate.
+
+     repeating-conic-gradient, not conic-gradient: the stops below define ONE
+     hue cycle spanning 100%/var(--tc-rgb-repeats) of the ring (100% = 360deg
+     for a conic gradient), and repeating-conic-gradient tiles that pattern
+     around the remaining circle automatically. --tc-rgb-repeats is set by
+     the Settings "Repeats" slider; previously nothing in this file actually
+     read that variable, so the ring always rendered exactly one rainbow lap
+     no matter what the slider said. */
+  background: repeating-conic-gradient(
     in oklch from var(--tc-rgb-angle, 0deg),
-    hsl(0, 100%, 65%),
-    hsl(60, 100%, 65%),
-    hsl(120, 100%, 65%),
-    hsl(180, 100%, 65%),
-    hsl(240, 100%, 65%),
-    hsl(300, 100%, 65%),
-    hsl(360, 100%, 65%)
+    hsl(0, 100%, 65%) 0%,
+    hsl(60, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 1),
+    hsl(120, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 2),
+    hsl(180, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 3),
+    hsl(240, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 4),
+    hsl(300, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 5),
+    hsl(360, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1))
   );
   /* See the .rgb-ring comment above: one mask shorthand + mask-composite,
      no redundant -webkit-mask shorthand or invalid `xor` value. */
@@ -2057,16 +2072,24 @@ body.tc-desktop-shell-body {
      space is what actually matters here — sRGB interpolation between hue-spaced
      hsl() stops speeds through some hue ranges and crawls through others, which
      reads as hard "seams" at yellow/cyan/blue and a smooth stretch through green.
-     OKLCH interpolation moves through hue at a constant perceptual rate. */
-  background: conic-gradient(
+     OKLCH interpolation moves through hue at a constant perceptual rate.
+
+     repeating-conic-gradient, not conic-gradient: the stops below define ONE
+     hue cycle spanning 100%/var(--tc-rgb-repeats) of the ring (100% = 360deg
+     for a conic gradient), and repeating-conic-gradient tiles that pattern
+     around the remaining circle automatically. --tc-rgb-repeats is set by
+     the Settings "Repeats" slider; previously nothing in this file actually
+     read that variable, so the ring always rendered exactly one rainbow lap
+     no matter what the slider said. */
+  background: repeating-conic-gradient(
     in oklch from var(--tc-rgb-angle, 0deg),
-    hsl(0, 100%, 65%),
-    hsl(60, 100%, 65%),
-    hsl(120, 100%, 65%),
-    hsl(180, 100%, 65%),
-    hsl(240, 100%, 65%),
-    hsl(300, 100%, 65%),
-    hsl(360, 100%, 65%)
+    hsl(0, 100%, 65%) 0%,
+    hsl(60, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 1),
+    hsl(120, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 2),
+    hsl(180, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 3),
+    hsl(240, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 4),
+    hsl(300, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 5),
+    hsl(360, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1))
   );
   mask:
     linear-gradient(#fff 0 0) content-box,

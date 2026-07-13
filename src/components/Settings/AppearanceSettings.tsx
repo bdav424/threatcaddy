@@ -2119,14 +2119,22 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
                     min={1}
                     max={6}
                     step={0.5}
-                    value={settings.rgbSpeed ?? 3}
+                    // The stored value is a duration in seconds (1s = fastest, 6s =
+                    // slowest), but the "Slow" label sits on the left and "Fast" on
+                    // the right. Rather than flip the track with `direction: rtl`
+                    // (which also flips the native fill color, making this one
+                    // slider's progress bar render backwards relative to every other
+                    // slider in this panel), invert the mapping instead: the visible
+                    // handle position runs low(left)->high(right) like a normal LTR
+                    // slider, and only the underlying seconds value is inverted.
+                    value={7 - (settings.rgbSpeed ?? 3)}
                     onChange={(e) => {
-                      const val = parseFloat(e.target.value);
+                      const raw = parseFloat(e.target.value);
+                      const val = 7 - raw;
                       document.documentElement.style.setProperty('--tc-rgb-speed', `${val}s`);
                       onUpdateSettings({ rgbSpeed: val });
                     }}
                     className="w-full accent-accent"
-                    style={{ direction: 'rtl' }}
                   />
                 </div>
                 {/* Repeats slider: 1–8 full spectrums around the ring */}
