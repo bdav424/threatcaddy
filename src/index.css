@@ -1874,8 +1874,7 @@ body.tc-desktop-shell-body {
      reads as hard "seams" at yellow/cyan/blue and a smooth stretch through green.
      OKLCH interpolation moves through hue at a constant perceptual rate. */
   background: conic-gradient(
-    in oklch,
-    from var(--tc-rgb-angle, 0deg),
+    in oklch from var(--tc-rgb-angle, 0deg),
     hsl(0, 100%, 65%),
     hsl(60, 100%, 65%),
     hsl(120, 100%, 65%),
@@ -1940,8 +1939,7 @@ body.tc-desktop-shell-body {
      reads as hard "seams" at yellow/cyan/blue and a smooth stretch through green.
      OKLCH interpolation moves through hue at a constant perceptual rate. */
   background: conic-gradient(
-    in oklch,
-    from var(--tc-rgb-angle, 0deg),
+    in oklch from var(--tc-rgb-angle, 0deg),
     hsl(0, 100%, 65%),
     hsl(60, 100%, 65%),
     hsl(120, 100%, 65%),
@@ -2061,8 +2059,7 @@ body.tc-desktop-shell-body {
      reads as hard "seams" at yellow/cyan/blue and a smooth stretch through green.
      OKLCH interpolation moves through hue at a constant perceptual rate. */
   background: conic-gradient(
-    in oklch,
-    from var(--tc-rgb-angle, 0deg),
+    in oklch from var(--tc-rgb-angle, 0deg),
     hsl(0, 100%, 65%),
     hsl(60, 100%, 65%),
     hsl(120, 100%, 65%),
