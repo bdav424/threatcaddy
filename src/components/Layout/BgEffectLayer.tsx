@@ -22,9 +22,6 @@ type MovingPoint = {
   vy: number;
   radius: number;
   twinkle: number;
-  emberSpark: boolean;
-  emberSides: number;
-  emberRot: number;
   /** Per-particle glow-sprite alpha 0–1. Patterns set this each frame; 1 = full halo. */
   glowA: number;
   /** Per-particle glow-sprite radius multiplier. 1 = the sprite's natural size. */
@@ -33,6 +30,8 @@ type MovingPoint = {
   emberLife: number;
   /** Fuel 0.15–1.0. Skewed dim via cubic distribution — most embers are cooling, occasional bright sparks. */
   emberFuel: number;
+  /** Remaining fast burnout fade in ms, 0 = alive or fully dead. Set once emberLife hits 0. */
+  emberFadeMs: number;
   /** Ring buffer: interleaved [x0, y0, x1, y1, ...] of past positions. */
   history: Float32Array;
   /** Next write slot (mod TRAIL_MAX_POSITIONS). */
@@ -128,15 +127,13 @@ function createPoints(width: number, height: number, scale: number, density: num
     vy: (Math.random() - 0.5) * 0.18 * scale,
     radius: (1.2 + Math.random() * 2.6) * scale,
     twinkle: Math.random() * Math.PI * 2,
-    emberSpark: Math.random() < 0.2,
-    emberSides: 3 + Math.floor(Math.random() * 3),
-    emberRot: Math.random() * Math.PI * 2,
     // Staggered so embers don't all ignite and die in lockstep.
     glowA: 1,
     glowR: 1,
     emberLife: Math.random(),
     // Cubic distribution: most embers are dim (cooling), rare bright sparks near 1.0.
     emberFuel: 0.15 + Math.pow(Math.random(), 3) * 0.85,
+    emberFadeMs: 0,
     history: new Float32Array(TRAIL_MAX_POSITIONS * 2),
     histHead: 0,
     histLen: 0,
@@ -749,110 +746,118 @@ export function BgEffectLayer({
       }
     };
 
+    // Fixed real-time burnout window (not a fraction of the variable lifespan) —
+    // an ember holds its glow at a near-constant level, then cuts out over this
+    // many milliseconds once its fuel is spent. ~1/8s reads as a snap, not a fade.
+    const EMBER_FADE_MS = 130;
+
     const drawEmbers = (dt: number) => {
+      const frameMs = dt * (1000 / 60);
       // At lower intensity fewer particles spread out — compensate with slightly larger radius.
       const emberSizeFactor = 1.0 + (1.0 - alphaBase) * 0.5;
+      // Size maps 0–1 across the createPoints radius range (1.2–3.8 × scale) — bigger
+      // embers both climb higher and burn brighter; smaller ones stay low.
       for (const point of points) {
+        const sizeFrac = clamp((point.radius / scale - 1.2) / 2.6, 0, 1);
+
+        // ── Death fade: fixed-duration snap-out, independent of drainRate/fuel ──
+        if (point.emberFadeMs > 0) {
+          point.emberFadeMs = Math.max(0, point.emberFadeMs - frameMs);
+          const fadeT = point.emberFadeMs / EMBER_FADE_MS; // 1 → 0
+
+          // Vortex keeps carrying the ember through its final flicker instead of
+          // freezing it mid-air while it cuts out.
+          point.twinkle += (0.05 + sizeFrac * 0.03) * dt;
+          point.y -= (reducedMotion ? 0.02 : 0.05 + sizeFrac * 0.12) * scale * dt;
+          point.x += Math.cos(point.twinkle) * 0.12 * scale * dt;
+
+          point.glowA = fadeT * (0.65 + sizeFrac * 0.35);
+          point.glowR = (0.5 + sizeFrac * 0.3) * fadeT;
+          const fadeAlpha = alphaBase * 0.55 * fadeT;
+          if (fadeAlpha > 0.004) {
+            pctx.beginPath();
+            pctx.arc(point.x, point.y, Math.max(0.4, point.radius * emberSizeFactor * (0.4 + 0.5 * fadeT)), 0, Math.PI * 2);
+            pctx.fillStyle = rgba(effectColor, fadeAlpha);
+            pctx.fill();
+          }
+
+          if (point.emberFadeMs <= 0) {
+            // Respawn burnt-out embers at the bottom with a fresh lifecycle.
+            point.x = Math.random() * width;
+            point.y = height + 10 + Math.random() * 30;
+            point.emberLife = 0.75 + Math.random() * 0.25;
+            point.emberFuel = 0.15 + Math.pow(Math.random(), 3) * 0.85;
+            point.vx = 0;
+            point.twinkle = Math.random() * Math.PI * 2;
+          }
+          continue;
+        }
+
         // ── Lifecycle drain ──────────────────────────────────────────────────
         // Less fuel → faster burnout. Clamp dt so a tab-hidden burst doesn't
         // incinerate the whole field at once.
         const drainRate = (0.00055 + (1 - point.emberFuel) * 0.0008) * dt;
         point.emberLife = Math.max(0, point.emberLife - drainRate);
 
-        // ── Stochastic abrupt extinction ─────────────────────────────────────
-        // Dim embers have a small per-frame chance of winking out instantly,
-        // simulating sparks that cool and die rather than smoothly fading.
-        if (point.emberFuel < 0.3 && Math.random() < 0.006) {
-          point.emberLife = 0;
-        }
-
-        // Respawn burnt-out embers at the bottom with a fresh lifecycle.
-        if (point.emberLife <= 0) {
-          point.x = Math.random() * width;
-          point.y = height + 10 + Math.random() * 30;
-          point.emberLife = 0.75 + Math.random() * 0.25;
-          // Cubic distribution on respawn matches the initial createPoints distribution.
-          point.emberFuel = 0.15 + Math.pow(Math.random(), 3) * 0.85;
-          point.vx = 0;
-          point.twinkle = Math.random() * Math.PI * 2;
-          point.emberRot = Math.random() * Math.PI * 2;
-        }
-
-        // ── Heat curve ───────────────────────────────────────────────────────
-        // Embers peak brightness in the first half of life, then cool toward ash.
-        // Using a curve rather than linear so the "hot" phase is long and the
-        // dying fade is rapid — matches how real embers look.
-        const heatCurve = point.emberLife < 0.25
-          ? point.emberLife / 0.25          // fast fade to dark at the end
-          : 0.55 + (point.emberLife - 0.25) * (0.45 / 0.75); // sustained glow
-
-        // ── Buoyancy ─────────────────────────────────────────────────────────
-        // Hot embers rise faster; heavier fuel gives more lift (bigger → climbs higher).
-        const riseSpeed = reducedMotion
-          ? 0.04
-          : (0.18 + point.emberFuel * 0.38 + point.radius * 0.06) * scale * (0.4 + heatCurve * 0.6);
-        point.y -= riseSpeed * dt;
-
-        // ── Turbulence ───────────────────────────────────────────────────────
-        // Brownian drift: damp vx each frame then apply a small random kick.
-        // This breaks the sine-wave lockstep while keeping motion bounded.
-        point.twinkle += 0.018 * dt;
-        point.vx = point.vx * 0.85 + (Math.random() - 0.5) * 0.10;
-        point.x += point.vx * scale * dt;
-
-        // ── Shrink on death ──────────────────────────────────────────────────
-        // Visual radius shrinks to zero as heatCurve → 0.
-        const liveRadius = point.radius * (0.25 + 0.75 * heatCurve);
-        const shrink = 0.25 + 0.75 * heatCurve;
-
-        // Flicker: fast sine modulation on top of the heat envelope (~1.75× higher freq).
-        const flicker = 0.6 + ((Math.sin(point.twinkle * 4.0) + 1) / 2) * 0.4;
-        const glow = heatCurve * flicker;
-
-        // S4b: End-of-life fade — smooth out the pop-out when particles expire.
-        // Over the last 12% of life (relative to fuel) the alpha ramps to 0.
-        const lifeRatio = point.emberLife / point.emberFuel;
-        const eolFade = lifeRatio < 0.12 ? lifeRatio / 0.12 : 1.0;
-
-        // S4c: Spawn fade-in over first 5% of life consumed — eliminates pop-in on birth.
-        const spawnProgress = 1.0 - lifeRatio;
-        const spawnFade = spawnProgress < 0.05 ? Math.max(0, spawnProgress) / 0.05 : 1.0;
-
-        // Per-particle glow modulation — set BEFORE the spark continue so sparks
-        // also get a correctly faded halo as they burn out.
-        point.glowA = heatCurve * flicker * eolFade * spawnFade;
-        point.glowR = shrink * (0.55 + point.radius * 0.16);
-
-        const burnAlpha = alphaBase * 0.52 * glow * eolFade * spawnFade;
-        pctx.fillStyle = rgba(effectColor, burnAlpha);
-
-        if (point.emberSpark) {
-          // Tighter core radius (~40% smaller) so the bright dot is a sharp pinpoint.
-          pctx.beginPath();
-          pctx.arc(point.x, point.y, Math.max(0.3, liveRadius * 0.81 * emberSizeFactor), 0, Math.PI * 2);
-          pctx.fill();
+        // Stochastic abrupt extinction: dim embers have a small per-frame chance
+        // of winking out instantly rather than draining all the way to zero.
+        const winkOut = point.emberFuel < 0.3 && Math.random() < 0.006;
+        if (point.emberLife <= 0 || winkOut) {
+          point.emberFadeMs = EMBER_FADE_MS;
           continue;
         }
 
-        // Flake size scaled 3× from original for visible embers; intensity factor adds slight size
-        // boost at lower density so sparse embers remain readable.
-        const flakeSize = liveRadius * 2.88 * emberSizeFactor;
-        const rotation = point.emberRot + point.twinkle * 0.4;
-        pctx.save();
-        pctx.translate(point.x, point.y);
-        pctx.rotate(rotation);
-        pctx.beginPath();
-        for (let side = 0; side < point.emberSides; side += 1) {
-          const angle = (side / point.emberSides) * Math.PI * 2;
-          const r = side % 2 === 0 ? flakeSize : flakeSize * 0.45;
-          const px = Math.cos(angle) * r;
-          const py = Math.sin(angle) * r * 0.55;
-          if (side === 0) pctx.moveTo(px, py);
-          else pctx.lineTo(px, py);
+        // ── Vortex rise ──────────────────────────────────────────────────────
+        // Bigger/hotter embers climb faster and farther; small ones drift lazily
+        // and burn out before gaining much altitude. A tightening spiral (vortex
+        // radius shrinks with height) rides on top of the straight-up buoyancy,
+        // like a heat plume rather than a straight column.
+        // ── Ambient draft ────────────────────────────────────────────────────
+        // A handful of invisible updrafts (reusing the same anchor points
+        // drawSwirls seeds) are spread across the screen. Spin direction is
+        // decided by which side of the nearest draft an ember sits on —
+        // anticlockwise to its left, clockwise to its right — the way smoke
+        // curls around a rising thermal, instead of every ember independently
+        // picking its own random spin. Embers near a draft center also get an
+        // extra upward push, tapering off with distance.
+        let nearestDraft = swirls[0];
+        let nearestDraftDist = Infinity;
+        for (const draft of swirls) {
+          const d = Math.abs(point.x - draft.anchorX);
+          if (d < nearestDraftDist) { nearestDraftDist = d; nearestDraft = draft; }
         }
-        pctx.closePath();
+        const draftPull = clamp(1 - nearestDraftDist / (260 * scale), 0, 1);
+        const spinDir = point.x >= nearestDraft.anchorX ? 1 : -1;
+
+        const riseSpeed = reducedMotion
+          ? 0.03
+          : (0.09 + sizeFrac * 0.5 + point.emberFuel * 0.14 + draftPull * 0.12) * scale;
+        point.y -= riseSpeed * dt;
+
+        point.twinkle += spinDir * (0.014 + sizeFrac * 0.01 + draftPull * 0.02) * dt;
+        const vortexRadius = (2 + sizeFrac * 5) * scale * clamp(point.emberLife * 1.6, 0.15, 1) * (0.5 + draftPull * 0.5);
+        point.vx = point.vx * 0.9 + Math.cos(point.twinkle) * 0.05;
+        point.x += (point.vx + Math.sin(point.twinkle) * 0.05) * vortexRadius * dt;
+
+        // ── Near-constant glow while alive ──────────────────────────────────
+        // The dramatic brightness swing now lives entirely in the death fade
+        // above — while alive the ember just flickers gently, it doesn't ramp
+        // up and back down on its own.
+        const flicker = 0.82 + ((Math.sin(point.twinkle * 4.2) + 1) / 2) * 0.18;
+
+        // Spawn fade-in over the first 6% of life consumed — avoids pop-in.
+        const lifeRatio = point.emberLife / point.emberFuel;
+        const spawnProgress = 1.0 - lifeRatio;
+        const spawnFade = spawnProgress < 0.06 ? Math.max(0, spawnProgress) / 0.06 : 1.0;
+
+        point.glowA = flicker * spawnFade * (0.7 + sizeFrac * 0.3);
+        point.glowR = 0.5 + sizeFrac * 0.4;
+
+        const burnAlpha = alphaBase * 0.5 * flicker * spawnFade * (0.75 + sizeFrac * 0.25);
+        pctx.beginPath();
+        pctx.arc(point.x, point.y, Math.max(0.6, point.radius * emberSizeFactor * (0.55 + sizeFrac * 0.25)), 0, Math.PI * 2);
+        pctx.fillStyle = rgba(effectColor, burnAlpha);
         pctx.fill();
-        pctx.restore();
       }
     };
 

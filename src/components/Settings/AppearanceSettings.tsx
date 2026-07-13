@@ -356,7 +356,7 @@ function getEffectPreviewBackground(pattern: BackgroundEffectPattern, color: str
     return `radial-gradient(circle at 24% 30%, ${color}55 0, transparent 10%), radial-gradient(circle at 60% 44%, ${color}44 0, transparent 8%), radial-gradient(circle at 72% 18%, ${color}30 0, transparent 6%), linear-gradient(135deg, ${color}10, transparent 58%, ${color}16)`;
   }
   if (pattern === 'embers') {
-    return `radial-gradient(circle at 25% 70%, ${color}55 0, transparent 10%), radial-gradient(circle at 68% 38%, ${color}3f 0, transparent 8%), linear-gradient(20deg, ${color}22, transparent 58%)`;
+    return `radial-gradient(circle at 22% 85%, ${color}66 0, transparent 6%), radial-gradient(circle at 38% 58%, ${color}50 0, transparent 5%), radial-gradient(circle at 58% 32%, ${color}38 0, transparent 4%), radial-gradient(circle at 74% 62%, ${color}45 0, transparent 5%), radial-gradient(circle at 86% 22%, ${color}26 0, transparent 4%), linear-gradient(0deg, ${color}20, transparent 65%)`;
   }
   return `radial-gradient(circle at 30% 38%, ${color}32 0, transparent 20%), radial-gradient(circle at 64% 62%, ${color}20 0, transparent 24%), linear-gradient(135deg, ${color}14, transparent 52%, ${color}18)`;
 }
