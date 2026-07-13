@@ -783,10 +783,55 @@ function EdgeIndicator({ activeEdge, snapped = false }: { activeEdge: ResizeEdge
   );
 }
 
-function SharedSeamIndicator({ edge, combined = false }: { edge: ResizeEdge | null; combined?: boolean }) {
-  if (!edge) return null;
+const JUNCTION_GLYPH_POSITION: Record<string, string> = {
+  'top-left': 'left-[-4px] top-[-4px]',
+  'top-right': 'right-[-4px] top-[-4px]',
+  'bottom-left': 'left-[-4px] bottom-[-4px]',
+  'bottom-right': 'right-[-4px] bottom-[-4px]',
+};
+
+/**
+ * A dot (3-way) or crosshair (4-way) stamped at the exact point multiple
+ * panels meet — deliberately not a directional glyph like a T or L, since
+ * that would claim a specific neighbor arrangement we don't have full
+ * topology for. A crosshair is topologically honest for any true 4-way
+ * junction (two boundaries always cross there); a plain dot for 3-way avoids
+ * making that same claim when it isn't earned.
+ */
+function JunctionGlyph({ edge, junctionCount }: { edge: ResizeEdge; junctionCount: number }) {
+  const position = JUNCTION_GLYPH_POSITION[edge];
+  if (!position) return null;
+
+  if (junctionCount >= 4) {
+    return (
+      <span
+        aria-hidden="true"
+        data-resize-junction-glyph="4-way"
+        className={cn('pointer-events-none absolute z-[26] h-2 w-2 animate-[seam-fade-in_150ms_ease-out]', position)}
+      >
+        <span className="absolute left-1/2 top-0 h-full w-[1.5px] -translate-x-1/2 rounded-full bg-white/70" />
+        <span className="absolute left-0 top-1/2 h-[1.5px] w-full -translate-y-1/2 rounded-full bg-white/70" />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      aria-hidden="true"
+      data-resize-junction-glyph="3-way"
+      className={cn('pointer-events-none absolute z-[26] h-[5px] w-[5px] animate-[seam-fade-in_150ms_ease-out] rounded-full bg-white/55', position)}
+    />
+  );
+}
+
+function SharedSeamIndicator({ edge, junctionCount = 0 }: { edge: ResizeEdge | null; junctionCount?: number }) {
+  if (!edge || junctionCount < 2) return null;
   const sides = edgeSides(edge);
-  const bgColor = combined ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.25)';
+  // Brightness escalates with how many panels share this point — a plain
+  // 2-panel seam stays subtle, a 4-way junction reads clearly before the
+  // drag even starts.
+  const alpha = junctionCount >= 4 ? 0.5 : junctionCount === 3 ? 0.38 : 0.25;
+  const bgColor = `rgba(255,255,255,${alpha})`;
 
   return (
     <>
@@ -806,6 +851,7 @@ function SharedSeamIndicator({ edge, combined = false }: { edge: ResizeEdge | nu
           data-resize-seam-side={side}
         />
       ))}
+      {isCorner(edge) && junctionCount >= 3 && <JunctionGlyph edge={edge} junctionCount={junctionCount} />}
     </>
   );
 }
@@ -1089,7 +1135,12 @@ export function WorkspacePanel({
   }, [active, hasEverBeenActive]);
   const [activeResizeEdge, setActiveResizeEdge] = useState<ResizeEdge | null>(null);
   const [activeSharedSeamEdge, setActiveSharedSeamEdge] = useState<ResizeEdge | null>(null);
-  const [resizeCombined, setResizeCombined] = useState(false);
+  // How many panels (including this one) meet at the point being resized —
+  // 0 = no shared neighbor, 2 = a seam shared with one neighbor, 3/4 = a
+  // corner junction shared with two/three neighbors. Drives which glyph
+  // SharedSeamIndicator renders so a 4-way corner reads differently from a
+  // plain 2-panel seam before you even start dragging.
+  const [seamJunctionCount, setSeamJunctionCount] = useState(0);
   const [moveSnapEdge, setMoveSnapEdge] = useState<SeamEdge | null>(null);
   const [bottomSnapNear, setBottomSnapNear] = useState(false);
   const [snapPreview, setSnapPreview] = useState<WorkspaceGridPlacement | null>(null);
@@ -1287,10 +1338,10 @@ export function WorkspacePanel({
       .filter((neighbor) => workspacePanelContext?.getPanel(neighbor.id));
     const zone = getSeamZone(event, edge);
     const seamNeighbors = filterNeighborsByZone(allSeamNeighbors, zone, edge, startGeometry);
-    const isCombined = zone === 'center' && (seamNeighbors.length > 1 || (seamGroup !== null && seamGroup.tiles.length > 1));
+    const junctionCount = seamGroup ? seamGroup.tiles.length + 1 : seamNeighbors.length > 0 ? seamNeighbors.length + 1 : 0;
     setActiveResizeEdge(edge);
     setActiveSharedSeamEdge(seamGroup || seamNeighbors.length > 0 ? edge : null);
-    setResizeCombined(isCombined);
+    setSeamJunctionCount(junctionCount);
     if (!isCorner(edge)) {
       const seamEdge = edge as SeamEdge;
       if (seamNeighbors.length > 0) {
@@ -1365,7 +1416,7 @@ export function WorkspacePanel({
       window.removeEventListener('pointerup', handlePointerUp);
       setActiveResizeEdge(null);
       setActiveSharedSeamEdge(null);
-      setResizeCombined(false);
+      setSeamJunctionCount(0);
       setBottomSnapNear(false);
       if (!isCorner(edge)) {
         const seamEdge = edge as SeamEdge;
@@ -1388,6 +1439,7 @@ export function WorkspacePanel({
     const seamNeighbors = !isCorner(edge) ? sharedResizeNeighbors(id, edge, panelGeometry) : [];
     const isSeam = !!(cornerGroup || seamNeighbors.length > 0);
     setActiveSharedSeamEdge(isSeam ? edge : null);
+    setSeamJunctionCount(cornerGroup ? cornerGroup.tiles.length + 1 : seamNeighbors.length > 0 ? seamNeighbors.length + 1 : 0);
     if (!isCorner(edge)) {
       const seamEdge = edge as SeamEdge;
       seamNeighbors.forEach((n) => workspacePanelContext?.notifySeamEdge(n.id, OPPOSITE_SEAM_EDGE[seamEdge]));
@@ -1405,6 +1457,7 @@ export function WorkspacePanel({
   const clearResizeEdge = (edge: ResizeEdge) => {
     setActiveResizeEdge((current) => current === edge ? null : current);
     setActiveSharedSeamEdge((current) => current === edge ? null : current);
+    if (activeResizeEdge === edge) setSeamJunctionCount(0);
     if (!isCorner(edge)) {
       const seamEdge = edge as SeamEdge;
       sharedResizeNeighbors(id, seamEdge, panelGeometry).forEach((n) => {
@@ -1573,7 +1626,7 @@ export function WorkspacePanel({
             <>
               <MosaicBorderMergeMasks masks={mosaicMergeMasks} />
               <EdgeIndicator activeEdge={snapped && sharedSeamEdge ? null : activeResizeEdge} snapped={snapped} />
-              <SharedSeamIndicator edge={sharedSeamEdge} combined={resizeCombined} />
+              <SharedSeamIndicator edge={sharedSeamEdge} junctionCount={seamJunctionCount} />
               <MoveSnapEdgeIndicator edge={moveSnapEdge} />
               {bottomSnapNear && (
                 <span
@@ -1687,7 +1740,7 @@ export function WorkspacePanel({
             {settings.rgbBorders && <span className="rgb-ring" aria-hidden="true" />}
             <MosaicBorderMergeMasks masks={mosaicMergeMasks} />
             <EdgeIndicator activeEdge={snapped && sharedSeamEdge ? null : activeResizeEdge} snapped={snapped} />
-            <SharedSeamIndicator edge={sharedSeamEdge} combined={resizeCombined} />
+            <SharedSeamIndicator edge={sharedSeamEdge} junctionCount={seamJunctionCount} />
             <MoveSnapEdgeIndicator edge={moveSnapEdge} />
             {resizeHandles.map((handle) => (
               <button
