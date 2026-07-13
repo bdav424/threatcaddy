@@ -189,7 +189,13 @@ const resizeHandles: Array<{ edge: ResizeEdge; label: string; className: string;
 ];
 
 const FLOATING_PANEL_Z_INDEX_FLOOR = 120;
-const SNAPPED_PANEL_Z_INDEX = FLOATING_PANEL_Z_INDEX_FLOOR - 8;
+// Every snapped panel used to share this one constant, so whenever the mosaic
+// math left even a sub-pixel overlap at a shared seam, which panel painted on
+// top was decided by React mount/DOM order — arbitrary and inconsistent (one
+// panel would win against its neighbor on one seam and lose on another).
+// SNAPPED_PANEL_Z_INDEX_BASE + a per-cell offset (below) makes that ordering
+// deterministic instead: same grid position always wins the same way.
+const SNAPPED_PANEL_Z_INDEX_BASE = FLOATING_PANEL_Z_INDEX_FLOOR - 24;
 const SHARED_SEAM_TOLERANCE = 3;
 const SHARED_CORNER_TOLERANCE = 24;
 const FLOATING_PANEL_REACHABLE_TOP_INSET = 8;
@@ -1134,7 +1140,13 @@ export function WorkspacePanel({
   const resolvedCloseLabel = closeLabel || `Close ${labelBase}`;
   const resolvedRestoreLabel = restoreLabel || `Restore ${labelBase}`;
   const snapZoneName = panelPlacement.kind === 'affixed' ? panelPlacement.legacyZone ?? panelPlacement.id : null;
-  const effectiveFloatingZIndex = snapped ? SNAPPED_PANEL_Z_INDEX : floatingZIndex;
+  // Bottom-right cells win ties over top-left ones — an arbitrary but stable
+  // convention, capped well under FLOATING_PANEL_Z_INDEX_FLOOR so a snapped
+  // panel can never outrank a genuinely floating one.
+  const snappedZIndex = panelPlacement.kind === 'affixed'
+    ? SNAPPED_PANEL_Z_INDEX_BASE + Math.min(panelPlacement.row * 4 + panelPlacement.column, 20)
+    : SNAPPED_PANEL_Z_INDEX_BASE;
+  const effectiveFloatingZIndex = snapped ? snappedZIndex : floatingZIndex;
   const contextSeamEdge = workspacePanelContext?.activeSeamEdges.get(id) ?? null;
   const sharedSeamEdge = snapped ? (activeSharedSeamEdge ?? contextSeamEdge) : null;
   const mosaicAttachmentState = useMemo(
