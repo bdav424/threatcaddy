@@ -702,31 +702,25 @@ body.tc-desktop-shell-body {
   background-color: transparent !important;
 }
 
-.has-bg-image .bg-gray-900 {
-  background-color: color-mix(in srgb, var(--color-bg-surface) 65%, transparent) !important;
-}
-
-.has-bg-effect .bg-gray-900 {
-  background-color: color-mix(in srgb, var(--color-bg-surface) 82%, transparent) !important;
-}
-
+/* Deliberately no .has-bg-image/.has-bg-effect background-color override here
+   (or on the bg-gray-900/50, /40, bg-gray-800/50, /40, and .sidebar-glass
+   selectors below) — this file used to hardcode a fixed opacity (65%/82%/58%/
+   78%) whenever a background image or animated background was active,
+   completely overriding the Panel Opacity slider's --tc-panel-glass-opacity
+   value regardless of what the user set it to. Both rules carried
+   !important, and `.has-bg-effect .bg-gray-900` (two classes) beats the
+   opacity rule's plain `.bg-gray-900` (one class) on specificity alone, so
+   the hardcoded value always won. The slider's own description ("Lift
+   panels off the animated background with a glass effect") is describing
+   exactly this scenario, so silently ignoring it whenever a background was
+   actually active defeated the feature's entire purpose. The opacity rule
+   already handles every case uniformly; nothing mode-specific needed here. */
 .has-window-glass .bg-gray-900 {
   background-color: var(--tc-glass-surface-dark) !important;
 }
 
 .has-window-blur.has-window-glass:not(.tc-desktop-shell) .bg-gray-900 {
   backdrop-filter: blur(calc(var(--tc-window-blur) * 0.45)) saturate(140%);
-}
-
-.has-bg-image .bg-gray-900\/50 {
-  background-color: color-mix(in srgb, var(--color-bg-surface) 45%, transparent) !important;
-}
-
-.has-bg-effect .bg-gray-900\/50,
-.has-bg-effect .bg-gray-900\/40,
-.has-bg-effect .bg-gray-800\/50,
-.has-bg-effect .bg-gray-800\/40 {
-  background-color: color-mix(in srgb, var(--color-bg-surface) 58%, transparent) !important;
 }
 
 .has-window-glass .bg-gray-900\/50,
@@ -748,13 +742,12 @@ body.tc-desktop-shell-body {
   background-color: var(--tc-glass-raised-dark) !important;
 }
 
+/* backdrop-filter (legibility over a background image) is intentionally kept
+   unconditional here — but no background-color override; see the comment
+   above the .bg-gray-900 rules for why panel opacity is never hardcoded
+   per background mode. */
 .has-bg-image .sidebar-glass {
-  background: color-mix(in srgb, var(--color-bg-surface) 75%, transparent) !important;
   backdrop-filter: blur(16px) !important;
-}
-
-.has-bg-effect .sidebar-glass {
-  background: color-mix(in srgb, var(--color-bg-surface) 78%, transparent) !important;
 }
 
 .has-window-glass .sidebar-glass {
@@ -1031,16 +1024,9 @@ body.tc-desktop-shell-body {
   background-color: var(--tc-glass-raised-light) !important;
 }
 
-.has-bg-image.light .bg-gray-900 {
-  background-color: color-mix(in srgb, var(--color-bg-surface) 65%, transparent) !important;
-}
-
-.has-bg-image.light .bg-gray-900\/50 {
-  background-color: color-mix(in srgb, var(--color-bg-surface) 45%, transparent) !important;
-}
-
+/* Same reasoning as the dark-mode block above: no background-color override,
+   backdrop-filter kept unconditional for legibility. */
 .has-bg-image.light .sidebar-glass {
-  background: color-mix(in srgb, var(--color-bg-surface) 75%, transparent) !important;
   backdrop-filter: blur(16px) !important;
 }
 
