@@ -1,0 +1,11 @@
+SOC Shift Handoff Notes
+=======================
+
+Nothing notable during this shift. All dashboards green, no alerts
+escalated beyond tier 1. Ticket queue is empty. Backup verification
+job completed successfully overnight.
+
+Reminder: patch window scheduled for next maintenance cycle. No
+action required from analysts before then.
+
+End of shift.

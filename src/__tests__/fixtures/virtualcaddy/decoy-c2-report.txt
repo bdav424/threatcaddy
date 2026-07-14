@@ -1,0 +1,34 @@
+FICTIONAL THREAT REPORT — TEST FIXTURE, NOT A REAL INCIDENT
+=============================================================
+All values below use IANA/RFC 5737 documentation ranges and example.*
+domains reserved for documentation. None of this infrastructure is real.
+This file exists only to exercise VirtualCaddy's static IOC extraction.
+
+Observed beacon activity to command-and-control infrastructure:
+  - C2 IP: 203.0.113.77
+  - C2 IP: 198.51.100.23
+  - Backup C2 domain: evil-example.net
+  - Phishing lure domain: totally-not-malware.example.com
+  - Payload delivery URL: http://192.0.2.10/update/stage2.bin
+  - Exfil drop URL: https://203.0.113.99/upload
+
+Internal host contacted (should be excluded — private range): 10.0.0.5
+Internal host contacted (should be excluded — private range): 192.168.1.42
+Internal host contacted (should be excluded — private range): 172.16.5.9
+Loopback reference (should be excluded): 127.0.0.1
+
+Attacker contact address (fictional): fake.actor@example.com
+
+Payload hashes (fictional, structurally valid but made up):
+  MD5:    9a56c15009b513412e5568ac26278557
+  SHA-1:  63f206e790ea056f521e2fa2f40689d6c2b705f4
+  SHA-256: db1b77ffea252adcf1e0fa19602a44b12dd90a64cc749c3c5e65eb36ae052199
+
+Junk hex string that should NOT be treated as a real hash (all repeated char):
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+Related vulnerability referenced in the report: CVE-2021-44228
+
+Notes: this scenario loosely mirrors a generic log4shell-style exploitation
+narrative for testing purposes only. No exploit code, executable payload,
+or functional script is present anywhere in this file — it is plain text.
