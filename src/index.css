@@ -1914,9 +1914,27 @@ body.tc-desktop-shell-body {
      around the remaining circle automatically. --tc-rgb-repeats is set by
      the Settings "Repeats" slider; previously nothing in this file actually
      read that variable, so the ring always rendered exactly one rainbow lap
-     no matter what the slider said. */
+     no matter what the slider said.
+
+     The `from` angle isn't the raw driver — conic-gradient sweeps at
+     constant ANGULAR speed, but a rectangle's border doesn't cover equal
+     physical distance per degree (corners get swept fast, edge midpoints
+     slowly), so plain linear motion looks like it crawls through the
+     middle of each side and darts through the corners. Getting this
+     exactly right depends on each element's aspect ratio, which isn't
+     knowable from CSS alone — a version tuned for square elements made
+     wide ones (e.g. the search bar) look worse, not better, so this
+     doesn't try to be geometrically exact. Instead the driver angle gets
+     a small sin(4x) wobble added on top (period 90deg — one pulse per
+     side) via native CSS trig functions: speeds up near the 0/90/180/
+     270deg marks, eases off near the 45/135/225/315deg marks. Softens
+     the crawl-then-dart motion into more of a smooth pulse for most
+     shapes without needing per-element data. 10deg keeps the added
+     term's derivative comfortably under 1 (peaks around ±0.7 of the
+     base rate) so the sweep never reverses direction; raise or lower it
+     to make the pulse more or less pronounced. */
   background: repeating-conic-gradient(
-    in oklch from var(--tc-rgb-angle, 0deg),
+    in oklch from calc(var(--tc-rgb-angle, 0deg) + 10deg * sin(4 * var(--tc-rgb-angle, 0deg))),
     hsl(0, 100%, 65%) 0%,
     hsl(60, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 1),
     hsl(120, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 2),
@@ -1989,7 +2007,7 @@ body.tc-desktop-shell-body {
      read that variable, so the ring always rendered exactly one rainbow lap
      no matter what the slider said. */
   background: repeating-conic-gradient(
-    in oklch from var(--tc-rgb-angle, 0deg),
+    in oklch from calc(var(--tc-rgb-angle, 0deg) + 10deg * sin(4 * var(--tc-rgb-angle, 0deg))),
     hsl(0, 100%, 65%) 0%,
     hsl(60, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 1),
     hsl(120, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 2),
@@ -2131,7 +2149,7 @@ body.tc-desktop-shell-body {
      read that variable, so the ring always rendered exactly one rainbow lap
      no matter what the slider said. */
   background: repeating-conic-gradient(
-    in oklch from var(--tc-rgb-angle, 0deg),
+    in oklch from calc(var(--tc-rgb-angle, 0deg) + 10deg * sin(4 * var(--tc-rgb-angle, 0deg))),
     hsl(0, 100%, 65%) 0%,
     hsl(60, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 1),
     hsl(120, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 2),
