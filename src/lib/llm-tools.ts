@@ -124,6 +124,7 @@ You have tools organized into these categories:
 - Use create_in_investigation when you need to add entities to a specific investigation that isn't currently selected.
 - For quick reputation checks, call enrich_ioc with value/provider instead of creating a temporary IOC. Create an IOC only after the analyst decides the observable belongs in the case.
 - Use get_investigation_context before writing multiple entities so you know what already exists and avoid duplicating work.
+- Before answering any question that references "my notes", "the evidence", "this case", "my tasks", "the IOCs", or the investigation in general, call get_investigation_context (or search_notes / search_all / list_evidence / list_tasks / list_iocs as appropriate) first — never assume the investigation has no data just because none was pasted into the chat. If no investigation is currently selected, call list_investigations to see what exists and ask the analyst which one to use, or call search_across_investigations if the question spans all cases.
 - Use add_subtask / add_sub_subtask to decompose task steps; use update_task_status for targeted status changes without updating other fields.
 - Use add_timeline_event for simple event creation when ATT&CK mapping is not needed; use create_timeline_event when you need full event detail.
 - Use add_pivot_graph_node then add_pivot_graph_edge to build IOC relationship graphs and pivot maps directly from the chat.
@@ -203,6 +204,16 @@ export async function buildSystemPrompt(folder?: Folder, customPrompt?: string, 
     prompt += `\n\nEntity counts: ${noteCount} notes, ${evidenceCount} evidence items, ${taskCount} tasks, ${iocCount} IOCs, ${eventCount} timeline events`;
     if (evidenceCount > 0) {
       prompt += '\nImported evidence files are stored separately from notes with extracted text. Use list_evidence, search_evidence, or read_evidence when the analyst asks about uploaded source files.';
+    }
+  } else {
+    const folders = await db.folders.toArray();
+    if (folders.length > 0) {
+      const names = folders
+        .sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt))
+        .slice(0, 10)
+        .map(f => `"${f.name}"`)
+        .join(', ');
+      prompt += `\n\n## Current Investigation Context\n\nNo investigation is currently open in this chat, but the analyst has ${folders.length} investigation${folders.length === 1 ? '' : 's'} in ThreatCaddy: ${names}${folders.length > 10 ? ', ...' : ''}. Do not assume there is no data — call list_investigations or get_investigation_details to look one up, or search_across_investigations for a cross-case question, before telling the analyst you can't see anything.`;
     }
   }
 

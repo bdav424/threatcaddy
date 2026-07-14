@@ -22,6 +22,29 @@ function snippetAround(text: string, query: string, maxLen = MAX_SNIPPET): { sni
   return { snippet: `${prefix}${text.slice(start, end)}${suffix}`, matchStart: index };
 }
 
+/**
+ * get_investigation_summary/get_investigation_context need a concrete folderId, but the chat
+ * session may not have one selected. Rather than hard-failing, auto-resolve to the only
+ * investigation if there's exactly one, or hand back a pickable list otherwise — the caller's
+ * job is to look like it "sees everything", not to require the analyst to pre-select a folder.
+ */
+async function resolveImplicitFolderId(): Promise<{ folderId?: string; response?: { error: string; investigations: { id: string; name: string; status: string }[] } }> {
+  const folders = await db.folders.toArray();
+  if (folders.length === 0) {
+    return { response: { error: 'No investigations exist yet.', investigations: [] } };
+  }
+  if (folders.length === 1) {
+    return { folderId: folders[0].id };
+  }
+  folders.sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
+  return {
+    response: {
+      error: 'No investigation is currently open in this chat. Call this tool again after the analyst picks one, or use get_investigation_details with one of these IDs.',
+      investigations: folders.map(f => ({ id: f.id, name: f.name, status: f.status || 'active' })),
+    },
+  };
+}
+
 export async function executeSearchNotes(input: Record<string, unknown>, folderId?: string): Promise<string> {
   const query = String(input.query || '').toLowerCase().substring(0, 500);
   const limit = Math.min(Number(input.limit) || 10, 30);
@@ -404,7 +427,9 @@ export async function executeListTimelineEvents(input: Record<string, unknown>, 
 
 export async function executeGetInvestigationSummary(_input: Record<string, unknown>, folderId?: string): Promise<string> {
   if (!folderId) {
-    return JSON.stringify({ error: 'No investigation selected. Select an investigation folder first.' });
+    const fallback = await resolveImplicitFolderId();
+    if (fallback.folderId) return executeGetInvestigationSummary(_input, fallback.folderId);
+    return JSON.stringify(fallback.response);
   }
 
   const folder = await db.folders.get(folderId);
@@ -656,7 +681,9 @@ export async function executeCompareInvestigations(input: Record<string, unknown
  */
 export async function executeGetInvestigationContext(_input: Record<string, unknown>, folderId?: string): Promise<string> {
   if (!folderId) {
-    return JSON.stringify({ error: 'No investigation selected. Select an investigation folder first.' });
+    const fallback = await resolveImplicitFolderId();
+    if (fallback.folderId) return executeGetInvestigationContext(_input, fallback.folderId);
+    return JSON.stringify(fallback.response);
   }
 
   const folder = await db.folders.get(folderId);

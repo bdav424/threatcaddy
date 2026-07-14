@@ -239,6 +239,43 @@ describe('executeTool — read tools', () => {
     expect(parsed.name).toBe('Test Investigation');
     expect(parsed.counts.notes).toBe(1);
   });
+
+  it('get_investigation_summary auto-resolves the sole investigation when no folderId is given', async () => {
+    await db.folders.add({ id: 'f1', name: 'Only Investigation', order: 0, createdAt: Date.now() });
+    await db.notes.add({
+      id: 'n1', title: 'Note', content: '', folderId: 'f1',
+      tags: [], pinned: false, archived: false, trashed: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    const { result } = await executeTool(makeToolUse('get_investigation_summary'));
+    const parsed = JSON.parse(result);
+    expect(parsed.name).toBe('Only Investigation');
+    expect(parsed.counts.notes).toBe(1);
+  });
+
+  it('get_investigation_summary lists options when multiple investigations exist and none is selected', async () => {
+    await db.folders.add({ id: 'f1', name: 'Case A', order: 0, createdAt: Date.now() });
+    await db.folders.add({ id: 'f2', name: 'Case B', order: 1, createdAt: Date.now() });
+
+    const { result } = await executeTool(makeToolUse('get_investigation_summary'));
+    const parsed = JSON.parse(result);
+    expect(parsed.error).toBeTruthy();
+    expect(parsed.investigations).toHaveLength(2);
+    expect(parsed.investigations.map((i: { name: string }) => i.name).sort()).toEqual(['Case A', 'Case B']);
+  });
+
+  it('get_investigation_context auto-resolves the sole investigation when no folderId is given', async () => {
+    await db.folders.add({ id: 'f1', name: 'Only Investigation', order: 0, createdAt: Date.now() });
+    await db.tasks.add({
+      id: 't1', title: 'Check logs', completed: false, priority: 'high', status: 'todo',
+      order: 0, folderId: 'f1', tags: [], trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    const { result } = await executeTool(makeToolUse('get_investigation_context'));
+    const parsed = JSON.parse(result);
+    expect(parsed.investigation.name).toBe('Only Investigation');
+    expect(parsed.counts.tasks).toBe(1);
+  });
 });
 
 describe('executeTool — write tools', () => {
