@@ -49,7 +49,12 @@ export function useFolders() {
       ...extra,
     };
     await db.folders.add(folder);
-    setFolders((prev) => [...prev, folder].sort((a, b) => a.order - b.order));
+    // Upsert by id, not a blind append — the liveQuery subscription above
+    // reacts to this same write and may already have applied it to `prev`
+    // by the time this callback runs (Dexie liveQuery emissions aren't
+    // ordered relative to the write's own await). A blind append would
+    // double the folder into state whenever that race lands the other way.
+    setFolders((prev) => [...prev.filter((f) => f.id !== folder.id), folder].sort((a, b) => a.order - b.order));
     return folder;
   }, [folders]);
 

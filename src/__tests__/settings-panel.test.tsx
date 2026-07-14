@@ -466,11 +466,17 @@ describe('SettingsPanel', { timeout: 30000 }, () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const storageSetSpy = vi.spyOn(Storage.prototype, 'setItem');
     vi.stubGlobal('fetch', fetchSpy);
 
     render(<SettingsPanel {...defaultProps} onUpdateSettings={onUpdateSettings} />);
     clickTab('AI');
+
+    // Installed after the initial render/tab-switch settle so it only observes
+    // writes caused by viewing the AI tab and clicking through to Integrations —
+    // unrelated panels mounted elsewhere in SettingsPanel (device sync key,
+    // mobile sync config) legitimately persist their own state on mount and
+    // aren't what this test is checking.
+    const storageSetSpy = vi.spyOn(Storage.prototype, 'setItem');
 
     const aiRegion = within(screen.getByRole('region', { name: 'AssistantCaddy AI setup' }));
     expect(aiRegion.getByText('CaddyAI (same as ThreatCaddy AI)')).toBeInTheDocument();
@@ -542,15 +548,20 @@ describe('SettingsPanel', { timeout: 30000 }, () => {
     render(<SettingsPanel {...defaultProps} settings={settings} />);
     clickTab('AI');
 
-    const aiRegion = within(screen.getByRole('region', { name: 'AssistantCaddy AI setup' }));
     const localRuntime = within(screen.getByRole('region', { name: 'Explicit Local LLM runtime controls' }));
-    expect(aiRegion.getByText('Local-only')).toBeInTheDocument();
     expect(localRuntime.getByText(/may contact the configured local endpoint only when clicked/i)).toBeInTheDocument();
     expect(fetchSpy).not.toHaveBeenCalled();
 
     fireEvent.click(localRuntime.getByRole('button', { name: 'Test Connection' }));
 
-    await waitFor(() => expect(aiRegion.getByText('Failed')).toBeInTheDocument());
+    // Failure surfaces in the explicit Local LLM runtime controls themselves
+    // (an inline HTTP-status error message), not as a status pill in the
+    // AssistantCaddy AI region — that status-pill system (StatusPill /
+    // assistantAIStatusMeta, including the "Local-only" and "Failed" labels)
+    // was intentionally removed when the Assistant route UI was simplified
+    // to the inline-credentials dropdown design (see git history for
+    // AssistantCaddyAISetup); this test previously asserted the old labels.
+    await waitFor(() => expect(localRuntime.getByText(/HTTP 500/i)).toBeInTheDocument());
     expect(fetchSpy).toHaveBeenCalled();
   });
 });

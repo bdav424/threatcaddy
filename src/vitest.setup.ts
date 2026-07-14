@@ -87,6 +87,18 @@ function ensureStorage(name: 'localStorage' | 'sessionStorage') {
 ensureStorage('localStorage');
 ensureStorage('sessionStorage');
 
+// jsdom doesn't implement ResizeObserver — components that measure their own
+// container (e.g. ActiveFilterBar's compact-width breakpoint) throw
+// "ResizeObserver is not defined" on mount without this.
+class ResizeObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
+}
+
 const namespaces: Record<string, Record<string, unknown>> = {
   settings: settingsEn, analysis: analysisEn, timeline: timelineEn,
   notes: notesEn, tasks: tasksEn, chat: chatEn, graph: graphEn,
