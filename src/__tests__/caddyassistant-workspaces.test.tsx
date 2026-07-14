@@ -50,7 +50,9 @@ import { CalendarCaddyWorkspaceContent } from '../components/CaddyAssistant/Cale
 import { EmailCaddyWorkspaceContent } from '../components/CaddyAssistant/CadEmailWorkspace';
 import { AppWorkspaceShell } from '../components/WorkspacePanels/AppWorkspaceShell';
 import { WorkspacePanel } from '../components/WorkspacePanels/WorkspacePanel';
+import { WorkspacePanelDock } from '../components/WorkspacePanels/WorkspacePanelDock';
 import { WorkspacePanelProvider } from '../components/WorkspacePanels/WorkspacePanelProvider';
+import { getRoutePopOut } from '../lib/route-popout-signal';
 import { useWorkspacePanel } from '../components/WorkspacePanels/useWorkspacePanels';
 import {
   WORKSPACE_PANEL_DRAG_TYPE,
@@ -504,21 +506,31 @@ describe('AssistantCaddy workspaces', () => {
   });
 
   it('pops out, resizes, minimizes, and restores the EmailCaddy message context panel', () => {
-    render(<EmailCaddyWorkspace />);
+    // The manual "Pop out"/"Dock ... back into UI" button pair was removed from
+    // WorkspacePanel entirely (e7ae45b "remove pop-out dock button from workspace
+    // panels" + 13cd96c "workspace panel reconciliation" cleaned up the leftover
+    // popOutLabel/dockLabel props). The message-context panel now only reaches
+    // floating mode automatically once the surrounding EmailCaddy layout is compact
+    // (AssistantCaddyWorkspaceShell's email view is compact by default), and its
+    // draft/context toolbars each render their own scoped "Context" control — see
+    // the already-updated sibling test "renders the EmailCaddy compact fallback
+    // without panel titlebar chrome..." which explicitly asserts the pop-out button
+    // is gone. This exercises the same resize/minimize/restore mechanics through
+    // that current, reachable path instead of the deleted button.
+    render(<AssistantCaddyWorkspaceShell view="email" />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Compose' }));
-    fireEvent.change(screen.getByRole('textbox', { name: 'EmailCaddy draft subject' }), {
+    const draftPanel = screen.getByRole('dialog', { name: 'EmailCaddy draft panel' });
+    fireEvent.change(within(draftPanel).getByRole('textbox', { name: 'EmailCaddy draft subject' }), {
       target: { value: 'Preserved draft subject' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Context' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Pop out message context' }));
+    fireEvent.click(within(draftPanel).getByRole('button', { name: 'Context' }));
 
     const panel = screen.getByRole('dialog', { name: 'EmailCaddy message context panel' });
     expect(panel).toHaveAttribute('data-workspace-panel-state', 'floating');
     expect(panel).toHaveClass('overflow-visible');
     expect(panel).not.toHaveClass('overflow-hidden');
     expect(screen.getByDisplayValue('Preserved draft subject')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Return message context to UI' })).toBeInTheDocument();
 
     const rightHandle = screen.getByRole('button', { name: 'Resize message context from right' });
     fireEvent.pointerEnter(rightHandle);
@@ -540,15 +552,17 @@ describe('AssistantCaddy workspaces', () => {
   });
 
   it('restores minimized EmailCaddy popouts without bottom dock chrome while preserving draft state', () => {
-    render(<EmailCaddyWorkspace />);
+    // See the comment on the preceding pop-out/resize/minimize test: the manual
+    // "Pop out" button is gone, so this reaches floating via AssistantCaddyWorkspaceShell's
+    // compact-by-default email view (draft's own "Context" control floats it directly).
+    render(<AssistantCaddyWorkspaceShell view="email" />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Compose' }));
-    fireEvent.change(screen.getByRole('textbox', { name: 'EmailCaddy draft subject' }), {
+    const draftPanel = screen.getByRole('dialog', { name: 'EmailCaddy draft panel' });
+    fireEvent.change(within(draftPanel).getByRole('textbox', { name: 'EmailCaddy draft subject' }), {
       target: { value: 'Dock restored draft subject' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Context' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Context' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Pop out message context' }));
+    fireEvent.click(within(draftPanel).getByRole('button', { name: 'Context' }));
     fireEvent.click(screen.getByRole('button', { name: 'Minimize message context' }));
 
     expect(screen.queryByRole('region', { name: 'Workspace panel dock' })).not.toBeInTheDocument();
@@ -564,11 +578,14 @@ describe('AssistantCaddy workspaces', () => {
   });
 
   it('raises the active EmailCaddy popout when it receives workspace focus', () => {
-    render(<EmailCaddyWorkspace />);
+    // See the comment on the pop-out/resize/minimize test above: no manual "Pop out"
+    // button exists anymore, so reach floating via the compact-by-default email view's
+    // reader popout, whose own "Context" control floats the context panel directly.
+    render(<AssistantCaddyWorkspaceShell view="email" />);
 
     fireEvent.click(screen.getByRole('button', { name: /Open Follow-up: did we answer every onboarding question?/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Context' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Pop out message context' }));
+    const readerPanel = screen.getByRole('dialog', { name: 'EmailCaddy message reader panel' });
+    fireEvent.click(within(readerPanel).getByRole('button', { name: 'Context' }));
     const initialPanel = screen.getByRole('dialog', { name: 'EmailCaddy message context panel' });
     const initialLayer = Number(initialPanel.getAttribute('data-workspace-panel-z-index'));
 
@@ -797,11 +814,23 @@ describe('AssistantCaddy workspaces', () => {
   });
 
   it('cleans up minimized EmailCaddy restore state when switching standalone AssistantCaddy workspaces', () => {
-    const { rerender } = render(<EmailCaddyWorkspace />);
+    // No manual "Pop out" button exists anymore (see comment on the pop-out/resize/
+    // minimize test above). This still needs a genuinely standalone, independently
+    // unmountable root (unlike AssistantCaddyWorkspaceShell's view switches, which
+    // intentionally preserve state — see the "preserves minimized shell state" test),
+    // so render EmailCaddyWorkspaceContent forced compact so its reader-panel "Context"
+    // control floats the message-context panel directly, matching the existing
+    // "renders the EmailCaddy compact fallback" test's setup.
+    const { rerender } = render(
+      <WorkspacePanelProvider initialPanels={emailCaddyPanelRegistrations}>
+        <EmailCaddyWorkspaceContent compactPanel />
+        <WorkspacePanelDock />
+      </WorkspacePanelProvider>,
+    );
 
     fireEvent.click(screen.getByRole('button', { name: /Open Follow-up: did we answer every onboarding question?/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Context' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Pop out message context' }));
+    const readerPanel = screen.getByRole('dialog', { name: 'EmailCaddy message reader panel' });
+    fireEvent.click(within(readerPanel).getByRole('button', { name: 'Context' }));
     fireEvent.click(screen.getByRole('button', { name: 'Minimize message context' }));
 
     expect(document.querySelector('[data-workspace-panel="emailcaddy-message-context"][data-workspace-panel-state="minimized"]')).toBeInTheDocument();
@@ -861,11 +890,17 @@ describe('AssistantCaddy workspaces', () => {
   });
 
   it('preserves minimized shell state across AssistantCaddy workspace switches without dock chips', () => {
+    // No manual "Pop out" button exists anymore (see comment on the pop-out/resize/
+    // minimize test above). AssistantCaddyWorkspaceShell's email view is compact by
+    // default, so opening a thread pops its own floating reader dialog — which means
+    // there are now two "Context" controls on screen (the reader's and the titlebar's),
+    // so scope to the reader panel, matching the already-passing "opens EmailCaddy from
+    // an AssistantCaddy workspace command request" test's established pattern.
     const { rerender } = render(<AssistantCaddyWorkspaceShell view="email" />);
 
     fireEvent.click(screen.getByRole('button', { name: /Open Follow-up: did we answer every onboarding question?/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Context' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Pop out message context' }));
+    const readerPanel = screen.getByRole('dialog', { name: 'EmailCaddy message reader panel' });
+    fireEvent.click(within(readerPanel).getByRole('button', { name: 'Context' }));
     fireEvent.click(screen.getByRole('button', { name: 'Minimize message context' }));
 
     expect(screen.queryByRole('region', { name: 'Workspace panel dock' })).not.toBeInTheDocument();
@@ -920,11 +955,14 @@ describe('AssistantCaddy workspaces', () => {
   });
 
   it('keeps floating shell panels visible while AssistantCaddy is globally inactive', () => {
+    // Same as above: no manual "Pop out" button, and opening a thread in this
+    // compact-by-default view pops a reader dialog with its own "Context" control —
+    // scope to it instead of the ambiguous unscoped query.
     const { rerender } = render(<AssistantCaddyWorkspaceShell view="email" />);
 
     fireEvent.click(screen.getByRole('button', { name: /Open Follow-up: did we answer every onboarding question?/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Context' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Pop out message context' }));
+    const readerPanel = screen.getByRole('dialog', { name: 'EmailCaddy message reader panel' });
+    fireEvent.click(within(readerPanel).getByRole('button', { name: 'Context' }));
 
     expect(screen.getByRole('dialog', { name: 'EmailCaddy message context panel' })).toHaveAttribute(
       'data-workspace-panel-state',
@@ -1012,7 +1050,11 @@ describe('AssistantCaddy workspaces', () => {
 
     expect(screen.getByRole('heading', { name: 'Notes' })).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: 'Notes panel' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Pop out Notes' })).toBeInTheDocument();
+    // The in-panel "Pop out Notes" button was removed with the rest of WorkspacePanel's
+    // pop-out chrome (e7ae45b / 13cd96c); route-active panels now publish their pop-out
+    // callback through route-popout-signal for ActiveFilterBar (a sibling above this
+    // component) to render, so assert the modern equivalent: the signal is live here.
+    expect(getRoutePopOut()?.label).toBe('Pop out');
     expect(document.querySelector('[data-workspace-panel="notes-workspace"][role="dialog"]')).toBeNull();
 
     unmount();
@@ -1196,14 +1238,19 @@ describe('AssistantCaddy workspaces', () => {
       expect(onWorkspacePanelLaunchHandled).toHaveBeenCalledWith(47);
     });
 
-    const sourceSlot = document.querySelector<HTMLElement>(
-      '[data-workspace-panel="tasks-workspace"][data-workspace-panel-state="floating-source"]',
-    );
-    expect(sourceSlot).not.toBeNull();
-    expect(sourceSlot).toHaveAttribute('data-workspace-panel-source-compact', 'true');
-    expect(sourceSlot).toHaveClass('w-fit');
-    expect(sourceSlot).not.toHaveTextContent('This pane is popped out in the workspace.');
-    expect(within(sourceSlot!).getByRole('button', { name: 'Return Tasks to main workspace from source slot' })).toBeInTheDocument();
+    // The dedicated "floating-source" placeholder pill (compact chip + "Return ... to
+    // main workspace" button left behind in the docked slot) was deleted along with the
+    // rest of WorkspacePanel's pop-out chrome (e7ae45b / 13cd96c "workspace panel
+    // reconciliation" — FloatingSourcePlaceholder no longer exists in WorkspacePanel.tsx).
+    // Floating panels now render through a single createPortal'd dialog with
+    // `position: fixed`, which is inherently out of document flow, so there is no
+    // separate node left behind to reserve height in the task list: this asserts that
+    // modern guarantee directly instead of the deleted placeholder's attributes.
+    const taskPanelNodes = document.querySelectorAll('[data-workspace-panel="tasks-workspace"]');
+    expect(taskPanelNodes).toHaveLength(1);
+    const floatingPanel = screen.getByRole('dialog', { name: 'Tasks panel' });
+    expect(floatingPanel).toHaveAttribute('data-workspace-panel-state', 'floating');
+    expect(floatingPanel).toHaveClass('fixed');
   });
 
   it('keeps floating and minimized panels mounted on the Workspace route', async () => {
@@ -1725,10 +1772,12 @@ describe('AssistantCaddy workspaces', () => {
 
     expect(navigateToMock).not.toHaveBeenCalled();
     fireEvent.click(within(draftPanel).getByRole('button', { name: 'Context' }));
-    const contextPanelSource = panel.querySelector(
-      '[data-workspace-panel="emailcaddy-message-context"][data-workspace-panel-state="floating-source"]',
-    );
-    expect(contextPanelSource).toHaveClass('hidden');
+    // The "floating-source" placeholder pill was deleted along with the rest of
+    // WorkspacePanel's pop-out chrome (e7ae45b / 13cd96c); floating panels now portal
+    // to document.body via createPortal, so nothing is left behind inside the parent
+    // EmailCaddy panel's subtree — assert that modern equivalent (no orphaned node)
+    // instead of the deleted placeholder's "hidden" class.
+    expect(panel.querySelector('[data-workspace-panel="emailcaddy-message-context"]')).toBeNull();
     expect(screen.getByRole('dialog', { name: 'EmailCaddy message context panel' })).toHaveAttribute(
       'data-workspace-panel-state',
       'floating',
@@ -1879,10 +1928,12 @@ describe('AssistantCaddy workspaces', () => {
       expect(rowMenu).toHaveAttribute('data-themed-context-menu', 'toolbar-select');
       expect(within(rowMenu).getByRole('menuitem', { name: 'Open reader' })).toBeInTheDocument();
       fireEvent.click(within(readerPanel).getByRole('button', { name: 'Context' }));
-      const contextPanelSource = panel.querySelector(
-        '[data-workspace-panel="emailcaddy-message-context"][data-workspace-panel-state="floating-source"]',
-      );
-      expect(contextPanelSource).toHaveClass('hidden');
+      // The "floating-source" placeholder pill was deleted along with the rest of
+      // WorkspacePanel's pop-out chrome (e7ae45b / 13cd96c); floating panels now portal
+      // to document.body via createPortal, so nothing is left behind inside the parent
+      // EmailCaddy panel's subtree — assert that modern equivalent (no orphaned node)
+      // instead of the deleted placeholder's "hidden" class.
+      expect(panel.querySelector('[data-workspace-panel="emailcaddy-message-context"]')).toBeNull();
       expect(screen.getByRole('dialog', { name: 'EmailCaddy message context panel' })).toHaveAttribute(
         'data-workspace-panel-state',
         'floating',
