@@ -1921,29 +1921,43 @@ body.tc-desktop-shell-body {
      linear angular speed, conic-gradient crawls slowest through the
      midpoint of each long edge (the vertical line through the panel's
      horizontal center, top and bottom) and comparatively faster along
-     the short left/right edges. The driver angle gets a sin(2x) wobble
-     added on top (period 180deg — one pulse at the top, one at the
-     bottom, per lap) via native CSS trig functions: speeds up near the
-     0/180deg marks (top/bottom edge midpoints) and eases off near
-     90/270deg (left/right) to compensate.
+     the short left/right edges.
 
-     The wobble's amplitude is divided by --tc-rgb-repeats, not a flat
-     18deg. Repeats packs N rainbow cycles into the ring, which turns
-     ANY sweep-speed unevenness into visibly bunched-up color bands
-     wherever the sweep is slower — the more repeats, the more legible
-     the bunching, even though the underlying angular speed pattern
-     hasn't changed shape. Shrinking the amplitude in proportion to
-     repeats keeps that bunching roughly equally subtle at every repeat
-     count instead of compounding: full ±18deg boost at repeats=1, only
-     ±4.5deg at repeats=4. Not an exact per-shape fix — just enough to
-     stop the crawl through the long edges' midpoints without adding
-     complexity that has to know each element's actual aspect ratio.
-     18deg (the repeats=1 ceiling) keeps the added term's derivative
-     comfortably under 1 (peaks around ±0.63 of the base rate) so the
-     sweep never reverses direction; any repeats>1 value only shrinks
-     that further. */
+     One-sided speed-up, not a symmetric wobble: an earlier version used
+     a sin(2x) wave (period 180deg) to speed up top/bottom, but any wave
+     that adds speed somewhere must remove it somewhere else — so
+     left/right visibly slowed down to compensate, which is its own
+     "hitch" once Repeats packs enough color bands in to make it
+     legible. This version instead adds K*cos(angle)^2 to the angular
+     SPEED (not the angle itself) — cos^2 is never negative and is
+     exactly 0, with zero slope (no kink), at 90/270deg, so left/right
+     stays at the untouched baseline rate instead of dipping below it.
+     It only ever speeds up near 0/180deg. Integrating that speed
+     function gives the `from` expression below: a linear term scaled by
+     (1 + K/2) plus a (180/pi)*(K/4) * sin(2x) correction. The (180/pi)
+     factor is NOT optional — d/dx[sin(2x)] only simplifies to a clean
+     cos(2x) when x is in radians, so differentiating a DEGREES-valued
+     angle needs that conversion folded into the coefficient, or the
+     sin() term ends up about 57x too small to matter (shipped broken
+     this way once already — verified by directly probing computed
+     style at fixed --tc-rgb-angle values, not just by re-deriving the
+     math again by hand). This is calculus, not an arbitrary formula;
+     re-derive by integrating 1 + K*cos(x)^2 if this ever needs to
+     change, and verify against actual computed style afterward.
+
+     Trade-off: since this only adds speed and never subtracts, the ring
+     completes slightly MORE than 360deg of driver angle per configured
+     rotation — about 1.2 full turns at K=0.4, repeats=1 — so the Speed
+     slider's seconds-per-lap becomes a mild underestimate. K is divided
+     by --tc-rgb-repeats for the same reason the old amplitude was:
+     Repeats amplifies how visible any speed non-uniformity is, so the
+     boost (and the timing drift that comes with it) backs off as
+     repeats goes up — negligible by repeats=4+, most noticeable right
+     at repeats=1. 0.4 keeps the peak speed multiplier at 1.4x (never
+     negative, so the sweep can't reverse direction) at top/bottom and
+     exactly 1.0x (baseline) at left/right. */
   background: repeating-conic-gradient(
-    in oklch from calc(var(--tc-rgb-angle, 0deg) + (18deg / var(--tc-rgb-repeats, 1)) * sin(2 * var(--tc-rgb-angle, 0deg))),
+    in oklch from calc(var(--tc-rgb-angle, 0deg) * (1 + 0.2 / var(--tc-rgb-repeats, 1)) + (5.7296deg / var(--tc-rgb-repeats, 1)) * sin(2 * var(--tc-rgb-angle, 0deg))),
     hsl(0, 100%, 65%) 0%,
     hsl(60, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 1),
     hsl(120, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 2),
@@ -2016,7 +2030,7 @@ body.tc-desktop-shell-body {
      read that variable, so the ring always rendered exactly one rainbow lap
      no matter what the slider said. */
   background: repeating-conic-gradient(
-    in oklch from calc(var(--tc-rgb-angle, 0deg) + (18deg / var(--tc-rgb-repeats, 1)) * sin(2 * var(--tc-rgb-angle, 0deg))),
+    in oklch from calc(var(--tc-rgb-angle, 0deg) * (1 + 0.2 / var(--tc-rgb-repeats, 1)) + (5.7296deg / var(--tc-rgb-repeats, 1)) * sin(2 * var(--tc-rgb-angle, 0deg))),
     hsl(0, 100%, 65%) 0%,
     hsl(60, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 1),
     hsl(120, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 2),
@@ -2158,7 +2172,7 @@ body.tc-desktop-shell-body {
      read that variable, so the ring always rendered exactly one rainbow lap
      no matter what the slider said. */
   background: repeating-conic-gradient(
-    in oklch from calc(var(--tc-rgb-angle, 0deg) + (18deg / var(--tc-rgb-repeats, 1)) * sin(2 * var(--tc-rgb-angle, 0deg))),
+    in oklch from calc(var(--tc-rgb-angle, 0deg) * (1 + 0.2 / var(--tc-rgb-repeats, 1)) + (5.7296deg / var(--tc-rgb-repeats, 1)) * sin(2 * var(--tc-rgb-angle, 0deg))),
     hsl(0, 100%, 65%) 0%,
     hsl(60, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 1),
     hsl(120, 100%, 65%) calc(100% / var(--tc-rgb-repeats, 1) / 6 * 2),
