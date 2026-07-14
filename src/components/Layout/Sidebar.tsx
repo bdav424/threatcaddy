@@ -745,6 +745,7 @@ export function Sidebar({
           {/* Clickable investigation card — opens settings */}
           <button
             onClick={() => setEditingFolderId(selectedFolder.id)}
+            data-tlp={effectiveClsLevel || undefined}
             className="relative w-full text-start rounded-lg border bg-bg-raised hover:bg-bg-hover transition-colors p-2 group overflow-hidden"
             style={{ borderColor: tlpFullBorderColor }}
             title={t('sidebar.investigationSettings')}
