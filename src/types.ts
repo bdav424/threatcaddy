@@ -465,6 +465,8 @@ export interface Settings {
   rgbRepeats?: number;    // how many full spectrums repeat around the ring (1–8; default 1)
   bgEffectTrail?: number;        // 0–100; canvas particle motion trail/fade length; default 0 (no trail)
   frostedPanels?: boolean;
+  /** Visual treatment for the frosted-panel highlight. Default 'streaks'. */
+  glassStyle?: 'streaks' | 'blurry' | 'bumpy' | 'lined';
   /** Auto-snap floating panels to snapped panel edges within 16 px during move (default true). */
   workspacePanelSnap?: boolean;
   /** Configured external agent hosts for skill execution */
@@ -656,6 +658,7 @@ export const DEFAULT_SETTINGS: Settings = {
   panelTransparency: 30,
   bgEffectTrail: 0,
   frostedPanels: false,
+  glassStyle: 'streaks',
   llmRoutingMode: 'auto',
 };
 

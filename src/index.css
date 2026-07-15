@@ -77,6 +77,14 @@
   --tc-panel-glass-border: var(--color-border-medium);
   --tc-panel-glass-opacity: 0.3;
   --tc-panel-glass-blur: 0px;
+  /* Edge bevel for glass panels — light top-left / dark bottom-right inset
+     shadows reading as a rounded glass edge. Same value in both themes; see
+     the LOAD-BEARING comment above the box-shadow rule that consumes this. */
+  --tc-panel-bevel: inset 0 2px 3px -1px rgba(255,255,255,0.28), inset 0 -2px 3px -1px rgba(0,0,0,0.35), inset 2px 0 3px -1px rgba(255,255,255,0.14), inset -2px 0 3px -1px rgba(0,0,0,0.21);
+  /* Etched-glass grain texture, factored out so every glass-style rule below
+     can layer it alongside its own pattern in one background-image list
+     instead of each needing to repeat this data URI. */
+  --tc-grain-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PGZpbHRlciBpZD0ibiI+PGZlVHVyYnVsZW5jZSB0eXBlPSJmcmFjdGFsTm9pc2UiIGJhc2VGcmVxdWVuY3k9IjAuODUiIG51bU9jdGF2ZXM9IjIiIHN0aXRjaFRpbGVzPSJzdGl0Y2giLz48ZmVDb2xvck1hdHJpeCB0eXBlPSJtYXRyaXgiIHZhbHVlcz0iMCAwIDAgMCAxICAwIDAgMCAwIDEgIDAgMCAwIDAgMSAgMCAwIDAgMC4wNSAwIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI24pIi8+PC9zdmc+");
   --tc-control-popup-bg: var(--color-bg-raised);
   --tc-control-popup-fg: var(--color-text-primary);
   --tc-control-popup-muted: var(--color-text-muted);
@@ -888,29 +896,283 @@ body.tc-desktop-shell-body {
 .has-panel-glass [class*="--color-surface"],
 .has-panel-glass [class*="--color-input-bg"] {
   /* brightness() restored at a conservative value — a previous session removed
-     brightness(1.28) from this exact rule to fix a "grey wash" bug, but the
-     .app-window-sheen block below documents that this brightness term is
-     specifically what's supposed to make panels "catch the light" more than
-     bare background does. Losing it collapsed that differentiation: the sheen
-     ended up reading as roughly equally visible on-panel and on-background,
-     which is why the opacity slider felt like "it did nothing" (the dominant
-     visual signal — the sheen — didn't change with it) and why the sheen
-     looked like it covered the whole page. 1.06 is deliberately far below the
-     1.28 that caused grey wash; verified live that panel/card content and text
-     don't wash out at this value. */
+     brightness(1.28) from this exact rule to fix a "grey wash" bug. That
+     older regression was specific to the since-replaced .app-window-sheen
+     architecture (a single fixed full-viewport layer that needed backdrop
+     brightness() to "amplify" it into visibility — see the glass-style block
+     below for why that's gone now: each style paints its own background-image
+     directly on the panel with real, sufficient alpha, no amplification
+     needed). 1.06 is kept here as a modest, independently-useful "catch the
+     light" boost for general panel legibility; verified live that panel/card
+     content and text don't wash out at this value. */
   backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%) brightness(var(--tc-panel-glass-brightness, 1.06));
 }
 
-/* Frosted glass: GRAIN only (etched-glass surface texture). The specular SHEEN
-   is no longer painted per panel — see .app-window-sheen below.
+/* ─── Glass style: per-panel, world-space, selectable ─────────────────────────
+   Supersedes the old single fixed full-viewport `.app-window-sheen` layer.
+   That architecture painted one diagonal gradient behind everything and relied
+   on panels' backdrop-filter `brightness()` to "amplify" it into visibility —
+   which is exactly why it read as "sheen on the whole page, not just panels."
+   A plain fixed div has no way to clip itself to only where panels are.
 
-   Why: a highlight is not a property of the glass, it is a property of where the
-   glass sits relative to the light. Painting it per element meant every element
-   got its own highlight in its own coordinate space — which is why the sheen
-   tiled once per day-cell in CalendarCaddy's month grid. It also cost N gradient
-   paints + N `overlay` blend passes.
+   This version paints the highlight as each matched panel's own
+   `background-image`, so it structurally cannot appear on bare background —
+   it's a background-image, it only ever paints inside that element's own box.
+   `background-attachment: fixed` ties the image's origin to the viewport
+   instead of the element, so every panel still samples ONE shared world-space
+   picture: scrolling reveals a different slice through each panel (real
+   glass), and panels that sit next to each other (e.g. a list of rows) read
+   as one continuous sheet, not independent copies — see rgb-border-tlp-guard
+   -style tests in glass-style.test.ts for the selector-coverage assertions.
 
-   Grain legitimately IS a surface property, so it stays on the panel. */
+   Known cost, accepted deliberately (this reverses an earlier "do not do
+   this" note in this same file): background-attachment: fixed repaints on
+   every scroll frame, per element using it. Split into two tiers to bound
+   that cost — real panel-scale containers (sidebar, bg-gray-900/bg-bg-deep
+   /primary/surface/raised family) get the full-size world image; smaller,
+   more numerous surfaces (bg-gray-800/700, bg-bg-hover/active/base — list
+   rows, buttons) get a half-scale copy instead of the same technique applied
+   at full size, both because a full-viewport gradient reads as oversized on
+   something 30px tall, and to keep the repaint cost proportional to how much
+   screen area actually needs it. Watch for scroll jank if real-world usage
+   pushes either tier's simultaneous panel count much higher than tested here. */
+[data-glass-style="streaks"].has-panel-glass .bg-gray-900,
+[data-glass-style="streaks"].has-panel-glass .bg-gray-900\/80,
+[data-glass-style="streaks"].has-panel-glass .bg-gray-900\/50,
+[data-glass-style="streaks"].has-panel-glass .bg-gray-900\/40,
+[data-glass-style="streaks"].has-panel-glass .bg-gray-900\/30,
+[data-glass-style="streaks"].has-panel-glass .sidebar-glass,
+[data-glass-style="streaks"].has-panel-glass [class*="bg-bg-deep"],
+[data-glass-style="streaks"].has-panel-glass [class*="bg-bg-primary"],
+[data-glass-style="streaks"].has-panel-glass [class*="bg-bg-surface"],
+[data-glass-style="streaks"].has-panel-glass [class*="bg-bg-raised"] {
+  /* Grain (top layer) + streak (behind it) in ONE declaration, not two
+     separate rules — background-image is not additive across rules, the
+     second rule to set it replaces the first entirely, it doesn't merge.
+     Each background-* property below carries per-layer values in the same
+     order as background-image's layer list. */
+  background-image: var(--tc-grain-image), linear-gradient(115deg, transparent 0%, rgba(0,0,0,0.17) 8%, rgba(0,0,0,0.08) 20.1%, rgba(255,255,255,0.06) 25.6%, rgba(255,255,255,0.33) 30%, rgba(255,255,255,0.06) 34.4%, rgba(0,0,0,0.08) 39.9%, rgba(0,0,0,0.17) 52%, transparent 65.2%) !important;
+  background-repeat: repeat, no-repeat !important;
+  background-blend-mode: overlay, normal !important;
+  background-attachment: scroll, fixed !important;
+  background-size: auto, 100vw 100vh !important;
+  background-position: 0 0, 0 0 !important;
+}
+
+[data-glass-style="streaks"].has-panel-glass .bg-gray-800,
+[data-glass-style="streaks"].has-panel-glass .bg-gray-800\/60,
+[data-glass-style="streaks"].has-panel-glass .bg-gray-800\/50,
+[data-glass-style="streaks"].has-panel-glass .bg-gray-800\/40,
+[data-glass-style="streaks"].has-panel-glass .bg-gray-700,
+[data-glass-style="streaks"].has-panel-glass .bg-gray-700\/50,
+[data-glass-style="streaks"].has-panel-glass .bg-gray-700\/30,
+[data-glass-style="streaks"].has-panel-glass .bg-bg-hover,
+[data-glass-style="streaks"].has-panel-glass .bg-bg-hover\/50,
+[data-glass-style="streaks"].has-panel-glass .bg-bg-hover\/55,
+[data-glass-style="streaks"].has-panel-glass .bg-bg-hover\/60,
+[data-glass-style="streaks"].has-panel-glass .bg-bg-hover\/70,
+[data-glass-style="streaks"].has-panel-glass .bg-bg-active,
+[data-glass-style="streaks"].has-panel-glass .bg-bg-base,
+[data-glass-style="streaks"].has-panel-glass .bg-bg-base\/50,
+[data-glass-style="streaks"].has-panel-glass .bg-bg-base\/60,
+[data-glass-style="streaks"].has-panel-glass .bg-bg-base\/70,
+[data-glass-style="streaks"].has-panel-glass [class*="--color-surface"],
+[data-glass-style="streaks"].has-panel-glass [class*="--color-input-bg"] {
+  background-image: var(--tc-grain-image), linear-gradient(115deg, transparent 0%, rgba(0,0,0,0.17) 8%, rgba(0,0,0,0.08) 20.1%, rgba(255,255,255,0.06) 25.6%, rgba(255,255,255,0.33) 30%, rgba(255,255,255,0.06) 34.4%, rgba(0,0,0,0.08) 39.9%, rgba(0,0,0,0.17) 52%, transparent 65.2%) !important;
+  background-repeat: repeat, no-repeat !important;
+  background-blend-mode: overlay, normal !important;
+  background-attachment: scroll, fixed !important;
+  background-size: auto, 50vw 50vh !important;
+  background-position: 0 0, 0 0 !important;
+}
+
+/* Blurry: patchy, soft brightness variation instead of a directional streak —
+   light diffusing through uneven frost rather than reflecting off it. Same
+   world-space/two-tier mechanism as streaks, same reasoning. */
+[data-glass-style="blurry"].has-panel-glass .bg-gray-900,
+[data-glass-style="blurry"].has-panel-glass .bg-gray-900\/80,
+[data-glass-style="blurry"].has-panel-glass .bg-gray-900\/50,
+[data-glass-style="blurry"].has-panel-glass .bg-gray-900\/40,
+[data-glass-style="blurry"].has-panel-glass .bg-gray-900\/30,
+[data-glass-style="blurry"].has-panel-glass .sidebar-glass,
+[data-glass-style="blurry"].has-panel-glass [class*="bg-bg-deep"],
+[data-glass-style="blurry"].has-panel-glass [class*="bg-bg-primary"],
+[data-glass-style="blurry"].has-panel-glass [class*="bg-bg-surface"],
+[data-glass-style="blurry"].has-panel-glass [class*="bg-bg-raised"] {
+  background-image: var(--tc-grain-image), radial-gradient(ellipse 42% 30% at 22% 28%, rgba(255,255,255,0.40), transparent 70%), radial-gradient(ellipse 36% 42% at 78% 65%, rgba(255,255,255,0.28), transparent 70%), radial-gradient(ellipse 48% 36% at 45% 92%, rgba(0,0,0,0.25), transparent 70%) !important;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat !important;
+  background-blend-mode: overlay, normal, normal, normal !important;
+  background-attachment: scroll, fixed, fixed, fixed !important;
+  background-size: auto, 100vw 100vh, 100vw 100vh, 100vw 100vh !important;
+  background-position: 0 0, 0 0, 0 0, 0 0 !important;
+}
+
+[data-glass-style="blurry"].has-panel-glass .bg-gray-800,
+[data-glass-style="blurry"].has-panel-glass .bg-gray-800\/60,
+[data-glass-style="blurry"].has-panel-glass .bg-gray-800\/50,
+[data-glass-style="blurry"].has-panel-glass .bg-gray-800\/40,
+[data-glass-style="blurry"].has-panel-glass .bg-gray-700,
+[data-glass-style="blurry"].has-panel-glass .bg-gray-700\/50,
+[data-glass-style="blurry"].has-panel-glass .bg-gray-700\/30,
+[data-glass-style="blurry"].has-panel-glass .bg-bg-hover,
+[data-glass-style="blurry"].has-panel-glass .bg-bg-hover\/50,
+[data-glass-style="blurry"].has-panel-glass .bg-bg-hover\/55,
+[data-glass-style="blurry"].has-panel-glass .bg-bg-hover\/60,
+[data-glass-style="blurry"].has-panel-glass .bg-bg-hover\/70,
+[data-glass-style="blurry"].has-panel-glass .bg-bg-active,
+[data-glass-style="blurry"].has-panel-glass .bg-bg-base,
+[data-glass-style="blurry"].has-panel-glass .bg-bg-base\/50,
+[data-glass-style="blurry"].has-panel-glass .bg-bg-base\/60,
+[data-glass-style="blurry"].has-panel-glass .bg-bg-base\/70,
+[data-glass-style="blurry"].has-panel-glass [class*="--color-surface"],
+[data-glass-style="blurry"].has-panel-glass [class*="--color-input-bg"] {
+  background-image: var(--tc-grain-image), radial-gradient(ellipse 42% 30% at 22% 28%, rgba(255,255,255,0.40), transparent 70%), radial-gradient(ellipse 36% 42% at 78% 65%, rgba(255,255,255,0.28), transparent 70%), radial-gradient(ellipse 48% 36% at 45% 92%, rgba(0,0,0,0.25), transparent 70%) !important;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat !important;
+  background-blend-mode: overlay, normal, normal, normal !important;
+  background-attachment: scroll, fixed, fixed, fixed !important;
+  background-size: auto, 50vw 50vh, 50vw 50vh, 50vw 50vh !important;
+  background-position: 0 0, 0 0, 0 0, 0 0 !important;
+}
+
+/* Bumpy: real refraction via feTurbulence + feDisplacementMap (defined once in
+   AppLayout.tsx as #tc-glass-noise), referenced straight from backdrop-filter —
+   distorts whatever's actually behind the panel, no canvas/WebGL. Unlike the
+   gradient styles this doesn't rescale per element (turbulence is inherently
+   local/organic at any size), so both tiers share one declaration. See the
+   backdrop-filter override block further down for the actual property. */
+
+/* Lined: reeded glass — a real ridge profile (cos(pi*(t-0.5))^sharpness per
+   period, computed offline and baked in as static stops), not a 50/50 stripe.
+   Most of each period is fully transparent (the "light" is just the panel's
+   own base/blur showing through); only a narrow, soft-edged groove darkens.
+   This is a material property of the glass, not a light-source effect, so it
+   stays in local per-element space with ordinary tiling — no
+   background-attachment: fixed, no scroll-linked movement, same as grain. */
+[data-glass-style="lined"].has-panel-glass .bg-gray-900,
+[data-glass-style="lined"].has-panel-glass .bg-gray-900\/80,
+[data-glass-style="lined"].has-panel-glass .bg-gray-900\/50,
+[data-glass-style="lined"].has-panel-glass .bg-gray-900\/40,
+[data-glass-style="lined"].has-panel-glass .bg-gray-900\/30,
+[data-glass-style="lined"].has-panel-glass .sidebar-glass,
+[data-glass-style="lined"].has-panel-glass [class*="bg-bg-deep"],
+[data-glass-style="lined"].has-panel-glass [class*="bg-bg-primary"],
+[data-glass-style="lined"].has-panel-glass [class*="bg-bg-surface"],
+[data-glass-style="lined"].has-panel-glass [class*="bg-bg-raised"] {
+  background-image: var(--tc-grain-image), repeating-linear-gradient(90deg, rgba(0,0,0,0.000) 0.00px, rgba(0,0,0,0.000) 0.70px, rgba(0,0,0,0.002) 1.40px, rgba(0,0,0,0.008) 2.10px, rgba(0,0,0,0.024) 2.80px, rgba(0,0,0,0.050) 3.50px, rgba(0,0,0,0.086) 4.20px, rgba(0,0,0,0.126) 4.90px, rgba(0,0,0,0.164) 5.60px, rgba(0,0,0,0.190) 6.30px, rgba(0,0,0,0.200) 7.00px, rgba(0,0,0,0.190) 7.70px, rgba(0,0,0,0.164) 8.40px, rgba(0,0,0,0.126) 9.10px, rgba(0,0,0,0.086) 9.80px, rgba(0,0,0,0.050) 10.50px, rgba(0,0,0,0.024) 11.20px, rgba(0,0,0,0.008) 11.90px, rgba(0,0,0,0.002) 12.60px, rgba(0,0,0,0.000) 13.30px, rgba(0,0,0,0.000) 14.00px) !important;
+  background-repeat: repeat, repeat !important;
+  background-blend-mode: overlay, normal !important;
+}
+
+[data-glass-style="lined"].has-panel-glass .bg-gray-800,
+[data-glass-style="lined"].has-panel-glass .bg-gray-800\/60,
+[data-glass-style="lined"].has-panel-glass .bg-gray-800\/50,
+[data-glass-style="lined"].has-panel-glass .bg-gray-800\/40,
+[data-glass-style="lined"].has-panel-glass .bg-gray-700,
+[data-glass-style="lined"].has-panel-glass .bg-gray-700\/50,
+[data-glass-style="lined"].has-panel-glass .bg-gray-700\/30,
+[data-glass-style="lined"].has-panel-glass .bg-bg-hover,
+[data-glass-style="lined"].has-panel-glass .bg-bg-hover\/50,
+[data-glass-style="lined"].has-panel-glass .bg-bg-hover\/55,
+[data-glass-style="lined"].has-panel-glass .bg-bg-hover\/60,
+[data-glass-style="lined"].has-panel-glass .bg-bg-hover\/70,
+[data-glass-style="lined"].has-panel-glass .bg-bg-active,
+[data-glass-style="lined"].has-panel-glass .bg-bg-base,
+[data-glass-style="lined"].has-panel-glass .bg-bg-base\/50,
+[data-glass-style="lined"].has-panel-glass .bg-bg-base\/60,
+[data-glass-style="lined"].has-panel-glass .bg-bg-base\/70,
+[data-glass-style="lined"].has-panel-glass [class*="--color-surface"],
+[data-glass-style="lined"].has-panel-glass [class*="--color-input-bg"] {
+  background-image: var(--tc-grain-image), repeating-linear-gradient(90deg, rgba(0,0,0,0.000) 0.00px, rgba(0,0,0,0.000) 0.35px, rgba(0,0,0,0.002) 0.70px, rgba(0,0,0,0.008) 1.05px, rgba(0,0,0,0.024) 1.40px, rgba(0,0,0,0.050) 1.75px, rgba(0,0,0,0.086) 2.10px, rgba(0,0,0,0.126) 2.45px, rgba(0,0,0,0.164) 2.80px, rgba(0,0,0,0.190) 3.15px, rgba(0,0,0,0.200) 3.50px, rgba(0,0,0,0.190) 3.85px, rgba(0,0,0,0.164) 4.20px, rgba(0,0,0,0.126) 4.55px, rgba(0,0,0,0.086) 4.90px, rgba(0,0,0,0.050) 5.25px, rgba(0,0,0,0.024) 5.60px, rgba(0,0,0,0.008) 5.95px, rgba(0,0,0,0.002) 6.30px, rgba(0,0,0,0.000) 6.65px, rgba(0,0,0,0.000) 7.00px) !important;
+  background-repeat: repeat, repeat !important;
+  background-blend-mode: overlay, normal !important;
+}
+
+/* Bumpy: grain stays (still a real surface property), but there's no second
+   background-image layer — the "bump" itself comes entirely from the
+   backdrop-filter override below (real refraction of whatever's behind the
+   panel), not from anything painted in background-image. Same selector list
+   (both tiers combined, matching the backdrop-filter override) as every
+   other style's grain declaration. */
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-900,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-900\/80,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-900\/50,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-900\/40,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-900\/30,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-800,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-800\/60,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-800\/50,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-800\/40,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-700,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-700\/50,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-700\/30,
+[data-glass-style="bumpy"].has-panel-glass .sidebar-glass,
+[data-glass-style="bumpy"].has-panel-glass [class*="bg-bg-deep"],
+[data-glass-style="bumpy"].has-panel-glass [class*="bg-bg-primary"],
+[data-glass-style="bumpy"].has-panel-glass [class*="bg-bg-surface"],
+[data-glass-style="bumpy"].has-panel-glass [class*="bg-bg-raised"],
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-hover,
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-hover\/50,
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-hover\/55,
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-hover\/60,
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-hover\/70,
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-active,
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-base,
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-base\/50,
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-base\/60,
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-base\/70,
+[data-glass-style="bumpy"].has-panel-glass [class*="--color-surface"],
+[data-glass-style="bumpy"].has-panel-glass [class*="--color-input-bg"] {
+  background-image: var(--tc-grain-image) !important;
+  background-repeat: repeat !important;
+  background-blend-mode: overlay !important;
+}
+
+/* Bumpy's backdrop-filter override — same selector list as above, plus the
+   noise filter reference. url(#tc-glass-noise) is Chromium-reliable (covers
+   Electron and most web users here) but not universal — see
+   glass-style.test.ts. */
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-900,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-900\/80,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-900\/50,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-900\/40,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-900\/30,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-800,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-800\/60,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-800\/50,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-800\/40,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-700,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-700\/50,
+[data-glass-style="bumpy"].has-panel-glass .bg-gray-700\/30,
+[data-glass-style="bumpy"].has-panel-glass .sidebar-glass,
+[data-glass-style="bumpy"].has-panel-glass [class*="bg-bg-deep"],
+[data-glass-style="bumpy"].has-panel-glass [class*="bg-bg-primary"],
+[data-glass-style="bumpy"].has-panel-glass [class*="bg-bg-surface"],
+[data-glass-style="bumpy"].has-panel-glass [class*="bg-bg-raised"],
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-hover,
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-hover\/50,
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-hover\/55,
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-hover\/60,
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-hover\/70,
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-active,
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-base,
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-base\/50,
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-base\/60,
+[data-glass-style="bumpy"].has-panel-glass .bg-bg-base\/70,
+[data-glass-style="bumpy"].has-panel-glass [class*="--color-surface"],
+[data-glass-style="bumpy"].has-panel-glass [class*="--color-input-bg"] {
+  backdrop-filter: url(#tc-glass-noise) blur(var(--tc-panel-glass-blur)) saturate(140%) brightness(var(--tc-panel-glass-brightness, 1.06));
+}
+
+/* Edge bevel: cheap (2-4 inset box-shadow layers, no filter/compositing cost
+   beyond a normal box-shadow) light-top-left/dark-bottom-right highlight that
+   reads as a rounded glass edge. Applies across all four glass styles
+   unconditionally — same selector list as the grain rule above.
+   LOAD-BEARING: the light-mode legibility scrim further below sets box-shadow
+   on this exact selector list too. box-shadow is not additive across separate
+   rules — whichever rule comes second in the cascade replaces it entirely, not
+   merges with it. That rule folds --tc-panel-bevel into its own value instead
+   of overriding it; do not "simplify" that back into two separate
+   box-shadow declarations on the same elements. */
 .has-panel-glass .bg-gray-900,
 .has-panel-glass .bg-gray-900\/80,
 .has-panel-glass .bg-gray-900\/50,
@@ -940,64 +1202,7 @@ body.tc-desktop-shell-body {
 .has-panel-glass .bg-bg-base\/70,
 .has-panel-glass [class*="--color-surface"],
 .has-panel-glass [class*="--color-input-bg"] {
-  background-image:
-    url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PGZpbHRlciBpZD0ibiI+PGZlVHVyYnVsZW5jZSB0eXBlPSJmcmFjdGFsTm9pc2UiIGJhc2VGcmVxdWVuY3k9IjAuODUiIG51bU9jdGF2ZXM9IjIiIHN0aXRjaFRpbGVzPSJzdGl0Y2giLz48ZmVDb2xvck1hdHJpeCB0eXBlPSJtYXRyaXgiIHZhbHVlcz0iMCAwIDAgMCAxICAwIDAgMCAwIDEgIDAgMCAwIDAgMSAgMCAwIDAgMC4wNSAwIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI24pIi8+PC9zdmc+") !important;
-  background-repeat: repeat !important;
-  background-blend-mode: overlay !important;
-}
-
-/* ─── World-space specular sheen ──────────────────────────────────────────────
-   Two-to-three diagonal light streaks fixed in VIEWPORT space, sitting behind
-   the panels. Frosted panels sample them through their existing backdrop-filter,
-   so the streak appears to be caught by the glass. Because the streaks are fixed
-   and the panels scroll, a panel moving vertically crosses a diagonal streak at a
-   point that travels horizontally across it — the highlight sweeps side to side
-   as you scroll. That is how real glass behaves.
-
-   Performance: one composited fixed layer that never repaints on scroll, instead
-   of N per-panel gradients plus N `overlay` blend passes. Do NOT reimplement this
-   with `background-attachment: fixed` on the panels — that anchors the gradient to
-   the viewport but forces every such element to repaint on every scroll frame.
-
-   The layer is deliberately faint on its own; the panels' backdrop `brightness()`
-   is what makes it read as a highlight through the glass. (Pure CSS cannot reveal
-   a fully invisible backdrop — backdrop-filter amplifies what is there, it cannot
-   conjure it. Low-but-nonzero + amplification is the honest version of "hidden
-   except on frost".) */
-.app-window-sheen {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 200ms ease;
-  /* Stop alphas lowered from 0.085/0.06/0.045 — the raw layer paints on bare
-     background too (nothing clips it to panels; see the block comment above
-     the .app-window-sheen rule for why that's the deliberate architecture),
-     so what reads as "sheen on the whole page" is this un-amplified base
-     value. The panel backdrop-filter's restored brightness() above is what's
-     now responsible for making panels stand out from that lowered baseline. */
-  background-image: linear-gradient(
-    var(--tc-sheen-angle, 115deg),
-    transparent 6%,
-    rgba(255, 255, 255, 0.055) 12%,
-    rgba(255, 255, 255, 0) 19%,
-    transparent 41%,
-    rgba(255, 255, 255, 0.04) 47%,
-    rgba(255, 255, 255, 0) 53%,
-    transparent 76%,
-    rgba(255, 255, 255, 0.03) 82%,
-    rgba(255, 255, 255, 0) 88%
-  );
-}
-
-/* Only exists when frosted panels are on — nothing to catch the light otherwise. */
-.has-panel-glass .app-window-sheen {
-  opacity: var(--tc-sheen-opacity, 0.55);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .app-window-sheen { transition: none; }
+  box-shadow: var(--tc-panel-bevel) !important;
 }
 
 /* ─── S3: Panel glass scrim — light theme contrast ────────────────────────────
@@ -1005,7 +1210,13 @@ body.tc-desktop-shell-body {
    wash out against the bright app background, making text hard to read. An inset
    box-shadow overlay renders above the glass background but below content,
    adding a subtle dark underlay that restores readability without touching
-   backdrop-filter, colors, or TLP/classification exclusions. */
+   backdrop-filter, colors, or TLP/classification exclusions.
+
+   Folds in --tc-panel-bevel rather than letting this rule's box-shadow replace
+   it — box-shadow is not additive across separate rules, so a plain
+   `box-shadow: inset 0 0 0 9999px ...` here would silently drop the bevel for
+   every light-theme panel. See the LOAD-BEARING comment on the base bevel
+   rule above. */
 .light.has-panel-glass .bg-gray-900,
 .light.has-panel-glass .bg-gray-900\/80,
 .light.has-panel-glass .bg-gray-900\/50,
@@ -1035,7 +1246,7 @@ body.tc-desktop-shell-body {
 .light.has-panel-glass .bg-bg-base\/70,
 .light.has-panel-glass [class*="--color-surface"],
 .light.has-panel-glass [class*="--color-input-bg"] {
-  box-shadow: inset 0 0 0 9999px rgba(0, 0, 0, 0.10) !important;
+  box-shadow: var(--tc-panel-bevel), inset 0 0 0 9999px rgba(0, 0, 0, 0.10) !important;
 }
 
 .has-window-glass.light .bg-gray-900 {

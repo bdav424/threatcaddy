@@ -663,6 +663,13 @@ function parseImportedThemes(value: unknown): CustomAppearanceTheme[] {
   });
 }
 
+const GLASS_STYLES: { id: NonNullable<Settings['glassStyle']>; label: string; description: string }[] = [
+  { id: 'streaks', label: 'Streaks', description: 'A diagonal light band with real dark troughs either side, fixed to the viewport — the highlight sweeps as you scroll, like a light source behind real glass.' },
+  { id: 'blurry', label: 'Blurry', description: 'Soft, patchy brightness variation instead of a directional streak — light diffusing through uneven frost rather than reflecting off it.' },
+  { id: 'bumpy', label: 'Bumpy', description: 'Real refraction: warps whatever is actually behind the panel, like uneven frosted glass. Most Chromium-reliable of the four (covers Electron and most web users here).' },
+  { id: 'lined', label: 'Lined', description: 'Reeded glass — wide, soft convex ridges with a narrow groove between each one. The most literal, architectural reading of frosted glass.' },
+];
+
 export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSettingsProps) {
   const { t } = useTranslation('settings');
   const { addToast } = useToast();
@@ -2089,6 +2096,26 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
                 <div className="peer h-5 w-9 rounded-full bg-gray-700 transition-colors peer-checked:bg-accent peer-focus:ring-1 peer-focus:ring-accent/50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-4" />
               </label>
             </div>
+            {(settings.frostedPanels ?? false) && (
+              <div className="space-y-2 pt-1">
+                <div className="text-[11px] text-gray-500">Glass style</div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {GLASS_STYLES.map((style) => (
+                    <button
+                      key={style.id}
+                      onClick={() => onUpdateSettings({ glassStyle: style.id })}
+                      className={`flex items-center justify-between gap-1.5 rounded-lg border px-2.5 py-2 text-left transition-colors ${(settings.glassStyle ?? 'streaks') === style.id ? 'border-accent bg-accent/10' : 'border-gray-700/80 bg-gray-900/30 hover:border-gray-600'}`}
+                    >
+                      <span className="text-xs text-gray-200">{style.label}</span>
+                      {(settings.glassStyle ?? 'streaks') === style.id && <Check size={13} className="shrink-0 text-accent" />}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-gray-600">
+                  {GLASS_STYLES.find((s) => s.id === (settings.glassStyle ?? 'streaks'))?.description}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* S4 — RGB borders toggle */}

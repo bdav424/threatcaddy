@@ -102,10 +102,17 @@ export function AppLayout({
         theme={resolvedTheme}
       />
       <div className="app-window-ambient pointer-events-none absolute inset-0 z-0" />
-      {/* World-space specular sheen: fixed diagonal light streaks behind the panels.
-          Frosted panels catch them via their existing backdrop-filter, so the
-          highlight sweeps across a panel as it scrolls through the streak. */}
-      <div className="app-window-sheen" aria-hidden="true" />
+      {/* feTurbulence + feDisplacementMap for the "bumpy" glass style, referenced from
+          backdrop-filter (see [data-glass-style="bumpy"] rules in index.css). SVG filters
+          are DOM elements, not something CSS alone can define, so they live here once and
+          get referenced by every panel via url(#tc-glass-noise). Zero-size + absolute so
+          it never affects layout. */}
+      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+        <filter id="tc-glass-noise" x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.012 0.0024" numOctaves={2} seed={7} stitchTiles="stitch" result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale={28} xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
       <div className="app-window-chrome-ring" aria-hidden="true" />
       {header}
       <div className="app-window-frame relative z-20 flex flex-1 overflow-hidden min-h-0">

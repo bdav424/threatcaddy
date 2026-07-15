@@ -170,6 +170,7 @@ export function useSettings() {
     root.style.setProperty('--tc-panel-glass-blur', `${effectiveBlur}px`);
 
     root.classList.toggle('has-panel-glass', frostedPanels);
+    root.setAttribute('data-glass-style', settings.glassStyle ?? 'streaks');
     root.classList.toggle('has-rgb-borders', settings.rgbBorders ?? false);
     // Numeric rgbSpeed (1–6 s) takes precedence over the legacy slow/normal/fast enum.
     const rgbSpeedValues = { slow: '12s', normal: '8s', fast: '4s' } as const;
@@ -188,7 +189,7 @@ export function useSettings() {
         // The desktop wrapper may still be starting up; keep the web UI responsive regardless.
       });
     }
-  }, [isDesktopShell, settings.frostedPanels, settings.panelTransparency, settings.rgbBorders, settings.rgbBorderSpeed, settings.rgbSpeed, settings.rgbRepeats]);
+  }, [isDesktopShell, settings.frostedPanels, settings.panelTransparency, settings.glassStyle, settings.rgbBorders, settings.rgbBorderSpeed, settings.rgbSpeed, settings.rgbRepeats]);
 
   const updateSettings = useCallback((updates: Partial<Settings>) => {
     setSettingsState((prev) => {

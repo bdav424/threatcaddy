@@ -125,4 +125,35 @@ describe('useSettings', () => {
     expect(dests).toBeDefined();
     expect(dests![0].label).toBe('External Backup');
   });
+
+  describe('glassStyle DOM wiring', () => {
+    it('defaults data-glass-style to "streaks" on document.documentElement', () => {
+      renderHook(() => useSettings());
+      expect(document.documentElement.getAttribute('data-glass-style')).toBe('streaks');
+    });
+
+    it('updates data-glass-style when the setting changes', () => {
+      const { result } = renderHook(() => useSettings());
+
+      act(() => {
+        result.current.updateSettings({ glassStyle: 'bumpy' });
+      });
+      expect(document.documentElement.getAttribute('data-glass-style')).toBe('bumpy');
+
+      act(() => {
+        result.current.updateSettings({ glassStyle: 'lined' });
+      });
+      expect(document.documentElement.getAttribute('data-glass-style')).toBe('lined');
+    });
+
+    it('sets data-glass-style regardless of frostedPanels (the CSS itself gates on .has-panel-glass)', () => {
+      const { result } = renderHook(() => useSettings());
+
+      act(() => {
+        result.current.updateSettings({ frostedPanels: false, glassStyle: 'blurry' });
+      });
+      expect(document.documentElement.getAttribute('data-glass-style')).toBe('blurry');
+      expect(document.documentElement.classList.contains('has-panel-glass')).toBe(false);
+    });
+  });
 });
