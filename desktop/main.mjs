@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, shell } from 'e
 import { registerMailBridge } from './mail-bridge.mjs';
 import { registerVirtualBridge } from './virtual-bridge.mjs';
 import { registerVmIngest } from './vm-ingest.mjs';
+import { registerVmSandbox } from './vm-sandbox.mjs';
 import { registerNetworkScanBridge } from './network-scan.mjs';
 import { registerUpdaterBridge } from './updater.mjs';
 import { registerCredsBridge } from './creds-bridge.mjs';
@@ -614,6 +615,7 @@ app.whenReady().then(async () => {
   registerMailBridge();
   registerVirtualBridge();
   registerVmIngest();
+  registerVmSandbox();
   registerNetworkScanBridge();
   registerUpdaterBridge(win);
   registerCredsBridge();

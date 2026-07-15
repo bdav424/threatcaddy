@@ -136,3 +136,13 @@ export function registerVirtualBridge() {
     return { watching: !!state.watcher, dirPath: state.dirPath, error: state.error };
   });
 }
+
+/**
+ * Plain in-process getter (not an IPC channel) for other main-process modules that want
+ * to write output where the renderer's file-watcher already looks — e.g. vm-sandbox.mjs
+ * drops detonation screenshots here when a watch directory is already configured, so
+ * VirtualCaddyDetonationReview picks them up without a second directory to set up.
+ */
+export function getConfiguredWatchDir() {
+  return state.dirPath;
+}

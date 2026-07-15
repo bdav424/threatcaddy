@@ -129,6 +129,83 @@ export function getVirtualCaddyBridge(): VirtualCaddyIngestBridge | null {
   return (globalThis as VirtualCaddyIngestBridgeGlobal).threatcaddyVirtualCaddy ?? null;
 }
 
+// ─── VM Sandbox Bridge ─────────────────────────────────────────────────────────
+// Orchestrates a VirtualBox VM to detonate a submitted sample. Network mode is always
+// host-only (isolated or simulated-internet) — there is no channel here that requests
+// real internet egress for the detonation VM. See desktop/vm-sandbox.mjs.
+
+export type DetonationNetworkMode = 'isolated' | 'simulated-internet';
+
+export interface VmSandboxVmListing {
+  name: string;
+  uuid: string;
+}
+
+export interface VmSandboxSnapshotListing {
+  name: string;
+  uuid: string | null;
+}
+
+export interface VmSandboxSubmitParams {
+  vmName: string;
+  snapshotName: string;
+  hostOnlyAdapter: string;
+  networkMode: DetonationNetworkMode;
+  filePath: string;
+  credentialReferenceId: string;
+  timeoutMs?: number;
+}
+
+export interface VmSandboxJobStatusPayload {
+  jobId: string;
+  state: string;
+  error?: string;
+  networkMode?: DetonationNetworkMode;
+  timeoutMs?: number;
+}
+
+export interface VmSandboxJobCompletePayload {
+  jobId: string;
+  outputDir: string;
+  report: {
+    jobId: string;
+    vmName: string;
+    snapshotName: string;
+    networkMode: DetonationNetworkMode;
+    hostOnlyAdapter: string;
+    filename: string;
+    startedAt: string;
+    completedAt: string;
+    timedOut: boolean;
+    guestExecOk: boolean;
+    guestExecOutput?: { stdout: string; stderr: string };
+  };
+}
+
+export interface VmSandboxJobErrorPayload {
+  jobId: string;
+  error: string;
+  recovered: boolean;
+  outputDir?: string;
+}
+
+export interface VmSandboxBridge {
+  listVms(): Promise<{ ok: boolean; vms?: VmSandboxVmListing[]; error?: string }>;
+  listSnapshots(vmName: string): Promise<{ ok: boolean; snapshots?: VmSandboxSnapshotListing[]; error?: string }>;
+  listNetworkAdapters(): Promise<{ ok: boolean; adapters?: string[]; error?: string }>;
+  saveGuestCredential(username: string, password: string): Promise<{ ok: boolean; credentialReferenceId?: string; error?: string }>;
+  submitDetonation(params: VmSandboxSubmitParams): Promise<{ ok: boolean; jobId?: string; error?: string }>;
+  onJobStatus(callback: (payload: VmSandboxJobStatusPayload) => void): () => void;
+  onJobComplete(callback: (payload: VmSandboxJobCompletePayload) => void): () => void;
+  onJobError(callback: (payload: VmSandboxJobErrorPayload) => void): () => void;
+}
+
+type VmSandboxBridgeGlobal = typeof globalThis & { threatcaddyVmSandbox?: VmSandboxBridge };
+
+export function getVmSandboxBridge(): VmSandboxBridge | null {
+  return (globalThis as VmSandboxBridgeGlobal).threatcaddyVmSandbox ?? null;
+}
+
 // ─── Netmap Bridge ─────────────────────────────────────────────────────────────
 // ARP/ping subnet scan — desktop only. No internet-routable probes; local /24 only.
 

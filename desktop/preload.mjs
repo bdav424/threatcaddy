@@ -135,6 +135,33 @@ contextBridge.exposeInMainWorld('threatcaddyVirtualCaddy', {
   },
 });
 
+// VM Sandbox bridge — orchestrates a VirtualBox VM to detonate a submitted sample.
+// Network mode is always host-only (isolated or simulated-internet via your own
+// INetSim-style responder) — this bridge has no channel that requests real internet
+// egress for the detonation VM. See desktop/vm-sandbox.mjs for the full scope notes.
+contextBridge.exposeInMainWorld('threatcaddyVmSandbox', {
+  listVms: () => ipcRenderer.invoke('vmsandbox:list-vms'),
+  listSnapshots: (vmName) => ipcRenderer.invoke('vmsandbox:list-snapshots', { vmName }),
+  listNetworkAdapters: () => ipcRenderer.invoke('vmsandbox:list-network-adapters'),
+  saveGuestCredential: (username, password) => ipcRenderer.invoke('vmsandbox:save-guest-credential', { username, password }),
+  submitDetonation: (params) => ipcRenderer.invoke('vmsandbox:submit-detonation', params),
+  onJobStatus: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('vmsandbox:job-status', listener);
+    return () => ipcRenderer.removeListener('vmsandbox:job-status', listener);
+  },
+  onJobComplete: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('vmsandbox:job-complete', listener);
+    return () => ipcRenderer.removeListener('vmsandbox:job-complete', listener);
+  },
+  onJobError: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('vmsandbox:job-error', listener);
+    return () => ipcRenderer.removeListener('vmsandbox:job-error', listener);
+  },
+});
+
 // Network map bridge — subnet ARP/ping scan. Only available in desktop app.
 // Scans local /24 subnets only; no internet-routable probes.
 contextBridge.exposeInMainWorld('threatcaddyNetmap', {

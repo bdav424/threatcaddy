@@ -112,6 +112,7 @@ const AppWorkspaceShell = lazy(() => import('./components/WorkspacePanels/AppWor
 const VirtualCaddyWorkspace = lazy(() => import('./components/VirtualCaddy/VirtualCaddyWorkspace').then(m => ({ default: m.VirtualCaddyWorkspace })));
 const VirtualCaddyPanel = lazy(() => import('./components/VirtualCaddy/VirtualCaddyPanel').then(m => ({ default: m.VirtualCaddyPanel })));
 const VirtualCaddyDetonationReview = lazy(() => import('./components/VirtualCaddy/VirtualCaddyDetonationReview').then(m => ({ default: m.VirtualCaddyDetonationReview })));
+const VirtualCaddySandbox = lazy(() => import('./components/VirtualCaddy/VirtualCaddySandbox').then(m => ({ default: m.VirtualCaddySandbox })));
 const NetworkMapPanel = lazy(() => import('./components/NetMap/NetworkMapPanel').then(m => ({ default: m.NetworkMapPanel })));
 const NetMapWorkspace = lazy(() => import('./components/NetMap/NetMapWorkspace').then(m => ({ default: m.NetMapWorkspace })));
 
@@ -184,22 +185,26 @@ function NetMapTabView() {
 
 // ─── VirtualCaddy tabbed view ─────────────────────────────────────────────────
 // Combines the file-watcher workspace (VirtualCaddyWorkspace), the static analysis
-// job panel (VirtualCaddyPanel), and the Detonation Review artifact viewer
-// (VirtualCaddyDetonationReview) in a three-tab layout under one nav entry.
+// job panel (VirtualCaddyPanel), the Detonation Review artifact viewer
+// (VirtualCaddyDetonationReview), and the VM Sandbox orchestrator (VirtualCaddySandbox)
+// in a four-tab layout under one nav entry.
 
-const VIRTUALCADDY_TAB_LABEL: Record<'analyze' | 'watch' | 'review', string> = {
+type VirtualCaddyTab = 'analyze' | 'watch' | 'review' | 'sandbox';
+
+const VIRTUALCADDY_TAB_LABEL: Record<VirtualCaddyTab, string> = {
   analyze: 'Static Analysis',
   watch: 'File Watch',
   review: 'Detonation Review',
+  sandbox: 'VM Sandbox',
 };
 
 function VirtualCaddyTabView() {
-  const [tab, setTab] = useState<'watch' | 'analyze' | 'review'>('analyze');
+  const [tab, setTab] = useState<VirtualCaddyTab>('analyze');
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Tab bar */}
       <div className="shrink-0 flex border-b border-border-subtle/50 bg-bg-primary/80">
-        {(['analyze', 'watch', 'review'] as const).map((t) => (
+        {(['analyze', 'watch', 'review', 'sandbox'] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -216,7 +221,10 @@ function VirtualCaddyTabView() {
       </div>
       {/* Panel content */}
       <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent" /></div>}>
-        {tab === 'analyze' ? <VirtualCaddyPanel /> : tab === 'watch' ? <VirtualCaddyWorkspace /> : <VirtualCaddyDetonationReview />}
+        {tab === 'analyze' ? <VirtualCaddyPanel />
+          : tab === 'watch' ? <VirtualCaddyWorkspace />
+          : tab === 'review' ? <VirtualCaddyDetonationReview />
+          : <VirtualCaddySandbox />}
       </Suspense>
     </div>
   );
