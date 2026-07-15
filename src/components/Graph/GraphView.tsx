@@ -260,7 +260,7 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
       : 'w-52 border-r border-gray-800 bg-gray-900 flex flex-col overflow-y-auto shrink-0';
 
   return (
-    <div className="flex flex-1 overflow-hidden h-full relative">
+    <div className="flex flex-1 overflow-hidden h-full relative bg-bg-primary">
       {/* Mobile backdrop when filter sheet is open */}
       {isMobile && !sidebarCollapsed && (
         <div

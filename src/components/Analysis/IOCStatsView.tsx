@@ -522,7 +522,7 @@ export function IOCStatsView({
 
   if (hasNoIOCs && activeTab === 'overview') {
     return (
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden bg-bg-primary">
         <Header
           selectedFolderId={selectedFolderId}
           selectedFolderName={selectedFolderName}
@@ -554,7 +554,7 @@ export function IOCStatsView({
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden bg-bg-primary">
       <Header
         selectedFolderId={selectedFolderId}
         selectedFolderName={selectedFolderName}

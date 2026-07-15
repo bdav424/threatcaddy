@@ -86,7 +86,7 @@ export function ActivityLogView({ entries, getFiltered, onClear }: ActivityLogVi
   const grouped = useMemo(() => groupByTimePeriod(filtered), [filtered]);
 
   return (
-    <section className="flex-1 flex flex-col overflow-hidden" aria-label="Activity log">
+    <section className="flex-1 flex flex-col overflow-hidden bg-bg-primary" aria-label="Activity log">
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-800 shrink-0">
         <Activity size={18} className="text-accent" />
