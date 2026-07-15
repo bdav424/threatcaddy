@@ -2,6 +2,11 @@ import { useState, useCallback, useRef, useEffect, useMemo, type PointerEvent as
 import { createPortal } from 'react-dom';
 import DOMPurify from 'dompurify';
 import { BookOpen, Plus, Trash2, Send, Palette, Upload, Pencil, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import { TextStyle } from '@tiptap/extension-text-style';
+import { FontFamily } from '@tiptap/extension-font-family';
+import { Placeholder } from '@tiptap/extensions';
 import { useJournalPages } from '../../hooks/useJournalPages';
 import type { JournalPage, JournalPageTheme, JournalPaperStyle, Folder } from '../../types';
 import { cn } from '../../lib/utils';
@@ -532,30 +537,92 @@ const DRAW_COLORS: { key: DrawColor; label: string; hex: string }[] = [
   { key: 'eraser', label: 'Eraser', hex: '#ffffff' },
 ];
 
-function RichToolbar({ onFormat }: { onFormat: (cmd: string, val?: string) => void }) {
-  const btn = (label: string, cmd: string, val?: string, title?: string) => (
+// Snapshot of everything the toolbar needs to render its active/inactive
+// state, recomputed via useEditorState so the toolbar re-renders on every
+// selection change (clicking around, arrow keys) — not just on content
+// edits. Reading editor.isActive()/getAttributes() directly in render would
+// use a stale snapshot until *something else* happened to re-render this
+// component, so the H1/Bold/etc. buttons would silently lag one selection
+// behind.
+function useToolbarState(editor: Editor | null) {
+  return useEditorState({
+    editor,
+    selector: (ctx) => {
+      const e = ctx.editor;
+      if (!e) return null;
+      return {
+        h1: e.isActive('heading', { level: 1 }),
+        h2: e.isActive('heading', { level: 2 }),
+        h3: e.isActive('heading', { level: 3 }),
+        bold: e.isActive('bold'),
+        italic: e.isActive('italic'),
+        underline: e.isActive('underline'),
+        bulletList: e.isActive('bulletList'),
+        orderedList: e.isActive('orderedList'),
+        fontFamily: (e.getAttributes('textStyle').fontFamily as string | undefined) ?? '',
+      };
+    },
+  });
+}
+
+// Selection-scoped font control — separate from the page-level "paperFont"
+// selector next to it in the toolbar. paperFont sets the page's *default*
+// font; this applies FontFamily (a TextStyle mark) to just the current
+// selection, the way a real word processor does. Reuses the same
+// FONT_OPTIONS list as the page-level selector for consistency.
+function SelectionFontControl({ editor, fontFamily }: { editor: Editor; fontFamily: string }) {
+  return (
+    <select
+      value={fontFamily}
+      onChange={(e) => {
+        const value = e.target.value;
+        if (value) editor.chain().focus().setFontFamily(value).run();
+        else editor.chain().focus().unsetFontFamily().run();
+      }}
+      title="Font for selected text"
+      className="rounded px-1.5 py-0.5 text-[11px] font-medium text-text-secondary bg-transparent hover:bg-bg-hover hover:text-text-primary transition-colors focus:outline-none"
+    >
+      <option value="">Selection font</option>
+      {FONT_OPTIONS.map((f) => (
+        <option key={f.id} value={f.value}>{f.label}</option>
+      ))}
+    </select>
+  );
+}
+
+function RichToolbar({ editor }: { editor: Editor | null }) {
+  const state = useToolbarState(editor);
+  if (!editor || !state) return null;
+
+  const btn = (label: string, isActive: boolean, onClick: () => void, title?: string) => (
     <button
       type="button"
-      onMouseDown={(e) => { e.preventDefault(); onFormat(cmd, val); }}
-      className="rounded px-1.5 py-0.5 text-[11px] font-medium text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors"
+      onMouseDown={(e) => { e.preventDefault(); onClick(); }}
+      className={cn(
+        'rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors',
+        isActive ? 'bg-accent/15 text-accent' : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary',
+      )}
       title={title ?? label}
     >
       {label}
     </button>
   );
+
   return (
     <div className="flex items-center gap-0.5 flex-wrap">
-      {btn('H1', 'formatBlock', 'h1', 'Heading 1')}
-      {btn('H2', 'formatBlock', 'h2', 'Heading 2')}
-      {btn('H3', 'formatBlock', 'h3', 'Heading 3')}
+      {btn('H1', state.h1, () => editor.chain().focus().toggleHeading({ level: 1 }).run(), 'Heading 1')}
+      {btn('H2', state.h2, () => editor.chain().focus().toggleHeading({ level: 2 }).run(), 'Heading 2')}
+      {btn('H3', state.h3, () => editor.chain().focus().toggleHeading({ level: 3 }).run(), 'Heading 3')}
       <div className="w-px h-4 bg-border-subtle mx-1" />
-      {btn('B', 'bold', undefined, 'Bold')}
-      {btn('I', 'italic', undefined, 'Italic')}
-      {btn('U', 'underline', undefined, 'Underline')}
+      {btn('B', state.bold, () => editor.chain().focus().toggleBold().run(), 'Bold')}
+      {btn('I', state.italic, () => editor.chain().focus().toggleItalic().run(), 'Italic')}
+      {btn('U', state.underline, () => editor.chain().focus().toggleUnderline().run(), 'Underline')}
       <div className="w-px h-4 bg-border-subtle mx-1" />
-      {btn('• List', 'insertUnorderedList', undefined, 'Bulleted list')}
-      {btn('1. List', 'insertOrderedList', undefined, 'Numbered list')}
-      {btn('—', 'insertHorizontalRule', undefined, 'Horizontal rule')}
+      {btn('• List', state.bulletList, () => editor.chain().focus().toggleBulletList().run(), 'Bulleted list')}
+      {btn('1. List', state.orderedList, () => editor.chain().focus().toggleOrderedList().run(), 'Numbered list')}
+      {btn('—', false, () => editor.chain().focus().setHorizontalRule().run(), 'Horizontal rule')}
+      <div className="w-px h-4 bg-border-subtle mx-1" />
+      <SelectionFontControl editor={editor} fontFamily={state.fontFamily} />
     </div>
   );
 }
@@ -1000,84 +1067,90 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
   const [showBgPicker, setShowBgPicker] = useState(false);
   const [drawMode, setDrawMode] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const editorRef = useRef<HTMLDivElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
   const bgButtonRef = useRef<HTMLButtonElement>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastPageId = useRef<string>('');
   const [guideMetrics, setGuideMetrics] = useState<GuideMetrics | null>(null);
 
-  // Sync content into contenteditable when page changes (but not on every keystroke)
+  const scheduleContentSave = useCallback((html: string) => {
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      onUpdate({ content: sanitizeJournalHtml(html) });
+    }, 600);
+  }, [onUpdate]);
+
+  // blockquote/code/codeBlock/link/strike are disabled — none are reachable
+  // from the toolbar, and none are in JOURNAL_PURIFY_CONFIG's ALLOWED_TAGS,
+  // so leaving them enabled would let paste/markdown-shortcuts create markup
+  // the sanitizer then silently mangles on save. Underline is bundled in
+  // StarterKit v3 (unlike v2, no separate extension needed).
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        blockquote: false,
+        code: false,
+        codeBlock: false,
+        link: false,
+        strike: false,
+        heading: { levels: [1, 2, 3] },
+      }),
+      TextStyle,
+      FontFamily,
+      Placeholder.configure({ placeholder: 'Start writing…' }),
+    ],
+    content: sanitizeJournalHtml(page.content || ''),
+    onUpdate: ({ editor: e }) => scheduleContentSave(e.getHTML()),
+    editorProps: {
+      attributes: {
+        class: 'journal-focus-quiet w-full flex-1 rounded-md bg-transparent text-sm leading-7 text-inherit transition-shadow focus-visible:ring-1 focus-visible:ring-accent/25 [&_.is-empty]:before:content-[attr(data-placeholder)] [&_.is-empty]:before:text-text-muted [&_.is-empty]:before:pointer-events-none [&_.is-empty]:before:float-left [&_.is-empty]:before:h-0 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5 [&_ul_ul]:list-[circle] [&_ul_ul_ul]:list-[square] [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-2 [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1',
+      },
+    },
+  }, [page.id]);
+
+  // Title lives in its own plain input, not the editor, so it needs its own
+  // sync-on-page-switch — the `[page.id]` deps array on useEditor above
+  // already handles the rich-text content side by recreating the editor
+  // (and re-seeding it from the fresh `content:` option) whenever the page
+  // changes, so there's no separate setContent call needed here.
   useEffect(() => {
-    if (lastPageId.current !== page.id) {
-      lastPageId.current = page.id;
-      setTitle(page.title);
-      if (editorRef.current) {
-        editorRef.current.innerHTML = sanitizeJournalHtml(page.content || '');
-      }
-    }
-  }, [page.id, page.content, page.title]);
+    if (lastPageId.current === page.id) return;
+    lastPageId.current = page.id;
+    setTitle(page.title);
+  }, [page.id, page.title]);
 
   // Measure the editor's actual rendered line-height + its offset within the
   // paper-styled surface, so ruled guide lines can be aligned to the real text
   // baseline (font-scale settings shift this away from any hardcoded value).
+  //
+  // Deps is just [editor], not [editor, page.id]: useEditor's onRender effect
+  // (registered earlier in this component, so it fires first) destroys the
+  // previous editor and creates the new one in the same effect flush that
+  // page.id changes in — but useSyncExternalStore doesn't hand this component
+  // the new `editor` value until the resulting re-render. An effect keyed on
+  // page.id fires in that same flush, before the re-render, and reads
+  // editor.view.dom off the just-destroyed old instance, which throws
+  // ("[tiptap error]: The editor view is not available"). Keying on `editor`
+  // alone defers this effect to the render where the swap has actually
+  // completed.
   useEffect(() => {
-    const editor = editorRef.current;
+    if (!editor || editor.isDestroyed) return;
+    const editorDom = editor.view.dom as HTMLElement;
     const surface = surfaceRef.current;
-    if (!editor || !surface) return;
+    if (!editorDom || !surface) return;
 
     const measure = () => {
-      const lineHeight = parseFloat(getComputedStyle(editor).lineHeight);
-      const offsetTop = editor.getBoundingClientRect().top - surface.getBoundingClientRect().top;
+      const lineHeight = parseFloat(getComputedStyle(editorDom).lineHeight);
+      const offsetTop = editorDom.getBoundingClientRect().top - surface.getBoundingClientRect().top;
       setGuideMetrics({ lineHeight: Number.isFinite(lineHeight) && lineHeight > 0 ? lineHeight : 28, offsetTop });
     };
 
     measure();
     const ro = new ResizeObserver(measure);
-    ro.observe(editor);
+    ro.observe(editorDom);
     ro.observe(surface);
     return () => ro.disconnect();
-  }, [page.id]);
-
-  const scheduleContentSave = useCallback(() => {
-    clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      if (editorRef.current) {
-        onUpdate({ content: sanitizeJournalHtml(editorRef.current.innerHTML) });
-      }
-    }, 600);
-  }, [onUpdate]);
-
-  // Make sure the caret is inside the editor before applying a format command —
-  // clicking a toolbar button steals focus otherwise, so formatBlock/bold/etc.
-  // would silently no-op or apply to the wrong place. Only reposition the
-  // selection when it's outside the editor entirely — if the user already has
-  // a caret/selection inside, leave it untouched so formatBlock has a real
-  // target instead of always collapsing to the end.
-  const ensureSelectionInEditor = useCallback(() => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) {
-      const range = sel.getRangeAt(0);
-      if (editor.contains(range.commonAncestorContainer)) {
-        editor.focus();
-        return;
-      }
-    }
-    editor.focus();
-    const range = document.createRange();
-    range.selectNodeContents(editor);
-    range.collapse(false);
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-  }, []);
-
-  const handleFormat = useCallback((cmd: string, val?: string) => {
-    ensureSelectionInEditor();
-    document.execCommand(cmd, false, val);
-    scheduleContentSave();
-  }, [ensureSelectionInEditor, scheduleContentSave]);
+  }, [editor]);
 
   const handleTitleBlur = useCallback(() => {
     if (title !== page.title) onUpdate({ title });
@@ -1144,7 +1217,7 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
           ))}
         </select>
         <div className="w-px h-4 bg-border-subtle" />
-        <RichToolbar onFormat={handleFormat} />
+        <RichToolbar editor={editor} />
         <div className="flex-1" />
         <button
           onClick={() => setDrawMode((v) => !v)}
@@ -1231,15 +1304,11 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
           />
           {/* Rich text content — flex-1 so the focus-ring box fills the rest of the
               panel instead of stopping at a fixed min-height with dead space below
-              it on tall viewports. */}
-          <div
-            ref={editorRef}
-            contentEditable
-            suppressContentEditableWarning
-            onInput={scheduleContentSave}
-            data-placeholder="Start writing…"
-            className="journal-focus-quiet w-full flex-1 rounded-md bg-transparent text-sm leading-7 text-inherit transition-shadow focus-visible:ring-1 focus-visible:ring-accent/25 empty:before:content-[attr(data-placeholder)] empty:before:text-text-muted empty:before:pointer-events-none [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5 [&_ul_ul]:list-[circle] [&_ul_ul_ul]:list-[square] [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-2 [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1"
-          />
+              it on tall viewports. The actual contentEditable styling (focus ring,
+              placeholder, heading/list rules) lives on editorProps.attributes.class
+              in the useEditor() call above, not here — EditorContent's own
+              className is just the layout wrapper. */}
+          <EditorContent editor={editor} className="w-full flex-1 flex flex-col" />
           {/* Read-only drawing overlay — always visible when drawing data exists */}
           {page.drawingData && !drawMode && (
             isLegacyRasterDrawing(page.drawingData) ? (
