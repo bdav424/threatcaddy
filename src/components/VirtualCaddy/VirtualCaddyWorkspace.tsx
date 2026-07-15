@@ -132,6 +132,7 @@ export function VirtualCaddyWorkspace() {
         title: selectedFile,
         content: `# ${selectedFile}\n\n*Ingested from VirtualCaddy — air-gapped file read. No network activity.*\n\n\`\`\`\n${content}\n\`\`\``,
         tags: [],
+        folderId: selectedFolderId,
       });
       setIngestStatus('ok');
       setTimeout(() => setIngestStatus('idle'), 2500);
