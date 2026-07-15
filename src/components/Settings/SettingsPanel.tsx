@@ -1354,7 +1354,12 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
 
           {/* Investigation card color mode */}
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-300">{t('investigationColorMode.label')}</h3>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-300">{t('investigationColorMode.label')}</h3>
+              <p className="mt-0.5 text-[11px] text-gray-500">
+                Controls the accent on investigation cards in the Investigations Hub and sidebar. Only visible on investigations that have a classification level (TLP) and/or a manually assigned color set.
+              </p>
+            </div>
             <div className="flex gap-2">
               {(['manual', 'tlp', 'combined'] as const).map((mode) => (
                 <button
@@ -1372,6 +1377,11 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
                 </button>
               ))}
             </div>
+            <p className="text-[10px] text-gray-600">
+              {invColorMode === 'manual' && 'Shows only the color strip from the investigation’s own Color field — no background tint.'}
+              {invColorMode === 'tlp' && 'Tints the whole card background using the TLP classification level (RED/AMBER/GREEN) — no color strip.'}
+              {invColorMode === 'combined' && 'Shows the color strip, and tints the background using the investigation’s Color field (or TLP level if no color is set).'}
+            </p>
           </div>
         </div>
       )}

@@ -134,16 +134,35 @@ export async function executeReadEvidence(input: Record<string, unknown>, folder
     if (item && (item.trashed || (folderId && item.folderId !== folderId))) {
       item = undefined;
     }
-  } else if (title || fileName) {
+  }
+  // Fall through to title/fileName matching even when an id was given but didn't
+  // resolve — a model that hallucinated or mistyped an id from an earlier
+  // list_evidence/search_evidence result may still have gotten the title/fileName
+  // right (or the caller may have passed both). Previously a bad id short-circuited
+  // straight to "Evidence not found" with no fallback and no way to self-correct.
+  if (!item && (title || fileName)) {
     const lower = (title || fileName).toLowerCase();
     const all = folderId
       ? await db.evidenceItems.where('folderId').equals(folderId).and(evidence => !evidence.trashed).toArray()
       : await db.evidenceItems.filter(evidence => !evidence.trashed).toArray();
     item = all.find(evidence => evidence.title.toLowerCase() === lower || evidence.fileName.toLowerCase() === lower)
-      || all.find(evidence => evidence.title.toLowerCase().includes(lower) || evidence.fileName.toLowerCase().includes(lower));
+      || all.find(evidence => evidence.title.toLowerCase().includes(lower) || evidence.fileName.toLowerCase().includes(lower))
+      || all.find(evidence => lower.includes(evidence.title.toLowerCase()) || lower.includes(evidence.fileName.toLowerCase()));
   }
 
-  if (!item) return JSON.stringify({ error: 'Evidence not found' });
+  if (!item) {
+    // Same self-healing pattern as get_investigation_context/get_investigation_summary:
+    // don't just fail — hand back what's actually available so the model can retry
+    // with a correct id instead of the caller (or the analyst, reading the chat)
+    // hitting a dead end.
+    const available = folderId
+      ? await db.evidenceItems.where('folderId').equals(folderId).and(evidence => !evidence.trashed).toArray()
+      : await db.evidenceItems.filter(evidence => !evidence.trashed).toArray();
+    return JSON.stringify({
+      error: 'Evidence not found. Use one of the ids below, or call list_evidence / search_evidence again.',
+      available: available.slice(0, 50).map(e => ({ id: e.id, title: e.title, fileName: e.fileName })),
+    });
+  }
 
   const contentStart = Math.min(offset, item.content.length);
   const contentEnd = Math.min(item.content.length, contentStart + length);

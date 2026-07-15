@@ -2051,6 +2051,28 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-gray-300">Bordered Panels</h3>
         <div className="space-y-4 rounded-xl border border-gray-700/70 bg-gray-900/40 p-4">
+          {/* Panel opacity lives in its own section, independent of Frosted panels —
+              it applies to bordered panels whether frost is on or off (frost only adds
+              the blur/grain/sheen glass treatment on top). Keeping it nested under the
+              Frosted panels toggle previously implied a dependency that doesn't exist. */}
+          <div className="space-y-1 rounded-lg border border-gray-700/60 bg-black/10 px-3 py-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-gray-300">Panel opacity</span>
+              <span className="text-[10px] text-gray-600">{settings.panelTransparency ?? 30}%</span>
+            </div>
+            <div className="mt-0.5 text-[11px] text-gray-500">How solid bordered panels, the side menu, buttons, and cards are — independent of Frosted panels below.</div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={settings.panelTransparency ?? 30}
+              onChange={(e) => onUpdateSettings({ panelTransparency: parseInt(e.target.value, 10) })}
+              className="mt-2 w-full accent-accent"
+            />
+            <p className="text-[10px] text-gray-600">0 = transparent · 100 = solid</p>
+          </div>
+
           <div className="space-y-3 rounded-lg border border-gray-700/60 bg-black/10 px-3 py-2.5">
             <div className="flex items-center justify-between">
               <div>
@@ -2066,22 +2088,6 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
                 />
                 <div className="peer h-5 w-9 rounded-full bg-gray-700 transition-colors peer-checked:bg-accent peer-focus:ring-1 peer-focus:ring-accent/50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-4" />
               </label>
-            </div>
-            <div className="space-y-1 pt-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-gray-500">Panel opacity</span>
-                <span className="text-[10px] text-gray-600">{settings.panelTransparency ?? 30}%</span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                step={5}
-                value={settings.panelTransparency ?? 30}
-                onChange={(e) => onUpdateSettings({ panelTransparency: parseInt(e.target.value, 10) })}
-                className="w-full accent-accent"
-              />
-              <p className="text-[10px] text-gray-600">0 = transparent · 100 = solid</p>
             </div>
           </div>
 

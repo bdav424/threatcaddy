@@ -689,16 +689,26 @@ body.tc-desktop-shell-body {
 }
 
 /* ─── Background image mode: make deep surfaces transparent ─── */
+/* Scoped to body.bg-gray-950 specifically, NOT the bare .bg-gray-950 class —
+   bg-gray-950 is also reused incidentally (as just "a dark color", nothing to
+   do with exposing the body-level effect canvas) by ~8 unrelated components
+   including the Appearance settings' own pattern-preview thumbnail cards,
+   GraphView, IOCStatsView, PassphraseDialog, and others. The bare selector
+   made every one of them go fully transparent — exposing the animated
+   background straight through them — whenever a background image/effect was
+   active, which read as those elements looking "washed out". body legitimately
+   carries this class via useSettings.ts's document.body.classList.add
+   ('bg-gray-950'), so body.bg-gray-950 reaches the real intended target only. */
 .has-bg-image body,
-.has-bg-image .bg-gray-950 {
+.has-bg-image body.bg-gray-950 {
   background-color: transparent !important;
 }
 
-.has-window-glass .bg-gray-950 {
+.has-window-glass body.bg-gray-950 {
   background-color: transparent !important;
 }
 
-.has-bg-effect .bg-gray-950 {
+.has-bg-effect body.bg-gray-950 {
   background-color: transparent !important;
 }
 
@@ -759,7 +769,7 @@ body.tc-desktop-shell-body {
 }
 
 .has-bg-image.light body,
-.has-bg-image.light .bg-gray-950 {
+.has-bg-image.light body.bg-gray-950 {
   background-color: transparent !important;
 }
 
@@ -871,7 +881,18 @@ body.tc-desktop-shell-body {
 .has-panel-glass .bg-bg-base\/70,
 .has-panel-glass [class*="--color-surface"],
 .has-panel-glass [class*="--color-input-bg"] {
-  backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%);
+  /* brightness() restored at a conservative value — a previous session removed
+     brightness(1.28) from this exact rule to fix a "grey wash" bug, but the
+     .app-window-sheen block below documents that this brightness term is
+     specifically what's supposed to make panels "catch the light" more than
+     bare background does. Losing it collapsed that differentiation: the sheen
+     ended up reading as roughly equally visible on-panel and on-background,
+     which is why the opacity slider felt like "it did nothing" (the dominant
+     visual signal — the sheen — didn't change with it) and why the sheen
+     looked like it covered the whole page. 1.06 is deliberately far below the
+     1.28 that caused grey wash; verified live that panel/card content and text
+     don't wash out at this value. */
+  backdrop-filter: blur(var(--tc-panel-glass-blur)) saturate(140%) brightness(var(--tc-panel-glass-brightness, 1.06));
 }
 
 /* Frosted glass: GRAIN only (etched-glass surface texture). The specular SHEEN
@@ -944,16 +965,22 @@ body.tc-desktop-shell-body {
   pointer-events: none;
   opacity: 0;
   transition: opacity 200ms ease;
+  /* Stop alphas lowered from 0.085/0.06/0.045 — the raw layer paints on bare
+     background too (nothing clips it to panels; see the block comment above
+     the .app-window-sheen rule for why that's the deliberate architecture),
+     so what reads as "sheen on the whole page" is this un-amplified base
+     value. The panel backdrop-filter's restored brightness() above is what's
+     now responsible for making panels stand out from that lowered baseline. */
   background-image: linear-gradient(
     var(--tc-sheen-angle, 115deg),
     transparent 6%,
-    rgba(255, 255, 255, 0.085) 12%,
+    rgba(255, 255, 255, 0.055) 12%,
     rgba(255, 255, 255, 0) 19%,
     transparent 41%,
-    rgba(255, 255, 255, 0.06) 47%,
+    rgba(255, 255, 255, 0.04) 47%,
     rgba(255, 255, 255, 0) 53%,
     transparent 76%,
-    rgba(255, 255, 255, 0.045) 82%,
+    rgba(255, 255, 255, 0.03) 82%,
     rgba(255, 255, 255, 0) 88%
   );
 }

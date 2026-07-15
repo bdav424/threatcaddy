@@ -464,6 +464,30 @@ export function NoteEditor({
     };
   }, [flushPendingSave]);
 
+  // A page refresh/close doesn't run this component's unmount cleanup the way
+  // in-app navigation does — the whole JS context can be torn down mid-flight,
+  // so a change made inside the 500ms scheduleSave debounce window right before
+  // a refresh was silently lost: the timer never got a chance to fire. Content
+  // edits are the one thing here that's continuously typed into a debounce
+  // (chat sends and evidence imports save on discrete, non-debounced actions,
+  // which is why this only ever showed up for notes). visibilitychange fires
+  // reliably when a refresh starts hiding the page — earlier and more
+  // consistently than beforeunload, which some browsers throttle/skip — so
+  // flush there, with pagehide/beforeunload as a fallback for browsers that
+  // don't fire visibilitychange on unload.
+  useEffect(() => {
+    const flush = () => flushPendingSave();
+    const handleVisibility = () => { if (document.visibilityState === 'hidden') flush(); };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('pagehide', flush);
+    window.addEventListener('beforeunload', flush);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('beforeunload', flush);
+    };
+  }, [flushPendingSave]);
+
   const scheduleSave = useCallback((updates: Partial<Note>) => {
     clearTimeout(saveTimeoutRef.current);
     markPending();
