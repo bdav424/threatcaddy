@@ -807,35 +807,41 @@ body.tc-desktop-shell-body {
   background-color: rgba(var(--tc-panel-bg-rgb, 10, 12, 20), var(--tc-panel-glass-opacity, 0.3)) !important;
 }
 
-.has-panel-glass .bg-gray-900,
-.has-panel-glass .bg-gray-900\/80,
-.has-panel-glass .bg-gray-900\/50,
-.has-panel-glass .bg-gray-900\/40,
-.has-panel-glass .bg-gray-900\/30,
-.has-panel-glass .bg-gray-800,
-.has-panel-glass .bg-gray-800\/60,
-.has-panel-glass .bg-gray-800\/50,
-.has-panel-glass .bg-gray-800\/40,
-.has-panel-glass .bg-gray-700,
-.has-panel-glass .bg-gray-700\/50,
-.has-panel-glass .bg-gray-700\/30,
-.has-panel-glass .sidebar-glass,
-.has-panel-glass [class*="bg-bg-deep"],
-.has-panel-glass [class*="bg-bg-primary"],
-.has-panel-glass [class*="bg-bg-surface"],
-.has-panel-glass [class*="bg-bg-raised"],
-.has-panel-glass .bg-bg-hover,
-.has-panel-glass .bg-bg-hover\/50,
-.has-panel-glass .bg-bg-hover\/55,
-.has-panel-glass .bg-bg-hover\/60,
-.has-panel-glass .bg-bg-hover\/70,
-.has-panel-glass .bg-bg-active,
-.has-panel-glass .bg-bg-base,
-.has-panel-glass .bg-bg-base\/50,
-.has-panel-glass .bg-bg-base\/60,
-.has-panel-glass .bg-bg-base\/70,
-.has-panel-glass [class*="--color-surface"],
-.has-panel-glass [class*="--color-input-bg"] {
+/* LOAD-BEARING: classification-bearing surfaces always opt out of the frost
+   border tint, same as the .rgb-ring exclusion above — color is data. Without
+   this, .has-panel-glass's `border-color: ... !important` clobbers the TLP
+   color applied via inline `style={{ borderColor }}` on things like the
+   sidebar's active-investigation card (Sidebar.tsx `[data-tlp]` button),
+   since an external !important rule always wins over a plain inline style. */
+.has-panel-glass .bg-gray-900:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-gray-900\/80:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-gray-900\/50:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-gray-900\/40:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-gray-900\/30:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-gray-800:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-gray-800\/60:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-gray-800\/50:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-gray-800\/40:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-gray-700:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-gray-700\/50:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-gray-700\/30:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .sidebar-glass:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass [class*="bg-bg-deep"]:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass [class*="bg-bg-primary"]:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass [class*="bg-bg-surface"]:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass [class*="bg-bg-raised"]:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-bg-hover:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-bg-hover\/50:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-bg-hover\/55:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-bg-hover\/60:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-bg-hover\/70:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-bg-active:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-bg-base:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-bg-base\/50:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-bg-base\/60:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass .bg-bg-base\/70:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass [class*="--color-surface"]:not([data-tlp], [class*="tlp-"], [data-investigation-status]),
+.has-panel-glass [class*="--color-input-bg"]:not([data-tlp], [class*="tlp-"], [data-investigation-status]) {
   border-color: var(--tc-panel-glass-border) !important;
 }
 

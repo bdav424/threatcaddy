@@ -39,4 +39,25 @@ describe('RGB border TLP guard', () => {
     expect(css).toMatch(/@media\s*\(prefers-reduced-motion\s*:\s*reduce\)\s*\{\s*\.rgb-ring\s*\{\s*animation\s*:\s*none/);
     expect(css).toMatch(/@media\s*\(prefers-reduced-motion\s*:\s*reduce\)\s*\{\s*\.app-window-chrome-ring\s*\{\s*animation\s*:\s*none/);
   });
+
+  it('hard-stops the frosted-panel border-color override on TLP/status-bearing elements', () => {
+    // .has-panel-glass's border-color: ... !important previously clobbered the
+    // inline TLP border style on the sidebar's active-investigation card
+    // (Sidebar.tsx sets style={{ borderColor: tlpFullBorderColor }} on a
+    // [data-tlp] button) because an external !important rule always beats a
+    // plain inline style. Every compound selector feeding that rule must
+    // exclude classification-bearing surfaces.
+    const borderRuleMatch = css.match(/\.has-panel-glass \.bg-gray-900:not\([\s\S]*?border-color:\s*var\(--tc-panel-glass-border\)\s*!important;\s*\}/);
+    expect(borderRuleMatch).not.toBeNull();
+    const borderRule = borderRuleMatch![0];
+    expect(borderRule).toMatch(/:not\(\[data-tlp\],\s*\[class\*="tlp-"\],\s*\[data-investigation-status\]\)/);
+    // Every selector line in this rule (not just the first) must carry the exclusion.
+    // Split on ",\n" (selector-per-line) rather than bare "," since each :not()
+    // argument list itself contains commas.
+    const selectorLines = borderRule.split('{')[0].split(',\n').map((s) => s.trim()).filter(Boolean);
+    expect(selectorLines.length).toBeGreaterThan(10);
+    for (const line of selectorLines) {
+      expect(line).toMatch(/:not\(\[data-tlp\]/);
+    }
+  });
 });
