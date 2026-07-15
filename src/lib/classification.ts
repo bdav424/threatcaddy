@@ -79,6 +79,48 @@ export function getInheritedClsLevel(
   return bestLevel;
 }
 
+const CLS_TEXT_MARKERS: Array<{ pattern: RegExp; level: string }> = [
+  { pattern: /\bTLP\s*:?\s*RED\b/i, level: 'TLP:RED' },
+  { pattern: /\bTLP\s*:?\s*AMBER\s*\+\s*STRICT\b/i, level: 'TLP:AMBER+STRICT' },
+  { pattern: /\bTLP\s*:?\s*AMBER\b/i, level: 'TLP:AMBER' },
+  { pattern: /\bTLP\s*:?\s*GREEN\b/i, level: 'TLP:GREEN' },
+  { pattern: /\bTLP\s*:?\s*(CLEAR|WHITE)\b/i, level: 'TLP:CLEAR' },
+  // Non-TLP confidentiality banners commonly found in ingested documents/emails.
+  // None of these name a TLP color, so they map onto the AMBER tier — "limited
+  // disclosure, restricted to participants' organizations" is the closest official
+  // TLP definition to "Confidential / Company Restricted / Employees Only". This
+  // is conservative on purpose (same spirit as isAboveClsThreshold's "unknown
+  // level -> hide" default above), and it means every downstream consumer of
+  // clsLevel (badge styling, border color, screenshare threshold, folder TLP
+  // escalation) picks these up for free without needing to know the source wording.
+  { pattern: /\bconfidential\b/i, level: 'TLP:AMBER' },
+  { pattern: /\b(company|internal)\s+restricted\b/i, level: 'TLP:AMBER' },
+  { pattern: /\bemployees?\s+only\b/i, level: 'TLP:AMBER' },
+  { pattern: /\binternal\s+use\s+only\b/i, level: 'TLP:AMBER' },
+  { pattern: /\brestricted\s+distribution\b/i, level: 'TLP:AMBER' },
+];
+
+/**
+ * Scans free text (evidence content, OCR text, etc.) for explicit TLP markers
+ * and common non-TLP confidentiality banners, returning the most restrictive
+ * level found. Returns undefined when nothing matches.
+ */
+export function detectClsLevelFromText(text: string | undefined | null): string | undefined {
+  if (!text) return undefined;
+  let best: string | undefined;
+  let bestIdx = -1;
+  for (const { pattern, level } of CLS_TEXT_MARKERS) {
+    if (pattern.test(text)) {
+      const idx = DEFAULT_CLS_LEVELS.indexOf(level);
+      if (idx > bestIdx) {
+        bestIdx = idx;
+        best = level;
+      }
+    }
+  }
+  return best;
+}
+
 /** Hex color for a TLP/PAP bottom-border indicator. Returns undefined for CLEAR/WHITE/unknown. */
 export function getTlpBorderColor(level: string | undefined): string | undefined {
   if (!level) return undefined;

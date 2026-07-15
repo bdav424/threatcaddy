@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  detectClsLevelFromText,
   getClsBadgeStyle,
   getEffectiveClsLevels,
   isAboveClsThreshold,
@@ -140,6 +141,43 @@ describe('resolveIOCClsLevel', () => {
     expect(resolveIOCClsLevel()).toBe('');
     expect(resolveIOCClsLevel(undefined, undefined, undefined)).toBe('');
     expect(resolveIOCClsLevel('', '', '')).toBe('');
+  });
+});
+
+// ── detectClsLevelFromText ──────────────────────────────────────────
+
+describe('detectClsLevelFromText', () => {
+  it('returns undefined for empty/missing text', () => {
+    expect(detectClsLevelFromText(undefined)).toBeUndefined();
+    expect(detectClsLevelFromText(null)).toBeUndefined();
+    expect(detectClsLevelFromText('')).toBeUndefined();
+    expect(detectClsLevelFromText('nothing sensitive here')).toBeUndefined();
+  });
+
+  it('detects explicit TLP markers regardless of colon/spacing', () => {
+    expect(detectClsLevelFromText('Classification: TLP:RED')).toBe('TLP:RED');
+    expect(detectClsLevelFromText('TLP RED — internal only')).toBe('TLP:RED');
+    expect(detectClsLevelFromText('tlp:amber')).toBe('TLP:AMBER');
+    expect(detectClsLevelFromText('TLP:AMBER+STRICT')).toBe('TLP:AMBER+STRICT');
+    expect(detectClsLevelFromText('TLP GREEN')).toBe('TLP:GREEN');
+    expect(detectClsLevelFromText('TLP:CLEAR')).toBe('TLP:CLEAR');
+    expect(detectClsLevelFromText('TLP:WHITE')).toBe('TLP:CLEAR');
+  });
+
+  it('does not mistake TLP:AMBER+STRICT for plain TLP:AMBER', () => {
+    expect(detectClsLevelFromText('Marked TLP:AMBER+STRICT for this doc')).toBe('TLP:AMBER+STRICT');
+  });
+
+  it('maps non-TLP confidentiality banners to TLP:AMBER', () => {
+    expect(detectClsLevelFromText('CONFIDENTIAL - Company Restricted')).toBe('TLP:AMBER');
+    expect(detectClsLevelFromText('Employees Only')).toBe('TLP:AMBER');
+    expect(detectClsLevelFromText('Internal Use Only')).toBe('TLP:AMBER');
+    expect(detectClsLevelFromText('Restricted Distribution')).toBe('TLP:AMBER');
+  });
+
+  it('takes the most restrictive marker when multiple are present', () => {
+    expect(detectClsLevelFromText('CONFIDENTIAL document. Also marked TLP:RED.')).toBe('TLP:RED');
+    expect(detectClsLevelFromText('TLP:GREEN doc, but also Employees Only')).toBe('TLP:AMBER');
   });
 });
 

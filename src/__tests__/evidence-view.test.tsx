@@ -310,3 +310,53 @@ describe('EvidenceView inspect preview', () => {
     expect(preview.getByText(/Showing 2 of 3 visible lines/)).toBeInTheDocument();
   });
 });
+
+describe('EvidenceView TLP classification', () => {
+  it('shows a TLP chip and colored border on a classified evidence card, matching the level', () => {
+    render(
+      <EvidenceView
+        folderId="folder-1"
+        folderName="Weaponized Clipboard"
+        items={[makeEvidenceItem({ clsLevel: 'TLP:RED' })]}
+        onImportFiles={vi.fn(async () => [])}
+        onOpenChat={vi.fn()}
+      />,
+    );
+
+    const card = document.querySelector('article[data-tlp="TLP:RED"]') as HTMLElement | null;
+    expect(card).not.toBeNull();
+    expect(card!.style.borderColor).toBe('rgb(239, 68, 68)'); // getTlpBorderColor('TLP:RED')
+    expect(within(card!).getByText('TLP:RED')).toBeInTheDocument();
+  });
+
+  it('omits the chip and data-tlp for unclassified evidence', () => {
+    render(
+      <EvidenceView
+        folderId="folder-1"
+        folderName="Weaponized Clipboard"
+        items={[makeEvidenceItem()]}
+        onImportFiles={vi.fn(async () => [])}
+        onOpenChat={vi.fn()}
+      />,
+    );
+
+    const card = document.querySelector('article') as HTMLElement | null;
+    expect(card).not.toBeNull();
+    expect(card!.hasAttribute('data-tlp')).toBe(false);
+    expect(card!.style.borderColor).toBe('');
+  });
+
+  it('omits the chip for TLP:CLEAR (not a meaningful classification signal)', () => {
+    render(
+      <EvidenceView
+        folderId="folder-1"
+        folderName="Weaponized Clipboard"
+        items={[makeEvidenceItem({ clsLevel: 'TLP:CLEAR' })]}
+        onImportFiles={vi.fn(async () => [])}
+        onOpenChat={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText('TLP:CLEAR')).not.toBeInTheDocument();
+  });
+});

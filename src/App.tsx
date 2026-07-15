@@ -51,7 +51,8 @@ const OperationNameGenerator = lazy(() => import('./components/Common/OperationN
 import { useActivityLog } from './hooks/useActivityLog';
 import { ActivityLogContext } from './hooks/ActivityLogContext';
 import { ScreenshareContext } from './hooks/ScreenshareContext';
-import { getEffectiveClsLevels, isAboveClsThreshold } from './lib/classification';
+import { getEffectiveClsLevels, isAboveClsThreshold, detectClsLevelFromText } from './lib/classification';
+import { effectiveTlpLevel } from './lib/tlp-inspector';
 import { clipBuffer } from './lib/clipBuffer';
 import { formatBytes, openFilePicker, getDroppedFiles, dispatchFile, type FileOpenDetail } from './lib/file-handler';
 import { hasPendingChanges } from './lib/pending-changes';
@@ -1628,10 +1629,19 @@ const AppInner = memo(function AppInner({
       }
 
       for (const draft of drafts) {
+        // Evidence inherits the investigation's TLP, but its own content can carry
+        // an explicit TLP marker or a confidentiality banner ("Confidential",
+        // "Company Restricted", "Employees Only", ...) that's more restrictive than
+        // the folder — e.g. a RED-marked document dropped into a GREEN investigation.
+        // effectiveTlpLevel takes the max of the two, same as the sidebar's
+        // investigation-card badge does for folder-vs-entity TLP.
+        const detectedClsLevel = detectClsLevelFromText(draft.content);
         const item = await evidenceItemsHook.createEvidenceItem({
           ...draft,
           folderId: selectedFolderId,
-          clsLevel: selectedFolder?.clsLevel,
+          clsLevel: detectedClsLevel
+            ? effectiveTlpLevel(selectedFolder?.clsLevel, detectedClsLevel)
+            : selectedFolder?.clsLevel,
         });
 
         const enabledIOCTypes = settings.tiEnabledIOCTypes as IOCType[] | undefined;

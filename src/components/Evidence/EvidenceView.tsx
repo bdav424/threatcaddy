@@ -30,6 +30,7 @@ import {
   renderEvidenceTableIOCCandidatesText,
   type EvidenceTableIOCCandidate,
 } from '../../lib/evidence-ioc-candidates';
+import { getClsBadgeStyle, getTlpBorderColor } from '../../lib/classification';
 
 interface EvidenceViewProps {
   folderId?: string;
@@ -473,13 +474,18 @@ export function EvidenceView({
                         <h3 className="text-sm font-semibold text-text-primary">No evidence matches</h3>
                         <p className="mt-1 text-xs text-text-muted">Try a file name, tag, type, or text from the extracted content.</p>
                       </div>
-                    ) : filteredItems.map((item) => (
+                    ) : filteredItems.map((item) => {
+                      const tlpBorderColor = getTlpBorderColor(item.clsLevel);
+                      const clsStyle = item.clsLevel ? getClsBadgeStyle(item.clsLevel) : null;
+                      return (
                       <article
                         key={item.id}
+                        data-tlp={item.clsLevel || undefined}
                         className={cn(
                           'rounded-lg border bg-bg-surface p-3 hover:border-border-medium transition-colors',
                           selectedItem?.id === item.id ? 'border-accent-blue/60' : 'border-border-subtle',
                         )}
+                        style={tlpBorderColor ? { borderColor: tlpBorderColor } : undefined}
                       >
                         <div className="flex items-start gap-3">
                           <div className="h-9 w-9 rounded-md bg-bg-raised text-accent-blue flex items-center justify-center shrink-0">
@@ -491,6 +497,11 @@ export function EvidenceView({
                               <span className="text-[10px] rounded-full bg-accent-blue/10 text-accent-blue px-1.5 py-0.5">
                                 {item.fileType}
                               </span>
+                              {clsStyle && item.clsLevel !== 'TLP:CLEAR' && (
+                                <span className={cn('text-[10px] font-semibold rounded-full border px-1.5 py-0.5', clsStyle.bg, clsStyle.text, clsStyle.border)}>
+                                  {item.clsLevel}
+                                </span>
+                              )}
                               {item.chunkCount > 1 && (
                                 <span className="text-[10px] rounded-full bg-bg-raised text-text-muted px-1.5 py-0.5">
                                   {item.chunkIndex}/{item.chunkCount}
@@ -518,15 +529,30 @@ export function EvidenceView({
                           </button>
                         </div>
                       </article>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {selectedItem && (
-                    <aside className="rounded-lg border border-border-subtle bg-bg-surface min-h-[380px] max-h-[760px] overflow-hidden flex flex-col">
+                    <aside
+                      data-tlp={selectedItem.clsLevel || undefined}
+                      className="rounded-lg border border-border-subtle bg-bg-surface min-h-[380px] max-h-[760px] overflow-hidden flex flex-col"
+                      style={getTlpBorderColor(selectedItem.clsLevel) ? { borderColor: getTlpBorderColor(selectedItem.clsLevel) } : undefined}
+                    >
                       <div className="border-b border-border-subtle px-3 py-2 space-y-2">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <h3 className="text-sm font-semibold text-text-primary truncate">{selectedItem.title}</h3>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-sm font-semibold text-text-primary truncate">{selectedItem.title}</h3>
+                              {selectedItem.clsLevel && selectedItem.clsLevel !== 'TLP:CLEAR' && (() => {
+                                const clsStyle = getClsBadgeStyle(selectedItem.clsLevel);
+                                return (
+                                  <span className={cn('text-[10px] font-semibold rounded-full border px-1.5 py-0.5 shrink-0', clsStyle.bg, clsStyle.text, clsStyle.border)}>
+                                    {selectedItem.clsLevel}
+                                  </span>
+                                );
+                              })()}
+                            </div>
                             <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-text-muted">
                               <span>{selectedItem.extractionStatus}</span>
                               <span>{formatBytes(selectedItem.size)}</span>
