@@ -66,6 +66,7 @@
     "@types/nunjucks": "^3.2.6",
     "cytoscape": "^3.33.1",
     "cytoscape-cose-bilkent": "^4.1.0",
+    "date-fns": "^4.4.0",
     "dexie": "^4.3.0",
     "diff-match-patch": "^1.0.5",
     "dompurify": "^3.4.11",

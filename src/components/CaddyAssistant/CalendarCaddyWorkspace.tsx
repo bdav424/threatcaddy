@@ -47,6 +47,17 @@ import { useCalendarAccounts } from '../../hooks/useCalendarAccounts';
 import { toSyncAccount } from '../../lib/calendar-accounts';
 import type { CalendarEvent, EventSource } from '../../types';
 import { parseICSContent } from '../../lib/ics-parser';
+import {
+  addDays,
+  addMonths,
+  addYears,
+  addMinutes,
+  startOfDay,
+  startOfMonth,
+  startOfWeek as dateFnsStartOfWeek,
+  isSameDay as sameDay,
+  isSameMonth as sameMonth,
+} from 'date-fns';
 
 type CalendarViewMode = 'week' | 'month' | 'year';
 type CalendarDensity = 'condensed' | 'medium' | 'spacious';
@@ -610,61 +621,22 @@ function cloneDate(date: Date) {
   return new Date(date.getTime());
 }
 
-function startOfDay(date: Date) {
-  return createDate(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function startOfMonth(date: Date) {
-  return createDate(date.getFullYear(), date.getMonth(), 1);
-}
-
-function addDays(date: Date, amount: number) {
-  const next = cloneDate(date);
-  next.setDate(next.getDate() + amount);
-  return next;
-}
-
-function addMonths(date: Date, amount: number) {
-  const next = cloneDate(date);
-  next.setMonth(next.getMonth() + amount);
-  return next;
-}
-
-function addYears(date: Date, amount: number) {
-  const next = cloneDate(date);
-  next.setFullYear(next.getFullYear() + amount);
-  return next;
-}
-
-function addMinutes(date: Date, amount: number) {
-  const next = cloneDate(date);
-  next.setMinutes(next.getMinutes() + amount);
-  return next;
-}
-
+// endOfDay is deliberately NOT date-fns's endOfDay (23:59:59.999 of the same
+// day) — clampTimeToDay below needs "midnight of the next day" as an
+// exclusive-feeling upper bound, which is what this always meant here.
 function endOfDay(date: Date) {
   return addDays(startOfDay(date), 1);
 }
 
+// date-fns's startOfWeek takes weekStartsOn as an options object rather than
+// a positional arg; wrapped so the many call sites below don't all need to
+// change shape.
 function startOfWeek(date: Date, weekStartIndex = DEFAULT_WEEK_START_INDEX) {
-  const normalized = startOfDay(date);
-  const day = normalized.getDay();
-  const delta = -((day - weekStartIndex + 7) % 7);
-  return addDays(normalized, delta);
+  return dateFnsStartOfWeek(date, { weekStartsOn: weekStartIndex as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
 }
 
 function getOrderedWeekdayLabels(weekStartIndex = DEFAULT_WEEK_START_INDEX) {
   return Array.from({ length: 7 }, (_, index) => WEEKDAY_LABELS[(weekStartIndex + index) % 7]);
-}
-
-function sameDay(left: Date, right: Date) {
-  return left.getFullYear() === right.getFullYear()
-    && left.getMonth() === right.getMonth()
-    && left.getDate() === right.getDate();
-}
-
-function sameMonth(left: Date, right: Date) {
-  return left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth();
 }
 
 function clampDateRange(left: Date, right: Date) {

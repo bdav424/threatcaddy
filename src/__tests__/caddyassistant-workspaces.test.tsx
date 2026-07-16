@@ -773,6 +773,47 @@ describe('AssistantCaddy workspaces', () => {
     expect(screen.queryByRole('button', { name: 'Pop out selected agenda' })).not.toBeInTheDocument();
   });
 
+  it('builds the month grid with date-fns date math (correct leading/trailing days)', () => {
+    render(<CalendarCaddyWorkspace />);
+
+    // "today" is fixed to June 5 2026 (a Friday) in beforeEach, so the month
+    // grid opens on June 2026. Week starts Sunday, so the grid should lead
+    // with May 31 2026 (the Sunday before June 1) and trail through July 4
+    // 2026 (the Saturday closing out June's last week).
+    const cells = document.querySelectorAll('[data-calendar-month-cell="true"]');
+    expect(cells.length).toBeGreaterThan(0);
+    expect(cells[0]).toHaveAttribute('data-calendar-date', '2026-05-31');
+    expect(cells[cells.length - 1]).toHaveAttribute('data-calendar-date', '2026-07-04');
+  });
+
+  it('navigates the month grid forward and back to the same state (addMonths/startOfMonth)', () => {
+    render(<CalendarCaddyWorkspace />);
+
+    const nextBtn = screen.getByRole('button', { name: 'Next calendar period' });
+    const prevBtn = screen.getByRole('button', { name: 'Previous calendar period' });
+
+    for (let i = 0; i < 12; i++) fireEvent.click(nextBtn);
+    expect(document.querySelector('[data-calendar-header-date="true"]')).toHaveTextContent('Tuesday, June 1, 2027');
+
+    for (let i = 0; i < 12; i++) fireEvent.click(prevBtn);
+    expect(document.querySelector('[data-calendar-header-date="true"]')).toHaveTextContent('Monday, June 1, 2026');
+  });
+
+  it('switches to year view and navigates a year forward/back (addYears)', () => {
+    render(<CalendarCaddyWorkspace />);
+
+    fireEvent.click(screen.getByRole('button', { name: /year/i }));
+    expect(screen.getByRole('button', { name: /year/i })).toHaveAttribute('aria-pressed', 'true');
+
+    const nextBtn = screen.getByRole('button', { name: 'Next calendar period' });
+    fireEvent.click(nextBtn);
+    expect(screen.getByText('2027')).toBeInTheDocument();
+
+    const prevBtn = screen.getByRole('button', { name: 'Previous calendar period' });
+    fireEvent.click(prevBtn);
+    expect(screen.getByText('2026')).toBeInTheDocument();
+  });
+
   it('smart-minimizes CalendarCaddy secondary tools while keeping the calendar usable', () => {
     render(
       <WorkspacePanelProvider initialPanels={calendarCaddyPanelRegistrations}>
