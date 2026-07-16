@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Excalidraw, MainMenu } from '@excalidraw/excalidraw';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { Excalidraw, MainMenu, convertToExcalidrawElements } from '@excalidraw/excalidraw';
 import '@excalidraw/excalidraw/index.css';
-import { Lock, Unlock } from 'lucide-react';
+import { Lock, Unlock, Sparkles, Link2 } from 'lucide-react';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
+import type { ExcalidrawTextElement } from '@excalidraw/excalidraw/element/types';
 import type { JournalPage } from '../../types';
 
 // Self-host Excalidraw's fonts/assets from /fonts instead of the esm.sh CDN
@@ -14,6 +15,15 @@ if (typeof window !== 'undefined') {
 interface JournalCanvasProps {
   page: JournalPage;
   onUpdate: (updates: Partial<JournalPage>) => void;
+  /** Fired when the user asks to promote the single selected text element to a real entity. */
+  onPromote?: (text: string) => void;
+  /** Fired when the user asks to bring an existing entity onto the canvas. */
+  onAddEntity?: () => void;
+}
+
+export interface JournalCanvasHandle {
+  /** Insert a labeled text element (used after picking an entity to add to the canvas). */
+  insertLabel: (text: string) => void;
 }
 
 function pickAppState(appState: Record<string, unknown>): Record<string, unknown> {
@@ -25,12 +35,17 @@ function pickAppState(appState: Record<string, unknown>): Record<string, unknown
 // nested canvas: text and a movable canvas coexist on one journal page. The
 // lock "holds the page" — Excalidraw's view mode makes the scene read-only so
 // you can pan/zoom around a fixed board without nudging elements; unlock to
-// edit and rearrange.
-export default function JournalCanvas({ page, onUpdate }: JournalCanvasProps) {
+// edit and rearrange. Phase 2 bridges the canvas to real entities: promote a
+// selected text element to a Note/Task/IOC, or bring an existing one in.
+const JournalCanvas = forwardRef<JournalCanvasHandle, JournalCanvasProps>(function JournalCanvas(
+  { page, onUpdate, onPromote, onAddEntity },
+  ref,
+) {
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pendingRef = useRef<{ elements: readonly unknown[]; appState: Record<string, unknown> } | null>(null);
   const [locked, setLocked] = useState(false);
+  const [selectedText, setSelectedText] = useState<string | null>(null);
 
   // onUpdate is a fresh closure every render (it captures the current page id in
   // JournalView). Keep a ref to the latest one so the save callbacks below can
@@ -66,7 +81,35 @@ export default function JournalCanvas({ page, onUpdate }: JournalCanvasProps) {
     clearTimeout(saveTimer.current);
     pendingRef.current = { elements: [...elements], appState: pickAppState(appState) };
     saveTimer.current = setTimeout(() => flush(), 600);
+
+    // Promote is only offered for a single selected plain text element.
+    const selectedIds = appState.selectedElementIds as Record<string, boolean> | undefined;
+    const ids = selectedIds ? Object.keys(selectedIds).filter((id) => selectedIds[id]) : [];
+    if (ids.length === 1) {
+      const el = (elements as ExcalidrawTextElement[]).find((e) => e.id === ids[0]);
+      setSelectedText(el && el.type === 'text' ? (el.originalText || el.text || '') : null);
+    } else {
+      setSelectedText(null);
+    }
   }, [flush]);
+
+  useImperativeHandle(ref, () => ({
+    insertLabel: (text: string) => {
+      const api = apiRef.current;
+      if (!api) return;
+      const appState = api.getAppState();
+      const scrollX = typeof appState.scrollX === 'number' ? appState.scrollX : 0;
+      const scrollY = typeof appState.scrollY === 'number' ? appState.scrollY : 0;
+      const zoomValue = typeof appState.zoom?.value === 'number' ? appState.zoom.value : 1;
+      const [newEl] = convertToExcalidrawElements([{
+        type: 'text',
+        text,
+        x: (appState.width / 2 - scrollX) / zoomValue - 60,
+        y: (appState.height / 2 - scrollY) / zoomValue - 12,
+      }]);
+      api.updateScene({ elements: [...api.getSceneElements(), newEl] });
+    },
+  }), []);
 
   let initialElements: unknown[] = [];
   if (page.canvasData) {
@@ -124,6 +167,39 @@ export default function JournalCanvas({ page, onUpdate }: JournalCanvasProps) {
         {locked ? <Lock size={13} /> : <Unlock size={13} />}
         {locked ? 'Locked' : 'Lock'}
       </button>
+
+      {/* Entity bridge — promote the selected text element to a real Note/Task/
+          IOC, or bring an existing one onto the board. Hidden while locked;
+          both are edits and the lock exists specifically to prevent those. */}
+      {!locked && (onPromote || onAddEntity) && (
+        <div className="absolute left-3 top-3 z-10 flex items-center gap-1.5">
+          {onPromote && (
+            <button
+              type="button"
+              onClick={() => selectedText && onPromote(selectedText)}
+              disabled={!selectedText}
+              title={selectedText ? 'Promote selected text to a Note, Task, or IOC' : 'Select a single text element to promote'}
+              className="flex items-center gap-1 rounded-lg border border-border-subtle bg-bg-raised/90 px-2.5 py-1.5 text-xs font-medium text-text-muted shadow-lg backdrop-blur transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Sparkles size={13} />
+              Promote
+            </button>
+          )}
+          {onAddEntity && (
+            <button
+              type="button"
+              onClick={onAddEntity}
+              title="Add an existing Note, Task, or IOC to the canvas"
+              className="flex items-center gap-1 rounded-lg border border-border-subtle bg-bg-raised/90 px-2.5 py-1.5 text-xs font-medium text-text-muted shadow-lg backdrop-blur transition-colors hover:text-text-primary"
+            >
+              <Link2 size={13} />
+              Add entity
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
-}
+});
+
+export default JournalCanvas;
