@@ -1,7 +1,7 @@
-import { useState, useCallback, useRef, useEffect, useMemo, type PointerEvent as ReactPointerEvent, type CSSProperties } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo, lazy, Suspense, type PointerEvent as ReactPointerEvent, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import DOMPurify from 'dompurify';
-import { BookOpen, Plus, Trash2, Send, Palette, Upload, Pencil, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Send, Palette, Upload, Pencil, X, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
 import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { TextStyle } from '@tiptap/extension-text-style';
@@ -11,6 +11,10 @@ import { useJournalPages } from '../../hooks/useJournalPages';
 import type { JournalPage, JournalPageTheme, JournalPaperStyle, Folder } from '../../types';
 import { cn } from '../../lib/utils';
 import { FONT_OPTIONS } from '../../lib/theme-schemes';
+
+// Excalidraw is heavy — keep it out of the Journal's initial bundle and only
+// pull the chunk when a page's Canvas mode is actually opened.
+const JournalCanvas = lazy(() => import('./JournalCanvas'));
 
 // ── Journal HTML sanitization ─────────────────────────────────────────────────
 // The shared `sanitizeHtml` (lib/markdown.ts) forbids the `style` attribute,
@@ -1084,6 +1088,7 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
   const [title, setTitle] = useState(page.title);
   const [showBgPicker, setShowBgPicker] = useState(false);
   const [drawMode, setDrawMode] = useState(false);
+  const [canvasMode, setCanvasMode] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const surfaceRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -1248,6 +1253,17 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
         <RichToolbar editor={editor} />
         <div className="flex-1" />
         <button
+          onClick={() => setCanvasMode((v) => !v)}
+          className={cn(
+            'flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors',
+            canvasMode ? 'bg-accent text-white' : 'text-text-muted hover:bg-bg-hover hover:text-text-primary',
+          )}
+          title="Toggle movable canvas"
+        >
+          <LayoutGrid size={12} />
+          Canvas
+        </button>
+        <button
           onClick={() => setDrawMode((v) => !v)}
           className={cn(
             'flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors',
@@ -1312,8 +1328,21 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
         </div>
       )}
 
+      {/* Movable canvas mode — occupies the page area below the toolbar. Kept
+          mounted-only-when-open (Excalidraw is heavy); its own autosave writes
+          canvasData back to the page. */}
+      {canvasMode && (
+        <div className="absolute inset-0" style={{ paddingTop: toolbarHeight }}>
+          <div className="relative h-full w-full">
+            <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-text-muted">Loading canvas…</div>}>
+              <JournalCanvas page={page} onUpdate={onUpdate} />
+            </Suspense>
+          </div>
+        </div>
+      )}
+
       {/* Page surface — background color + paper pattern */}
-      <div ref={surfaceRef} className={cn('absolute inset-0 overflow-auto', legacyClasses)} style={{ ...paperSurfaceStyle, paddingTop: toolbarHeight }}>
+      <div ref={surfaceRef} className={cn('absolute inset-0 overflow-auto', canvasMode && 'hidden', legacyClasses)} style={{ ...paperSurfaceStyle, paddingTop: toolbarHeight }}>
         <div className="mx-auto flex min-h-full max-w-3xl flex-col px-8 py-6 relative">
           {/* Linked badge */}
           {page.linkedInvestigationId && (

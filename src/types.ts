@@ -335,6 +335,11 @@ export interface JournalPage {
   /** CSS font-family stack applied to the title + rich text content. Undefined = theme default. */
   paperFont?: string;
   drawingData?: string;
+  /** Excalidraw scene for this page's movable/nested canvas (JSON.stringify(elements)).
+   * Separate from `drawingData` (the legacy freehand overlay). Non-indexed. */
+  canvasData?: string;
+  /** Excalidraw viewport state for the canvas (JSON.stringify({zoom, scrollX, scrollY, theme})). */
+  canvasAppState?: string;
   createdAt: number;
   updatedAt: number;
   linkedInvestigationId?: string;
