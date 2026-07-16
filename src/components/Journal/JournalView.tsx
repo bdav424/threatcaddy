@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo, lazy, Suspense, type PointerEvent as ReactPointerEvent, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import DOMPurify from 'dompurify';
-import { BookOpen, Plus, Trash2, Send, Palette, Upload, Pencil, X, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Send, Palette, Upload, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
 import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { TextStyle } from '@tiptap/extension-text-style';
@@ -549,16 +549,6 @@ function BackgroundPicker({ paperColor, paperStyle, paperOpacity, paperFont, onC
 
 // ── Rich text toolbar ─────────────────────────────────────────────────────────
 
-type DrawColor = 'black' | 'red' | 'blue' | 'green' | 'eraser';
-
-const DRAW_COLORS: { key: DrawColor; label: string; hex: string }[] = [
-  { key: 'black', label: 'Black', hex: '#1a1a1a' },
-  { key: 'red', label: 'Red', hex: '#ef4444' },
-  { key: 'blue', label: 'Blue', hex: '#3b82f6' },
-  { key: 'green', label: 'Green', hex: '#22c55e' },
-  { key: 'eraser', label: 'Eraser', hex: '#ffffff' },
-];
-
 // Snapshot of everything the toolbar needs to render its active/inactive
 // state, recomputed via useEditorState so the toolbar re-renders on every
 // selection change (clicking around, arrow keys) — not just on content
@@ -649,127 +639,6 @@ function RichToolbar({ editor }: { editor: Editor | null }) {
   );
 }
 
-// ── Draw color picker ─────────────────────────────────────────────────────────
-// Same color-wheel technique as BackgroundPicker (reuses its hexToHsl/hslToHex/
-// hslToWheelPoint/pointerToWheelHsl helpers) but scoped to picking a pen color
-// instead of a paper color — no "theme" option, since a stroke's color is
-// always a concrete value, never inherited.
-
-interface DrawColorPickerProps {
-  color: string;
-  onChange: (hex: string) => void;
-  onClose: () => void;
-  anchorRef: React.RefObject<HTMLElement | null>;
-}
-
-function DrawColorPicker({ color, onChange, onClose, anchorRef }: DrawColorPickerProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  const wheelPtrRef = useRef<number | null>(null);
-  const [hexInput, setHexInput] = useState(color);
-  const [wheelPt, setWheelPt] = useState(() => hslToWheelPoint(hexToHsl(color)));
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
-
-  useEffect(() => {
-    const anchor = anchorRef.current;
-    if (!anchor) return;
-    const rect = anchor.getBoundingClientRect();
-    setPos({ top: rect.bottom + 4, left: rect.left });
-  }, [anchorRef]);
-
-  useEffect(() => {
-    const h = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    };
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
-  }, [onClose]);
-
-  const applyHex = useCallback((hex: string) => {
-    if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
-      onChange(hex);
-      setWheelPt(hslToWheelPoint(hexToHsl(hex)));
-    }
-  }, [onChange]);
-
-  const handleWheelPointer = useCallback((e: ReactPointerEvent<HTMLElement>) => {
-    if (wheelPtrRef.current !== null && e.pointerId !== wheelPtrRef.current) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    wheelPtrRef.current = e.pointerId;
-    const { hsl, point } = pointerToWheelHsl(e);
-    const hex = hslToHex(hsl);
-    setWheelPt(point);
-    setHexInput(hex);
-    onChange(hex);
-  }, [onChange]);
-
-  const releaseWheel = useCallback(() => { wheelPtrRef.current = null; }, []);
-
-  const hsl = hexToHsl(color);
-
-  if (!pos) return null;
-
-  return createPortal(
-    <div
-      ref={ref}
-      className="fixed z-[9999] w-56 rounded-xl border border-border-medium bg-bg-raised p-3 shadow-xl"
-      style={{ top: pos.top, left: pos.left }}
-    >
-      <div className="flex justify-center">
-        <div
-          className="relative h-32 w-32 touch-none rounded-full border border-white/20 shadow-inner cursor-crosshair"
-          style={{ background: COLOR_WHEEL_BG }}
-          onPointerDown={handleWheelPointer}
-          onPointerMove={(e) => { if (wheelPtrRef.current !== null) handleWheelPointer(e); }}
-          onPointerUp={releaseWheel}
-          onPointerCancel={releaseWheel}
-          role="application"
-          aria-label="Color wheel"
-        >
-          <span
-            className="pointer-events-none absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_2px_rgba(0,0,0,0.55)]"
-            style={{ left: `${wheelPt.x}%`, top: `${wheelPt.y}%`, backgroundColor: color }}
-          />
-        </div>
-      </div>
-      <div className="mt-2 space-y-1">
-        {(['h', 's', 'l'] as const).map((ch) => {
-          const labels = { h: 'Hue', s: 'Saturation', l: 'Lightness' };
-          const maxes = { h: 359, s: 100, l: 100 };
-          return (
-            <label key={ch} className="flex items-center gap-2">
-              <span className="w-14 shrink-0 text-[9px] text-text-muted">{labels[ch]}</span>
-              <input
-                type="range"
-                min={0}
-                max={maxes[ch]}
-                value={hsl[ch]}
-                onChange={(e) => {
-                  const updated = { ...hsl, [ch]: Number(e.target.value) };
-                  const hex = hslToHex(updated);
-                  setHexInput(hex);
-                  setWheelPt(hslToWheelPoint(updated));
-                  onChange(hex);
-                }}
-                className="flex-1 accent-accent"
-              />
-            </label>
-          );
-        })}
-      </div>
-      <div className="mt-2 flex items-center gap-2">
-        <div className="h-6 w-6 shrink-0 rounded border border-border-subtle" style={{ backgroundColor: color }} />
-        <input
-          value={hexInput}
-          placeholder="#ffffff"
-          onChange={(e) => { setHexInput(e.target.value); applyHex(e.target.value); }}
-          className="flex-1 rounded border border-border-subtle bg-bg-surface px-2 py-1 font-mono text-[11px] text-text-primary focus:border-accent/40 focus:outline-none"
-        />
-      </div>
-    </div>,
-    document.body,
-  );
-}
-
 // ── Drawing canvas ────────────────────────────────────────────────────────────
 //
 // Strokes are stored as vectors (JSON), not a raster snapshot. A raster
@@ -848,231 +717,6 @@ function StaticDrawingCanvas({ data }: { data: string }) {
   return <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true" />;
 }
 
-interface DrawingCanvasProps {
-  initialData?: string;
-  onSave: (data: string) => void;
-  onExit: () => void;
-}
-
-function DrawingCanvas({ initialData, onSave, onExit }: DrawingCanvasProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  // Pen color is a plain hex string (not tied to the preset swatch list) so a
-  // custom color from the picker below is just as first-class as a preset.
-  // Defaults to a light pen in dark mode — black-on-black was nearly invisible
-  // on the default dark paper and had to be manually switched every time.
-  const [drawColor, setDrawColor] = useState<string>(
-    () => (document.documentElement.classList.contains('dark') ? '#f5f5f5' : '#1a1a1a'),
-  );
-  const [isEraser, setIsEraser] = useState(false);
-  const [showColorPicker, setShowColorPicker] = useState(false);
-  const colorButtonRef = useRef<HTMLButtonElement>(null);
-  const isDrawing = useRef(false);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const strokesRef = useRef<Stroke[]>(parseStrokes(initialData));
-  const currentStrokeRef = useRef<Stroke | null>(null);
-  // Legacy raster saves are drawn once as a backdrop trace — not perfect,
-  // but keeps existing drawings visible instead of discarding them outright.
-  const legacyImageRef = useRef<HTMLImageElement | null>(null);
-  const sizeRef = useRef({ width: 0, height: 0 });
-
-  const render = useCallback(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
-    const { width, height } = sizeRef.current;
-    if (width === 0 || height === 0) return;
-    ctx.clearRect(0, 0, width, height);
-    if (legacyImageRef.current) ctx.drawImage(legacyImageRef.current, 0, 0, width, height);
-    const strokes = currentStrokeRef.current
-      ? [...strokesRef.current, currentStrokeRef.current]
-      : strokesRef.current;
-    for (const stroke of strokes) drawStroke(ctx, stroke);
-  }, []);
-
-  useEffect(() => {
-    if (initialData && isLegacyRasterDrawing(initialData)) {
-      const img = new Image();
-      img.onload = () => { legacyImageRef.current = img; render(); };
-      img.src = initialData;
-    }
-  }, [initialData, render]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Re-measures the backing store against devicePixelRatio and replays all
-    // strokes from their stored point coordinates — no snapshot, so there's
-    // nothing to double-scale.
-    const resize = () => {
-      const width = canvas.offsetWidth;
-      const height = canvas.offsetHeight;
-      if (width === 0 || height === 0) return;
-      const dpr = window.devicePixelRatio || 1;
-      sizeRef.current = { width, height };
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.scale(dpr, dpr);
-      render();
-    };
-
-    resize();
-
-    const ro = new ResizeObserver(resize);
-    ro.observe(canvas);
-    return () => ro.disconnect();
-  }, [render]);
-
-  const scheduleSave = useCallback(() => {
-    clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      onSave(strokesRef.current.length > 0 ? JSON.stringify(strokesRef.current) : '');
-    }, 800);
-  }, [onSave]);
-
-  const getPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const rect = canvasRef.current!.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  };
-
-  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    isDrawing.current = true;
-    canvasRef.current?.setPointerCapture(e.pointerId);
-    const pressure = e.pressure > 0 ? e.pressure : 0.5;
-    const { x, y } = getPos(e);
-    currentStrokeRef.current = {
-      color: drawColor,
-      width: isEraser ? 24 : pressure * 4,
-      erase: isEraser,
-      points: [{ x, y }],
-    };
-  };
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawing.current || !currentStrokeRef.current) return;
-    const { x, y } = getPos(e);
-    currentStrokeRef.current.points.push({ x, y });
-    render();
-  };
-
-  const handlePointerUp = () => {
-    if (!isDrawing.current) return;
-    isDrawing.current = false;
-    if (currentStrokeRef.current && currentStrokeRef.current.points.length > 1) {
-      strokesRef.current = [...strokesRef.current, currentStrokeRef.current];
-    }
-    currentStrokeRef.current = null;
-    render();
-    scheduleSave();
-  };
-
-  const clearCanvas = () => {
-    strokesRef.current = [];
-    legacyImageRef.current = null;
-    render();
-    onSave('');
-  };
-
-  return (
-    <div className="absolute inset-0 z-10">
-      {/* Canvas fills the same inset-0 frame as StaticDrawingCanvas — the toolbar
-          below floats over it instead of pushing it down, so recorded stroke
-          points stay in the same coordinate space before and after exiting
-          draw mode (a shrink-0 toolbar above the canvas used to offset every
-          saved drawing upward by the toolbar's height once it was replayed by
-          the toolbar-less static overlay). */}
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 h-full w-full cursor-crosshair"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-      />
-      {/* Draw toolbar — sticky, not absolute: this canvas overlay spans the full
-          (possibly tall/scrollable) page, so an absolute top-0 toolbar was
-          anchored to the top of the *content*, not the viewport. Scrolling down
-          to draw on a lower part of a long page scrolled the color picker and
-          Exit button out of reach; exiting then required scrolling back up
-          first, which read as "the drawing moved" even though only the
-          viewport had. Sticky keeps it pinned to the visible top while drawing
-          anywhere on the page. */}
-      <div className="sticky top-0 z-20 flex items-center gap-2 bg-bg-raised/95 backdrop-blur border-b border-border-subtle px-3 py-1.5">
-        <span className="text-[11px] font-semibold text-text-muted">Draw mode</span>
-        <div className="flex items-center gap-1">
-          {DRAW_COLORS.filter(({ key }) => key !== 'eraser').map(({ key, hex, label }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => { setDrawColor(hex); setIsEraser(false); }}
-              title={label}
-              className={cn(
-                'h-5 w-5 rounded-full border-2 transition-transform',
-                !isEraser && drawColor === hex ? 'scale-125 border-text-primary' : 'border-transparent hover:scale-110',
-              )}
-              style={{ backgroundColor: hex }}
-            />
-          ))}
-          <button
-            ref={colorButtonRef}
-            type="button"
-            onClick={() => setShowColorPicker((v) => !v)}
-            title="Custom color"
-            className={cn(
-              'h-5 w-5 rounded-full border-2 transition-transform',
-              !isEraser && !DRAW_COLORS.some((c) => c.hex === drawColor)
-                ? 'scale-125 border-text-primary'
-                : 'border-border-subtle hover:scale-110',
-            )}
-            style={{ background: 'conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)' }}
-          />
-          {showColorPicker && (
-            <DrawColorPicker
-              anchorRef={colorButtonRef}
-              color={drawColor}
-              onChange={(hex) => { setDrawColor(hex); setIsEraser(false); }}
-              onClose={() => setShowColorPicker(false)}
-            />
-          )}
-          <button
-            type="button"
-            onClick={() => setIsEraser(true)}
-            title="Eraser"
-            className={cn(
-              'flex h-5 w-5 items-center justify-center rounded-full border-2 bg-bg-surface transition-transform',
-              isEraser ? 'scale-125 border-text-primary' : 'border-border-subtle hover:scale-110',
-            )}
-          >
-            <span className="text-[9px] text-text-muted">✕</span>
-          </button>
-        </div>
-        <button
-          type="button"
-          onClick={clearCanvas}
-          className="ml-2 rounded px-2 py-0.5 text-[10px] text-text-muted hover:bg-red-500/10 hover:text-red-400 transition-colors"
-        >
-          Clear drawing
-        </button>
-        <div className="flex-1" />
-        <button
-          type="button"
-          onClick={() => {
-            clearTimeout(saveTimer.current);
-            onSave(strokesRef.current.length > 0 ? JSON.stringify(strokesRef.current) : '');
-            onExit();
-          }}
-          className="flex items-center gap-1 rounded px-2 py-0.5 text-[10px] text-text-muted hover:bg-bg-hover hover:text-text-primary transition-colors"
-        >
-          <X size={11} /> Exit draw
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ── Page editor ───────────────────────────────────────────────────────────────
 
 interface PageEditorProps {
@@ -1087,7 +731,6 @@ interface PageEditorProps {
 function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageEditorProps) {
   const [title, setTitle] = useState(page.title);
   const [showBgPicker, setShowBgPicker] = useState(false);
-  const [drawMode, setDrawMode] = useState(false);
   const [canvasMode, setCanvasMode] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const surfaceRef = useRef<HTMLDivElement>(null);
@@ -1264,17 +907,6 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
           Canvas
         </button>
         <button
-          onClick={() => setDrawMode((v) => !v)}
-          className={cn(
-            'flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors',
-            drawMode ? 'bg-accent text-white' : 'text-text-muted hover:bg-bg-hover hover:text-text-primary',
-          )}
-          title="Toggle drawing mode"
-        >
-          <Pencil size={12} />
-          Draw
-        </button>
-        <button
           onClick={onImportMeeting}
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-text-muted hover:bg-bg-hover hover:text-text-primary"
           title="Import meeting notes into this page"
@@ -1366,8 +998,10 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
               in the useEditor() call above, not here — EditorContent's own
               className is just the layout wrapper. */}
           <EditorContent editor={editor} className="w-full flex-1 flex flex-col" />
-          {/* Read-only drawing overlay — always visible when drawing data exists */}
-          {page.drawingData && !drawMode && (
+          {/* Read-only drawing overlay — legacy freehand drawings (interactive Draw
+              mode was retired in favor of Canvas; existing drawingData still
+              renders here so nothing already saved is lost). */}
+          {page.drawingData && (
             isLegacyRasterDrawing(page.drawingData) ? (
               <img
                 src={page.drawingData}
@@ -1379,14 +1013,6 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
             ) : (
               <StaticDrawingCanvas data={page.drawingData} />
             )
-          )}
-          {/* Interactive drawing canvas overlay — only in draw mode */}
-          {drawMode && (
-            <DrawingCanvas
-              initialData={page.drawingData}
-              onSave={(data) => onUpdate({ drawingData: data || undefined })}
-              onExit={() => setDrawMode(false)}
-            />
           )}
         </div>
       </div>
