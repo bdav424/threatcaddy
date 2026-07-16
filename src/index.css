@@ -1634,7 +1634,10 @@ body.tc-desktop-shell-body {
 }
 
 /* ─── Mobile sidebar — solid background in overlay ─── */
-@media (max-width: 767px) {
+/* 767.98px matches Tailwind's `md:` cutoff (min-width: 768px) exactly — at
+   768px itself these rules and `md:hidden` must agree on which side of the
+   line they're on, and 767px vs 768px used to disagree by a pixel. */
+@media (max-width: 767.98px) {
   .has-window-glass .app-window-frame {
     margin: 0;
     border-radius: 0;
@@ -1658,7 +1661,7 @@ body.tc-desktop-shell-body {
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
 /* ─── Global mobile utilities ─── */
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   .hide-mobile { display: none !important; }
   .show-mobile { display: block !important; }
 }

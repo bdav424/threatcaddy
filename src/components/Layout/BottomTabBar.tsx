@@ -26,7 +26,7 @@ export function BottomTabBar() {
 
   return (
     <nav
-      className="md:hidden flex shrink-0 border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm safe-area-inset-bottom"
+      className="md:hidden flex shrink-0 border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm pb-[env(safe-area-inset-bottom)]"
       aria-label="Mobile navigation"
       data-testid="bottom-tab-bar"
     >
