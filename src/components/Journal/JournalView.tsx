@@ -1225,6 +1225,13 @@ function PageList({ pages, books, folders, selectedId, onSelect, onNewPage, onNe
   const [bookMenu, setBookMenu] = useState<{ x: number; y: number; book: JournalBook } | null>(null);
   const [renamingBookId, setRenamingBookId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
+  const [bookFilter, setBookFilter] = useState<string>('all');
+
+  // A book can vanish (deleted) out from under a stale filter selection.
+  useEffect(() => {
+    if (bookFilter === 'all' || bookFilter === 'unfiled') return;
+    if (!books.some((b) => b.id === bookFilter)) setBookFilter('all');
+  }, [books, bookFilter]);
 
   const openMenu = (page: JournalPage, x: number, y: number) => setMenu({ x, y, page });
 
@@ -1363,6 +1370,27 @@ function PageList({ pages, books, folders, selectedId, onSelect, onNewPage, onNe
           </button>
         </div>
       </div>
+      {books.length > 0 && (
+        <div className="border-b border-border-subtle px-2 py-1.5">
+          <select
+            aria-label="Filter by book"
+            value={bookFilter}
+            onChange={(e) => setBookFilter(e.target.value)}
+            className="w-full rounded-md border border-border-subtle bg-bg-surface px-2 py-1 text-[11px] text-text-secondary focus:border-accent/40 focus:outline-none"
+          >
+            <option value="all">All books</option>
+            <option value="unfiled">Unfiled</option>
+            {books.map((book) => {
+              const investigation = book.investigationId ? folders.find((f) => f.id === book.investigationId) : undefined;
+              return (
+                <option key={book.id} value={book.id}>
+                  {book.name}{investigation ? ` · ${investigation.name}` : ''}
+                </option>
+              );
+            })}
+          </select>
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto">
         {pages.length === 0 && books.length === 0 && (
           <div className="px-3 py-6 text-center text-xs text-text-muted">
@@ -1373,7 +1401,7 @@ function PageList({ pages, books, folders, selectedId, onSelect, onNewPage, onNe
           pages.map(renderPageItem)
         ) : (
           <>
-            {books.map((book) => {
+            {books.filter((book) => bookFilter === 'all' || bookFilter === book.id).map((book) => {
               const investigation = book.investigationId ? folders.find((f) => f.id === book.investigationId) : undefined;
               const bookPages = pages.filter((p) => p.bookId === book.id);
               return (
@@ -1424,8 +1452,14 @@ function PageList({ pages, books, folders, selectedId, onSelect, onNewPage, onNe
               );
             })}
             {(() => {
+              if (bookFilter !== 'all' && bookFilter !== 'unfiled') return null;
               const unfiled = pages.filter((p) => !p.bookId);
-              if (unfiled.length === 0) return null;
+              if (unfiled.length === 0) {
+                if (bookFilter === 'unfiled') {
+                  return <div className="px-3 py-6 text-center text-xs text-text-muted">No unfiled pages.</div>;
+                }
+                return null;
+              }
               return (
                 <div>
                   <div className="mt-1 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted">

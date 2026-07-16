@@ -29,6 +29,12 @@ async function clickNewPage(user: ReturnType<typeof userEvent.setup>) {
   await user.click(newPageItem);
 }
 
+// Once the Slice C book-filter dropdown is present, a book's name matches
+// both its <option> and its list header — pick the header specifically.
+function getBookHeader(name: string) {
+  return screen.getAllByText(name).find((el) => el.tagName !== 'OPTION')!;
+}
+
 async function renderJournalWithNewPage() {
   const user = userEvent.setup();
   render(<JournalView folders={[]} onTearToInvestigation={async () => {}} />);
@@ -289,7 +295,7 @@ describe('Journal books', () => {
     await user.type(screen.getByPlaceholderText(/Ideas, Daily/), 'Ideas');
     await user.click(screen.getByRole('button', { name: 'Create book' }));
 
-    await waitFor(() => expect(screen.getByText('Ideas')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('Ideas').length).toBeGreaterThan(0));
     const books = await db.journalBooks.toArray();
     expect(books).toHaveLength(1);
     expect(books[0].name).toBe('Ideas');
@@ -356,7 +362,7 @@ describe('Journal books', () => {
     await waitFor(() => expect(screen.getByText('New book')).toBeInTheDocument());
     await user.type(screen.getByPlaceholderText(/Ideas, Daily/), 'Temp Book');
     await user.click(screen.getByRole('button', { name: 'Create book' }));
-    await waitFor(() => expect(screen.getByText('Temp Book')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('Temp Book').length).toBeGreaterThan(0));
 
     const pageButton = screen.getByText('Untitled Page').closest('button')!;
     fireEvent.contextMenu(pageButton, { clientX: 100, clientY: 100 });
@@ -371,7 +377,7 @@ describe('Journal books', () => {
     });
 
     // delete the book via its own context menu
-    const bookHeader = screen.getByText('Temp Book');
+    const bookHeader = getBookHeader('Temp Book');
     fireEvent.contextMenu(bookHeader, { clientX: 50, clientY: 50 });
     await waitFor(() => expect(screen.getByRole('menu')).toBeInTheDocument());
     await user.click(screen.getByRole('menuitem', { name: 'Delete book' }));
@@ -396,9 +402,9 @@ describe('Journal books', () => {
     await waitFor(() => expect(screen.getByText('New book')).toBeInTheDocument());
     await user.type(screen.getByPlaceholderText(/Ideas, Daily/), 'Old Name');
     await user.click(screen.getByRole('button', { name: 'Create book' }));
-    await waitFor(() => expect(screen.getByText('Old Name')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('Old Name').length).toBeGreaterThan(0));
 
-    const bookHeader = screen.getByText('Old Name');
+    const bookHeader = getBookHeader('Old Name');
     fireEvent.contextMenu(bookHeader, { clientX: 50, clientY: 50 });
     await waitFor(() => expect(screen.getByRole('menu')).toBeInTheDocument());
     await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
@@ -412,5 +418,40 @@ describe('Journal books', () => {
       const books = await db.journalBooks.toArray();
       expect(books[0]?.name).toBe('New Name');
     });
+  });
+
+  it('filters the page list to a single book via the book dropdown', async () => {
+    const user = userEvent.setup();
+    render(<JournalView folders={[]} onTearToInvestigation={async () => {}} />);
+
+    expect(screen.queryByLabelText('Filter by book')).not.toBeInTheDocument();
+
+    async function createBook(name: string) {
+      await user.click(await screen.findByTitle('New page or book'));
+      await user.click(await screen.findByRole('menuitem', { name: 'New book' }));
+      await waitFor(() => expect(screen.getByText('New book')).toBeInTheDocument());
+      await user.type(screen.getByPlaceholderText(/Ideas, Daily/), name);
+      await user.click(screen.getByRole('button', { name: 'Create book' }));
+      // Once the filter dropdown exists, the name matches both its <option>
+      // and the list's book header, so assert presence via count, not getByText.
+      await waitFor(() => expect(screen.getAllByText(name).length).toBeGreaterThan(0));
+    }
+    await createBook('Alpha Book');
+    await createBook('Beta Book');
+
+    // 'Alpha Book'/'Beta Book' text appears twice while both groups render:
+    // once as the <option>, once as the list's book header.
+    const filter = screen.getByLabelText('Filter by book');
+    expect(screen.getAllByText('Alpha Book')).toHaveLength(2);
+    expect(screen.getAllByText('Beta Book')).toHaveLength(2);
+
+    await user.selectOptions(filter, 'Alpha Book');
+    expect(screen.getAllByText('Alpha Book')).toHaveLength(2);
+    // Beta's header is gone; only its <option> remains.
+    expect(screen.getAllByText('Beta Book')).toHaveLength(1);
+
+    await user.selectOptions(filter, 'All books');
+    expect(screen.getAllByText('Alpha Book')).toHaveLength(2);
+    expect(screen.getAllByText('Beta Book')).toHaveLength(2);
   });
 });
