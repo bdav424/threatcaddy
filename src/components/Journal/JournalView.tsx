@@ -261,14 +261,16 @@ interface BackgroundPickerProps {
   paperColor: string | 'theme';
   paperStyle: JournalPaperStyle;
   paperOpacity: number;
+  paperFont?: string;
   onChangePaperColor: (color: string | 'theme') => void;
   onChangePaperStyle: (style: JournalPaperStyle) => void;
   onChangePaperOpacity: (opacity: number) => void;
+  onChangePaperFont: (font: string | undefined) => void;
   onClose: () => void;
   anchorRef: React.RefObject<HTMLElement | null>;
 }
 
-function BackgroundPicker({ paperColor, paperStyle, paperOpacity, onChangePaperColor, onChangePaperStyle, onChangePaperOpacity, onClose, anchorRef }: BackgroundPickerProps) {
+function BackgroundPicker({ paperColor, paperStyle, paperOpacity, paperFont, onChangePaperColor, onChangePaperStyle, onChangePaperOpacity, onChangePaperFont, onClose, anchorRef }: BackgroundPickerProps) {
   const ref = useRef<HTMLDivElement>(null);
   const wheelPtrRef = useRef<number | null>(null);
 
@@ -358,6 +360,22 @@ function BackgroundPicker({ paperColor, paperStyle, paperOpacity, onChangePaperC
       className="fixed z-[9999] w-72 rounded-xl border border-border-medium bg-bg-raised shadow-xl"
       style={{ top: pos.top, left: pos.left }}
     >
+      {/* ── Page font (the page's default font — per-selection overrides live
+              on the toolbar's own font control) ── */}
+      <div className="border-b border-border-subtle px-3 py-2.5">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">Page font</p>
+        <select
+          value={paperFont ?? ''}
+          onChange={(e) => onChangePaperFont(e.target.value || undefined)}
+          className="w-full rounded-lg border border-border-subtle bg-bg-surface px-2 py-1.5 text-xs text-text-secondary focus:border-accent/40 focus:outline-none"
+        >
+          <option value="">Theme font (default)</option>
+          {FONT_OPTIONS.map((f) => (
+            <option key={f.id} value={f.value} style={{ fontFamily: f.value }}>{f.label}</option>
+          ))}
+        </select>
+      </div>
+
       {/* ── Paper style ── */}
       <div className="border-b border-border-subtle px-3 py-2.5">
         <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">Paper style</p>
@@ -1068,10 +1086,18 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
   const [drawMode, setDrawMode] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const surfaceRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
   const bgButtonRef = useRef<HTMLButtonElement>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastPageId = useRef<string>('');
   const [guideMetrics, setGuideMetrics] = useState<GuideMetrics | null>(null);
+  // The toolbar floats over the page (absolute), and the surface reserves room
+  // for it with top padding. That padding used to be a hardcoded pt-12 (48px) —
+  // fine when the toolbar was one row, but the TipTap migration added enough
+  // buttons (H1/H2/H3, B/I/U, two lists, HR, selection-font) that the toolbar
+  // now wraps to a second row at common widths, and the fixed padding no longer
+  // cleared it, so the page title hid underneath. Measure the real height.
+  const [toolbarHeight, setToolbarHeight] = useState(48);
 
   const scheduleContentSave = useCallback((html: string) => {
     clearTimeout(saveTimer.current);
@@ -1152,6 +1178,18 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
     return () => ro.disconnect();
   }, [editor]);
 
+  // Track the floating toolbar's real height so the surface reserves exactly
+  // enough top padding — whether the toolbar sits on one row or wraps to two.
+  useEffect(() => {
+    const toolbar = toolbarRef.current;
+    if (!toolbar) return;
+    const measure = () => setToolbarHeight(toolbar.getBoundingClientRect().height || 48);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(toolbar);
+    return () => ro.disconnect();
+  }, []);
+
   const handleTitleBlur = useCallback(() => {
     if (title !== page.title) onUpdate({ title });
   }, [title, page.title, onUpdate]);
@@ -1173,7 +1211,7 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
       {/* Top toolbar — floats over the page surface instead of shrinking the
           editor height; the surface below adds matching top padding so
           content doesn't start out hidden underneath it. */}
-      <div className="absolute top-0 left-0 right-0 z-20 flex items-center gap-2 border-b border-border-subtle px-4 py-2 bg-bg-raised/95 backdrop-blur flex-wrap">
+      <div ref={toolbarRef} className="absolute top-0 left-0 right-0 z-20 flex items-center gap-2 border-b border-border-subtle px-4 py-2 bg-bg-raised/95 backdrop-blur flex-wrap">
         <div className="relative">
           <button
             ref={bgButtonRef}
@@ -1197,25 +1235,15 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
               paperColor={paperColor}
               paperStyle={paperStyle}
               paperOpacity={paperOpacity}
+              paperFont={paperFont}
               onChangePaperColor={(c) => onUpdate({ paperColor: c })}
               onChangePaperStyle={(s) => onUpdate({ paperStyle: s })}
               onChangePaperOpacity={(o) => onUpdate({ paperOpacity: o })}
+              onChangePaperFont={(fontVal) => onUpdate({ paperFont: fontVal })}
               onClose={() => setShowBgPicker(false)}
             />
           )}
         </div>
-        <div className="w-px h-4 bg-border-subtle" />
-        <select
-          value={paperFont ?? ''}
-          onChange={(e) => onUpdate({ paperFont: e.target.value || undefined })}
-          title="Page font"
-          className="rounded px-1.5 py-0.5 text-[11px] font-medium text-text-secondary bg-transparent hover:bg-bg-hover hover:text-text-primary transition-colors focus:outline-none"
-        >
-          <option value="">Theme font</option>
-          {FONT_OPTIONS.map((f) => (
-            <option key={f.id} value={f.value}>{f.label}</option>
-          ))}
-        </select>
         <div className="w-px h-4 bg-border-subtle" />
         <RichToolbar editor={editor} />
         <div className="flex-1" />
@@ -1285,7 +1313,7 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
       )}
 
       {/* Page surface — background color + paper pattern */}
-      <div ref={surfaceRef} className={cn('absolute inset-0 overflow-auto pt-12', legacyClasses)} style={paperSurfaceStyle}>
+      <div ref={surfaceRef} className={cn('absolute inset-0 overflow-auto', legacyClasses)} style={{ ...paperSurfaceStyle, paddingTop: toolbarHeight }}>
         <div className="mx-auto flex min-h-full max-w-3xl flex-col px-8 py-6 relative">
           {/* Linked badge */}
           {page.linkedInvestigationId && (

@@ -95,11 +95,34 @@ export const DEFAULT_LIGHT_THEME_COLORS: Record<AppearanceColorVariable, string>
   '--color-accent-pink': '#db2777',
 };
 
+// NOTE: the `value` strings for existing ids (system/serif/mono/rounded) are
+// frozen — journal pages persist the resolved font stack (not the id), so
+// changing a value would silently orphan every page already saved with it.
+// New options may be appended freely. `bundled: true` marks families backed by
+// a self-hosted woff2 (see the @font-face block in index.css); the rest are
+// system stacks with generic fallbacks, so they cost nothing and work offline.
 export const FONT_OPTIONS = [
   { id: 'system', label: 'System UI', value: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
   { id: 'serif', label: 'Serif', value: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif' },
   { id: 'mono', label: 'Mono', value: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace' },
   { id: 'rounded', label: 'Rounded', value: 'ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif' },
+  // Bundled (self-hosted woff2, distinctive)
+  { id: 'handwriting', label: 'Handwriting', value: '"TC Virgil", "Comic Sans MS", "Segoe Print", cursive', bundled: true },
+  { id: 'cascadia', label: 'Cascadia Code', value: '"TC Cascadia", ui-monospace, "Cascadia Code", Consolas, monospace', bundled: true },
+  // System serifs
+  { id: 'georgia', label: 'Georgia', value: 'Georgia, Cambria, "Times New Roman", serif' },
+  { id: 'times', label: 'Times', value: '"Times New Roman", Times, ui-serif, serif' },
+  { id: 'palatino', label: 'Palatino', value: '"Palatino Linotype", "Book Antiqua", Palatino, "URW Palladio L", serif' },
+  { id: 'garamond', label: 'Garamond', value: 'Garamond, "EB Garamond", "Palatino Linotype", Georgia, serif' },
+  // System sans / display
+  { id: 'verdana', label: 'Verdana', value: 'Verdana, Geneva, "DejaVu Sans", sans-serif' },
+  { id: 'trebuchet', label: 'Trebuchet', value: '"Trebuchet MS", "Segoe UI", Verdana, sans-serif' },
+  { id: 'tahoma', label: 'Tahoma', value: 'Tahoma, Geneva, Verdana, sans-serif' },
+  { id: 'impact', label: 'Impact', value: 'Impact, Haettenschweiler, "Arial Narrow Bold", "Franklin Gothic Bold", sans-serif' },
+  // System monospace + playful
+  { id: 'courier', label: 'Courier', value: '"Courier New", Courier, ui-monospace, monospace' },
+  { id: 'comic', label: 'Comic Sans', value: '"Comic Sans MS", "Comic Sans", "Chalkboard SE", ui-rounded, cursive' },
+  { id: 'cursive', label: 'Cursive', value: '"Segoe Script", "Snell Roundhand", "Brush Script MT", cursive' },
 ] as const;
 
 export const COLOR_SCHEMES: ColorScheme[] = [

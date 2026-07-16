@@ -17,3 +17,18 @@ describe('theme-aware native controls', () => {
     expect(indexCss).toContain('background-color: var(--tc-control-popup-selected-bg)');
   });
 });
+
+describe('journal page font inheritance', () => {
+  // Guards the regression where the global `p, li, h1..` font-family rules beat
+  // the page font inherited from the surface, so the Page-font picker silently
+  // did nothing. The editor content must re-inherit to follow the page font.
+  it('re-inherits font-family into the journal editor content', () => {
+    expect(indexCss).toMatch(/\.journal-focus-quiet\s+p[\s\S]*?font-family:\s*inherit/);
+    expect(indexCss).toMatch(/\.journal-focus-quiet\s+h1/);
+  });
+
+  it('self-hosts the bundled Journal fonts', () => {
+    expect(indexCss).toMatch(/@font-face\s*\{[^}]*font-family:\s*'TC Virgil'/);
+    expect(indexCss).toMatch(/@font-face\s*\{[^}]*font-family:\s*'TC Cascadia'/);
+  });
+});

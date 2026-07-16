@@ -2,6 +2,27 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ─── Bundled Journal fonts ───────────────────────────────────────────────
+   Self-declared under TC-prefixed family names so they never collide with
+   Excalidraw's own @font-face rules for the same files (Excalidraw loads
+   subset-split variants; these point at the clean single-file versions).
+   These woff2 already ship in public/fonts for the whiteboard, so exposing
+   them to the Journal font picker adds no new download weight. */
+@font-face {
+  font-family: 'TC Virgil';
+  src: url('/fonts/Virgil/Virgil-Regular.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'TC Cascadia';
+  src: url('/fonts/Cascadia/CascadiaCode-Regular.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
   --color-accent: #6366f1;
   --color-accent-hover: #818cf8;
@@ -178,6 +199,20 @@ h4,
 h5,
 h6 {
   font-family: var(--tc-font-family-headings);
+}
+
+/* Journal content must follow the page's own font (the surface sets it inline
+   as `paperFont`), not the global body/heading families above. Those element
+   rules are explicit and would otherwise beat the inherited page font, so the
+   editor's paragraphs/headings/lists ignored the Page-font picker entirely.
+   Re-inheriting here lets the surface's font flow into the editor content. */
+.journal-focus-quiet,
+.journal-focus-quiet p,
+.journal-focus-quiet li,
+.journal-focus-quiet h1,
+.journal-focus-quiet h2,
+.journal-focus-quiet h3 {
+  font-family: inherit;
 }
 
 button,
@@ -951,7 +986,7 @@ body.tc-desktop-shell-body {
      second rule to set it replaces the first entirely, it doesn't merge.
      Each background-* property below carries per-layer values in the same
      order as background-image's layer list. */
-  background-image: var(--tc-grain-image), linear-gradient(115deg, transparent 0%, rgba(0,0,0,0.17) 8%, rgba(0,0,0,0.08) 20.1%, rgba(255,255,255,0.06) 25.6%, rgba(255,255,255,0.33) 30%, rgba(255,255,255,0.06) 34.4%, rgba(0,0,0,0.08) 39.9%, rgba(0,0,0,0.17) 52%, transparent 65.2%) !important;
+  background-image: var(--tc-grain-image), linear-gradient(115deg, transparent 0%, rgba(0,0,0,0.17) 8%, rgba(0,0,0,0.08) 20.1%, rgba(255,255,255,0.03) 25.6%, rgba(255,255,255,0.165) 30%, rgba(255,255,255,0.03) 34.4%, rgba(0,0,0,0.08) 39.9%, rgba(0,0,0,0.17) 52%, transparent 65.2%) !important;
   background-repeat: repeat, no-repeat !important;
   background-blend-mode: overlay, normal !important;
   background-attachment: scroll, fixed !important;
@@ -978,7 +1013,7 @@ body.tc-desktop-shell-body {
 [data-glass-style="streaks"].has-panel-glass .bg-bg-base\/70,
 [data-glass-style="streaks"].has-panel-glass [class*="--color-surface"],
 [data-glass-style="streaks"].has-panel-glass [class*="--color-input-bg"] {
-  background-image: var(--tc-grain-image), linear-gradient(115deg, transparent 0%, rgba(0,0,0,0.17) 8%, rgba(0,0,0,0.08) 20.1%, rgba(255,255,255,0.06) 25.6%, rgba(255,255,255,0.33) 30%, rgba(255,255,255,0.06) 34.4%, rgba(0,0,0,0.08) 39.9%, rgba(0,0,0,0.17) 52%, transparent 65.2%) !important;
+  background-image: var(--tc-grain-image), linear-gradient(115deg, transparent 0%, rgba(0,0,0,0.17) 8%, rgba(0,0,0,0.08) 20.1%, rgba(255,255,255,0.03) 25.6%, rgba(255,255,255,0.165) 30%, rgba(255,255,255,0.03) 34.4%, rgba(0,0,0,0.08) 39.9%, rgba(0,0,0,0.17) 52%, transparent 65.2%) !important;
   background-repeat: repeat, no-repeat !important;
   background-blend-mode: overlay, normal !important;
   background-attachment: scroll, fixed !important;
