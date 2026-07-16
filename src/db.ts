@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, ReportTemplate, GraphSnapshot, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus, EnrichmentCacheEntry, VirtualCaddyJob, NetworkDevice, NetworkScanJob, SyncAuthSettings, JournalPage, IOCRecheckDiff } from './types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, ReportTemplate, GraphSnapshot, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus, EnrichmentCacheEntry, VirtualCaddyJob, NetworkDevice, NetworkScanJob, SyncAuthSettings, JournalPage, JournalBook, IOCRecheckDiff } from './types';
 import type { IntegrationTemplate, InstalledIntegration, IntegrationRun } from './types/integration-types';
 import { installEncryptionMiddleware } from './lib/encryptionMiddleware';
 
@@ -35,6 +35,7 @@ const db = new Dexie('ThreatCaddyDB') as Dexie & {
   syncAuthSettings: EntityTable<SyncAuthSettings, 'id'>;
   journalPages: EntityTable<JournalPage, 'id'>;
   iocRecheckDiffs: EntityTable<IOCRecheckDiff, 'id'>;
+  journalBooks: EntityTable<JournalBook, 'id'>;
 };
 
 db.version(1).stores({
@@ -371,6 +372,14 @@ db.version(42).stores({
 // Indexed by iocId and checkedAt (composite index for per-IOC chronological queries).
 db.version(43).stores({
   iocRecheckDiffs: 'id, iocId, checkedAt, [iocId+checkedAt]',
+});
+
+// Version 44: Journal books — optional containers grouping journal pages,
+// either personal or bound to an investigation (for that investigation's TLP
+// floor; see JournalBook in types.ts). journalPages.bookId is a new
+// unindexed field — existing pages are simply unfiled until moved into a book.
+db.version(44).stores({
+  journalBooks: 'id, name, investigationId, order, createdAt, updatedAt',
 });
 
 

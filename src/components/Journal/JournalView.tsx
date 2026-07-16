@@ -8,10 +8,12 @@ import { TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
 import { Placeholder } from '@tiptap/extensions';
 import { useJournalPages } from '../../hooks/useJournalPages';
-import type { JournalPage, JournalPageTheme, JournalPaperStyle, Folder } from '../../types';
+import { useJournalBooks } from '../../hooks/useJournalBooks';
+import type { JournalPage, JournalPageTheme, JournalPaperStyle, JournalBook, Folder } from '../../types';
 import { cn } from '../../lib/utils';
 import { FONT_OPTIONS } from '../../lib/theme-schemes';
 import { getClsBadgeStyle, getTlpBorderColor } from '../../lib/classification';
+import { effectiveTlpLevel } from '../../lib/tlp-inspector';
 import { ContextMenu, type ContextMenuEntry } from '../Common/ContextMenu';
 import { ClsSelect } from '../Common/ClsSelect';
 import { EntityInvestigationBar } from '../Common/EntityInvestigationBar';
@@ -268,13 +270,14 @@ function TearModal({ page, folders, onTear, onClose }: TearModalProps) {
 interface EditPageDetailsModalProps {
   page: JournalPage;
   folders: Folder[];
+  books: JournalBook[];
   clsLevels?: string[];
   onUpdate: (updates: Partial<JournalPage>) => void;
   onMoveInvestigation: (investigationId: string | undefined) => void;
   onClose: () => void;
 }
 
-function EditPageDetailsModal({ page, folders, clsLevels, onUpdate, onMoveInvestigation, onClose }: EditPageDetailsModalProps) {
+function EditPageDetailsModal({ page, folders, books, clsLevels, onUpdate, onMoveInvestigation, onClose }: EditPageDetailsModalProps) {
   const [title, setTitle] = useState(page.title);
   const linkedInvestigation = folders.find((f) => f.id === page.linkedInvestigationId);
 
@@ -329,12 +332,103 @@ function EditPageDetailsModal({ page, folders, clsLevels, onUpdate, onMoveInvest
             </div>
           </div>
 
+          {books.length > 0 && (
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-text-muted">Book</span>
+              <select
+                value={page.bookId ?? ''}
+                onChange={(e) => onUpdate({ bookId: e.target.value || undefined })}
+                className="w-full rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary focus:border-accent/40 focus:outline-none"
+              >
+                <option value="">Unfiled</option>
+                {books.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+            </label>
+          )}
+
           <div className="flex gap-2 pt-1">
             <button
               onClick={onClose}
               className="flex-1 rounded-lg border border-border-subtle px-4 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-hover"
             >
               Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── New book modal ────────────────────────────────────────────────────────────
+
+interface NewBookModalProps {
+  folders: Folder[];
+  onCreate: (name: string, investigationId: string | undefined) => void;
+  onClose: () => void;
+}
+
+function NewBookModal({ folders, onCreate, onClose }: NewBookModalProps) {
+  const [name, setName] = useState('');
+  const [investigationId, setInvestigationId] = useState('');
+  const activeInvestigations = folders.filter((f) => !('isFolder' in f));
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="w-full max-w-sm rounded-xl border border-border-medium bg-bg-raised shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border-subtle px-4 py-3">
+          <div className="flex items-center gap-2">
+            <BookOpen size={15} className="text-accent" />
+            <span className="text-sm font-semibold text-text-primary">New book</span>
+          </div>
+        </div>
+        <div className="space-y-3 p-4">
+          <label className="block">
+            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-text-muted">Name</span>
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Ideas, Daily, Operation Foo notes…"
+              className="w-full rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary focus:border-accent/40 focus:outline-none"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+              Investigation (optional)
+            </span>
+            <select
+              value={investigationId}
+              onChange={(e) => setInvestigationId(e.target.value)}
+              className="w-full rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary focus:border-accent/40 focus:outline-none"
+            >
+              <option value="">Personal (no investigation)</option>
+              {activeInvestigations.map((f) => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-[10px] text-text-muted">
+              Binding to an investigation makes that investigation's TLP a floor for pages in this book — it can only raise their displayed classification, never lower it.
+            </p>
+          </label>
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-lg border border-border-subtle px-4 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-hover"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => { if (name.trim()) onCreate(name.trim(), investigationId || undefined); }}
+              disabled={!name.trim()}
+              className="flex-1 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-40"
+            >
+              Create book
             </button>
           </div>
         </div>
@@ -1108,20 +1202,29 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
 
 interface PageListProps {
   pages: JournalPage[];
+  books: JournalBook[];
+  folders: Folder[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onNewPage: () => void;
   onNewJournal: () => void;
+  onNewBook: () => void;
   onEditDetails: (page: JournalPage) => void;
   onTear: (page: JournalPage) => void;
   onDelete: (pageId: string) => void;
+  onRenameBook: (book: JournalBook, name: string) => void;
+  onDeleteBook: (bookId: string) => void;
 }
 
-function PageList({ pages, selectedId, onSelect, onNewPage, onNewJournal, onEditDetails, onTear, onDelete }: PageListProps) {
+function PageList({ pages, books, folders, selectedId, onSelect, onNewPage, onNewJournal, onNewBook, onEditDetails, onTear, onDelete, onRenameBook, onDeleteBook }: PageListProps) {
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem('journal-list-collapsed') === 'true'; } catch { return false; }
   });
   const [menu, setMenu] = useState<{ x: number; y: number; page: JournalPage } | null>(null);
+  const [addMenu, setAddMenu] = useState<{ x: number; y: number } | null>(null);
+  const [bookMenu, setBookMenu] = useState<{ x: number; y: number; book: JournalBook } | null>(null);
+  const [renamingBookId, setRenamingBookId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
 
   const openMenu = (page: JournalPage, x: number, y: number) => setMenu({ x, y, page });
 
@@ -1131,6 +1234,74 @@ function PageList({ pages, selectedId, onSelect, onNewPage, onNewJournal, onEdit
     'separator',
     { label: 'Delete', icon: <Trash2 size={12} />, onClick: () => onDelete(page.id), danger: true },
   ];
+
+  const bookMenuItems = (book: JournalBook): ContextMenuEntry[] => [
+    { label: 'Rename', icon: <SquarePen size={12} />, onClick: () => { setRenamingBookId(book.id); setRenameDraft(book.name); } },
+    { label: 'Delete book', icon: <Trash2 size={12} />, onClick: () => onDeleteBook(book.id), danger: true },
+  ];
+
+  const commitRename = (book: JournalBook) => {
+    const name = renameDraft.trim();
+    if (name && name !== book.name) onRenameBook(book, name);
+    setRenamingBookId(null);
+  };
+
+  // Shared page-item renderer for both the grouped (by book) and flat
+  // (no books created yet) list layouts — one place for the TLP border/chip,
+  // right-click, and hover 3-dot menu wiring.
+  const renderPageItem = (p: JournalPage) => {
+    const book = p.bookId ? books.find((b) => b.id === p.bookId) : undefined;
+    const investigation = book?.investigationId ? folders.find((f) => f.id === book.investigationId) : undefined;
+    // A book bound to an investigation makes that investigation's TLP a floor
+    // for display — it can raise a page's shown classification, never lower it.
+    const displayCls = investigation ? effectiveTlpLevel(investigation.clsLevel, p.clsLevel) : p.clsLevel;
+    const tlpBorderColor = getTlpBorderColor(displayCls);
+    const clsStyle = displayCls ? getClsBadgeStyle(displayCls) : null;
+    return (
+      <div key={p.id} className="group relative">
+        <button
+          onClick={() => onSelect(p.id)}
+          onContextMenu={(e) => { e.preventDefault(); openMenu(p, e.clientX, e.clientY); }}
+          data-tlp={displayCls || undefined}
+          className={cn(
+            'flex w-full flex-col items-start border-l-2 px-3 py-2.5 text-left transition-colors hover:bg-bg-hover',
+            selectedId === p.id && 'bg-accent/10 text-accent',
+            !tlpBorderColor && 'border-transparent',
+          )}
+          style={tlpBorderColor ? { borderColor: tlpBorderColor } : undefined}
+        >
+          <span className="flex w-full items-center gap-1.5 pr-5">
+            <span className={cn('truncate text-sm font-medium', selectedId === p.id ? 'text-accent' : 'text-text-primary')}>
+              {p.title || 'Untitled'}
+            </span>
+            {clsStyle && displayCls !== 'TLP:CLEAR' && (
+              <span className={cn('shrink-0 rounded-full border px-1 py-0 text-[9px] font-semibold', clsStyle.bg, clsStyle.text, clsStyle.border)}>
+                {displayCls}
+              </span>
+            )}
+          </span>
+          <span className="mt-0.5 text-[10px] text-text-muted">
+            {new Date(p.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+            {p.linkedInvestigationId && (
+              <span className="ml-1 text-accent/70">· linked</span>
+            )}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            const rect = e.currentTarget.getBoundingClientRect();
+            openMenu(p, rect.right, rect.bottom);
+          }}
+          title="Page actions"
+          className="absolute right-1 top-1.5 flex h-5 w-5 items-center justify-center rounded text-text-muted opacity-0 hover:bg-bg-hover hover:text-text-primary focus-visible:opacity-100 group-hover:opacity-100"
+        >
+          <MoreVertical size={12} />
+        </button>
+      </div>
+    );
+  };
 
   const toggleCollapse = () => {
     setCollapsed((v) => {
@@ -1181,8 +1352,11 @@ function PageList({ pages, selectedId, onSelect, onNewPage, onNewJournal, onEdit
             <BookOpen size={12} />
           </button>
           <button
-            onClick={onNewPage}
-            title="New blank page"
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setAddMenu({ x: rect.right, y: rect.bottom });
+            }}
+            title="New page or book"
             className="flex h-5 w-5 items-center justify-center rounded text-text-muted hover:bg-bg-hover hover:text-text-primary"
           >
             <Plus size={13} />
@@ -1190,59 +1364,79 @@ function PageList({ pages, selectedId, onSelect, onNewPage, onNewJournal, onEdit
         </div>
       </div>
       <div className="flex-1 overflow-y-auto">
-        {pages.length === 0 && (
+        {pages.length === 0 && books.length === 0 && (
           <div className="px-3 py-6 text-center text-xs text-text-muted">
             No pages yet. Create one with +.
           </div>
         )}
-        {pages.map((p) => {
-          const tlpBorderColor = getTlpBorderColor(p.clsLevel);
-          const clsStyle = p.clsLevel ? getClsBadgeStyle(p.clsLevel) : null;
-          return (
-            <div key={p.id} className="group relative">
-              <button
-                onClick={() => onSelect(p.id)}
-                onContextMenu={(e) => { e.preventDefault(); openMenu(p, e.clientX, e.clientY); }}
-                data-tlp={p.clsLevel || undefined}
-                className={cn(
-                  'flex w-full flex-col items-start border-l-2 px-3 py-2.5 text-left transition-colors hover:bg-bg-hover',
-                  selectedId === p.id && 'bg-accent/10 text-accent',
-                  !tlpBorderColor && 'border-transparent',
-                )}
-                style={tlpBorderColor ? { borderColor: tlpBorderColor } : undefined}
-              >
-                <span className="flex w-full items-center gap-1.5 pr-5">
-                  <span className={cn('truncate text-sm font-medium', selectedId === p.id ? 'text-accent' : 'text-text-primary')}>
-                    {p.title || 'Untitled'}
-                  </span>
-                  {clsStyle && p.clsLevel !== 'TLP:CLEAR' && (
-                    <span className={cn('shrink-0 rounded-full border px-1 py-0 text-[9px] font-semibold', clsStyle.bg, clsStyle.text, clsStyle.border)}>
-                      {p.clsLevel}
-                    </span>
+        {books.length === 0 ? (
+          pages.map(renderPageItem)
+        ) : (
+          <>
+            {books.map((book) => {
+              const investigation = book.investigationId ? folders.find((f) => f.id === book.investigationId) : undefined;
+              const bookPages = pages.filter((p) => p.bookId === book.id);
+              return (
+                <div key={book.id}>
+                  <div
+                    className="group/book mt-1 flex items-center justify-between px-3 py-1.5 first:mt-0"
+                    onContextMenu={(e) => { e.preventDefault(); setBookMenu({ x: e.clientX, y: e.clientY, book }); }}
+                  >
+                    {renamingBookId === book.id ? (
+                      <input
+                        autoFocus
+                        value={renameDraft}
+                        onChange={(e) => setRenameDraft(e.target.value)}
+                        onBlur={() => commitRename(book)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitRename(book);
+                          if (e.key === 'Escape') setRenamingBookId(null);
+                        }}
+                        className="min-w-0 flex-1 rounded border border-accent/40 bg-bg-surface px-1 text-[11px] font-semibold uppercase tracking-wide text-text-primary focus:outline-none"
+                      />
+                    ) : (
+                      <span className="flex min-w-0 items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                        <BookOpen size={10} className="shrink-0" />
+                        <span className="truncate">{book.name}</span>
+                        {investigation && (
+                          <span className="shrink-0 truncate normal-case text-accent/70">· {investigation.name}</span>
+                        )}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setBookMenu({ x: rect.right, y: rect.bottom, book });
+                      }}
+                      title="Book actions"
+                      className="ml-1 flex h-4 w-4 shrink-0 items-center justify-center rounded text-text-muted opacity-0 hover:bg-bg-hover hover:text-text-primary group-hover/book:opacity-100"
+                    >
+                      <MoreVertical size={10} />
+                    </button>
+                  </div>
+                  {bookPages.length === 0 ? (
+                    <div className="px-3 pb-1 text-[10px] text-text-muted">No pages in this book yet.</div>
+                  ) : (
+                    bookPages.map(renderPageItem)
                   )}
-                </span>
-                <span className="mt-0.5 text-[10px] text-text-muted">
-                  {new Date(p.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                  {p.linkedInvestigationId && (
-                    <span className="ml-1 text-accent/70">· linked</span>
-                  )}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  openMenu(p, rect.right, rect.bottom);
-                }}
-                title="Page actions"
-                className="absolute right-1 top-1.5 flex h-5 w-5 items-center justify-center rounded text-text-muted opacity-0 hover:bg-bg-hover hover:text-text-primary focus-visible:opacity-100 group-hover:opacity-100"
-              >
-                <MoreVertical size={12} />
-              </button>
-            </div>
-          );
-        })}
+                </div>
+              );
+            })}
+            {(() => {
+              const unfiled = pages.filter((p) => !p.bookId);
+              if (unfiled.length === 0) return null;
+              return (
+                <div>
+                  <div className="mt-1 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                    Unfiled
+                  </div>
+                  {unfiled.map(renderPageItem)}
+                </div>
+              );
+            })()}
+          </>
+        )}
       </div>
       {menu && (
         <ContextMenu
@@ -1250,6 +1444,25 @@ function PageList({ pages, selectedId, onSelect, onNewPage, onNewJournal, onEdit
           y={menu.y}
           items={menuItems(menu.page)}
           onClose={() => setMenu(null)}
+        />
+      )}
+      {addMenu && (
+        <ContextMenu
+          x={addMenu.x}
+          y={addMenu.y}
+          items={[
+            { label: 'New page', icon: <Plus size={12} />, onClick: onNewPage },
+            { label: 'New book', icon: <BookOpen size={12} />, onClick: onNewBook },
+          ]}
+          onClose={() => setAddMenu(null)}
+        />
+      )}
+      {bookMenu && (
+        <ContextMenu
+          x={bookMenu.x}
+          y={bookMenu.y}
+          items={bookMenuItems(bookMenu.book)}
+          onClose={() => setBookMenu(null)}
         />
       )}
     </div>
@@ -1328,10 +1541,12 @@ interface JournalViewProps {
 
 export function JournalView({ folders, onTearToInvestigation, clsLevels }: JournalViewProps) {
   const { pages, loading, createPage, updatePage, deletePage, linkToInvestigation } = useJournalPages();
+  const { books, createBook, deleteBook, updateBook } = useJournalBooks();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tearingPage, setTearingPage] = useState<JournalPage | null>(null);
   const [editingPage, setEditingPage] = useState<JournalPage | null>(null);
   const [showMeetingModal, setShowMeetingModal] = useState(false);
+  const [showNewBookModal, setShowNewBookModal] = useState(false);
 
   const selectedPage = useMemo(() => pages.find((p) => p.id === selectedId) ?? null, [pages, selectedId]);
 
@@ -1369,6 +1584,16 @@ export function JournalView({ folders, onTearToInvestigation, clsLevels }: Journ
     updatePage(selectedPage.id, { content: (selectedPage.content ? selectedPage.content + '\n\n---\n\n' : '') + raw });
   }, [selectedPage, updatePage]);
 
+  // Deleting a book doesn't delete its pages — they fall back to unfiled.
+  // bookId isn't a Dexie-indexed field (kept non-indexed to avoid a reindex
+  // migration for a still-small dataset), so the cleanup is a plain in-memory
+  // scan of the already-loaded pages rather than a .where() query.
+  const handleDeleteBook = useCallback(async (bookId: string) => {
+    const affected = pages.filter((p) => p.bookId === bookId);
+    await Promise.all(affected.map((p) => updatePage(p.id, { bookId: undefined })));
+    await deleteBook(bookId);
+  }, [pages, updatePage, deleteBook]);
+
   if (loading) {
     return <div className="flex h-full items-center justify-center text-text-muted text-sm">Loading journal…</div>;
   }
@@ -1377,16 +1602,21 @@ export function JournalView({ folders, onTearToInvestigation, clsLevels }: Journ
     <div className="flex h-full overflow-hidden">
       <PageList
         pages={pages}
+        books={books}
+        folders={folders}
         selectedId={selectedId}
         onSelect={setSelectedId}
         onNewPage={handleNewPage}
         onNewJournal={handleNewJournal}
+        onNewBook={() => setShowNewBookModal(true)}
         onEditDetails={setEditingPage}
         onTear={setTearingPage}
         onDelete={async (pageId) => {
           await deletePage(pageId);
           if (selectedId === pageId) setSelectedId(null);
         }}
+        onRenameBook={(book, name) => updateBook(book.id, { name })}
+        onDeleteBook={handleDeleteBook}
       />
 
       <div className="flex-1 min-w-0 overflow-hidden">
@@ -1427,6 +1657,7 @@ export function JournalView({ folders, onTearToInvestigation, clsLevels }: Journ
         <EditPageDetailsModal
           page={editingPage}
           folders={folders}
+          books={books}
           clsLevels={clsLevels}
           onUpdate={(updates) => updatePage(editingPage.id, updates)}
           onMoveInvestigation={(investigationId) => (
@@ -1435,6 +1666,17 @@ export function JournalView({ folders, onTearToInvestigation, clsLevels }: Journ
               : updatePage(editingPage.id, { linkedInvestigationId: undefined, linkedAt: undefined })
           )}
           onClose={() => setEditingPage(null)}
+        />
+      )}
+
+      {showNewBookModal && (
+        <NewBookModal
+          folders={folders}
+          onCreate={async (name, investigationId) => {
+            await createBook(name, investigationId);
+            setShowNewBookModal(false);
+          }}
+          onClose={() => setShowNewBookModal(false)}
         />
       )}
 

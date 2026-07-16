@@ -19,17 +19,26 @@ if (!document.elementFromPoint) {
   document.elementFromPoint = () => null;
 }
 
+// The "+" button now opens a New page / New book chooser (Slice B) instead
+// of creating a page directly — click through it every time a test needs a
+// fresh page.
+async function clickNewPage(user: ReturnType<typeof userEvent.setup>) {
+  const addBtn = await screen.findByTitle('New page or book');
+  await user.click(addBtn);
+  const newPageItem = await screen.findByRole('menuitem', { name: 'New page' });
+  await user.click(newPageItem);
+}
+
 async function renderJournalWithNewPage() {
   const user = userEvent.setup();
   render(<JournalView folders={[]} onTearToInvestigation={async () => {}} />);
-  const newPageBtn = await screen.findByTitle('New blank page');
-  await user.click(newPageBtn);
+  await clickNewPage(user);
   const editor = await waitFor(() => {
     const el = document.querySelector<HTMLElement>('.ProseMirror');
     if (!el) throw new Error('editor not mounted');
     return el;
   });
-  return { user, editor, newPageBtn };
+  return { user, editor };
 }
 
 describe('Journal TipTap editor', () => {
@@ -123,12 +132,12 @@ describe('Journal TipTap editor', () => {
     // editor.view.dom off an already-destroyed editor mid-transition (see
     // JournalView.tsx's guideMetrics effect comment). Reproduces by editing
     // page A, then creating page B in the same mounted PageEditor instance.
-    const { user, editor, newPageBtn } = await renderJournalWithNewPage();
+    const { user, editor } = await renderJournalWithNewPage();
     await user.click(editor);
     await user.type(editor, 'first page content');
     await waitFor(() => expect(editor.textContent).toContain('first page content'));
 
-    await user.click(newPageBtn);
+    await clickNewPage(user);
 
     await waitFor(() => {
       const el = document.querySelector<HTMLElement>('.ProseMirror');
@@ -140,7 +149,7 @@ describe('Journal TipTap editor', () => {
   });
 
   it('persists content across a page switch and back', async () => {
-    const { user, editor, newPageBtn } = await renderJournalWithNewPage();
+    const { user, editor } = await renderJournalWithNewPage();
     await user.click(editor);
     await user.type(editor, 'remember me');
     await waitFor(() => expect(editor.textContent).toContain('remember me'));
@@ -151,7 +160,7 @@ describe('Journal TipTap editor', () => {
       expect(rows.some((r) => r.content.includes('remember me'))).toBe(true);
     });
 
-    await user.click(newPageBtn);
+    await clickNewPage(user);
     await waitFor(() => {
       const el = document.querySelector<HTMLElement>('.ProseMirror');
       expect(el?.querySelector('.is-editor-empty')).toBeTruthy();
@@ -259,6 +268,149 @@ describe('Journal page list: right-click actions + TLP', () => {
     await waitFor(async () => {
       const rows = await db.journalPages.toArray();
       expect(rows[0]?.title).toBe('Renamed Page');
+    });
+  });
+});
+
+describe('Journal books', () => {
+  beforeEach(async () => {
+    await db.journalPages.clear();
+    await db.journalBooks.clear();
+  });
+
+  it('creates a personal book from the + menu and shows it as a header', async () => {
+    const user = userEvent.setup();
+    render(<JournalView folders={[]} onTearToInvestigation={async () => {}} />);
+    const addBtn = await screen.findByTitle('New page or book');
+    await user.click(addBtn);
+    await user.click(await screen.findByRole('menuitem', { name: 'New book' }));
+
+    await waitFor(() => expect(screen.getByText('New book')).toBeInTheDocument());
+    await user.type(screen.getByPlaceholderText(/Ideas, Daily/), 'Ideas');
+    await user.click(screen.getByRole('button', { name: 'Create book' }));
+
+    await waitFor(() => expect(screen.getByText('Ideas')).toBeInTheDocument());
+    const books = await db.journalBooks.toArray();
+    expect(books).toHaveLength(1);
+    expect(books[0].name).toBe('Ideas');
+    expect(books[0].investigationId).toBeUndefined();
+  });
+
+  it('moving a page into an investigation-bound book raises its displayed TLP to the investigation floor', async () => {
+    const investigation = { id: 'inv1', name: 'Operation Foo', order: 0, createdAt: Date.now(), clsLevel: 'TLP:RED' };
+    const user = userEvent.setup();
+    render(<JournalView folders={[investigation]} onTearToInvestigation={async () => {}} />);
+
+    // create the page first
+    await clickNewPage(user);
+    await waitFor(() => expect(document.querySelector('.ProseMirror')).toBeTruthy());
+
+    // create an investigation-bound book
+    const addBtn = await screen.findByTitle('New page or book');
+    await user.click(addBtn);
+    await user.click(await screen.findByRole('menuitem', { name: 'New book' }));
+    await waitFor(() => expect(screen.getByText('New book')).toBeInTheDocument());
+    await user.type(screen.getByPlaceholderText(/Ideas, Daily/), 'Case Book');
+    const investigationSelect = screen.getByDisplayValue('Personal (no investigation)');
+    await user.selectOptions(investigationSelect, 'Operation Foo');
+    await user.click(screen.getByRole('button', { name: 'Create book' }));
+    await waitFor(() => expect(screen.getByText('Case Book')).toBeInTheDocument());
+    // book header shows the investigation annotation
+    expect(screen.getByText('· Operation Foo')).toBeInTheDocument();
+
+    // page has no TLP of its own yet
+    const pageButton = screen.getByText('Untitled Page').closest('button')!;
+    expect(pageButton).not.toHaveAttribute('data-tlp');
+
+    // move the page into the investigation-bound book via Edit details
+    fireEvent.contextMenu(pageButton, { clientX: 100, clientY: 100 });
+    await waitFor(() => expect(screen.getByRole('menu')).toBeInTheDocument());
+    await user.click(screen.getByRole('menuitem', { name: 'Edit details' }));
+    await waitFor(() => expect(screen.getByText('Page details')).toBeInTheDocument());
+    const bookSelect = screen.getByDisplayValue('Unfiled');
+    await user.selectOptions(bookSelect, 'Case Book');
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+
+    // the page never set its own TLP, but the investigation-bound book's
+    // TLP:RED becomes a display floor — never silently downgraded.
+    await waitFor(async () => {
+      const rows = await db.journalPages.toArray();
+      expect(rows[0]?.bookId).toBeTruthy();
+    });
+    await waitFor(() => {
+      const btn = screen.getByText('Untitled Page').closest('button')!;
+      expect(btn).toHaveAttribute('data-tlp', 'TLP:RED');
+    });
+    expect(screen.getByText('TLP:RED')).toBeInTheDocument();
+  });
+
+  it('deleting a book unfiles its pages instead of deleting them', async () => {
+    const user = userEvent.setup();
+    render(<JournalView folders={[]} onTearToInvestigation={async () => {}} />);
+    await clickNewPage(user);
+    await waitFor(() => expect(document.querySelector('.ProseMirror')).toBeTruthy());
+
+    const addBtn = await screen.findByTitle('New page or book');
+    await user.click(addBtn);
+    await user.click(await screen.findByRole('menuitem', { name: 'New book' }));
+    await waitFor(() => expect(screen.getByText('New book')).toBeInTheDocument());
+    await user.type(screen.getByPlaceholderText(/Ideas, Daily/), 'Temp Book');
+    await user.click(screen.getByRole('button', { name: 'Create book' }));
+    await waitFor(() => expect(screen.getByText('Temp Book')).toBeInTheDocument());
+
+    const pageButton = screen.getByText('Untitled Page').closest('button')!;
+    fireEvent.contextMenu(pageButton, { clientX: 100, clientY: 100 });
+    await waitFor(() => expect(screen.getByRole('menu')).toBeInTheDocument());
+    await user.click(screen.getByRole('menuitem', { name: 'Edit details' }));
+    await waitFor(() => expect(screen.getByText('Page details')).toBeInTheDocument());
+    await user.selectOptions(screen.getByDisplayValue('Unfiled'), 'Temp Book');
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(async () => {
+      const rows = await db.journalPages.toArray();
+      expect(rows[0]?.bookId).toBeTruthy();
+    });
+
+    // delete the book via its own context menu
+    const bookHeader = screen.getByText('Temp Book');
+    fireEvent.contextMenu(bookHeader, { clientX: 50, clientY: 50 });
+    await waitFor(() => expect(screen.getByRole('menu')).toBeInTheDocument());
+    await user.click(screen.getByRole('menuitem', { name: 'Delete book' }));
+
+    await waitFor(async () => {
+      const books = await db.journalBooks.toArray();
+      expect(books).toHaveLength(0);
+    });
+    // the page survives, just unfiled
+    const rows = await db.journalPages.toArray();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].bookId).toBeUndefined();
+    expect(screen.getByText('Untitled Page')).toBeInTheDocument();
+  });
+
+  it('renames a book from its context menu', async () => {
+    const user = userEvent.setup();
+    render(<JournalView folders={[]} onTearToInvestigation={async () => {}} />);
+    const addBtn = await screen.findByTitle('New page or book');
+    await user.click(addBtn);
+    await user.click(await screen.findByRole('menuitem', { name: 'New book' }));
+    await waitFor(() => expect(screen.getByText('New book')).toBeInTheDocument());
+    await user.type(screen.getByPlaceholderText(/Ideas, Daily/), 'Old Name');
+    await user.click(screen.getByRole('button', { name: 'Create book' }));
+    await waitFor(() => expect(screen.getByText('Old Name')).toBeInTheDocument());
+
+    const bookHeader = screen.getByText('Old Name');
+    fireEvent.contextMenu(bookHeader, { clientX: 50, clientY: 50 });
+    await waitFor(() => expect(screen.getByRole('menu')).toBeInTheDocument());
+    await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
+
+    const renameInput = await screen.findByDisplayValue('Old Name');
+    await user.clear(renameInput);
+    await user.type(renameInput, 'New Name');
+    await user.keyboard('{Enter}');
+
+    await waitFor(async () => {
+      const books = await db.journalBooks.toArray();
+      expect(books[0]?.name).toBe('New Name');
     });
   });
 });

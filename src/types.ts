@@ -349,7 +349,33 @@ export interface JournalPage {
    * confidentiality signal a page carries on its own — see getTlpBorderColor /
    * getClsBadgeStyle in lib/classification.ts for how it's rendered. */
   clsLevel?: string;
+  /** The JournalBook this page is grouped under. Undefined = unfiled (the
+   * default — filing into a book is opt-in, existing pages need no migration). */
+  bookId?: string;
 }
+
+/**
+ * A container grouping Journal pages — either personal (cross-cutting, not
+ * tied to any case) or bound to an investigation. Journal is the analyst's
+ * pre-record thinking space (personal, exploratory); Notes is the
+ * investigation's record (scoped, classified). A book doesn't change that —
+ * it's just an organizing shelf. See docs/journal-dispatch.md.
+ */
+export interface JournalBook {
+  id: string;
+  name: string;
+  /** If set, this book is scoped to an investigation: pages in it display
+   * effectiveTlpLevel(investigation.clsLevel, page.clsLevel) — the
+   * investigation's classification is a floor a page's own TLP can raise but
+   * never lower, same precedence used elsewhere (lib/tlp-inspector.ts). The
+   * book and its pages stay fully accessible if that investigation is later
+   * archived — nothing here reads or depends on investigation status. */
+  investigationId?: string;
+  order: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export type EditorMode = 'edit' | 'preview' | 'split';
 export type TaskViewMode = 'list' | 'kanban';
 
