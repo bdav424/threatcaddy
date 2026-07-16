@@ -2987,6 +2987,7 @@ const AppInner = memo(function AppInner({
           <Suspense fallback={null}>
             <JournalView
               folders={folders}
+              clsLevels={settings.tiClsLevels}
               onTearToInvestigation={async (content, title, investigationId) => {
                 const folder = folders.find((f) => f.id === investigationId);
                 const now = new Date();

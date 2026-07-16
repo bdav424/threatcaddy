@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo, lazy, Suspense, type PointerEvent as ReactPointerEvent, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import DOMPurify from 'dompurify';
-import { BookOpen, Plus, Trash2, Send, Palette, Upload, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Send, Palette, Upload, ChevronLeft, ChevronRight, LayoutGrid, MoreVertical, SquarePen } from 'lucide-react';
 import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { TextStyle } from '@tiptap/extension-text-style';
@@ -11,6 +11,10 @@ import { useJournalPages } from '../../hooks/useJournalPages';
 import type { JournalPage, JournalPageTheme, JournalPaperStyle, Folder } from '../../types';
 import { cn } from '../../lib/utils';
 import { FONT_OPTIONS } from '../../lib/theme-schemes';
+import { getClsBadgeStyle, getTlpBorderColor } from '../../lib/classification';
+import { ContextMenu, type ContextMenuEntry } from '../Common/ContextMenu';
+import { ClsSelect } from '../Common/ClsSelect';
+import { EntityInvestigationBar } from '../Common/EntityInvestigationBar';
 
 // Excalidraw is heavy — keep it out of the Journal's initial bundle and only
 // pull the chunk when a page's Canvas mode is actually opened.
@@ -251,6 +255,86 @@ function TearModal({ page, folders, onTear, onClose }: TearModalProps) {
               className="flex-1 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-40"
             >
               Send page
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Edit page details modal ───────────────────────────────────────────────────
+
+interface EditPageDetailsModalProps {
+  page: JournalPage;
+  folders: Folder[];
+  clsLevels?: string[];
+  onUpdate: (updates: Partial<JournalPage>) => void;
+  onMoveInvestigation: (investigationId: string | undefined) => void;
+  onClose: () => void;
+}
+
+function EditPageDetailsModal({ page, folders, clsLevels, onUpdate, onMoveInvestigation, onClose }: EditPageDetailsModalProps) {
+  const [title, setTitle] = useState(page.title);
+  const linkedInvestigation = folders.find((f) => f.id === page.linkedInvestigationId);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="w-full max-w-sm rounded-xl border border-border-medium bg-bg-raised shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border-subtle px-4 py-3">
+          <div className="flex items-center gap-2">
+            <SquarePen size={15} className="text-accent" />
+            <span className="text-sm font-semibold text-text-primary">Page details</span>
+          </div>
+        </div>
+        <div className="space-y-3 p-4">
+          <label className="block">
+            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-text-muted">Title</span>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={() => { if (title !== page.title) onUpdate({ title }); }}
+              className="w-full rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary focus:border-accent/40 focus:outline-none"
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+              TLP / classification
+            </span>
+            <ClsSelect
+              value={page.clsLevel}
+              onChange={(level) => onUpdate({ clsLevel: level })}
+              clsLevels={clsLevels}
+              className="w-full"
+            />
+          </label>
+
+          <div>
+            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+              Investigation
+            </span>
+            <div className="flex items-center justify-between rounded-lg border border-border-subtle bg-bg-surface px-2 py-1.5">
+              <span className="truncate text-xs text-text-secondary">
+                {linkedInvestigation ? linkedInvestigation.name : 'Not linked'}
+              </span>
+              <EntityInvestigationBar
+                folders={folders}
+                currentFolderId={page.linkedInvestigationId}
+                onMove={onMoveInvestigation}
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-lg border border-border-subtle px-4 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-hover"
+            >
+              Close
             </button>
           </div>
         </div>
@@ -1028,12 +1112,25 @@ interface PageListProps {
   onSelect: (id: string) => void;
   onNewPage: () => void;
   onNewJournal: () => void;
+  onEditDetails: (page: JournalPage) => void;
+  onTear: (page: JournalPage) => void;
+  onDelete: (pageId: string) => void;
 }
 
-function PageList({ pages, selectedId, onSelect, onNewPage, onNewJournal }: PageListProps) {
+function PageList({ pages, selectedId, onSelect, onNewPage, onNewJournal, onEditDetails, onTear, onDelete }: PageListProps) {
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem('journal-list-collapsed') === 'true'; } catch { return false; }
   });
+  const [menu, setMenu] = useState<{ x: number; y: number; page: JournalPage } | null>(null);
+
+  const openMenu = (page: JournalPage, x: number, y: number) => setMenu({ x, y, page });
+
+  const menuItems = (page: JournalPage): ContextMenuEntry[] => [
+    { label: 'Edit details', icon: <SquarePen size={12} />, onClick: () => onEditDetails(page) },
+    { label: 'Tear to investigation', icon: <Send size={12} />, onClick: () => onTear(page) },
+    'separator',
+    { label: 'Delete', icon: <Trash2 size={12} />, onClick: () => onDelete(page.id), danger: true },
+  ];
 
   const toggleCollapse = () => {
     setCollapsed((v) => {
@@ -1098,27 +1195,63 @@ function PageList({ pages, selectedId, onSelect, onNewPage, onNewJournal }: Page
             No pages yet. Create one with +.
           </div>
         )}
-        {pages.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => onSelect(p.id)}
-            className={cn(
-              'flex w-full flex-col items-start px-3 py-2.5 text-left transition-colors hover:bg-bg-hover',
-              selectedId === p.id && 'bg-accent/10 text-accent',
-            )}
-          >
-            <span className={cn('truncate text-sm font-medium', selectedId === p.id ? 'text-accent' : 'text-text-primary')}>
-              {p.title || 'Untitled'}
-            </span>
-            <span className="mt-0.5 text-[10px] text-text-muted">
-              {new Date(p.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-              {p.linkedInvestigationId && (
-                <span className="ml-1 text-accent/70">· linked</span>
-              )}
-            </span>
-          </button>
-        ))}
+        {pages.map((p) => {
+          const tlpBorderColor = getTlpBorderColor(p.clsLevel);
+          const clsStyle = p.clsLevel ? getClsBadgeStyle(p.clsLevel) : null;
+          return (
+            <div key={p.id} className="group relative">
+              <button
+                onClick={() => onSelect(p.id)}
+                onContextMenu={(e) => { e.preventDefault(); openMenu(p, e.clientX, e.clientY); }}
+                data-tlp={p.clsLevel || undefined}
+                className={cn(
+                  'flex w-full flex-col items-start border-l-2 px-3 py-2.5 text-left transition-colors hover:bg-bg-hover',
+                  selectedId === p.id && 'bg-accent/10 text-accent',
+                  !tlpBorderColor && 'border-transparent',
+                )}
+                style={tlpBorderColor ? { borderColor: tlpBorderColor } : undefined}
+              >
+                <span className="flex w-full items-center gap-1.5 pr-5">
+                  <span className={cn('truncate text-sm font-medium', selectedId === p.id ? 'text-accent' : 'text-text-primary')}>
+                    {p.title || 'Untitled'}
+                  </span>
+                  {clsStyle && p.clsLevel !== 'TLP:CLEAR' && (
+                    <span className={cn('shrink-0 rounded-full border px-1 py-0 text-[9px] font-semibold', clsStyle.bg, clsStyle.text, clsStyle.border)}>
+                      {p.clsLevel}
+                    </span>
+                  )}
+                </span>
+                <span className="mt-0.5 text-[10px] text-text-muted">
+                  {new Date(p.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                  {p.linkedInvestigationId && (
+                    <span className="ml-1 text-accent/70">· linked</span>
+                  )}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  openMenu(p, rect.right, rect.bottom);
+                }}
+                title="Page actions"
+                className="absolute right-1 top-1.5 flex h-5 w-5 items-center justify-center rounded text-text-muted opacity-0 hover:bg-bg-hover hover:text-text-primary focus-visible:opacity-100 group-hover:opacity-100"
+              >
+                <MoreVertical size={12} />
+              </button>
+            </div>
+          );
+        })}
       </div>
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          items={menuItems(menu.page)}
+          onClose={() => setMenu(null)}
+        />
+      )}
     </div>
   );
 }
@@ -1190,12 +1323,14 @@ function MeetingPasteModal({ onClose, onImport }: MeetingPasteModalProps) {
 interface JournalViewProps {
   folders: Folder[];
   onTearToInvestigation: (pageContent: string, pageTitle: string, investigationId: string) => Promise<void>;
+  clsLevels?: string[];
 }
 
-export function JournalView({ folders, onTearToInvestigation }: JournalViewProps) {
+export function JournalView({ folders, onTearToInvestigation, clsLevels }: JournalViewProps) {
   const { pages, loading, createPage, updatePage, deletePage, linkToInvestigation } = useJournalPages();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tearingPage, setTearingPage] = useState<JournalPage | null>(null);
+  const [editingPage, setEditingPage] = useState<JournalPage | null>(null);
   const [showMeetingModal, setShowMeetingModal] = useState(false);
 
   const selectedPage = useMemo(() => pages.find((p) => p.id === selectedId) ?? null, [pages, selectedId]);
@@ -1246,6 +1381,12 @@ export function JournalView({ folders, onTearToInvestigation }: JournalViewProps
         onSelect={setSelectedId}
         onNewPage={handleNewPage}
         onNewJournal={handleNewJournal}
+        onEditDetails={setEditingPage}
+        onTear={setTearingPage}
+        onDelete={async (pageId) => {
+          await deletePage(pageId);
+          if (selectedId === pageId) setSelectedId(null);
+        }}
       />
 
       <div className="flex-1 min-w-0 overflow-hidden">
@@ -1279,6 +1420,21 @@ export function JournalView({ folders, onTearToInvestigation }: JournalViewProps
           folders={folders}
           onTear={handleTear}
           onClose={() => setTearingPage(null)}
+        />
+      )}
+
+      {editingPage && (
+        <EditPageDetailsModal
+          page={editingPage}
+          folders={folders}
+          clsLevels={clsLevels}
+          onUpdate={(updates) => updatePage(editingPage.id, updates)}
+          onMoveInvestigation={(investigationId) => (
+            investigationId
+              ? linkToInvestigation(editingPage.id, investigationId)
+              : updatePage(editingPage.id, { linkedInvestigationId: undefined, linkedAt: undefined })
+          )}
+          onClose={() => setEditingPage(null)}
         />
       )}
 

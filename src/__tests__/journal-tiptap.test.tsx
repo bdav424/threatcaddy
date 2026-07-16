@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { JournalView } from '../components/Journal/JournalView';
 import { db } from '../db';
@@ -164,6 +164,101 @@ describe('Journal TipTap editor', () => {
     await waitFor(() => {
       const el = document.querySelector<HTMLElement>('.ProseMirror');
       expect(el?.textContent).toContain('remember me');
+    });
+  });
+});
+
+describe('Journal page list: right-click actions + TLP', () => {
+  beforeEach(async () => {
+    await db.journalPages.clear();
+  });
+
+  it('opens a context menu on right-click with Edit details / Tear / Delete', async () => {
+    await renderJournalWithNewPage();
+    const pageButton = screen.getByText('Untitled Page').closest('button')!;
+
+    fireEvent.contextMenu(pageButton, { clientX: 100, clientY: 100 });
+    await waitFor(() => expect(screen.getByRole('menu')).toBeInTheDocument());
+
+    expect(screen.getByRole('menuitem', { name: 'Edit details' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Tear to investigation' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument();
+  });
+
+  it('closes the context menu on Escape and on outside click', async () => {
+    const { user } = await renderJournalWithNewPage();
+    const pageButton = screen.getByText('Untitled Page').closest('button')!;
+
+    fireEvent.contextMenu(pageButton, { clientX: 100, clientY: 100 });
+    await waitFor(() => expect(screen.getByRole('menu')).toBeInTheDocument());
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+
+    fireEvent.contextMenu(pageButton, { clientX: 100, clientY: 100 });
+    await waitFor(() => expect(screen.getByRole('menu')).toBeInTheDocument());
+    fireEvent.mouseDown(document.body);
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+  });
+
+  it('deletes a page from the context menu', async () => {
+    const { user } = await renderJournalWithNewPage();
+    const pageButton = screen.getByText('Untitled Page').closest('button')!;
+
+    fireEvent.contextMenu(pageButton, { clientX: 100, clientY: 100 });
+    await waitFor(() => expect(screen.getByRole('menu')).toBeInTheDocument());
+    await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
+
+    await waitFor(async () => {
+      const rows = await db.journalPages.toArray();
+      expect(rows).toHaveLength(0);
+    });
+  });
+
+  it('Edit details sets TLP, persists it, and shows a chip + data-tlp on the page item', async () => {
+    const { user } = await renderJournalWithNewPage();
+    const pageButton = screen.getByText('Untitled Page').closest('button')!;
+    expect(pageButton).not.toHaveAttribute('data-tlp');
+
+    fireEvent.contextMenu(pageButton, { clientX: 100, clientY: 100 });
+    await waitFor(() => expect(screen.getByRole('menu')).toBeInTheDocument());
+    await user.click(screen.getByRole('menuitem', { name: 'Edit details' }));
+    await waitFor(() => expect(screen.getByText('Page details')).toBeInTheDocument());
+
+    const clsSelect = screen.getByLabelText('Classification level') as HTMLSelectElement;
+    await user.selectOptions(clsSelect, 'TLP:AMBER');
+
+    await waitFor(async () => {
+      const rows = await db.journalPages.toArray();
+      expect(rows[0]?.clsLevel).toBe('TLP:AMBER');
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByText('Page details')).toBeNull());
+
+    await waitFor(() => expect(screen.getByText('TLP:AMBER')).toBeInTheDocument());
+    expect(pageButton).toHaveAttribute('data-tlp', 'TLP:AMBER');
+  });
+
+  it('renames a page from Edit details', async () => {
+    const { user } = await renderJournalWithNewPage();
+    const pageButton = screen.getByText('Untitled Page').closest('button')!;
+
+    fireEvent.contextMenu(pageButton, { clientX: 100, clientY: 100 });
+    await waitFor(() => expect(screen.getByRole('menu')).toBeInTheDocument());
+    await user.click(screen.getByRole('menuitem', { name: 'Edit details' }));
+    await waitFor(() => expect(screen.getByText('Page details')).toBeInTheDocument());
+
+    // getByDisplayValue would match both this modal's title input and the
+    // page editor's own title field behind it (both show "Untitled Page") —
+    // the modal's <label> wraps its <input>, so query by that label instead.
+    const titleInput = screen.getByLabelText('Title');
+    await user.clear(titleInput);
+    await user.type(titleInput, 'Renamed Page');
+    await user.tab(); // blur triggers the save
+
+    await waitFor(async () => {
+      const rows = await db.journalPages.toArray();
+      expect(rows[0]?.title).toBe('Renamed Page');
     });
   });
 });

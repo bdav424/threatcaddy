@@ -344,6 +344,11 @@ export interface JournalPage {
   updatedAt: number;
   linkedInvestigationId?: string;
   linkedAt?: number;
+  /** TLP/confidentiality level for this page (e.g. 'TLP:RED', 'TLP:AMBER'). Undefined
+   * = unclassified. Journal pages are otherwise unscoped/global, so this is the only
+   * confidentiality signal a page carries on its own — see getTlpBorderColor /
+   * getClsBadgeStyle in lib/classification.ts for how it's rendered. */
+  clsLevel?: string;
 }
 export type EditorMode = 'edit' | 'preview' | 'split';
 export type TaskViewMode = 'list' | 'kanban';
