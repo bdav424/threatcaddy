@@ -1,4 +1,4 @@
-import { Menu, Search, Github, Download, Chrome, HardDriveDownload, FolderUp, HelpCircle, Shield, RefreshCw, ChevronDown, Briefcase, FlaskConical } from 'lucide-react';
+import { Menu, Search, Github, Download, Chrome, HardDriveDownload, FolderUp, HelpCircle, Shield, RefreshCw, ChevronDown, Briefcase, FlaskConical, Pin } from 'lucide-react';
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ThemeToggle } from '../Common/ThemeToggle';
@@ -39,6 +39,8 @@ interface HeaderProps {
   onQuickLoad: (file: File) => void;
   onStartTour?: () => void;
   onOpenFortuneInt?: () => void;
+  onOpenJots?: () => void;
+  jotsCount?: number;
   effectiveClsLevels: string[];
   presenceUsers?: PresenceUser[];
   addToast?: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
@@ -63,6 +65,8 @@ export function Header({
   onQuickLoad,
   onStartTour,
   onOpenFortuneInt,
+  onOpenJots,
+  jotsCount,
   effectiveClsLevels,
   presenceUsers,
   addToast,
@@ -340,6 +344,21 @@ export function Header({
           onChangeLevel={onScreenshareChange}
           effectiveLevels={effectiveClsLevels}
         />
+        {onOpenJots && (
+          <button
+            onClick={onOpenJots}
+            className="relative p-1.5 sm:p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors"
+            title={t('header.openJots', { defaultValue: 'Jots' })}
+            aria-label={t('header.openJots', { defaultValue: 'Jots' })}
+          >
+            <Pin size={16} />
+            {!!jotsCount && (
+              <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-accent px-0.5 text-[9px] font-medium leading-none text-white">
+                {jotsCount > 99 ? '99+' : jotsCount}
+              </span>
+            )}
+          </button>
+        )}
         {presenceUsers && presenceUsers.length > 0 && (
           <PresenceIndicator users={presenceUsers} />
         )}

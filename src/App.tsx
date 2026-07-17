@@ -2371,6 +2371,7 @@ const AppInner = memo(function AppInner({
   const jotsCount = selectedFolderId
     ? notes.notes.filter((n) => n.noteType === 'sticky' && n.folderId === selectedFolderId && !n.trashed && !n.archived).length
     : 0;
+  const allJotsCount = notes.notes.filter((n) => n.noteType === 'sticky' && !n.trashed && !n.archived).length;
 
   const filterBar = !assistantWorkspaceActive && !workspaceRouteActive && (selectedFolderId || selectedTag) ? (
     <ActiveFilterBar
@@ -2937,6 +2938,8 @@ const AppInner = memo(function AppInner({
             onQuickLoad={handleQuickLoad}
             onStartTour={() => tour.start(activeView)}
             onOpenFortuneInt={handleOpenFortuneInt}
+            onOpenJots={() => setShowJotsPanel(true)}
+            jotsCount={allJotsCount}
             effectiveClsLevels={effectiveClsLevels}
             presenceUsers={presenceUsers}
             addToast={addToast}
@@ -3250,13 +3253,13 @@ const AppInner = memo(function AppInner({
         </Suspense>
       )}
 
-      {showJotsPanel && selectedFolderId && (
+      {showJotsPanel && (
         <Suspense fallback={null}>
           <JotsPanel
             notes={notes.notes}
             onClose={() => setShowJotsPanel(false)}
             onCreateJot={async () => {
-              const folder = folders.find((f) => f.id === selectedFolderId);
+              const folder = selectedFolderId ? folders.find((f) => f.id === selectedFolderId) : undefined;
               await notes.createNote({
                 noteType: 'sticky',
                 title: 'Jot',
