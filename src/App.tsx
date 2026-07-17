@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useEffect, useRef, useState, lazy, Suspense, memo, type ReactNode } from 'react';
-import type { JournalEntityRef } from './components/Journal/JournalView';
+import type { CanvasEntityRef } from './components/Common/CanvasEntityBridge';
 import { AppLayout } from './components/Layout/AppLayout';
 import { BottomTabBar } from './components/Layout/BottomTabBar';
 import { Header } from './components/Layout/Header';
@@ -262,13 +262,13 @@ function AppDataLayer() {
   const { folders, loading: foldersLoading, createFolder, findOrCreateFolder, updateFolder, deleteFolder, deleteFolderWithContents, trashFolderContents, archiveFolder, unarchiveFolder, reload: reloadFolders } = useFolders();
   const { tags, createTag, updateTag, deleteTag, reload: reloadTags } = useTags();
 
-  // Flattened for the Journal canvas's "Add entity" picker (Phase 2 entity
-  // bridge) — JournalView doesn't import Note/Task/StandaloneIOC directly, it
-  // only knows this narrower shape, same pattern as onTearToInvestigation.
-  const journalEntities = useMemo<JournalEntityRef[]>(() => [
-    ...notes.notes.filter((n) => !n.trashed).map((n): JournalEntityRef => ({ id: n.id, type: 'note', label: n.title, clsLevel: n.clsLevel, folderId: n.folderId })),
-    ...tasks.tasks.filter((t) => !t.trashed).map((t): JournalEntityRef => ({ id: t.id, type: 'task', label: t.title, clsLevel: t.clsLevel, folderId: t.folderId })),
-    ...standaloneIOCsHook.iocs.filter((i) => !i.trashed).map((i): JournalEntityRef => ({ id: i.id, type: 'ioc', label: i.value, clsLevel: i.clsLevel, folderId: i.folderId })),
+  // Flattened for a whiteboard canvas's "Add entity" picker (entity bridge) —
+  // WhiteboardEditor doesn't import Note/Task/StandaloneIOC directly, it only
+  // knows this narrower shape, same pattern as onTearToInvestigation.
+  const canvasEntities = useMemo<CanvasEntityRef[]>(() => [
+    ...notes.notes.filter((n) => !n.trashed).map((n): CanvasEntityRef => ({ id: n.id, type: 'note', label: n.title, clsLevel: n.clsLevel, folderId: n.folderId })),
+    ...tasks.tasks.filter((t) => !t.trashed).map((t): CanvasEntityRef => ({ id: t.id, type: 'task', label: t.title, clsLevel: t.clsLevel, folderId: t.folderId })),
+    ...standaloneIOCsHook.iocs.filter((i) => !i.trashed).map((i): CanvasEntityRef => ({ id: i.id, type: 'ioc', label: i.value, clsLevel: i.clsLevel, folderId: i.folderId })),
   ], [notes.notes, tasks.tasks, standaloneIOCsHook.iocs]);
   const noteTemplatesHook = useNoteTemplates();
   const playbooksHook = usePlaybooks();
@@ -389,7 +389,7 @@ function AppDataLayer() {
             standaloneIOCsHook={standaloneIOCsHook}
             evidenceItemsHook={evidenceItemsHook}
             chatsHook={chatsHook}
-            journalEntities={journalEntities}
+            canvasEntities={canvasEntities}
             folders={folders}
             foldersLoading={foldersLoading}
             createFolder={createFolder}
@@ -492,7 +492,7 @@ type AppInnerProps = {
   standaloneIOCsHook: ReturnType<typeof useStandaloneIOCs>;
   evidenceItemsHook: ReturnType<typeof useEvidenceItems>;
   chatsHook: ReturnType<typeof useChats>;
-  journalEntities: JournalEntityRef[];
+  canvasEntities: CanvasEntityRef[];
   folders: ReturnType<typeof useFolders>['folders'];
   foldersLoading: boolean;
   createFolder: ReturnType<typeof useFolders>['createFolder'];
@@ -540,7 +540,7 @@ const AppInner = memo(function AppInner({
   whiteboards, createWhiteboard, updateWhiteboard, deleteWhiteboard,
   trashWhiteboard, restoreWhiteboard, toggleArchiveWhiteboard,
   emptyTrashWhiteboards, getFilteredWhiteboards, whiteboardCounts, reloadWhiteboards,
-  standaloneIOCsHook, evidenceItemsHook, chatsHook, journalEntities,
+  standaloneIOCsHook, evidenceItemsHook, chatsHook, canvasEntities,
   folders, foldersLoading, createFolder, findOrCreateFolder, updateFolder, deleteFolder,
   deleteFolderWithContents, trashFolderContents, archiveFolder, unarchiveFolder, reloadFolders,
   tags, createTag, updateTag, deleteTag, reloadTags,
@@ -2647,6 +2647,39 @@ const AppInner = memo(function AppInner({
     />
   );
 
+  const handlePromoteToEntity = async (kind: CanvasEntityRef['type'], text: string, investigationId: string | undefined, clsLevel: string | undefined) => {
+    const folder = investigationId ? folders.find((f) => f.id === investigationId) : undefined;
+    // Same TLP-floor rule as tearing into an investigation and as
+    // Books (Slice B): binding raises the effective classification,
+    // never lowers it.
+    const effectiveLevel = effectiveTlpLevel(folder?.clsLevel, clsLevel);
+    if (kind === 'note') {
+      await notes.createNote({
+        title: text.length > 60 ? `${text.slice(0, 60)}…` : text,
+        content: text,
+        folderId: investigationId,
+        clsLevel: effectiveLevel,
+      });
+    } else if (kind === 'task') {
+      await tasks.createTask({
+        title: text.length > 80 ? `${text.slice(0, 80)}…` : text,
+        description: text,
+        folderId: investigationId,
+        clsLevel: effectiveLevel,
+      });
+    } else {
+      const detected = extractIOCs(text)[0];
+      if (!detected) return;
+      await standaloneIOCsHook.createIOC({
+        type: detected.type,
+        value: detected.value,
+        analystNotes: text,
+        folderId: investigationId,
+        clsLevel: effectiveLevel,
+      });
+    }
+  };
+
   const whiteboardsWorkspace = (
     <WhiteboardView
       whiteboards={ssFilteredWhiteboards}
@@ -2662,6 +2695,8 @@ const AppInner = memo(function AppInner({
       selectedWhiteboardId={selectedWhiteboardId ?? null}
       onWhiteboardSelect={(id) => setSelectedWhiteboardId(id ?? undefined)}
       settings={settings}
+      entities={canvasEntities}
+      onPromoteToEntity={handlePromoteToEntity}
     />
   );
 
@@ -3028,7 +3063,6 @@ const AppInner = memo(function AppInner({
             <JournalView
               folders={folders}
               clsLevels={settings.tiClsLevels}
-              entities={journalEntities}
               onTearToInvestigation={async (content, title, investigationId) => {
                 const folder = folders.find((f) => f.id === investigationId);
                 const now = new Date();
@@ -3039,38 +3073,6 @@ const AppInner = memo(function AppInner({
                   folderId: investigationId,
                   clsLevel: folder?.clsLevel,
                 });
-              }}
-              onPromoteToEntity={async (kind, text, investigationId, clsLevel) => {
-                const folder = investigationId ? folders.find((f) => f.id === investigationId) : undefined;
-                // Same TLP-floor rule as tearing into an investigation and as
-                // Books (Slice B): binding raises the effective classification,
-                // never lowers it.
-                const effectiveLevel = effectiveTlpLevel(folder?.clsLevel, clsLevel);
-                if (kind === 'note') {
-                  await notes.createNote({
-                    title: text.length > 60 ? `${text.slice(0, 60)}…` : text,
-                    content: text,
-                    folderId: investigationId,
-                    clsLevel: effectiveLevel,
-                  });
-                } else if (kind === 'task') {
-                  await tasks.createTask({
-                    title: text.length > 80 ? `${text.slice(0, 80)}…` : text,
-                    description: text,
-                    folderId: investigationId,
-                    clsLevel: effectiveLevel,
-                  });
-                } else {
-                  const detected = extractIOCs(text)[0];
-                  if (!detected) return;
-                  await standaloneIOCsHook.createIOC({
-                    type: detected.type,
-                    value: detected.value,
-                    analystNotes: text,
-                    folderId: investigationId,
-                    clsLevel: effectiveLevel,
-                  });
-                }
               }}
             />
           </Suspense>

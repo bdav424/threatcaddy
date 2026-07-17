@@ -1,19 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Excalidraw, MainMenu, exportToBlob } from '@excalidraw/excalidraw';
+import { Excalidraw, MainMenu, exportToBlob, convertToExcalidrawElements } from '@excalidraw/excalidraw';
 import '@excalidraw/excalidraw/index.css';
 
 // Self-host fonts — prevent CDN fallback to esm.sh
 if (typeof window !== 'undefined') {
   (window as unknown as Record<string, unknown>).EXCALIDRAW_ASSET_PATH = '/';
 }
-import { ArrowLeft, Trash2, Image } from 'lucide-react';
+import { ArrowLeft, Trash2, Image, Sparkles, Link2 } from 'lucide-react';
 import { markPending, clearPending } from '../../lib/pending-changes';
 import type { Whiteboard, Tag, Folder, Settings } from '../../types';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
+import type { ExcalidrawTextElement } from '@excalidraw/excalidraw/element/types';
 import { TagInput } from '../Common/TagInput';
 import { ClsSelect } from '../Common/ClsSelect';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { EntityInvestigationBar } from '../Common/EntityInvestigationBar';
+import { PromoteModal, AddEntityModal, type CanvasEntityRef } from '../Common/CanvasEntityBridge';
 
 interface WhiteboardEditorProps {
   whiteboard: Whiteboard;
@@ -24,6 +26,10 @@ interface WhiteboardEditorProps {
   onBack: () => void;
   onDelete?: (id: string) => void;
   settings?: Settings;
+  /** Existing Notes/Tasks/IOCs offered by the "Add entity" picker. */
+  entities?: CanvasEntityRef[];
+  /** Promotes a selected text element on the canvas to a real Note/Task/IOC. */
+  onPromoteToEntity?: (kind: CanvasEntityRef['type'], text: string, investigationId: string | undefined, clsLevel: string | undefined) => Promise<void>;
 }
 
 function pickAppState(appState: Record<string, unknown>): Record<string, unknown> {
@@ -31,10 +37,13 @@ function pickAppState(appState: Record<string, unknown>): Record<string, unknown
   return { zoom, scrollX, scrollY, theme };
 }
 
-export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdate, onCreateTag, onBack, onDelete, settings }: WhiteboardEditorProps) {
+export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdate, onCreateTag, onBack, onDelete, settings, entities, onPromoteToEntity }: WhiteboardEditorProps) {
   const [name, setName] = useState(whiteboard.name);
   const [saved, setSaved] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [selectedText, setSelectedText] = useState<string | null>(null);
+  const [promptingText, setPromptingText] = useState<string | null>(null);
+  const [showEntityPicker, setShowEntityPicker] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const excalidrawSaveRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -106,7 +115,35 @@ export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdat
     };
     markPending();
     excalidrawSaveRef.current = setTimeout(() => flushPendingSceneSave(), 500);
+
+    // Promote is only offered for a single selected plain text element.
+    const selectedIds = appState.selectedElementIds as Record<string, boolean> | undefined;
+    const ids = selectedIds ? Object.keys(selectedIds).filter((id) => selectedIds[id]) : [];
+    if (ids.length === 1) {
+      const el = (elements as ExcalidrawTextElement[]).find((e) => e.id === ids[0]);
+      setSelectedText(el && el.type === 'text' ? (el.originalText || el.text || '') : null);
+    } else {
+      setSelectedText(null);
+    }
   }, [flushPendingSceneSave]);
+
+  const handleAddEntity = useCallback((entity: CanvasEntityRef) => {
+    const api = excalidrawApiRef.current;
+    if (!api) return;
+    const prefix = entity.type === 'note' ? 'Note' : entity.type === 'task' ? 'Task' : 'IOC';
+    const appState = api.getAppState();
+    const scrollX = typeof appState.scrollX === 'number' ? appState.scrollX : 0;
+    const scrollY = typeof appState.scrollY === 'number' ? appState.scrollY : 0;
+    const zoomValue = typeof appState.zoom?.value === 'number' ? appState.zoom.value : 1;
+    const [newEl] = convertToExcalidrawElements([{
+      type: 'text',
+      text: `[${prefix}] ${entity.label}`,
+      x: (appState.width / 2 - scrollX) / zoomValue - 60,
+      y: (appState.height / 2 - scrollY) / zoomValue - 12,
+    }]);
+    api.updateScene({ elements: [...api.getSceneElements(), newEl] });
+    setShowEntityPicker(false);
+  }, []);
 
   const handleTagsChange = useCallback((tags: string[]) => {
     onUpdate(whiteboard.id, { tags });
@@ -242,7 +279,57 @@ export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdat
             </MainMenu>
           </Excalidraw>
         </div>
+
+        {/* Entity bridge — promote the selected text element to a real Note/Task/
+            IOC, or bring an existing one onto the board. */}
+        {(onPromoteToEntity || entities) && (
+          <div className="absolute left-3 top-3 z-10 flex items-center gap-1.5">
+            {onPromoteToEntity && (
+              <button
+                type="button"
+                onClick={() => selectedText && setPromptingText(selectedText)}
+                disabled={!selectedText}
+                title={selectedText ? 'Promote selected text to a Note, Task, or IOC' : 'Select a single text element to promote'}
+                className="flex items-center gap-1 rounded-lg border border-border-subtle bg-bg-raised/90 px-2.5 py-1.5 text-xs font-medium text-text-muted shadow-lg backdrop-blur transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Sparkles size={13} />
+                Promote
+              </button>
+            )}
+            {entities && (
+              <button
+                type="button"
+                onClick={() => setShowEntityPicker(true)}
+                title="Add an existing Note, Task, or IOC to the board"
+                className="flex items-center gap-1 rounded-lg border border-border-subtle bg-bg-raised/90 px-2.5 py-1.5 text-xs font-medium text-text-muted shadow-lg backdrop-blur transition-colors hover:text-text-primary"
+              >
+                <Link2 size={13} />
+                Add entity
+              </button>
+            )}
+          </div>
+        )}
       </div>
+
+      {promptingText && onPromoteToEntity && (
+        <PromoteModal
+          text={promptingText}
+          folders={folders}
+          onPromote={async (kind, investigationId, clsLevel) => {
+            await onPromoteToEntity(kind, promptingText, investigationId, clsLevel);
+            setPromptingText(null);
+          }}
+          onClose={() => setPromptingText(null)}
+        />
+      )}
+
+      {showEntityPicker && entities && (
+        <AddEntityModal
+          entities={entities}
+          onPick={handleAddEntity}
+          onClose={() => setShowEntityPicker(false)}
+        />
+      )}
 
       <ConfirmDialog
         open={showConfirmDelete}

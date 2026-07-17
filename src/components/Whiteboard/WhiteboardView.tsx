@@ -1,6 +1,7 @@
 import React, { Suspense, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Whiteboard, Folder, Tag, Settings } from '../../types';
+import type { CanvasEntityRef } from '../Common/CanvasEntityBridge';
 import { WhiteboardList } from './WhiteboardList';
 import { Loader2 } from 'lucide-react';
 
@@ -20,6 +21,10 @@ interface WhiteboardViewProps {
   selectedWhiteboardId?: string | null;
   onWhiteboardSelect?: (id: string | null) => void;
   settings?: Settings;
+  /** Existing Notes/Tasks/IOCs offered by the "Add entity" picker. */
+  entities?: CanvasEntityRef[];
+  /** Promotes a selected text element on the canvas to a real Note/Task/IOC. */
+  onPromoteToEntity?: (kind: CanvasEntityRef['type'], text: string, investigationId: string | undefined, clsLevel: string | undefined) => Promise<void>;
 }
 
 export function WhiteboardView({
@@ -36,6 +41,8 @@ export function WhiteboardView({
   selectedWhiteboardId = null,
   onWhiteboardSelect,
   settings,
+  entities,
+  onPromoteToEntity,
 }: WhiteboardViewProps) {
   const { t } = useTranslation('whiteboard');
   const selectedWhiteboard = selectedWhiteboardId ? whiteboards.find((w) => w.id === selectedWhiteboardId) : null;
@@ -77,6 +84,8 @@ export function WhiteboardView({
             onBack={() => onWhiteboardSelect?.(null)}
             onDelete={handleDelete}
             settings={settings}
+            entities={entities}
+            onPromoteToEntity={onPromoteToEntity}
           />
         </Suspense>
       </div>
