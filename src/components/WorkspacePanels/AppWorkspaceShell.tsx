@@ -14,6 +14,7 @@ import {
 } from 'react';
 import { useNavigation } from '../../contexts/NavigationContext';
 import { useInvestigation } from '../../contexts/InvestigationContext';
+import type { Folder } from '../../types';
 import { RoutePopOutContext } from '../../contexts/RoutePopOutContext';
 import { setRoutePopOut } from '../../lib/route-popout-signal';
 import { downloadFile } from '../../lib/export';
@@ -332,6 +333,7 @@ export function AppWorkspaceShell({
   assistantView,
   dashboardActive,
   dashboard,
+  screensafeFolders,
   activityActive,
   activity,
   productsActive,
@@ -370,6 +372,8 @@ export function AppWorkspaceShell({
   assistantView: AssistantCaddyWorkspaceView;
   dashboardActive: boolean;
   dashboard: ReactNode;
+  /** Screenshare-filtered investigation list, for the investigation-switcher dropdown. */
+  screensafeFolders?: Folder[];
   activityActive: boolean;
   activity: ReactNode;
   productsActive: boolean;
@@ -745,6 +749,7 @@ export function AppWorkspaceShell({
           workspaceOwnedPanelIds={workspaceOwnedPanelIds}
           onLaunchPanel={handleWorkspaceOwnPanel}
           onLayoutTemplatePanelsApplied={handleLayoutTemplatePanelsApplied}
+          screensafeFolders={screensafeFolders}
         />
       )}
       {(assistantMounted || assistantActive || Array.from(workspaceOwnedPanelIds).some((panelId) => (
@@ -842,10 +847,12 @@ function WorkspaceHome({
   workspaceOwnedPanelIds,
   onLaunchPanel,
   onLayoutTemplatePanelsApplied,
+  screensafeFolders,
 }: {
   workspaceOwnedPanelIds: ReadonlySet<string>;
   onLaunchPanel: (panelId: string) => void;
   onLayoutTemplatePanelsApplied: (panelIds: string[]) => void;
+  screensafeFolders?: Folder[];
 }) {
   const { setGeometry, setMode, setPlacement, focusPanel } = useWorkspacePanels();
   const [dragState, setDragState] = useState<'idle' | 'valid'>('idle');
@@ -917,6 +924,7 @@ function WorkspaceHome({
       <WorkspaceLayoutTemplateControls
         workspaceOwnedPanelIds={workspaceOwnedPanelIds}
         onApplied={onLayoutTemplatePanelsApplied}
+        screensafeFolders={screensafeFolders}
       />
     </section>
   );
@@ -938,13 +946,19 @@ interface SavedWorkspaceLayoutTemplate {
 function WorkspaceLayoutTemplateControls({
   workspaceOwnedPanelIds,
   onApplied,
+  screensafeFolders,
 }: {
   workspaceOwnedPanelIds: ReadonlySet<string>;
   onApplied: (panelIds: string[]) => void;
+  screensafeFolders?: Folder[];
 }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const investigationContext = useInvestigation();
-  const folders = Array.isArray(investigationContext.folders) ? investigationContext.folders : [];
+  // Falls back to the unfiltered context list when the caller doesn't pass
+  // screensafeFolders (e.g. tests rendering this shell directly) rather than
+  // showing an empty dropdown — App.tsx's real render path always passes it.
+  const dropdownFolders = screensafeFolders
+    ?? (Array.isArray(investigationContext.folders) ? investigationContext.folders : []);
   const {
     selectedFolder,
     selectedFolderId,
@@ -1139,8 +1153,8 @@ function WorkspaceLayoutTemplateControls({
   const tlpGlow = workspaceTlpGlow(resolvedClsLevel);
   const investigationOptions = useMemo<Array<ToolbarSelectOption<string>>>(() => [
     { value: '', label: 'No investigation selected' },
-    ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
-  ], [folders]);
+    ...dropdownFolders.map((folder) => ({ value: folder.id, label: folder.name })),
+  ], [dropdownFolders]);
   const layoutOptions = useMemo<Array<ToolbarSelectOption<string>>>(() => [
     { value: DEFAULT_WORKSPACE_LAYOUT_SELECT_VALUE, label: 'Default' },
     ...savedLayouts.map((layout) => ({ value: layout.id, label: layout.name })),

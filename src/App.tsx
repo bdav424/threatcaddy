@@ -3129,6 +3129,7 @@ const AppInner = memo(function AppInner({
               assistantActive={assistantWorkspaceVisible}
               assistantView={assistantShellView}
               dashboardActive={dashboardWorkspaceVisible}
+              screensafeFolders={screensafeFolders}
               dashboard={(
                 <DashboardView
                   links={settings.quickLinks ?? DEFAULT_QUICK_LINKS}
