@@ -47,7 +47,14 @@ export function useNotes(folderId?: string) {
   // Bounded LRU cache of full note content keyed by note id (used by search when content isn't in state)
   const contentCacheRef = useRef(createLRUCache<string, string>(CONTENT_CACHE_MAX));
   const mountedRef = useRef(true);
-  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
+  useEffect(() => {
+    // Must reset to true here, not just false in cleanup: StrictMode's dev
+    // double-invoke (mount -> cleanup -> mount) reuses this ref, so without
+    // the reset it gets permanently stuck false after the first cleanup,
+    // silently no-opping every future loadNotes() via the guard below.
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const loadNotes = useCallback(async () => {
     try {

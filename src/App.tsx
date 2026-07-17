@@ -52,7 +52,7 @@ const OperationNameGenerator = lazy(() => import('./components/Common/OperationN
 import { useActivityLog } from './hooks/useActivityLog';
 import { ActivityLogContext } from './hooks/ActivityLogContext';
 import { ScreenshareContext } from './hooks/ScreenshareContext';
-import { getEffectiveClsLevels, isAboveClsThreshold, detectClsLevelFromText } from './lib/classification';
+import { getEffectiveClsLevels, isAboveClsThreshold, detectClsLevelFromText, getInheritedClsLevel } from './lib/classification';
 import { effectiveTlpLevel } from './lib/tlp-inspector';
 import { clipBuffer } from './lib/clipBuffer';
 import { formatBytes, openFilePicker, getDroppedFiles, dispatchFile, type FileOpenDetail } from './lib/file-handler';
@@ -1199,6 +1199,34 @@ const AppInner = memo(function AppInner({
   const screensafeChatThreads = useMemo(
     () => screenshareMaxLevel ? chatsHook.threads.filter((t) => !isAboveClsThreshold(t.clsLevel ?? undefined, screenshareMaxLevel, effectiveClsLevels)) : chatsHook.threads,
     [chatsHook.threads, screenshareMaxLevel, effectiveClsLevels]
+  );
+  // Investigations themselves weren't gated by screenshare mode — only the
+  // entities inside them were, so a folder marked TLP:RED purely at the
+  // folder level (no red-marked content) still showed up by name/badge in
+  // the Investigations hub and the workspace investigation switcher. Uses
+  // the RAW (non-screensafe) entity arrays for the inherited-level lookup —
+  // using the already-filtered screensafe arrays here would hide exactly the
+  // content that should raise a folder's effective level, undercounting it.
+  const screensafeFolders = useMemo(() => {
+    if (!screenshareMaxLevel) return folders;
+    const allEntities = [
+      ...notes.notes.filter((n) => !n.trashed && !n.archived),
+      ...tasks.tasks.filter((t) => !t.trashed && !t.archived),
+      ...timeline.events.filter((e) => !e.trashed && !e.archived),
+      ...standaloneIOCsHook.iocs.filter((i) => !i.trashed && !i.archived),
+    ];
+    return folders.filter((f) => {
+      const effective = effectiveTlpLevel(f.clsLevel, getInheritedClsLevel(f.id, allEntities));
+      return !isAboveClsThreshold(effective, screenshareMaxLevel, effectiveClsLevels);
+    });
+  }, [folders, notes.notes, tasks.tasks, timeline.events, standaloneIOCsHook.iocs, screenshareMaxLevel, effectiveClsLevels]);
+  // Remote investigation summaries only carry the folder-level clsLevel (no
+  // local entity data to inherit from), so this filters on that alone.
+  const screensafeRemoteInvestigations = useMemo(
+    () => screenshareMaxLevel
+      ? remoteInvestigations.filter((r) => !isAboveClsThreshold(r.folder.clsLevel, screenshareMaxLevel, effectiveClsLevels))
+      : remoteInvestigations,
+    [remoteInvestigations, screenshareMaxLevel, effectiveClsLevels]
   );
 
   // Folder-filtered + screenshare-safe (for NoteList, TaskList, TimelineView)
@@ -3052,8 +3080,8 @@ const AppInner = memo(function AppInner({
           <NetMapTabView />
         ) : activeView === 'investigations' ? (
           <InvestigationsHub
-            localFolders={folders}
-            remoteInvestigations={remoteInvestigations}
+            localFolders={screensafeFolders}
+            remoteInvestigations={screensafeRemoteInvestigations}
             syncedFolderIds={syncedFolderIds}
             serverConnected={auth.connected}
             localLoading={foldersLoading}
