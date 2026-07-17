@@ -124,7 +124,7 @@ export function InvestigationCard({
   })();
   const clsBadgeStyle = effectiveClsLevel ? getClsBadgeStyle(effectiveClsLevel) : null;
   const tlpOutlineColor = (() => {
-    const u = liveClsLevel.toUpperCase();
+    const u = (effectiveClsLevel ?? '').toUpperCase();
     if (u.includes('RED')) return '#cc0000';
     if (u.includes('AMBER')) return '#ff8c00';
     if (u.includes('GREEN')) return '#007a00';

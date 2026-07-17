@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AudioLines,
   Baby,
@@ -1021,7 +1022,13 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
   const [dayStamps, setDayStamps] = useState<Record<string, CalendarStampId[]>>(() => loadStampMap(DAY_STAMP_STORAGE_KEY));
   const [eventStamps, setEventStamps] = useState<Record<string, CalendarStampId[]>>(() => loadStampMap(EVENT_STAMP_STORAGE_KEY));
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(() => new Set());
+  const multiSelectAnchorIdRef = useRef<string | null>(null);
+  const [boxSelectRect, setBoxSelectRect] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const boxSelectStartRef = useRef<{ x: number; y: number } | null>(null);
   const [eventContextMenu, setEventContextMenu] = useState<EventContextMenuState | null>(null);
+  const eventContextMenuRef = useRef<HTMLDivElement>(null);
+  const [eventContextMenuPos, setEventContextMenuPos] = useState({ top: 0, left: 0, ready: false });
   const assistantInputRef = useRef<HTMLInputElement>(null);
   const icsFileInputRef = useRef<HTMLInputElement>(null);
   const weekScrollerRef = useRef<HTMLDivElement>(null);
@@ -1162,6 +1169,19 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
 
   useEffect(() => {
     if (!eventContextMenu) {
+      setEventContextMenuPos({ top: 0, left: 0, ready: false });
+      return;
+    }
+    const el = eventContextMenuRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const left = Math.max(8, Math.min(eventContextMenu.x, window.innerWidth - rect.width - 8));
+    const top = Math.max(8, Math.min(eventContextMenu.y, window.innerHeight - rect.height - 8));
+    setEventContextMenuPos({ left, top, ready: true });
+  }, [eventContextMenu]);
+
+  useEffect(() => {
+    if (!eventContextMenu) {
       return undefined;
     }
 
@@ -1260,6 +1280,103 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
     setEventContextMenu(null);
     setStatusMessage(`${event.title} selected. Double-click to edit, drag to move, or right-click for options.`);
   };
+
+  // Multi-select: Ctrl/Cmd+click toggles one event, Shift+click selects a
+  // chronological range from the last-touched event. Both feed the same
+  // multiSelectedIds set that powers bulk delete.
+  const handleEventSelectClick = (event: CalendarEvent, clickEvent: MouseEvent<HTMLButtonElement>) => {
+    if (clickEvent.shiftKey) {
+      const anchorId = multiSelectAnchorIdRef.current ?? selectedEventId;
+      const sorted = sortEvents(events);
+      const anchorIdx = anchorId ? sorted.findIndex((e) => e.id === anchorId) : -1;
+      const targetIdx = sorted.findIndex((e) => e.id === event.id);
+      if (anchorIdx === -1 || targetIdx === -1) {
+        setMultiSelectedIds(new Set([event.id]));
+      } else {
+        const [from, to] = anchorIdx < targetIdx ? [anchorIdx, targetIdx] : [targetIdx, anchorIdx];
+        setMultiSelectedIds(new Set(sorted.slice(from, to + 1).map((e) => e.id)));
+      }
+      setSelectedEventId(null);
+      setStatusMessage('Range selected. Press Delete to remove, or Escape to clear.');
+      return;
+    }
+    if (clickEvent.metaKey || clickEvent.ctrlKey) {
+      setMultiSelectedIds((current) => {
+        const next = new Set(current);
+        if (next.size === 0 && selectedEventId) next.add(selectedEventId);
+        if (next.has(event.id)) next.delete(event.id); else next.add(event.id);
+        return next;
+      });
+      multiSelectAnchorIdRef.current = event.id;
+      setSelectedEventId(null);
+      return;
+    }
+    if (multiSelectedIds.size > 0) setMultiSelectedIds(new Set());
+    multiSelectAnchorIdRef.current = event.id;
+    selectEvent(event);
+  };
+
+  // Box (drag) select: Shift+drag across empty month/week canvas. Draws a
+  // viewport-fixed rectangle and, on release, selects every rendered event
+  // chip whose bounding box intersects it — layout-agnostic (works the same
+  // in month's flow layout and week's absolutely-positioned slots) since it
+  // measures real DOM rects rather than reasoning about grid geometry.
+  const startBoxSelect = (event: MouseEvent<HTMLElement>) => {
+    if (event.button !== 0) return false;
+    event.preventDefault();
+    boxSelectStartRef.current = { x: event.clientX, y: event.clientY };
+    setBoxSelectRect({ x0: event.clientX, y0: event.clientY, x1: event.clientX, y1: event.clientY });
+    setStatusMessage('Drag to box-select events, then release to select them.');
+    return true;
+  };
+
+  const updateBoxSelectFromPointer = (event: globalThis.MouseEvent) => {
+    const start = boxSelectStartRef.current;
+    if (!start || event.buttons !== 1) return;
+    setBoxSelectRect({ x0: start.x, y0: start.y, x1: event.clientX, y1: event.clientY });
+  };
+
+  const finalizeBoxSelect = () => {
+    const rect = boxSelectRect;
+    boxSelectStartRef.current = null;
+    setBoxSelectRect(null);
+    if (!rect) return;
+
+    const left = Math.min(rect.x0, rect.x1);
+    const right = Math.max(rect.x0, rect.x1);
+    const top = Math.min(rect.y0, rect.y1);
+    const bottom = Math.max(rect.y0, rect.y1);
+    if (right - left < 4 && bottom - top < 4) return; // too small to count as a drag
+
+    const nodes = document.querySelectorAll<HTMLElement>('[data-calendar-event-id]');
+    const hitIds = new Set<string>();
+    nodes.forEach((node) => {
+      const box = node.getBoundingClientRect();
+      if (box.left < right && box.right > left && box.top < bottom && box.bottom > top) {
+        const id = node.dataset.calendarEventId;
+        if (id) hitIds.add(id);
+      }
+    });
+    if (hitIds.size > 0) {
+      setMultiSelectedIds(hitIds);
+      setSelectedEventId(null);
+      setStatusMessage(`${hitIds.size} event${hitIds.size === 1 ? '' : 's'} selected. Press Delete to remove them, or Escape to clear.`);
+    }
+  };
+
+  useEffect(() => {
+    if (!boxSelectRect) {
+      return undefined;
+    }
+    const handleMouseUp = () => finalizeBoxSelect();
+    window.addEventListener('mousemove', updateBoxSelectFromPointer);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', updateBoxSelectFromPointer);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boxSelectRect]);
 
   const clearWeekSelection = () => {
     selectionAnchorRef.current = null;
@@ -1797,12 +1914,43 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
     setStatusMessage(event ? `Removed ${event.title}.` : 'Removed event.');
   };
 
+  // Bulk counterpart to deleteEvent — used by multi-select (Ctrl/Cmd+click,
+  // Shift+click range, Shift+drag box-select). One state update instead of
+  // N sequential ones, and the status message reports an accurate count.
+  const deleteEvents = (eventIds: string[]) => {
+    const idSet = new Set(eventIds);
+    const removed = events.filter((event) => idSet.has(event.id));
+    const remoteRemovals = removed
+      .filter((event): event is CalendarEvent & { remoteId: string; syncAccountId: string } => !!event.remoteId && !!event.syncAccountId)
+      .map((event) => ({ remoteId: event.remoteId, syncAccountId: event.syncAccountId }));
+    if (remoteRemovals.length > 0) {
+      setPendingDeletions((cur) => [...cur, ...remoteRemovals]);
+    }
+    setEvents((current) => current.filter((item) => !idSet.has(item.id)));
+    setEventStamps((current) => {
+      const next = { ...current };
+      for (const id of idSet) delete next[id];
+      return next;
+    });
+    setSelectedEventId((current) => (current && idSet.has(current) ? null : current));
+    setEventContextMenu(null);
+    setMultiSelectedIds(new Set());
+    setStatusMessage(`Removed ${removed.length} event${removed.length === 1 ? '' : 's'}.`);
+  };
+
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
         if (eventContextMenu) {
           event.preventDefault();
           setEventContextMenu(null);
+          return;
+        }
+
+        if (multiSelectedIds.size > 0) {
+          event.preventDefault();
+          setMultiSelectedIds(new Set());
+          setStatusMessage('Selection cleared.');
           return;
         }
 
@@ -1838,10 +1986,17 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
         return;
       }
 
-      if ((event.key === 'Delete' || event.key === 'Backspace') && selectedEvent) {
-        event.preventDefault();
-        deleteEvent(selectedEvent.id);
-        return;
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        if (multiSelectedIds.size > 0) {
+          event.preventDefault();
+          deleteEvents(Array.from(multiSelectedIds));
+          return;
+        }
+        if (selectedEvent) {
+          event.preventDefault();
+          deleteEvent(selectedEvent.id);
+          return;
+        }
       }
 
       if (event.key === 'Enter' && selectedEvent && !eventContextMenu && !isNativeActionTarget(event.target)) {
@@ -1852,7 +2007,7 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeStampId, drawerOpen, eventContextMenu, monthSelection, selectedEvent, weekSelection, events]);
+  }, [activeStampId, drawerOpen, eventContextMenu, monthSelection, multiSelectedIds, selectedEvent, weekSelection, events]);
 
   const handleNavigate = useCallback((direction: -1 | 1) => {
     if (viewMode === 'week') {
@@ -1993,6 +2148,10 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
   };
 
   const startWeekSelection = (date: Date, hour: number, event: MouseEvent<HTMLElement>) => {
+    if (event.shiftKey) {
+      startBoxSelect(event);
+      return;
+    }
     if (event.button !== 0) {
       return;
     }
@@ -2017,6 +2176,9 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
   };
 
   const startMonthSelection = (date: Date, event: MouseEvent<HTMLElement>) => {
+    if (event.shiftKey) {
+      return startBoxSelect(event);
+    }
     if (activeStampId || event.button !== 0) {
       return false;
     }
@@ -2362,6 +2524,7 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
               )}
               <button
                 type="button"
+                data-calendar-event-id={event.id}
                 onMouseDown={(mouseEvent) => mouseEvent.stopPropagation()}
                 onClick={(clickEvent) => {
                   clickEvent.stopPropagation();
@@ -2369,7 +2532,7 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
                     toggleEventStamp(event, activeStampId);
                     return;
                   }
-                  selectEvent(event);
+                  handleEventSelectClick(event, clickEvent);
                 }}
                 onDoubleClick={(clickEvent) => {
                   clickEvent.stopPropagation();
@@ -2388,6 +2551,7 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
                   density.monthEvent,
                   eventStampIds.length > 0 && 'pl-6',
                   selectedEventId === event.id && 'ring-1 ring-accent/45',
+                  multiSelectedIds.has(event.id) && 'ring-2 ring-rose-400',
                 )}
                 style={{
                   color: SOURCE_STYLES[event.source].color,
@@ -2526,6 +2690,7 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
             <button
               key={event.id}
               type="button"
+              data-calendar-event-id={event.id}
               draggable
               onMouseDown={(mouseEvent) => mouseEvent.stopPropagation()}
               onDragStart={(dragEvent: DragEvent<HTMLButtonElement>) => {
@@ -2543,7 +2708,7 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
                   toggleEventStamp(event, activeStampId);
                   return;
                 }
-                selectEvent(event);
+                handleEventSelectClick(event, clickEvent);
               }}
               onDoubleClick={(clickEvent) => {
                 clickEvent.stopPropagation();
@@ -2560,6 +2725,7 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
                 'absolute left-1 right-1 z-10 border text-left font-medium shadow-[0_10px_20px_rgba(15,23,42,0.14)]',
                 density.weekEvent,
                 selectedEventId === event.id && 'ring-1 ring-accent/55',
+                multiSelectedIds.has(event.id) && 'ring-2 ring-rose-400',
               )}
               style={{
                 top,
@@ -3245,13 +3411,14 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
                     <button
                       key={event.id}
                       type="button"
+                      data-calendar-event-id={event.id}
                       onClick={(clickEvent) => {
                         clickEvent.stopPropagation();
                         if (activeStampId) {
                           toggleEventStamp(event, activeStampId);
                           return;
                         }
-                        selectEvent(event);
+                        handleEventSelectClick(event, clickEvent);
                       }}
                       onDoubleClick={(clickEvent) => {
                         clickEvent.stopPropagation();
@@ -3268,6 +3435,7 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
                         'mb-1 block w-full border text-left font-medium',
                         density.allDayEvent,
                         selectedEventId === event.id && 'ring-1 ring-accent/45',
+                        multiSelectedIds.has(event.id) && 'ring-2 ring-rose-400',
                       )}
                       style={{
                         color: SOURCE_STYLES[event.source].color,
@@ -3337,12 +3505,50 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
         {statusMessage}
       </div>
 
-      {eventContextMenu && selectedEvent && (
+      {boxSelectRect && createPortal(
         <div
+          className="pointer-events-none fixed z-[300] rounded-sm border-2 border-dashed border-rose-400/70 bg-rose-400/10"
+          style={{
+            left: Math.min(boxSelectRect.x0, boxSelectRect.x1),
+            top: Math.min(boxSelectRect.y0, boxSelectRect.y1),
+            width: Math.abs(boxSelectRect.x1 - boxSelectRect.x0),
+            height: Math.abs(boxSelectRect.y1 - boxSelectRect.y0),
+          }}
+        />,
+        document.body,
+      )}
+
+      {multiSelectedIds.size > 0 && createPortal(
+        <div className="fixed inset-x-0 bottom-6 z-[280] flex justify-center">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-border-medium bg-bg-raised/98 px-4 py-2 text-xs font-medium text-text-secondary shadow-[0_12px_24px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+            <span>{multiSelectedIds.size} event{multiSelectedIds.size === 1 ? '' : 's'} selected</span>
+            <button
+              type="button"
+              onClick={() => { setMultiSelectedIds(new Set()); setStatusMessage('Selection cleared.'); }}
+              className="text-text-muted transition-colors hover:text-text-primary"
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              onClick={() => deleteEvents(Array.from(multiSelectedIds))}
+              className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/15 px-3 py-1 font-semibold text-rose-300 transition-colors hover:bg-rose-500/25"
+            >
+              <Trash2 size={13} />
+              Delete {multiSelectedIds.size}
+            </button>
+          </div>
+        </div>,
+        document.body,
+      )}
+
+      {eventContextMenu && selectedEvent && createPortal(
+        <div
+          ref={eventContextMenuRef}
           role="menu"
           aria-label="Calendar event actions"
           className="fixed z-[260] w-48 overflow-hidden rounded-[10px] border border-border-medium bg-bg-raised/98 p-1 text-[11px] shadow-[8px_12px_24px_rgba(0,0,0,0.32)] backdrop-blur-xl"
-          style={{ left: eventContextMenu.x, top: eventContextMenu.y }}
+          style={{ left: eventContextMenuPos.left, top: eventContextMenuPos.top, visibility: eventContextMenuPos.ready ? 'visible' : 'hidden' }}
           onClick={(event) => event.stopPropagation()}
           onContextMenu={(event) => event.preventDefault()}
           data-calendar-event-menu="true"
@@ -3403,7 +3609,8 @@ export const CalendarCaddyWorkspaceContent = memo(function CalendarCaddyWorkspac
             <Trash2 size={13} />
             Delete event
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {drawerOpen && (
