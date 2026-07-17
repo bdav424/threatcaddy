@@ -371,6 +371,25 @@ export interface JournalBook {
    * book and its pages stay fully accessible if that investigation is later
    * archived — nothing here reads or depends on investigation status. */
   investigationId?: string;
+  /** The JournalCollection this book is grouped under. Undefined = not in a
+   * collection (the default — grouping into a collection is opt-in). */
+  collectionId?: string;
+  order: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * A container grouping JournalBooks — the tier above Book, formed by
+ * dragging one book onto another. Same personal-vs-investigation-scoped
+ * shape as JournalBook; a collection's own investigationId (if set) is a
+ * floor for every book/page nested under it, same precedence rule as book
+ * -> page.
+ */
+export interface JournalCollection {
+  id: string;
+  name: string;
+  investigationId?: string;
   order: number;
   createdAt: number;
   updatedAt: number;

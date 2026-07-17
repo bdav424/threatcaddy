@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, ReportTemplate, GraphSnapshot, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus, EnrichmentCacheEntry, VirtualCaddyJob, NetworkDevice, NetworkScanJob, SyncAuthSettings, JournalPage, JournalBook, IOCRecheckDiff } from './types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, ReportTemplate, GraphSnapshot, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus, EnrichmentCacheEntry, VirtualCaddyJob, NetworkDevice, NetworkScanJob, SyncAuthSettings, JournalPage, JournalBook, JournalCollection, IOCRecheckDiff } from './types';
 import type { IntegrationTemplate, InstalledIntegration, IntegrationRun } from './types/integration-types';
 import { installEncryptionMiddleware } from './lib/encryptionMiddleware';
 
@@ -36,6 +36,7 @@ const db = new Dexie('ThreatCaddyDB') as Dexie & {
   journalPages: EntityTable<JournalPage, 'id'>;
   iocRecheckDiffs: EntityTable<IOCRecheckDiff, 'id'>;
   journalBooks: EntityTable<JournalBook, 'id'>;
+  journalCollections: EntityTable<JournalCollection, 'id'>;
 };
 
 db.version(1).stores({
@@ -380,6 +381,15 @@ db.version(43).stores({
 // unindexed field — existing pages are simply unfiled until moved into a book.
 db.version(44).stores({
   journalBooks: 'id, name, investigationId, order, createdAt, updatedAt',
+});
+
+// Version 45: Journal collections — a tier above books, formed by dragging
+// one book onto another (or the reverse: a book's collectionId groups it
+// under one). Same personal-vs-investigation-scoped shape as journalBooks.
+// journalBooks.collectionId is a new unindexed field — existing books are
+// simply uncollected until merged.
+db.version(45).stores({
+  journalCollections: 'id, name, investigationId, order, createdAt, updatedAt',
 });
 
 

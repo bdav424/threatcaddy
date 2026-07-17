@@ -15,7 +15,7 @@ export function useJournalPages() {
 
   useEffect(() => { void reload(); }, [reload]);
 
-  const createPage = useCallback(async (partial?: Partial<Pick<JournalPage, 'title' | 'content' | 'theme' | 'paperColor' | 'paperStyle'>>): Promise<JournalPage> => {
+  const createPage = useCallback(async (partial?: Partial<Pick<JournalPage, 'title' | 'content' | 'theme' | 'paperColor' | 'paperStyle' | 'bookId'>>): Promise<JournalPage> => {
     const now = Date.now();
     const page: JournalPage = {
       id: nanoid(),
@@ -24,6 +24,7 @@ export function useJournalPages() {
       theme: partial?.theme ?? 'plain',
       paperColor: partial?.paperColor ?? 'theme',
       paperStyle: partial?.paperStyle ?? 'blank',
+      bookId: partial?.bookId,
       createdAt: now,
       updatedAt: now,
     };
