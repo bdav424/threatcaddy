@@ -67,11 +67,19 @@ export function TagSubList({
                   className="bg-bg-deep border border-border-medium rounded px-2 py-0.5 text-xs text-text-primary focus:outline-none focus:border-purple w-24"
                 />
               ) : (
-                <button
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => nav(() => { onTagSelect(tag.name); onFolderSelect(undefined); onShowTrash(false); onShowArchive(false); })}
                   onDoubleClick={() => { setEditingId(tag.id); setEditName(tag.name); }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      nav(() => { onTagSelect(tag.name); onFolderSelect(undefined); onShowTrash(false); onShowArchive(false); });
+                    }
+                  }}
                   className={cn(
-                    'flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs transition-colors',
+                    'flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs transition-colors cursor-pointer',
                     selectedTag === tag.name
                       ? 'bg-purple/20 text-purple'
                       : 'bg-bg-raised text-text-secondary hover:bg-bg-hover hover:text-text-primary'
@@ -87,7 +95,7 @@ export function TagSubList({
                   >
                     <X size={10} />
                   </button>
-                </button>
+                </div>
               )}
             </div>
           ))}
