@@ -2863,6 +2863,9 @@ const AppInner = memo(function AppInner({
       onUpdateReportTitle={reportsHook.updateTitle}
       onDeleteReport={reportsHook.deleteReport}
       onShipReportToProducts={handleShipReportToProducts}
+      onCreateReportCheckpoint={reportsHook.createCheckpoint}
+      onRestoreReportCheckpoint={reportsHook.restoreCheckpoint}
+      onDeleteReportCheckpoint={reportsHook.deleteCheckpoint}
     />
   );
 

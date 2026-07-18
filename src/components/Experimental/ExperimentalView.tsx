@@ -3,7 +3,6 @@ import {
   Brain,
   CheckCircle2,
   FileText,
-  GitBranch,
   Loader2,
   Lock,
   Network,
@@ -53,32 +52,6 @@ const prototypes = [
       },
     ],
   },
-  {
-    id: 'draft',
-    title: 'Versioned working documents',
-    eyebrow: 'Draft control',
-    description: 'Experiment with checkpointed working papers, compare/revert affordances, and deliberate promotion into the Products workspace when a draft is ready.',
-    icon: GitBranch,
-    accent: 'from-emerald-500/20 to-lime-400/5',
-    border: 'border-emerald-400/30',
-    steps: [
-      {
-        id: 'checkpoints',
-        title: 'Create checkpoints',
-        description: 'Saves draft milestones while a report or working paper develops. Analysts can return to earlier versions without losing the reasoning behind them.',
-      },
-      {
-        id: 'deltas',
-        title: 'Review deltas',
-        description: 'Shows what changed between draft checkpoints. This is meant to catch accidental removals, unsupported additions, and changes that weaken caveats or sourcing.',
-      },
-      {
-        id: 'promote-product',
-        title: 'Promote to product',
-        description: 'Moves a reviewed draft toward formal Products output. It keeps experimentation separate from customer-facing or report-ready material.',
-      },
-    ],
-  },
 ] as const;
 
 type PrototypeLane = typeof prototypes[number]['id'];
@@ -93,11 +66,9 @@ function ProbeStatusIcon({ status }: { status: EndpointProbeStatus }) {
 }
 
 function ActionRequestPanel({
-  lane,
   folderName,
   onOpenChat,
 }: {
-  lane: PrototypeLane;
   folderName?: string;
   onOpenChat: () => void;
 }) {
@@ -105,29 +76,16 @@ function ActionRequestPanel({
   const [researchQuestion, setResearchQuestion] = useState('');
   const [researchScope, setResearchScope] = useState('Use only the active investigation context and cited source material. Do not invent IOCs, TTPs, or actor claims.');
   const [researchOutput, setResearchOutput] = useState('Produce a source-aware research brief with findings, caveats, confidence, and recommended next pivots.');
-  const [draftTitle, setDraftTitle] = useState('');
-  const [draftType, setDraftType] = useState('Analyst working note');
-  const [draftGoal, setDraftGoal] = useState('Create a checkpointed draft from reviewed investigation material and list open questions before promotion to Products.');
 
-  const prompt = lane === 'research'
-    ? [
-      'CaddyShack request: investigation-scoped deep research.',
-      `Investigation: ${folderName || 'No investigation selected yet; ask me to select one before using case data.'}`,
-      `Research question: ${researchQuestion || '[fill in the research question]'}`,
-      `Scope and guardrails: ${researchScope}`,
-      `Requested output: ${researchOutput}`,
-      'Privacy rule: keep conclusions inside this investigation unless I explicitly approve reuse or export.',
-      'Review gate: present findings for analyst review before creating notes, IOCs, evidence, or products.',
-    ].join('\n')
-    : [
-      'CaddyShack request: versioned working document.',
-      `Investigation: ${folderName || 'No investigation selected yet; ask me to select one before using case data.'}`,
-      `Draft title: ${draftTitle || '[fill in the draft title]'}`,
-      `Draft type: ${draftType}`,
-      `Checkpoint goal: ${draftGoal}`,
-      'Drafting rule: treat this as a working document, not a final product. Preserve assumptions, open questions, and source caveats.',
-      'Review gate: do not promote the draft to Products or export formats until I approve the checkpoint.',
-    ].join('\n');
+  const prompt = [
+    'CaddyShack request: investigation-scoped deep research.',
+    `Investigation: ${folderName || 'No investigation selected yet; ask me to select one before using case data.'}`,
+    `Research question: ${researchQuestion || '[fill in the research question]'}`,
+    `Scope and guardrails: ${researchScope}`,
+    `Requested output: ${researchOutput}`,
+    'Privacy rule: keep conclusions inside this investigation unless I explicitly approve reuse or export.',
+    'Review gate: present findings for analyst review before creating notes, IOCs, evidence, or products.',
+  ].join('\n');
 
   async function copyPrompt() {
     try {
@@ -150,10 +108,10 @@ function ActionRequestPanel({
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-accent-blue/25 bg-accent-blue/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-accent-blue">
             <PlayCircle size={14} />
-            {lane === 'research' ? 'Research action' : 'Draft action'}
+            Research action
           </div>
           <h2 className="mt-3 text-lg font-semibold text-text-primary">
-            {lane === 'research' ? 'Stage a CaddyAI research request' : 'Stage a CaddyAI working-document request'}
+            Stage a CaddyAI research request
           </h2>
           <p className="mt-1 text-sm leading-6 text-text-secondary">
             Fill this out, copy the generated prompt, then open CaddyAI. This prototype does not silently execute tools or write entities.
@@ -161,72 +119,38 @@ function ActionRequestPanel({
         </div>
       </div>
 
-      {lane === 'research' ? (
-        <div className="grid gap-3">
-          <label className="grid gap-1 text-xs font-medium text-text-secondary">
-            Research question
-            <input
-              value={researchQuestion}
-              onChange={(event) => setResearchQuestion(event.target.value)}
-              maxLength={240}
-              placeholder="What should CaddyAI investigate?"
-              className="rounded-xl border border-border-subtle bg-bg-base px-3 py-2 text-sm text-text-primary outline-none transition focus:border-accent-blue"
-            />
-          </label>
-          <label className="grid gap-1 text-xs font-medium text-text-secondary">
-            Scope and guardrails
-            <textarea
-              value={researchScope}
-              onChange={(event) => setResearchScope(event.target.value)}
-              maxLength={700}
-              rows={3}
-              className="rounded-xl border border-border-subtle bg-bg-base px-3 py-2 text-sm text-text-primary outline-none transition focus:border-accent-blue"
-            />
-          </label>
-          <label className="grid gap-1 text-xs font-medium text-text-secondary">
-            Requested output
-            <textarea
-              value={researchOutput}
-              onChange={(event) => setResearchOutput(event.target.value)}
-              maxLength={500}
-              rows={2}
-              className="rounded-xl border border-border-subtle bg-bg-base px-3 py-2 text-sm text-text-primary outline-none transition focus:border-accent-blue"
-            />
-          </label>
-        </div>
-      ) : (
-        <div className="grid gap-3">
-          <label className="grid gap-1 text-xs font-medium text-text-secondary">
-            Draft title
-            <input
-              value={draftTitle}
-              onChange={(event) => setDraftTitle(event.target.value)}
-              maxLength={180}
-              placeholder="Working paper title"
-              className="rounded-xl border border-border-subtle bg-bg-base px-3 py-2 text-sm text-text-primary outline-none transition focus:border-accent-blue"
-            />
-          </label>
-          <label className="grid gap-1 text-xs font-medium text-text-secondary">
-            Draft type
-            <input
-              value={draftType}
-              onChange={(event) => setDraftType(event.target.value)}
-              maxLength={120}
-              className="rounded-xl border border-border-subtle bg-bg-base px-3 py-2 text-sm text-text-primary outline-none transition focus:border-accent-blue"
-            />
-          </label>
-          <label className="grid gap-1 text-xs font-medium text-text-secondary">
-            Checkpoint goal
-            <textarea
-              value={draftGoal}
-              onChange={(event) => setDraftGoal(event.target.value)}
-              maxLength={600}
-              rows={3}
-              className="rounded-xl border border-border-subtle bg-bg-base px-3 py-2 text-sm text-text-primary outline-none transition focus:border-accent-blue"
-            />
-          </label>
-        </div>
-      )}
+      <div className="grid gap-3">
+        <label className="grid gap-1 text-xs font-medium text-text-secondary">
+          Research question
+          <input
+            value={researchQuestion}
+            onChange={(event) => setResearchQuestion(event.target.value)}
+            maxLength={240}
+            placeholder="What should CaddyAI investigate?"
+            className="rounded-xl border border-border-subtle bg-bg-base px-3 py-2 text-sm text-text-primary outline-none transition focus:border-accent-blue"
+          />
+        </label>
+        <label className="grid gap-1 text-xs font-medium text-text-secondary">
+          Scope and guardrails
+          <textarea
+            value={researchScope}
+            onChange={(event) => setResearchScope(event.target.value)}
+            maxLength={700}
+            rows={3}
+            className="rounded-xl border border-border-subtle bg-bg-base px-3 py-2 text-sm text-text-primary outline-none transition focus:border-accent-blue"
+          />
+        </label>
+        <label className="grid gap-1 text-xs font-medium text-text-secondary">
+          Requested output
+          <textarea
+            value={researchOutput}
+            onChange={(event) => setResearchOutput(event.target.value)}
+            maxLength={500}
+            rows={2}
+            className="rounded-xl border border-border-subtle bg-bg-base px-3 py-2 text-sm text-text-primary outline-none transition focus:border-accent-blue"
+          />
+        </label>
+      </div>
 
       <div className="mt-4 rounded-xl border border-border-subtle bg-bg-base/60 p-3">
         <div className="mb-2 flex items-center justify-between gap-3">
@@ -325,7 +249,7 @@ export function ExperimentalView({ folder, settings, onUpdateSettings, onOpenCha
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2">
+        <section className="grid gap-4 md:max-w-xl">
           {prototypes.map((prototype) => {
             const Icon = prototype.icon;
             return (
@@ -391,11 +315,15 @@ export function ExperimentalView({ folder, settings, onUpdateSettings, onOpenCha
 
         {activeLane && (
           <ActionRequestPanel
-            lane={activeLane}
             folderName={folder?.name}
             onOpenChat={onOpenChat}
           />
         )}
+
+        <div className="rounded-2xl border border-border-subtle bg-bg-raised/60 p-4 text-sm leading-6 text-text-secondary">
+          Looking for versioned working documents? Draft checkpointing, delta review, and promotion to Products now live in{' '}
+          <span className="font-semibold text-text-primary">ReportCaddy</span> — open a report there and use the checkpoint button in its toolbar.
+        </div>
 
         <section className="grid gap-4">
           <article className="rounded-2xl border border-rose-400/30 bg-bg-raised p-5">

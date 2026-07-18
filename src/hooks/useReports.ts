@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { nanoid } from 'nanoid';
 import { db } from '../db';
-import type { Report, ReportSectionContent } from '../types';
+import type { Report, ReportCheckpoint, ReportSectionContent } from '../types';
 
 const SAVE_DEBOUNCE_MS = 600;
 
@@ -75,5 +75,47 @@ export function useReports() {
     await reload();
   }, [reload]);
 
-  return { reports, loading, createReport, updateSection, updateTitle, deleteReport, reload };
+  // Draft checkpointing/versioning: save a labeled snapshot of the report's current
+  // title/sections, restore an earlier one, or discard one. Written immediately —
+  // these are deliberate, infrequent actions, unlike the debounced section edits above.
+  const createCheckpoint = useCallback(async (id: string, label: string) => {
+    const target = reports.find((r) => r.id === id);
+    if (!target) return;
+    const checkpoint: ReportCheckpoint = {
+      id: nanoid(),
+      label: label.trim() || `Checkpoint ${new Date().toLocaleString()}`,
+      title: target.title,
+      sections: target.sections.map((s) => ({ ...s })),
+      createdAt: Date.now(),
+    };
+    const checkpoints = [...(target.checkpoints || []), checkpoint];
+    await db.reports.update(id, { checkpoints });
+    setReports((prev) => prev.map((r) => (r.id === id ? { ...r, checkpoints } : r)));
+  }, [reports]);
+
+  const restoreCheckpoint = useCallback(async (id: string, checkpointId: string) => {
+    const target = reports.find((r) => r.id === id);
+    const checkpoint = target?.checkpoints?.find((c) => c.id === checkpointId);
+    if (!target || !checkpoint) return;
+    const updates = {
+      title: checkpoint.title,
+      sections: checkpoint.sections.map((s) => ({ ...s })),
+      updatedAt: Date.now(),
+    };
+    await db.reports.update(id, updates);
+    setReports((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)));
+  }, [reports]);
+
+  const deleteCheckpoint = useCallback(async (id: string, checkpointId: string) => {
+    const target = reports.find((r) => r.id === id);
+    if (!target) return;
+    const checkpoints = (target.checkpoints || []).filter((c) => c.id !== checkpointId);
+    await db.reports.update(id, { checkpoints });
+    setReports((prev) => prev.map((r) => (r.id === id ? { ...r, checkpoints } : r)));
+  }, [reports]);
+
+  return {
+    reports, loading, createReport, updateSection, updateTitle, deleteReport, reload,
+    createCheckpoint, restoreCheckpoint, deleteCheckpoint,
+  };
 }

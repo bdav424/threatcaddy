@@ -1475,6 +1475,15 @@ export interface ReportSectionContent {
   content: string;
 }
 
+/** A saved snapshot of a Report's title/sections at a point in time — draft checkpointing/versioning. */
+export interface ReportCheckpoint {
+  id: string;
+  label: string;
+  title: string;
+  sections: ReportSectionContent[];
+  createdAt: number;
+}
+
 /** A written report — the user-authored output of filling in a ReportTemplate. */
 export interface Report {
   id: string;
@@ -1482,6 +1491,8 @@ export interface Report {
   templateId: string;
   sections: ReportSectionContent[];
   folderId?: string;
+  /** Saved checkpoints, most recent last. Lets analysts return to earlier versions and diff against the current draft before promoting it to Products. */
+  checkpoints?: ReportCheckpoint[];
   createdAt: number;
   updatedAt: number;
 }

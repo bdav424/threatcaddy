@@ -1,12 +1,14 @@
 import { useState, useCallback, useRef, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileText, Plus, Trash2, Download, Copy, ChevronRight, ArrowLeft, X, Camera, Rocket } from 'lucide-react';
+import { FileText, Plus, Trash2, Download, Copy, ChevronRight, ArrowLeft, X, Camera, Rocket, GitBranch, RotateCcw, GitCompare } from 'lucide-react';
 import { useReportTemplates } from '../../hooks/useReportTemplates';
 import { useInvestigation } from '../../contexts/InvestigationContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useWorkspacePanelChromeState } from '../WorkspacePanels/WorkspacePanel';
 import { buildReportContext, renderSectionTemplate } from '../../lib/report-template-renderer';
 import { useGraphSnapshots } from '../../hooks/useGraphSnapshots';
+import { InlineDiffView } from '../Common/InlineDiffView';
+import { formatDate } from '../../lib/utils';
 import type { ReportTemplate, ReportSection, Report } from '../../types';
 
 // Re-exported for the toast-regression test, which still imports this name.
@@ -300,6 +302,9 @@ export function ReportEditor({
   onBack,
   onDelete,
   onShipToProducts,
+  onCreateCheckpoint,
+  onRestoreCheckpoint,
+  onDeleteCheckpoint,
 }: {
   report: ActiveReport;
   template: ReportTemplate;
@@ -308,14 +313,21 @@ export function ReportEditor({
   onBack: () => void;
   onDelete: () => void;
   onShipToProducts?: () => void;
+  onCreateCheckpoint?: (label: string) => void;
+  onRestoreCheckpoint?: (checkpointId: string) => void;
+  onDeleteCheckpoint?: (checkpointId: string) => void;
 }) {
   const { t } = useTranslation();
   const { addToast } = useToast();
   const { selectedFolderId } = useInvestigation();
   const [activeSectionIdx, setActiveSectionIdx] = useState<number | null>(null);
+  const [showCheckpoints, setShowCheckpoints] = useState(false);
+  const [checkpointLabel, setCheckpointLabel] = useState('');
+  const [diffCheckpointId, setDiffCheckpointId] = useState<string | null>(null);
   const compact = Boolean(useWorkspacePanelChromeState()?.compact);
 
   const ordered = [...template.sections].sort((a, b) => a.order - b.order);
+  const checkpoints = report.checkpoints ?? [];
 
   const handleExportMd = useCallback(() => {
     downloadMarkdown(report, template);
@@ -332,6 +344,20 @@ export function ReportEditor({
     onShipToProducts();
     addToast('success', 'Shipped to Products');
   }, [onShipToProducts, addToast]);
+
+  const handleSaveCheckpoint = useCallback(() => {
+    if (!onCreateCheckpoint) return;
+    onCreateCheckpoint(checkpointLabel);
+    setCheckpointLabel('');
+    addToast('success', 'Checkpoint saved');
+  }, [onCreateCheckpoint, checkpointLabel, addToast]);
+
+  const handleRestoreCheckpoint = useCallback((checkpointId: string) => {
+    if (!onRestoreCheckpoint) return;
+    onRestoreCheckpoint(checkpointId);
+    setDiffCheckpointId(null);
+    addToast('success', 'Checkpoint restored');
+  }, [onRestoreCheckpoint, addToast]);
 
   const getSectionContent = (sectionId: string) =>
     report.sections.find(s => s.sectionId === sectionId)?.content ?? '';
@@ -376,6 +402,25 @@ export function ReportEditor({
           </button>
         )}
 
+        {onCreateCheckpoint && (
+          <button
+            className="relative p-1.5 rounded transition-colors hover:bg-[color:var(--color-bg-raised)]"
+            style={{ color: showCheckpoints ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
+            title="Draft checkpoints"
+            onClick={() => setShowCheckpoints(v => !v)}
+          >
+            <GitBranch size={13} />
+            {checkpoints.length > 0 && (
+              <span
+                className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-0.5 text-[9px] font-semibold"
+                style={{ background: 'var(--color-accent)', color: '#fff' }}
+              >
+                {checkpoints.length}
+              </span>
+            )}
+          </button>
+        )}
+
         <button
           className="p-1.5 rounded transition-colors hover:bg-[color:var(--color-bg-raised)]"
           style={{ color: 'var(--color-text-secondary)' }}
@@ -403,6 +448,91 @@ export function ReportEditor({
           <Trash2 size={13} />
         </button>
       </div>
+
+      {showCheckpoints && onCreateCheckpoint && (
+        <div
+          className="shrink-0 border-b px-3 py-2.5 space-y-2.5"
+          style={{ borderColor: 'var(--color-border-subtle)', background: 'var(--color-bg-deep)' }}
+        >
+          <div className="flex items-center gap-2">
+            <input
+              value={checkpointLabel}
+              onChange={e => setCheckpointLabel(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleSaveCheckpoint(); }}
+              placeholder="Checkpoint label (optional)"
+              className="flex-1 min-w-0 rounded-md px-2.5 py-1.5 text-xs focus:outline-none"
+              style={{ background: 'var(--color-bg-raised)', border: '1px solid var(--color-border-medium)', color: 'var(--color-text-primary)' }}
+            />
+            <button
+              onClick={handleSaveCheckpoint}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium shrink-0"
+              style={{ background: 'var(--color-accent)', color: '#fff' }}
+            >
+              <GitBranch size={12} />
+              Save checkpoint
+            </button>
+          </div>
+
+          {checkpoints.length === 0 ? (
+            <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+              No checkpoints yet. Save one before making risky edits so you can compare or revert later.
+            </p>
+          ) : (
+            <div className="space-y-1.5 max-h-56 overflow-y-auto">
+              {[...checkpoints].reverse().map(checkpoint => (
+                <div key={checkpoint.id} className="rounded-md px-2.5 py-1.5" style={{ background: 'var(--color-bg-raised)' }}>
+                  <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>{checkpoint.label}</p>
+                      <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{formatDate(checkpoint.createdAt)}</p>
+                    </div>
+                    <button
+                      onClick={() => setDiffCheckpointId(id => id === checkpoint.id ? null : checkpoint.id)}
+                      title="Compare to current draft"
+                      className="p-1 rounded transition-colors hover:bg-[color:var(--color-bg-hover)]"
+                      style={{ color: diffCheckpointId === checkpoint.id ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
+                    >
+                      <GitCompare size={12} />
+                    </button>
+                    {onRestoreCheckpoint && (
+                      <button
+                        onClick={() => handleRestoreCheckpoint(checkpoint.id)}
+                        title="Restore this checkpoint"
+                        className="p-1 rounded transition-colors hover:bg-[color:var(--color-bg-hover)]"
+                        style={{ color: 'var(--color-text-secondary)' }}
+                      >
+                        <RotateCcw size={12} />
+                      </button>
+                    )}
+                    {onDeleteCheckpoint && (
+                      <button
+                        onClick={() => { onDeleteCheckpoint(checkpoint.id); if (diffCheckpointId === checkpoint.id) setDiffCheckpointId(null); }}
+                        title="Delete this checkpoint"
+                        className="p-1 rounded transition-colors hover:bg-[color:var(--color-bg-hover)]"
+                        style={{ color: 'var(--color-accent-pink, #f472b6)' }}
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                  {diffCheckpointId === checkpoint.id && (
+                    <div className="mt-2">
+                      <InlineDiffView
+                        localText={buildMarkdown({ ...report, title: checkpoint.title, sections: checkpoint.sections }, template)}
+                        remoteText={buildMarkdown(report, template)}
+                        maxHeight="240px"
+                      />
+                      <p className="mt-1 text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                        Red: removed since this checkpoint · Green: added since this checkpoint
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Body: section nav + editor */}
       <div className="flex flex-1 overflow-hidden">

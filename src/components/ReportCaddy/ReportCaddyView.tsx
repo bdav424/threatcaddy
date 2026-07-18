@@ -19,6 +19,9 @@ interface ReportCaddyViewProps {
   onUpdateReportTitle: (id: string, title: string) => void;
   onDeleteReport: (id: string) => void;
   onShipReportToProducts: (title: string, content: string, folderId?: string) => void;
+  onCreateReportCheckpoint: (id: string, label: string) => void;
+  onRestoreReportCheckpoint: (id: string, checkpointId: string) => void;
+  onDeleteReportCheckpoint: (id: string, checkpointId: string) => void;
 }
 
 const EXTRACTION_SYSTEM_PROMPT = `You are a document structure analyst. The user will paste an existing report. Extract ONLY the structural skeleton: section headings, sub-headings, field labels, and any recurring outline patterns. Do NOT include any actual report content, analysis, prose, or data.
@@ -177,6 +180,9 @@ export function ReportCaddyView({
   onUpdateReportTitle,
   onDeleteReport,
   onShipReportToProducts,
+  onCreateReportCheckpoint,
+  onRestoreReportCheckpoint,
+  onDeleteReportCheckpoint,
 }: ReportCaddyViewProps) {
   const { allTemplates, loading, createTemplate, updateTemplate, deleteTemplate, categories } = useReportTemplates();
 
@@ -761,6 +767,9 @@ export function ReportCaddyView({
           onBack={() => setActiveReportId(null)}
           onDelete={handleDeleteActiveReport}
           onShipToProducts={handleShipActiveReport}
+          onCreateCheckpoint={(label) => onCreateReportCheckpoint(activeReport.id, label)}
+          onRestoreCheckpoint={(checkpointId) => onRestoreReportCheckpoint(activeReport.id, checkpointId)}
+          onDeleteCheckpoint={(checkpointId) => onDeleteReportCheckpoint(activeReport.id, checkpointId)}
         />
       );
     }
