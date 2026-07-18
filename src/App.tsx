@@ -2341,6 +2341,53 @@ const AppInner = memo(function AppInner({
 
   const handleNotesWorkspaceCreate = workspaceRouteActive ? handleCreateWorkspaceNote : handleNewNote;
 
+  // Auto-open Notes/Whiteboards instead of leaving an empty-state "create one" prompt:
+  // no investigation selected -> fresh page; investigation selected -> its most recently
+  // updated note/whiteboard, or fresh if it has none. Only fires on genuine arrival (view
+  // just became active, or the investigation changed) — not on every selection change, so
+  // explicit user actions like "back to list" aren't fought by re-opening something.
+  const notesAutoOpenRef = useRef<{ view: ViewMode | null; folderId: string | undefined }>({ view: null, folderId: undefined });
+  useEffect(() => {
+    if (activeView !== 'notes' || showTrash || showArchive) return;
+    const prev = notesAutoOpenRef.current;
+    const enteredView = prev.view !== 'notes';
+    const folderChanged = prev.folderId !== selectedFolderId;
+    notesAutoOpenRef.current = { view: activeView, folderId: selectedFolderId };
+    if (!enteredView && !folderChanged) return;
+    if (selectedNoteId) return;
+    if (!selectedFolderId) {
+      void handleNotesWorkspaceCreate();
+      return;
+    }
+    const candidates = resolvedNotes.filter((n) => n.folderId === selectedFolderId && !n.trashed && !n.archived && !n.isFolder);
+    if (candidates.length > 0) {
+      setSelectedNoteId(candidates.reduce((a, b) => (a.updatedAt > b.updatedAt ? a : b)).id);
+    } else {
+      void handleNotesWorkspaceCreate();
+    }
+  }, [activeView, selectedFolderId, selectedNoteId, resolvedNotes, showTrash, showArchive, handleNotesWorkspaceCreate, setSelectedNoteId]);
+
+  const whiteboardsAutoOpenRef = useRef<{ view: ViewMode | null; folderId: string | undefined }>({ view: null, folderId: undefined });
+  useEffect(() => {
+    if (activeView !== 'whiteboard' || showTrash || showArchive) return;
+    const prev = whiteboardsAutoOpenRef.current;
+    const enteredView = prev.view !== 'whiteboard';
+    const folderChanged = prev.folderId !== selectedFolderId;
+    whiteboardsAutoOpenRef.current = { view: activeView, folderId: selectedFolderId };
+    if (!enteredView && !folderChanged) return;
+    if (selectedWhiteboardId) return;
+    if (!selectedFolderId) {
+      void handleNewWhiteboard();
+      return;
+    }
+    const candidates = resolvedWhiteboards.filter((w) => w.folderId === selectedFolderId && !w.trashed && !w.archived);
+    if (candidates.length > 0) {
+      setSelectedWhiteboardId(candidates.reduce((a, b) => (a.updatedAt > b.updatedAt ? a : b)).id);
+    } else {
+      void handleNewWhiteboard();
+    }
+  }, [activeView, selectedFolderId, selectedWhiteboardId, resolvedWhiteboards, showTrash, showArchive, handleNewWhiteboard, setSelectedWhiteboardId]);
+
   const handleCreateWorkspaceTypedNote = useCallback(async (type: NoteType) => {
     if (showQuickCapture) return;
     setShowTrash(false);
