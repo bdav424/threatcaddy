@@ -2065,7 +2065,7 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
           <div className="space-y-1 rounded-lg border border-gray-700/60 bg-black/10 px-3 py-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-gray-300">Panel opacity</span>
-              <span className="text-[10px] text-gray-600">{settings.panelTransparency ?? 30}%</span>
+              <span className="text-[10px] text-gray-600">{settings.panelTransparency ?? 75}%</span>
             </div>
             <div className="mt-0.5 text-[11px] text-gray-500">How solid bordered panels, the side menu, buttons, and cards are — independent of Frosted panels below.</div>
             <input
@@ -2073,7 +2073,7 @@ export function AppearanceSettings({ settings, onUpdateSettings }: AppearanceSet
               min={0}
               max={100}
               step={5}
-              value={settings.panelTransparency ?? 30}
+              value={settings.panelTransparency ?? 75}
               onChange={(e) => onUpdateSettings({ panelTransparency: parseInt(e.target.value, 10) })}
               className="mt-2 w-full accent-accent"
             />

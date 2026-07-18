@@ -75,7 +75,7 @@ export function CreateDropdown({ onQuickNote, onNewNote, onNewTask, onNewTimelin
         data-tour="new-note"
         onClick={() => setOpen(!open)}
         onKeyDown={handleKeyDown}
-        className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-sm font-medium transition-colors bg-gray-700 hover:bg-gray-600 text-gray-200"
+        className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-sm font-medium transition-colors bg-gray-700 hover:bg-gray-600 text-gray-200 min-h-[40px] sm:min-h-0"
         title={t('createDropdown.createNew')}
         aria-label={t('createDropdown.createNew')}
         aria-haspopup="menu"

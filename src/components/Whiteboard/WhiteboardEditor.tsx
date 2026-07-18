@@ -191,50 +191,57 @@ export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdat
 
   return (
     <div className="flex flex-col h-full">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 p-2 border-b border-gray-800 shrink-0">
-        <button
-          onClick={onBack}
-          className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors shrink-0"
-          title="Back to list"
-        >
-          <ArrowLeft size={18} />
-        </button>
-        <input
-          value={name}
-          onChange={(e) => handleNameChange(e.target.value)}
-          className="min-w-0 flex-1 bg-transparent text-gray-200 text-sm font-medium px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-accent"
-          placeholder="Whiteboard name"
-        />
-        <EntityInvestigationBar
-          folders={folders}
-          currentFolderId={whiteboard.folderId}
-          onMove={handleFolderChange}
-          className="min-w-0 flex-1"
-        />
-        <ClsSelect
-          value={whiteboard.clsLevel}
-          onChange={(clsLevel) => { onUpdate(whiteboard.id, { clsLevel }); flashSaved(); }}
-          clsLevels={settings?.tiClsLevels}
-        />
-        <button
-          onClick={handleExportPNG}
-          className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors shrink-0"
-          title="Export as PNG"
-        >
-          <Image size={16} />
-        </button>
-        {saved && <span className="text-xs text-green-500 shrink-0">Saved</span>}
-        {onDelete && (
+      {/* Toolbar — two rows so the name input and the Move-To/TLP controls each
+          get their own full-width row instead of competing as two flex-1
+          elements in one row, which is what caused them to overlap on narrow
+          (mobile) viewports. */}
+      <div className="flex flex-col gap-2 p-2 border-b border-gray-800 shrink-0">
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowConfirmDelete(true)}
-            className="p-1.5 rounded text-red-500 hover:text-red-400 hover:bg-gray-800 shrink-0"
-            title="Delete whiteboard"
-            aria-label="Delete whiteboard"
+            onClick={onBack}
+            className="p-2 -m-0.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors shrink-0 min-h-[40px] min-w-[40px] flex items-center justify-center"
+            title="Back to list"
           >
-            <Trash2 size={16} />
+            <ArrowLeft size={18} />
           </button>
-        )}
+          <input
+            value={name}
+            onChange={(e) => handleNameChange(e.target.value)}
+            className="min-w-0 flex-1 bg-transparent text-gray-200 text-sm font-medium px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-accent"
+            placeholder="Whiteboard name"
+          />
+          {saved && <span className="text-xs text-green-500 shrink-0">Saved</span>}
+          <button
+            onClick={handleExportPNG}
+            className="p-2 -m-0.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors shrink-0 min-h-[40px] min-w-[40px] flex items-center justify-center"
+            title="Export as PNG"
+          >
+            <Image size={16} />
+          </button>
+          {onDelete && (
+            <button
+              onClick={() => setShowConfirmDelete(true)}
+              className="p-2 -m-0.5 rounded text-red-500 hover:text-red-400 hover:bg-gray-800 shrink-0 min-h-[40px] min-w-[40px] flex items-center justify-center"
+              title="Delete whiteboard"
+              aria-label="Delete whiteboard"
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <EntityInvestigationBar
+            folders={folders}
+            currentFolderId={whiteboard.folderId}
+            onMove={handleFolderChange}
+            className="min-w-0 flex-1"
+          />
+          <ClsSelect
+            value={whiteboard.clsLevel}
+            onChange={(clsLevel) => { onUpdate(whiteboard.id, { clsLevel }); flashSaved(); }}
+            clsLevels={settings?.tiClsLevels}
+          />
+        </div>
       </div>
 
       {/* Tags */}
@@ -246,6 +253,39 @@ export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdat
           onCreateTag={onCreateTag}
         />
       </div>
+
+      {/* Entity bridge — promote the selected text element to a real Note/Task/
+          IOC, or bring an existing one onto the board. Rendered in normal flow
+          (not floated over the canvas) so it can never collide with Excalidraw's
+          own toolbar, which claims the entire top band of the canvas on narrow
+          viewports regardless of what breakpoint we'd otherwise guess at. */}
+      {(onPromoteToEntity || entities) && (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-gray-800 shrink-0">
+          {onPromoteToEntity && (
+            <button
+              type="button"
+              onClick={() => selectedText && setPromptingText(selectedText)}
+              disabled={!selectedText}
+              title={selectedText ? 'Promote selected text to a Note, Task, or IOC' : 'Select a single text element to promote'}
+              className="flex items-center gap-1 rounded-lg border border-border-subtle bg-bg-raised px-2.5 py-1.5 text-xs font-medium text-text-muted transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40 min-h-[36px]"
+            >
+              <Sparkles size={13} />
+              Promote
+            </button>
+          )}
+          {entities && (
+            <button
+              type="button"
+              onClick={() => setShowEntityPicker(true)}
+              title="Add an existing Note, Task, or IOC to the board"
+              className="flex items-center gap-1 rounded-lg border border-border-subtle bg-bg-raised px-2.5 py-1.5 text-xs font-medium text-text-muted transition-colors hover:text-text-primary min-h-[36px]"
+            >
+              <Link2 size={13} />
+              Add entity
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Excalidraw canvas — needs a container with explicit dimensions */}
       <div className="flex-1 min-h-0 relative">
@@ -279,36 +319,6 @@ export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdat
             </MainMenu>
           </Excalidraw>
         </div>
-
-        {/* Entity bridge — promote the selected text element to a real Note/Task/
-            IOC, or bring an existing one onto the board. */}
-        {(onPromoteToEntity || entities) && (
-          <div className="absolute left-3 top-3 z-10 flex items-center gap-1.5">
-            {onPromoteToEntity && (
-              <button
-                type="button"
-                onClick={() => selectedText && setPromptingText(selectedText)}
-                disabled={!selectedText}
-                title={selectedText ? 'Promote selected text to a Note, Task, or IOC' : 'Select a single text element to promote'}
-                className="flex items-center gap-1 rounded-lg border border-border-subtle bg-bg-raised/90 px-2.5 py-1.5 text-xs font-medium text-text-muted shadow-lg backdrop-blur transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <Sparkles size={13} />
-                Promote
-              </button>
-            )}
-            {entities && (
-              <button
-                type="button"
-                onClick={() => setShowEntityPicker(true)}
-                title="Add an existing Note, Task, or IOC to the board"
-                className="flex items-center gap-1 rounded-lg border border-border-subtle bg-bg-raised/90 px-2.5 py-1.5 text-xs font-medium text-text-muted shadow-lg backdrop-blur transition-colors hover:text-text-primary"
-              >
-                <Link2 size={13} />
-                Add entity
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
       {promptingText && onPromoteToEntity && (

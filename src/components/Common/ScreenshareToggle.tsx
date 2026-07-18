@@ -104,7 +104,7 @@ export function ScreenshareToggle({ maxLevel, onChangeLevel }: ScreenshareToggle
         <button
           onClick={() => setOpen(!open)}
           className={cn(
-            'p-1.5 sm:p-2 rounded-lg transition-colors',
+            'p-1.5 sm:p-2 rounded-lg transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center',
             active
               ? 'text-red-400 hover:text-red-300 hover:bg-red-500/10'
               : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800',

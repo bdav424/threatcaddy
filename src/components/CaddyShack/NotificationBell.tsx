@@ -232,7 +232,7 @@ export function NotificationBell() {
           setOpen((v) => !v);
           if (!open) loadNotifications();
         }}
-        className="relative p-1.5 rounded-md hover:bg-gray-800/60 text-gray-400 hover:text-gray-200 transition-colors"
+        className="relative p-1.5 rounded-md hover:bg-gray-800/60 text-gray-400 hover:text-gray-200 transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
         title="Notifications"
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
         aria-expanded={open}

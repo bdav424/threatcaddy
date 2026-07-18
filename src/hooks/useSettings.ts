@@ -162,7 +162,7 @@ export function useSettings() {
     const root = document.documentElement;
     const frostedPanels = settings.frostedPanels ?? false;
     // Panel background opacity — always active, not gated on frostedPanels
-    const panelBgOpacity = (settings.panelTransparency ?? 30) / 100;
+    const panelBgOpacity = (settings.panelTransparency ?? 75) / 100;
     root.style.setProperty('--tc-panel-glass-opacity', String(panelBgOpacity));
 
     // Blur — only when frosted

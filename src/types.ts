@@ -710,7 +710,7 @@ export const DEFAULT_SETTINGS: Settings = {
   bgEffectSize: 100,
   bgGlowIntensity: 50,
   bgParticleGlow: 45,
-  panelTransparency: 30,
+  panelTransparency: 75,
   bgEffectTrail: 0,
   frostedPanels: false,
   glassStyle: 'streaks',

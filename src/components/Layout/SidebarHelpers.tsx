@@ -71,7 +71,7 @@ export const NavItem = React.memo(function NavItem({
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
       className={cn(
         'flex items-center w-full rounded-lg transition-colors group cursor-pointer relative',
-        compact ? 'gap-1.5 px-2 py-0.5 text-xs' : 'gap-2 px-3 py-1.5 text-[13px] font-medium',
+        compact ? 'gap-1.5 px-2 py-0.5 text-xs' : 'gap-2 px-3 py-1.5 text-[13px] font-medium min-h-[44px] md:min-h-0',
         colorChipsEnabled
           ? active
             ? 'border border-border-medium bg-bg-active text-text-primary shadow-[0_12px_28px_rgba(0,0,0,0.18)]'

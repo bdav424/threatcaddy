@@ -312,7 +312,7 @@ export function Header({
         <button
           data-tour="backup"
           onClick={onQuickSave}
-          className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors"
+          className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
           title={t('header.saveBackup') + ' (Ctrl+S)'}
           aria-label={t('header.saveBackup')}
         >
@@ -320,7 +320,7 @@ export function Header({
         </button>
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors"
+          className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
           title={t('header.loadBackup')}
           aria-label={t('header.loadBackup')}
         >
@@ -347,7 +347,7 @@ export function Header({
         {onOpenJots && (
           <button
             onClick={onOpenJots}
-            className="relative p-1.5 sm:p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors"
+            className="relative p-1.5 sm:p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
             title={t('header.openJots', { defaultValue: 'Jots' })}
             aria-label={t('header.openJots', { defaultValue: 'Jots' })}
           >
