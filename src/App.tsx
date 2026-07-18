@@ -109,7 +109,7 @@ import { ShareReceiver } from './components/ExecMode/ShareReceiver';
 const ShareDialog = lazy(() => import('./components/ExecMode/ShareDialog').then(m => ({ default: m.ShareDialog })));
 import type { SharePayload, InvestigationBundle } from './lib/share';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-const CaddyShackView = lazy(() => import('./components/CaddyShack/CaddyShackView').then(m => ({ default: m.CaddyShackView })));
+const ReportCaddyView = lazy(() => import('./components/ReportCaddy/ReportCaddyView').then(m => ({ default: m.ReportCaddyView })));
 const AppWorkspaceShell = lazy(() => import('./components/WorkspacePanels/AppWorkspaceShell').then(m => ({ default: m.AppWorkspaceShell })));
 const VirtualCaddyWorkspace = lazy(() => import('./components/VirtualCaddy/VirtualCaddyWorkspace').then(m => ({ default: m.VirtualCaddyWorkspace })));
 const VirtualCaddyPanel = lazy(() => import('./components/VirtualCaddy/VirtualCaddyPanel').then(m => ({ default: m.VirtualCaddyPanel })));
@@ -338,7 +338,7 @@ function AppDataLayer() {
   const isMobile = useIsMobile();
 
   // Compute safe default view from settings for NavigationProvider
-  const safeDefaultView = settings.defaultView === 'dashboard' || settings.defaultView === 'workspace' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'evidence' || settings.defaultView === 'products' || settings.defaultView === 'experimental' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' || settings.defaultView === 'chat' || settings.defaultView === 'caddyassistant' || settings.defaultView === 'cademail' || settings.defaultView === 'calendarcaddy' || settings.defaultView === 'caddyshack' || settings.defaultView === 'agent' || settings.defaultView === 'investigations' || settings.defaultView === 'reports' || settings.defaultView === 'virtualcaddy' || settings.defaultView === 'netmap' ? settings.defaultView : 'notes';
+  const safeDefaultView = settings.defaultView === 'dashboard' || settings.defaultView === 'workspace' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'evidence' || settings.defaultView === 'products' || settings.defaultView === 'experimental' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' || settings.defaultView === 'chat' || settings.defaultView === 'caddyassistant' || settings.defaultView === 'cademail' || settings.defaultView === 'calendarcaddy' || settings.defaultView === 'reportcaddy' || settings.defaultView === 'agent' || settings.defaultView === 'investigations' || settings.defaultView === 'reports' || settings.defaultView === 'virtualcaddy' || settings.defaultView === 'netmap' ? settings.defaultView : 'notes';
 
   return (
     <InvestigationProvider
@@ -841,7 +841,7 @@ const AppInner = memo(function AppInner({
       const { type, postId, folderId } = (e as CustomEvent).detail ?? {};
       if ((type === 'mention' || type === 'reply' || type === 'reaction') && postId) {
         if (folderId) setSelectedFolderId(folderId);
-        setActiveView('caddyshack');
+        setActiveView('reportcaddy');
         window.dispatchEvent(new CustomEvent('caddyshack-select-post', { detail: { postId } }));
       } else if (type === 'invite' && folderId) {
         setSelectedFolderId(folderId);
@@ -2250,14 +2250,14 @@ const AppInner = memo(function AppInner({
   const timelineWorkspaceActive = activeView === 'timeline';
   const whiteboardsWorkspaceActive = activeView === 'whiteboard';
   const graphWorkspaceActive = activeView === 'graph';
-  const caddyShackWorkspaceActive = activeView === 'caddyshack';
+  const reportCaddyWorkspaceActive = activeView === 'reportcaddy';
   const iocsWorkspaceActive = activeView === 'ioc-stats';
   const experimentalWorkspaceActive = activeView === 'experimental';
   const agentCaddyWorkspaceActive = activeView === 'agent';
   const chatWorkspaceActive = activeView === 'chat';
   const reportsWorkspaceActive = activeView === 'reports';
   const workspaceRouteActive = activeView === 'workspace';
-  const appWorkspaceActive = workspaceRouteActive || assistantWorkspaceActive || dashboardWorkspaceActive || activityWorkspaceActive || productsWorkspaceActive || notesWorkspaceActive || tasksWorkspaceActive || evidenceWorkspaceActive || timelineWorkspaceActive || whiteboardsWorkspaceActive || graphWorkspaceActive || caddyShackWorkspaceActive || iocsWorkspaceActive || experimentalWorkspaceActive || agentCaddyWorkspaceActive || chatWorkspaceActive || reportsWorkspaceActive;
+  const appWorkspaceActive = workspaceRouteActive || assistantWorkspaceActive || dashboardWorkspaceActive || activityWorkspaceActive || productsWorkspaceActive || notesWorkspaceActive || tasksWorkspaceActive || evidenceWorkspaceActive || timelineWorkspaceActive || whiteboardsWorkspaceActive || graphWorkspaceActive || reportCaddyWorkspaceActive || iocsWorkspaceActive || experimentalWorkspaceActive || agentCaddyWorkspaceActive || chatWorkspaceActive || reportsWorkspaceActive;
   const assistantWorkspaceVisible = assistantWorkspaceActive && !showSettings && !showTrash && !showArchive;
   const dashboardWorkspaceVisible = dashboardWorkspaceActive && !showSettings && !showTrash && !showArchive;
   const activityWorkspaceVisible = activityWorkspaceActive && !showSettings && !showTrash && !showArchive;
@@ -2268,7 +2268,7 @@ const AppInner = memo(function AppInner({
   const timelineWorkspaceVisible = timelineWorkspaceActive && !showSettings && !showTrash && !showArchive;
   const whiteboardsWorkspaceVisible = whiteboardsWorkspaceActive && !showSettings && !showTrash && !showArchive;
   const graphWorkspaceVisible = graphWorkspaceActive && !showSettings && !showTrash && !showArchive;
-  const caddyShackWorkspaceVisible = caddyShackWorkspaceActive && !showSettings && !showTrash && !showArchive;
+  const reportCaddyWorkspaceVisible = reportCaddyWorkspaceActive && !showSettings && !showTrash && !showArchive;
   const iocsWorkspaceVisible = iocsWorkspaceActive && !showSettings && !showTrash && !showArchive;
   const experimentalWorkspaceVisible = experimentalWorkspaceActive && !showSettings && !showTrash && !showArchive;
   const agentCaddyWorkspaceVisible = agentCaddyWorkspaceActive && !showSettings && !showTrash && !showArchive;
@@ -2780,8 +2780,8 @@ const AppInner = memo(function AppInner({
     />
   );
 
-  const caddyShackWorkspace = (
-    <CaddyShackView
+  const reportCaddyWorkspace = (
+    <ReportCaddyView
       folderId={selectedFolderId}
       folderName={selectedFolder?.name}
       settings={settings}
@@ -3112,8 +3112,8 @@ const AppInner = memo(function AppInner({
             allIOCs={screensafeStandaloneIOCs}
             allChats={screensafeChatThreads}
           />
-        ) : activeView === 'caddyshack' ? (
-          null /* CaddyShackView is always-mounted below for workspace panel persistence */
+        ) : activeView === 'reportcaddy' ? (
+          null /* ReportCaddyView is always-mounted below for workspace panel persistence */
         ) : activeView === 'agent' ? (
           null /* AgentCaddy is always-mounted below for workspace panel persistence */
         ) : activeView === 'tasks' ? (
@@ -3181,8 +3181,8 @@ const AppInner = memo(function AppInner({
               whiteboards={whiteboardsWorkspace}
               graphActive={graphWorkspaceVisible}
               graph={graphWorkspace}
-              caddyShackActive={caddyShackWorkspaceVisible}
-              caddyShack={caddyShackWorkspace}
+              reportCaddyActive={reportCaddyWorkspaceVisible}
+              reportCaddy={reportCaddyWorkspace}
               iocsActive={iocsWorkspaceVisible}
               iocs={iocsWorkspace}
               experimentalActive={experimentalWorkspaceVisible}

@@ -7,7 +7,7 @@ import { cn } from '../../lib/utils';
 import type { ReportSection, ReportTemplate } from '../../types';
 import type { Settings } from '../../types';
 
-interface CaddyShackViewProps {
+interface ReportCaddyViewProps {
   folderId?: string;
   folderName?: string;
   settings?: Settings;
@@ -159,7 +159,7 @@ function SectionEditor({
   );
 }
 
-export function CaddyShackView({ settings }: CaddyShackViewProps) {
+export function ReportCaddyView({ settings }: ReportCaddyViewProps) {
   const { allTemplates, loading, createTemplate, updateTemplate, deleteTemplate, categories } = useReportTemplates();
 
   const [search, setSearch] = useState('');

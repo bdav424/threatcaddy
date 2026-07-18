@@ -114,9 +114,9 @@ const graphPane = (
   </section>
 );
 
-const caddyShackPane = (
-  <section aria-label="CaddyShack test surface">
-    <h2>CaddyShack</h2>
+const reportCaddyPane = (
+  <section aria-label="ReportCaddy test surface">
+    <h2>ReportCaddy</h2>
     <p>Connect to a team server to use Team Feed.</p>
   </section>
 );
@@ -233,8 +233,8 @@ function renderWorkspaceHomeShell({
       whiteboards={whiteboardsPane}
       graphActive={false}
       graph={() => graphPane}
-      caddyShackActive={false}
-      caddyShack={caddyShackPane}
+      reportCaddyActive={false}
+      reportCaddy={reportCaddyPane}
       iocsActive={false}
       iocs={iocsPane}
       agentCaddyActive={false}
@@ -1078,8 +1078,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
         agentCaddyActive={false}
@@ -1136,8 +1136,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
         agentCaddyActive={false}
@@ -1231,8 +1231,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
         agentCaddyActive={false}
@@ -1371,8 +1371,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
         agentCaddyActive={false}
@@ -2066,8 +2066,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2093,8 +2093,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2128,8 +2128,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2191,8 +2191,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2218,8 +2218,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2253,8 +2253,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2314,8 +2314,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2341,8 +2341,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2376,8 +2376,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2437,8 +2437,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2464,8 +2464,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2499,8 +2499,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2560,8 +2560,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2587,8 +2587,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2622,8 +2622,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2690,8 +2690,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={graph}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2717,8 +2717,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive
         graph={graph}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2753,8 +2753,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={graph}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2779,7 +2779,7 @@ describe('AssistantCaddy workspaces', () => {
     );
   });
 
-  it.skip('lets CaddyShack join an already-mounted app workspace and restore from the shared dock', () => {
+  it.skip('lets ReportCaddy join an already-mounted app workspace and restore from the shared dock', () => {
     const dashboard = (
       <section aria-label="Dashboard test surface">
         <h2>Quick Links</h2>
@@ -2815,8 +2815,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2842,19 +2842,19 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive
-        caddyShack={caddyShackPane}
+        reportCaddyActive
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
     );
 
-    expect(screen.getByRole('heading', { level: 2, name: 'CaddyShack' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'ReportCaddy' })).toBeInTheDocument();
     expect(screen.getByText('Connect to a team server to use Team Feed.')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pop out CaddyShack' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pop out ReportCaddy' }));
 
-    const panel = screen.getByRole('dialog', { name: 'CaddyShack panel' });
+    const panel = screen.getByRole('dialog', { name: 'ReportCaddy panel' });
     expect(panel).toHaveAttribute('data-workspace-panel-state', 'floating');
     expect(within(panel).getByText('Connect to a team server to use Team Feed.')).toBeInTheDocument();
 
@@ -2878,26 +2878,26 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
     );
 
-    expect(screen.getByRole('dialog', { name: 'CaddyShack panel' })).toHaveAttribute(
+    expect(screen.getByRole('dialog', { name: 'ReportCaddy panel' })).toHaveAttribute(
       'data-workspace-panel-state',
       'floating',
     );
     expect(screen.getByRole('heading', { level: 2, name: 'Quick Links' })).toBeInTheDocument();
 
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'CaddyShack panel' })).getByRole('button', { name: 'Minimize CaddyShack' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'ReportCaddy panel' })).getByRole('button', { name: 'Minimize ReportCaddy' }));
 
     expect(screen.getByRole('region', { name: 'Workspace panel dock' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Restore caddyshack panel from workspace dock' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore reportcaddy panel from workspace dock' }));
 
     expect(navigateToMock).not.toHaveBeenCalled();
-    expect(screen.getByRole('dialog', { name: 'CaddyShack panel' })).toHaveAttribute(
+    expect(screen.getByRole('dialog', { name: 'ReportCaddy panel' })).toHaveAttribute(
       'data-workspace-panel-state',
       'floating',
     );
@@ -2939,8 +2939,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -2966,8 +2966,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive
         iocs={iocsPane}
       />,
@@ -3001,8 +3001,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -3062,8 +3062,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -3089,8 +3089,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -3125,8 +3125,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -3150,7 +3150,7 @@ describe('AssistantCaddy workspaces', () => {
     );
   });
 
-  it.skip('keeps one shared dock for Dashboard, Activity, Products, Notes, Tasks, Whiteboards, Graph, CaddyShack, IOCs, CaddyShack workbench, and AssistantCaddy panels', () => {
+  it.skip('keeps one shared dock for Dashboard, Activity, Products, Notes, Tasks, Whiteboards, Graph, ReportCaddy, IOCs, CaddyShack workbench, and AssistantCaddy panels', () => {
     const dashboard = (
       <section aria-label="Dashboard test surface">
         <h2>Quick Links</h2>
@@ -3186,8 +3186,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -3216,8 +3216,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -3246,8 +3246,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -3276,8 +3276,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -3306,8 +3306,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -3336,8 +3336,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -3366,8 +3366,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -3396,15 +3396,15 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive
-        caddyShack={caddyShackPane}
+        reportCaddyActive
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pop out CaddyShack' }));
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'CaddyShack panel' })).getByRole('button', { name: 'Minimize CaddyShack' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pop out ReportCaddy' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'ReportCaddy panel' })).getByRole('button', { name: 'Minimize ReportCaddy' }));
 
     rerender(
       <AppWorkspaceShell
@@ -3426,8 +3426,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive
         iocs={iocsPane}
       />,
@@ -3456,8 +3456,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -3486,8 +3486,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -3505,7 +3505,7 @@ describe('AssistantCaddy workspaces', () => {
     expect(screen.getByRole('button', { name: 'Restore tasks panel from workspace dock' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Restore whiteboards panel from workspace dock' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Restore graph panel from workspace dock' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Restore caddyshack panel from workspace dock' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Restore reportcaddy panel from workspace dock' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Restore iocs panel from workspace dock' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Restore caddyshack workbench panel from workspace dock' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Restore message context panel from workspace dock' })).toBeInTheDocument();
@@ -3549,8 +3549,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -3586,8 +3586,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -3650,8 +3650,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -3689,8 +3689,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
       />,
@@ -3753,8 +3753,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
         agentCaddyActive
@@ -3794,8 +3794,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
         agentCaddyActive={false}
@@ -3860,8 +3860,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
         chatActive
@@ -3903,8 +3903,8 @@ describe('AssistantCaddy workspaces', () => {
         whiteboards={whiteboardsPane}
         graphActive={false}
         graph={() => graphPane}
-        caddyShackActive={false}
-        caddyShack={caddyShackPane}
+        reportCaddyActive={false}
+        reportCaddy={reportCaddyPane}
         iocsActive={false}
         iocs={iocsPane}
         chatActive={false}

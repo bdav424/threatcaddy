@@ -78,7 +78,7 @@ export const evidenceWorkspacePanelId = EVIDENCE_WORKSPACE_PANEL_ID;
 export const timelineWorkspacePanelId = TIMELINE_WORKSPACE_PANEL_ID;
 export const whiteboardsWorkspacePanelId = 'whiteboards-workspace';
 export const graphWorkspacePanelId = 'graph-workspace';
-export const caddyShackWorkspacePanelId = 'caddyshack-workspace';
+export const reportCaddyWorkspacePanelId = 'reportcaddy-workspace';
 export const iocsWorkspacePanelId = 'iocs-workspace';
 export const experimentalWorkbenchWorkspacePanelId = 'experimental-workbench-workspace';
 export const agentCaddyWorkspacePanelId = 'agentcaddy-workspace';
@@ -236,9 +236,9 @@ const graphWorkspacePanelRegistration: WorkspacePanelRegistration = {
   },
 };
 
-const caddyShackWorkspacePanelRegistration: WorkspacePanelRegistration = {
-  id: caddyShackWorkspacePanelId,
-  title: 'CaddyShack',
+const reportCaddyWorkspacePanelRegistration: WorkspacePanelRegistration = {
+  id: reportCaddyWorkspacePanelId,
+  title: 'ReportCaddy',
   mode: 'docked',
   geometry: {
     x: 360,
@@ -319,7 +319,7 @@ const appWorkspacePanelRegistrations: WorkspacePanelRegistration[] = [
   timelineWorkspacePanelRegistration,
   whiteboardsWorkspacePanelRegistration,
   graphWorkspacePanelRegistration,
-  caddyShackWorkspacePanelRegistration,
+  reportCaddyWorkspacePanelRegistration,
   iocsWorkspacePanelRegistration,
   experimentalWorkbenchWorkspacePanelRegistration,
   agentCaddyWorkspacePanelRegistration,
@@ -350,8 +350,8 @@ export function AppWorkspaceShell({
   whiteboards,
   graphActive,
   graph,
-  caddyShackActive,
-  caddyShack,
+  reportCaddyActive,
+  reportCaddy,
   iocsActive,
   iocs,
   experimentalActive,
@@ -390,8 +390,8 @@ export function AppWorkspaceShell({
   whiteboards: ReactNode;
   graphActive: boolean;
   graph: (visible: boolean) => ReactNode;
-  caddyShackActive: boolean;
-  caddyShack: ReactNode;
+  reportCaddyActive: boolean;
+  reportCaddy: ReactNode;
   iocsActive: boolean;
   iocs: ReactNode;
   experimentalActive: boolean;
@@ -418,7 +418,7 @@ export function AppWorkspaceShell({
   const [timelineMounted, setTimelineMounted] = useState(timelineActive);
   const [whiteboardsMounted, setWhiteboardsMounted] = useState(whiteboardsActive);
   const [graphMounted, setGraphMounted] = useState(graphActive);
-  const [caddyShackMounted, setCaddyShackMounted] = useState(caddyShackActive);
+  const [reportCaddyMounted, setReportCaddyMounted] = useState(reportCaddyActive);
   const [iocsMounted, setIocsMounted] = useState(iocsActive);
   const [experimentalMounted, setExperimentalMounted] = useState(experimentalActive);
   const [agentCaddyMounted, setAgentCaddyMounted] = useState(agentCaddyActive);
@@ -487,10 +487,10 @@ export function AppWorkspaceShell({
   }, [graphActive]);
 
   useEffect(() => {
-    if (caddyShackActive) {
-      setCaddyShackMounted(true);
+    if (reportCaddyActive) {
+      setReportCaddyMounted(true);
     }
-  }, [caddyShackActive]);
+  }, [reportCaddyActive]);
 
   useEffect(() => {
     if (iocsActive) {
@@ -587,8 +587,8 @@ export function AppWorkspaceShell({
       return;
     }
 
-    if (panel.id === caddyShackWorkspacePanelId) {
-      navigateTo('caddyshack');
+    if (panel.id === reportCaddyWorkspacePanelId) {
+      navigateTo('reportcaddy');
       return;
     }
 
@@ -622,7 +622,7 @@ export function AppWorkspaceShell({
     || timelineActive
     || whiteboardsActive
     || graphActive
-    || caddyShackActive
+    || reportCaddyActive
     || iocsActive
     || experimentalActive
     || agentCaddyActive
@@ -667,8 +667,8 @@ export function AppWorkspaceShell({
       case graphWorkspacePanelId:
         setGraphMounted(true);
         break;
-      case caddyShackWorkspacePanelId:
-        setCaddyShackMounted(true);
+      case reportCaddyWorkspacePanelId:
+        setReportCaddyMounted(true);
         break;
       case iocsWorkspacePanelId:
         setIocsMounted(true);
@@ -811,9 +811,9 @@ export function AppWorkspaceShell({
           <GraphWorkspacePanel routeActive={routeSurfaceActive(graphActive)} workspacePanelActive={workspacePanelActive(graphWorkspacePanelId)} renderGraph={graph} />
         </AppWorkspacePane>
       )}
-      {(caddyShackMounted || caddyShackActive || workspaceOwnedPanelIds.has(caddyShackWorkspacePanelId)) && (
-        <AppWorkspacePane active={panelPaneActive(caddyShackWorkspacePanelId, caddyShackActive)} preserveWorkspaceCanvas={workspacePanelActive(caddyShackWorkspacePanelId)}>
-          <CaddyShackWorkspacePanel routeActive={routeSurfaceActive(caddyShackActive)} workspacePanelActive={workspacePanelActive(caddyShackWorkspacePanelId)}>{caddyShack}</CaddyShackWorkspacePanel>
+      {(reportCaddyMounted || reportCaddyActive || workspaceOwnedPanelIds.has(reportCaddyWorkspacePanelId)) && (
+        <AppWorkspacePane active={panelPaneActive(reportCaddyWorkspacePanelId, reportCaddyActive)} preserveWorkspaceCanvas={workspacePanelActive(reportCaddyWorkspacePanelId)}>
+          <ReportCaddyWorkspacePanel routeActive={routeSurfaceActive(reportCaddyActive)} workspacePanelActive={workspacePanelActive(reportCaddyWorkspacePanelId)}>{reportCaddy}</ReportCaddyWorkspacePanel>
         </AppWorkspacePane>
       )}
       {(iocsMounted || iocsActive || workspaceOwnedPanelIds.has(iocsWorkspacePanelId)) && (
@@ -1946,8 +1946,8 @@ function GraphWorkspacePanel({
   );
 }
 
-function CaddyShackWorkspacePanel({ routeActive, workspacePanelActive, children }: { routeActive: boolean; workspacePanelActive: boolean; children: ReactNode }) {
-  const { panel, setMode, setGeometry, focus, restore, close } = useWorkspaceOwnedPanel(caddyShackWorkspacePanelId);
+function ReportCaddyWorkspacePanel({ routeActive, workspacePanelActive, children }: { routeActive: boolean; workspacePanelActive: boolean; children: ReactNode }) {
+  const { panel, setMode, setGeometry, focus, restore, close } = useWorkspaceOwnedPanel(reportCaddyWorkspacePanelId);
 
   if (routeActive && panel.mode === 'docked') {
     return <RoutePanelPopOutSurface title={panel.title} onPopOut={() => { setMode('floating'); focus(); }}>{children}</RoutePanelPopOutSurface>;
@@ -1970,11 +1970,11 @@ function CaddyShackWorkspacePanel({ routeActive, workspacePanelActive, children 
       minHeight={300}
       compactWidth={740}
       compactHeight={540}
-      resizeLabelBase="CaddyShack panel"
-      floatingAriaLabel="CaddyShack panel"
-      minimizeLabel="Minimize CaddyShack"
-      closeLabel="Close CaddyShack workspace panel"
-      restoreLabel="Restore CaddyShack panel"
+      resizeLabelBase="ReportCaddy panel"
+      floatingAriaLabel="ReportCaddy panel"
+      minimizeLabel="Minimize ReportCaddy"
+      closeLabel="Close ReportCaddy workspace panel"
+      restoreLabel="Restore ReportCaddy panel"
       dockedClassName="flex h-full min-h-0 flex-col"
       floatingClassName="shadow-[10px_16px_36px_rgba(0,0,0,0.38)]"
       placeholderClassName="m-3"

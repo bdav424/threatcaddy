@@ -100,7 +100,7 @@ export function QuickLinkForm({ link, onSave, onCancel }: QuickLinkFormProps) {
             id="quick-link-icon"
             value={icon}
             onChange={(e) => setIcon(e.target.value)}
-            placeholder="e.g. \uD83D\uDD0D"
+            placeholder="e.g. 🔍"
             className={`${inputClass} w-20`}
             maxLength={4}
           />

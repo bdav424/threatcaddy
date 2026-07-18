@@ -106,6 +106,7 @@ function viewLabel(view: string, entityId?: string): string {
     graph: 'Viewing graph',
     iocs: 'Analyzing IOCs',
     caddyshack: 'On CaddyShack',
+    reportcaddy: 'On ReportCaddy',
     dashboard: 'On dashboard',
   };
   const base = labels[view] || `Viewing ${view}`;

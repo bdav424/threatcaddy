@@ -57,7 +57,7 @@ const NAV_ACCENT_COLORS: Record<string, string> = {
   reports: 'var(--color-accent-amber)',
   activity: 'var(--color-accent-amber)',
   chat: 'var(--color-purple)',
-  caddyshack: 'var(--color-purple)',
+  reportcaddy: 'var(--color-purple)',
   agent: 'var(--color-accent-amber)',
   virtualcaddy: 'var(--color-accent-green)',
   netmap: 'var(--color-accent-amber)',
@@ -513,13 +513,13 @@ export function Sidebar({
 
   const collapsedBottomItems: CollapsedNavItem[] = [
     {
-      key: 'caddyshack',
+      key: 'reportcaddy',
       icon: LayoutTemplate,
       label: t('sidebar.caddyShack'),
-      active: activeView === 'caddyshack' && !showTrash && !showArchive,
-      onClick: () => nav(() => navToView('caddyshack')),
-      dataTour: 'caddyshack',
-      accentKey: 'caddyshack',
+      active: activeView === 'reportcaddy' && !showTrash && !showArchive,
+      onClick: () => nav(() => navToView('reportcaddy')),
+      dataTour: 'reportcaddy',
+      accentKey: 'reportcaddy',
     },
     {
       key: 'agent',
@@ -1164,14 +1164,14 @@ export function Sidebar({
             />
           </div>
         )}
-        <div data-tour="caddyshack">
+        <div data-tour="reportcaddy">
           <NavItem
             icon={<LayoutTemplate size={16} />}
             label={t('sidebar.caddyShack')}
-            active={activeView === 'caddyshack' && !showTrash && !showArchive}
-            onClick={() => nav(() => navToView('caddyshack'))}
+            active={activeView === 'reportcaddy' && !showTrash && !showArchive}
+            onClick={() => nav(() => navToView('reportcaddy'))}
             accentStyle={sidebarAccentStyle}
-            accentColor={accentColorFor('caddyshack')}
+            accentColor={accentColorFor('reportcaddy')}
           />
         </div>
         <div data-tour="agent">
