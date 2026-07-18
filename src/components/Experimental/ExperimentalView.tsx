@@ -78,7 +78,7 @@ function ActionRequestPanel({
   const [researchOutput, setResearchOutput] = useState('Produce a source-aware research brief with findings, caveats, confidence, and recommended next pivots.');
 
   const prompt = [
-    'CaddyShack request: investigation-scoped deep research.',
+    'CaddyLab request: investigation-scoped deep research.',
     `Investigation: ${folderName || 'No investigation selected yet; ask me to select one before using case data.'}`,
     `Research question: ${researchQuestion || '[fill in the research question]'}`,
     `Scope and guardrails: ${researchScope}`,
@@ -228,9 +228,9 @@ export function ExperimentalView({ folder, settings, onUpdateSettings, onOpenCha
             <div className="max-w-3xl">
               <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-accent-blue/25 bg-accent-blue/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-accent-blue">
                 <ShieldCheck size={14} />
-                CaddyShack workbench
+                CaddyLab
               </div>
-              <h1 className="text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">CaddyShack</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">CaddyLab</h1>
               <p className="mt-3 text-sm leading-6 text-text-secondary sm:text-base">
                 A client-first staging area for ThreatCaddy ideas that need analyst review before they become storage, server, or automation commitments.
               </p>

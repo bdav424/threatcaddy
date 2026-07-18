@@ -129,8 +129,8 @@ const iocsPane = (
 );
 
 const experimentalWorkbenchPane = (
-  <section aria-label="CaddyShack workbench test surface">
-    <h2>CaddyShack workbench</h2>
+  <section aria-label="CaddyLab test surface">
+    <h2>CaddyLab</h2>
     <button type="button">Open request form</button>
   </section>
 );
@@ -3026,7 +3026,7 @@ describe('AssistantCaddy workspaces', () => {
     );
   });
 
-  it.skip('lets the CaddyShack workbench join an already-mounted app workspace and restore from the shared dock', () => {
+  it.skip('lets CaddyLab join an already-mounted app workspace and restore from the shared dock', () => {
     const dashboard = (
       <section aria-label="Dashboard test surface">
         <h2>Quick Links</h2>
@@ -3096,12 +3096,12 @@ describe('AssistantCaddy workspaces', () => {
       />,
     );
 
-    expect(screen.getByRole('heading', { level: 2, name: 'CaddyShack workbench' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'CaddyLab' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open request form' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pop out CaddyShack workbench' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pop out CaddyLab' }));
 
-    const panel = screen.getByRole('dialog', { name: 'CaddyShack workbench panel' });
+    const panel = screen.getByRole('dialog', { name: 'CaddyLab panel' });
     expect(panel).toHaveAttribute('data-workspace-panel-state', 'floating');
     expect(within(panel).getByRole('button', { name: 'Open request form' })).toBeInTheDocument();
 
@@ -3132,25 +3132,25 @@ describe('AssistantCaddy workspaces', () => {
       />,
     );
 
-    expect(screen.getByRole('dialog', { name: 'CaddyShack workbench panel' })).toHaveAttribute(
+    expect(screen.getByRole('dialog', { name: 'CaddyLab panel' })).toHaveAttribute(
       'data-workspace-panel-state',
       'floating',
     );
     expect(screen.getByRole('heading', { level: 2, name: 'Quick Links' })).toBeInTheDocument();
 
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'CaddyShack workbench panel' })).getByRole('button', { name: 'Minimize CaddyShack workbench' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'CaddyLab panel' })).getByRole('button', { name: 'Minimize CaddyLab' }));
 
     expect(screen.getByRole('region', { name: 'Workspace panel dock' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Restore caddyshack workbench panel from workspace dock' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore CaddyLab panel from workspace dock' }));
 
     expect(navigateToMock).not.toHaveBeenCalled();
-    expect(screen.getByRole('dialog', { name: 'CaddyShack workbench panel' })).toHaveAttribute(
+    expect(screen.getByRole('dialog', { name: 'CaddyLab panel' })).toHaveAttribute(
       'data-workspace-panel-state',
       'floating',
     );
   });
 
-  it.skip('keeps one shared dock for Dashboard, Activity, Products, Notes, Tasks, Whiteboards, Graph, ReportCaddy, IOCs, CaddyShack workbench, and AssistantCaddy panels', () => {
+  it.skip('keeps one shared dock for Dashboard, Activity, Products, Notes, Tasks, Whiteboards, Graph, ReportCaddy, IOCs, CaddyLab, and AssistantCaddy panels', () => {
     const dashboard = (
       <section aria-label="Dashboard test surface">
         <h2>Quick Links</h2>
@@ -3463,8 +3463,8 @@ describe('AssistantCaddy workspaces', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pop out CaddyShack workbench' }));
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'CaddyShack workbench panel' })).getByRole('button', { name: 'Minimize CaddyShack workbench' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pop out CaddyLab' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'CaddyLab panel' })).getByRole('button', { name: 'Minimize CaddyLab' }));
 
     rerender(
       <AppWorkspaceShell
@@ -3507,7 +3507,7 @@ describe('AssistantCaddy workspaces', () => {
     expect(screen.getByRole('button', { name: 'Restore graph panel from workspace dock' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Restore reportcaddy panel from workspace dock' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Restore iocs panel from workspace dock' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Restore caddyshack workbench panel from workspace dock' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Restore CaddyLab panel from workspace dock' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Restore message context panel from workspace dock' })).toBeInTheDocument();
   });
 

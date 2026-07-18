@@ -111,6 +111,7 @@ const ShareDialog = lazy(() => import('./components/ExecMode/ShareDialog').then(
 import type { SharePayload, InvestigationBundle } from './lib/share';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 const ReportCaddyView = lazy(() => import('./components/ReportCaddy/ReportCaddyView').then(m => ({ default: m.ReportCaddyView })));
+const CaddyShackView = lazy(() => import('./components/CaddyShack/CaddyShackView').then(m => ({ default: m.CaddyShackView })));
 const AppWorkspaceShell = lazy(() => import('./components/WorkspacePanels/AppWorkspaceShell').then(m => ({ default: m.AppWorkspaceShell })));
 const VirtualCaddyWorkspace = lazy(() => import('./components/VirtualCaddy/VirtualCaddyWorkspace').then(m => ({ default: m.VirtualCaddyWorkspace })));
 const VirtualCaddyPanel = lazy(() => import('./components/VirtualCaddy/VirtualCaddyPanel').then(m => ({ default: m.VirtualCaddyPanel })));
@@ -3133,7 +3134,7 @@ const AppInner = memo(function AppInner({
         ) : activeView === 'products' ? (
           null /* ProductView is always-mounted below for workspace panel persistence */
         ) : activeView === 'experimental' ? (
-          null /* Experimental/CaddyShack workbench is always-mounted below for workspace panel persistence */
+          null /* Experimental/CaddyLab is always-mounted below for workspace panel persistence */
         ) : activeView === 'caddyassistant' || activeView === 'cademail' || activeView === 'calendarcaddy' ? (
           null /* AssistantCaddy shell is always-mounted below after first use. */
         ) : activeView === 'timeline' ? (
@@ -3164,6 +3165,10 @@ const AppInner = memo(function AppInner({
           <VirtualCaddyTabView />
         ) : activeView === 'netmap' ? (
           <NetMapTabView />
+        ) : activeView === 'caddyshack' ? (
+          <Suspense fallback={null}>
+            <CaddyShackView settings={settings} onUpdateSettings={updateSettings} />
+          </Suspense>
         ) : activeView === 'investigations' ? (
           <InvestigationsHub
             localFolders={screensafeFolders}

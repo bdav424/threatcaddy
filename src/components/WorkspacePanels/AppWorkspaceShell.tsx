@@ -261,7 +261,7 @@ const iocsWorkspacePanelRegistration: WorkspacePanelRegistration = {
 
 const experimentalWorkbenchWorkspacePanelRegistration: WorkspacePanelRegistration = {
   id: experimentalWorkbenchWorkspacePanelId,
-  title: 'CaddyShack workbench',
+  title: 'CaddyLab',
   mode: 'docked',
   geometry: {
     x: 320,
@@ -2019,11 +2019,11 @@ function ExperimentalWorkbenchWorkspacePanel({ routeActive, workspacePanelActive
       minHeight={320}
       compactWidth={800}
       compactHeight={560}
-      resizeLabelBase="CaddyShack workbench panel"
-      floatingAriaLabel="CaddyShack workbench panel"
-      minimizeLabel="Minimize CaddyShack workbench"
-      closeLabel="Close CaddyShack workbench workspace panel"
-      restoreLabel="Restore CaddyShack workbench panel"
+      resizeLabelBase="CaddyLab panel"
+      floatingAriaLabel="CaddyLab panel"
+      minimizeLabel="Minimize CaddyLab"
+      closeLabel="Close CaddyLab workspace panel"
+      restoreLabel="Restore CaddyLab panel"
       dockedClassName="flex h-full min-h-0 flex-col"
       floatingClassName="shadow-[10px_16px_36px_rgba(0,0,0,0.38)]"
       placeholderClassName="m-3"

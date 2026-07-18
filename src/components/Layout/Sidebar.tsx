@@ -6,7 +6,7 @@ import {
   Archive, Settings as SettingsIcon,
   PanelLeftClose, PanelLeft, Github, Download, Chrome, PenTool, Activity, Network, Search, Shield,
   LayoutDashboard, PanelsTopLeft, MessageSquare, LayoutTemplate, ChevronLeft, ChevronDown, ChevronRight,
-  Bot, FileOutput, FlaskConical, Sparkles, Mail, CalendarDays, Monitor, BookMarked, ScanSearch,
+  Bot, FileOutput, FlaskConical, Sparkles, Mail, CalendarDays, Monitor, BookMarked, ScanSearch, Server,
 } from 'lucide-react';
 import type { Timeline, Whiteboard, ViewMode } from '../../types';
 import { cn } from '../../lib/utils';
@@ -58,6 +58,7 @@ const NAV_ACCENT_COLORS: Record<string, string> = {
   chat: 'var(--color-purple)',
   reportcaddy: 'var(--color-purple)',
   agent: 'var(--color-accent-amber)',
+  caddyshack: 'var(--color-accent-green)',
   virtualcaddy: 'var(--color-accent-green)',
   netmap: 'var(--color-accent-amber)',
   fortuneint: 'var(--color-accent-blue)',
@@ -320,7 +321,7 @@ export function Sidebar({
     {
       key: 'experimental',
       icon: FlaskConical,
-      label: t('sidebar.experimental', { defaultValue: 'CaddyShack' }),
+      label: t('sidebar.experimental', { defaultValue: 'CaddyLab' }),
       active: activeView === 'experimental' && !showTrash && !showArchive,
       onClick: () => nav(() => navToView('experimental')),
       accentKey: 'experimental',
@@ -520,6 +521,15 @@ export function Sidebar({
       badge: agentActionCount,
       dataTour: 'agent',
       accentKey: 'agent',
+    },
+    {
+      key: 'caddyshack',
+      icon: Server,
+      label: t('sidebar.caddyShackHub', { defaultValue: 'CaddyShack' }),
+      active: activeView === 'caddyshack' && !showTrash && !showArchive,
+      onClick: () => nav(() => navToView('caddyshack')),
+      dataTour: 'caddyshack',
+      accentKey: 'caddyshack',
     },
   ];
 
@@ -859,7 +869,7 @@ export function Sidebar({
         <div data-tour="experimental">
           <NavItem
             icon={<FlaskConical size={16} />}
-            label={t('sidebar.experimental', { defaultValue: 'CaddyShack' })}
+            label={t('sidebar.experimental', { defaultValue: 'CaddyLab' })}
             active={activeView === 'experimental' && !showTrash && !showArchive}
             onClick={() => nav(() => navToView('experimental'))}
             accentStyle={sidebarAccentStyle}
@@ -1163,6 +1173,16 @@ export function Sidebar({
             onClick={() => nav(() => navToView('agent'))}
             accentStyle={sidebarAccentStyle}
             accentColor={accentColorFor('agent')}
+          />
+        </div>
+        <div data-tour="caddyshack">
+          <NavItem
+            icon={<Server size={16} />}
+            label={t('sidebar.caddyShackHub', { defaultValue: 'CaddyShack' })}
+            active={activeView === 'caddyshack' && !showTrash && !showArchive}
+            onClick={() => nav(() => navToView('caddyshack'))}
+            accentStyle={sidebarAccentStyle}
+            accentColor={accentColorFor('caddyshack')}
           />
         </div>
 

@@ -306,7 +306,7 @@ export type SidebarAccentStyle = 'default' | 'color-chips';
 export type BackgroundEffectPattern = 'none' | 'dots' | 'synapse' | 'rain' | 'constellations' | 'perlin-flow' | 'petals' | 'sparkles' | 'embers' | 'swirls' | 'warp';
 
 /** Top-level view/page the user can navigate to. */
-export type ViewMode = 'dashboard' | 'workspace' | 'notes' | 'tasks' | 'evidence' | 'products' | 'experimental' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat' | 'caddyassistant' | 'cademail' | 'calendarcaddy' | 'reportcaddy' | 'agent' | 'investigations' | 'virtualcaddy' | 'netmap' | 'journal';
+export type ViewMode = 'dashboard' | 'workspace' | 'notes' | 'tasks' | 'evidence' | 'products' | 'experimental' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat' | 'caddyassistant' | 'cademail' | 'calendarcaddy' | 'reportcaddy' | 'agent' | 'investigations' | 'virtualcaddy' | 'netmap' | 'journal' | 'caddyshack';
 
 // ── Journal Page ────────────────────────────────────────────────────────────
 export type JournalPageTheme = 'plain' | 'paper' | 'lined' | 'bullet' | 'grid' | 'cream' | 'blue-gray' | 'sage' | 'watermark';

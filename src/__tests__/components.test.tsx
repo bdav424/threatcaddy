@@ -342,7 +342,7 @@ describe('Sidebar', () => {
   it('renders the investigations and assistant dropdown structure', () => {
     render(<Sidebar {...defaultProps} onOpenFortuneInt={vi.fn()} />);
 
-    expect(screen.getByText('CaddyShack')).toBeInTheDocument();
+    expect(screen.getByText('CaddyLab')).toBeInTheDocument();
     expect(screen.getByText('Workspace')).toBeInTheDocument();
     expect(screen.getByText('Investigations')).toBeInTheDocument();
     expect(screen.getByText('CaddyAI')).toBeInTheDocument();
