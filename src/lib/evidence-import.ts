@@ -578,7 +578,7 @@ function renderImageMetadata(file: File, metadata?: ImageEvidenceMetadata): stri
   ].filter(Boolean).join('\n') || 'No image metadata could be read.';
 }
 
-function extractDocxEvidence(bytes: Uint8Array): DocxEvidence {
+export function extractDocxEvidence(bytes: Uint8Array): DocxEvidence {
   try {
     const files = readZip(bytes);
     const documentXmlData = files.get('word/document.xml');

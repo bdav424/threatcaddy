@@ -23,8 +23,8 @@ vi.mock('../hooks/useGraphSnapshots', () => ({
   useGraphSnapshots: () => ({ snapshots: [], saveSnapshot: vi.fn(), updateCaption: vi.fn() }),
 }));
 
-import { ReportEditor } from '../components/Reports/ReportsPanel';
-import type { ActiveReport } from '../components/Reports/ReportsPanel';
+import { ReportEditor } from '../components/ReportCaddy/ReportInstanceEditor';
+import type { ActiveReport } from '../components/ReportCaddy/ReportInstanceEditor';
 import type { ReportTemplate } from '../types';
 
 beforeEach(() => {

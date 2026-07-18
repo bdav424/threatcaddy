@@ -28,7 +28,7 @@ const VIEW_COMMANDS: Array<{ label: string; view: ViewMode; icon: typeof Search 
   { label: 'IOC Intel', view: 'ioc-stats', icon: Shield },
   { label: 'Graph', view: 'graph', icon: Network },
   { label: 'Agents', view: 'agent', icon: Bot },
-  { label: 'Reports', view: 'reports', icon: BookOpen },
+  { label: 'ReportCaddy', view: 'reportcaddy', icon: BookOpen },
   { label: 'Chat', view: 'chat', icon: MessageSquare },
   { label: 'Activity', view: 'activity', icon: BarChart2 },
   { label: 'Investigations', view: 'investigations', icon: Briefcase },

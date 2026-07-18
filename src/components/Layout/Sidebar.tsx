@@ -54,7 +54,6 @@ const NAV_ACCENT_COLORS: Record<string, string> = {
   whiteboard: 'var(--color-purple)',
   'ioc-stats': 'var(--color-accent-green)',
   graph: 'var(--color-purple)',
-  reports: 'var(--color-accent-amber)',
   activity: 'var(--color-accent-amber)',
   chat: 'var(--color-purple)',
   reportcaddy: 'var(--color-purple)',
@@ -79,7 +78,6 @@ const INVESTIGATION_GROUP_VIEWS: ViewMode[] = [
   'whiteboard',
   'ioc-stats',
   'graph',
-  'reports',
   'activity',
   'virtualcaddy',
   'netmap',
@@ -450,14 +448,6 @@ export function Sidebar({
       active: activeView === 'graph' && !showTrash && !showArchive,
       onClick: () => nav(() => navToView('graph')),
       accentKey: 'graph',
-    },
-    {
-      key: 'reports',
-      icon: FileOutput,
-      label: t('sidebar.reports'),
-      active: activeView === 'reports' && !showTrash && !showArchive,
-      onClick: () => nav(() => navToView('reports')),
-      accentKey: 'reports',
     },
     {
       key: 'activity',
@@ -1043,17 +1033,6 @@ export function Sidebar({
                 compact
                 accentStyle={sidebarAccentStyle}
                 accentColor={accentColorFor('graph')}
-              />
-            </div>
-            <div className="ms-4">
-              <NavItem
-                icon={<FileOutput size={14} />}
-                label={t('sidebar.reports')}
-                active={activeView === 'reports' && !showTrash && !showArchive}
-                onClick={() => nav(() => navToView('reports'))}
-                compact
-                accentStyle={sidebarAccentStyle}
-                accentColor={accentColorFor('reports')}
               />
             </div>
             <div data-tour="activity" className="ms-4">

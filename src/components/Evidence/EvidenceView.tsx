@@ -31,6 +31,7 @@ import {
   type EvidenceTableIOCCandidate,
 } from '../../lib/evidence-ioc-candidates';
 import { getClsBadgeStyle, getTlpBorderColor } from '../../lib/classification';
+import { ContextMenu, type ContextMenuEntry } from '../Common/ContextMenu';
 
 interface EvidenceViewProps {
   folderId?: string;
@@ -41,7 +42,12 @@ interface EvidenceViewProps {
   onCreateTableIOCs?: (item: EvidenceItem, candidates: EvidenceTableIOCCandidate[]) => Promise<number>;
   onOpenChat: () => void;
   onAnalyzeImage?: (item: EvidenceItem) => void;
+  onPromoteToReportDraft?: (item: EvidenceItem) => void;
 }
+
+// File types the "Edit as draft for ReportCaddy" promotion is offered for —
+// the source-document types the user actually authors reports from.
+const REPORT_DRAFT_ELIGIBLE_FILE_TYPES = new Set(['docx', 'doc', 'pdf', 'xlsx', 'xls', 'spreadsheet']);
 
 interface MetadataRow {
   label: string;
@@ -106,10 +112,12 @@ export function EvidenceView({
   onCreateTableIOCs,
   onOpenChat,
   onAnalyzeImage,
+  onPromoteToReportDraft,
 }: EvidenceViewProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inspectScrollRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [itemContextMenu, setItemContextMenu] = useState<{ x: number; y: number; item: EvidenceItem } | null>(null);
   const [importing, setImporting] = useState(false);
   const [deduping, setDeduping] = useState(false);
   const [creatingTableIOCs, setCreatingTableIOCs] = useState(false);
@@ -481,6 +489,11 @@ export function EvidenceView({
                       <article
                         key={item.id}
                         data-tlp={item.clsLevel || undefined}
+                        onContextMenu={(event) => {
+                          if (!onPromoteToReportDraft || !REPORT_DRAFT_ELIGIBLE_FILE_TYPES.has(item.fileType)) return;
+                          event.preventDefault();
+                          setItemContextMenu({ x: event.clientX, y: event.clientY, item });
+                        }}
                         className={cn(
                           'rounded-lg border bg-bg-surface p-3 hover:border-border-medium transition-colors',
                           selectedItem?.id === item.id ? 'border-accent-blue/60' : 'border-border-subtle',
@@ -959,8 +972,31 @@ export function EvidenceView({
           </div>
         )}
       </main>
+
+      {itemContextMenu && (
+        <ContextMenu
+          x={itemContextMenu.x}
+          y={itemContextMenu.y}
+          onClose={() => setItemContextMenu(null)}
+          items={buildEvidenceItemContextMenuEntries(itemContextMenu.item, onPromoteToReportDraft)}
+        />
+      )}
     </div>
   );
+}
+
+function buildEvidenceItemContextMenuEntries(
+  item: EvidenceItem,
+  onPromoteToReportDraft?: (item: EvidenceItem) => void,
+): ContextMenuEntry[] {
+  if (!onPromoteToReportDraft) return [];
+  return [
+    {
+      label: 'Edit as draft for ReportCaddy',
+      icon: <FileText size={13} />,
+      onClick: () => onPromoteToReportDraft(item),
+    },
+  ];
 }
 
 function evidenceIcon(item: EvidenceItem): ReactNode {

@@ -45,6 +45,7 @@ import { useTags } from './hooks/useTags';
 import { useSettings } from './hooks/useSettings';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useNoteTemplates } from './hooks/useNoteTemplates';
+import { useReports } from './hooks/useReports';
 import { usePlaybooks } from './hooks/usePlaybooks';
 import { useIntegrations } from './hooks/useIntegrations';
 const PlaybookPicker = lazy(() => import('./components/Playbooks/PlaybookPicker').then(m => ({ default: m.PlaybookPicker })));
@@ -70,7 +71,7 @@ const SearchOverlay = lazy(() => import('./components/Search/SearchOverlay').the
 import { extractIOCs, mergeIOCAnalysis } from './lib/ioc-extractor';
 import { buildEvidenceItemDrafts, evidenceFileKeyFromFile, evidenceFileKeyFromItem, findDuplicateEvidenceItemIds, MAX_EVIDENCE_IMPORT_FILES } from './lib/evidence-import';
 import { extractEvidenceTableIOCCandidates, type EvidenceTableIOCCandidate } from './lib/evidence-ioc-candidates';
-import { BUILTIN_PRODUCT_BASELINES, importProductBaselinePackage, isProductBaselineTemplate, isProductNote } from './lib/product-baselines';
+import { BUILTIN_PRODUCT_BASELINES, importProductBaselinePackage, isProductBaselineTemplate, isProductNote, PRODUCT_NOTE_TAG, PRODUCT_DRAFT_TAG } from './lib/product-baselines';
 import { generateSampleInvestigation, isSampleEntity } from './lib/sample-investigation';
 import { db } from './db';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
@@ -129,7 +130,6 @@ type AssistantWorkspacePanelLaunchRequest = {
 };
 const AgentPanel = lazy(() => import('./components/Agent/AgentPanel').then(m => ({ default: m.AgentPanel })));
 const AgentDashboard = lazy(() => import('./components/Agent/AgentDashboard').then(m => ({ default: m.AgentDashboard })));
-const ReportsPanel = lazy(() => import('./components/Reports/ReportsPanel').then(m => ({ default: m.ReportsPanel })));
 const ConflictDialog = lazy(() => import('./components/Common/ConflictDialog').then(m => ({ default: m.ConflictDialog })));
 const KeyboardShortcutsPanel = lazy(() => import('./components/Common/KeyboardShortcutsPanel').then(m => ({ default: m.KeyboardShortcutsPanel })));
 const ServerOnboardingModal = lazy(() => import('./components/Settings/ServerOnboardingModal').then(m => ({ default: m.ServerOnboardingModal })));
@@ -271,6 +271,7 @@ function AppDataLayer() {
     ...standaloneIOCsHook.iocs.filter((i) => !i.trashed).map((i): CanvasEntityRef => ({ id: i.id, type: 'ioc', label: i.value, clsLevel: i.clsLevel, folderId: i.folderId })),
   ], [notes.notes, tasks.tasks, standaloneIOCsHook.iocs]);
   const noteTemplatesHook = useNoteTemplates();
+  const reportsHook = useReports();
   const playbooksHook = usePlaybooks();
   const integrationsHook = useIntegrations();
 
@@ -338,7 +339,7 @@ function AppDataLayer() {
   const isMobile = useIsMobile();
 
   // Compute safe default view from settings for NavigationProvider
-  const safeDefaultView = settings.defaultView === 'dashboard' || settings.defaultView === 'workspace' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'evidence' || settings.defaultView === 'products' || settings.defaultView === 'experimental' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' || settings.defaultView === 'chat' || settings.defaultView === 'caddyassistant' || settings.defaultView === 'cademail' || settings.defaultView === 'calendarcaddy' || settings.defaultView === 'reportcaddy' || settings.defaultView === 'agent' || settings.defaultView === 'investigations' || settings.defaultView === 'reports' || settings.defaultView === 'virtualcaddy' || settings.defaultView === 'netmap' ? settings.defaultView : 'notes';
+  const safeDefaultView = settings.defaultView === 'dashboard' || settings.defaultView === 'workspace' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'evidence' || settings.defaultView === 'products' || settings.defaultView === 'experimental' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' || settings.defaultView === 'chat' || settings.defaultView === 'caddyassistant' || settings.defaultView === 'cademail' || settings.defaultView === 'calendarcaddy' || settings.defaultView === 'reportcaddy' || settings.defaultView === 'agent' || settings.defaultView === 'investigations' || settings.defaultView === 'virtualcaddy' || settings.defaultView === 'netmap' ? settings.defaultView : 'notes';
 
   return (
     <InvestigationProvider
@@ -388,6 +389,7 @@ function AppDataLayer() {
             reloadWhiteboards={reloadWhiteboards}
             standaloneIOCsHook={standaloneIOCsHook}
             evidenceItemsHook={evidenceItemsHook}
+            reportsHook={reportsHook}
             chatsHook={chatsHook}
             canvasEntities={canvasEntities}
             folders={folders}
@@ -491,6 +493,7 @@ type AppInnerProps = {
   reloadWhiteboards: ReturnType<typeof useWhiteboards>['reload'];
   standaloneIOCsHook: ReturnType<typeof useStandaloneIOCs>;
   evidenceItemsHook: ReturnType<typeof useEvidenceItems>;
+  reportsHook: ReturnType<typeof useReports>;
   chatsHook: ReturnType<typeof useChats>;
   canvasEntities: CanvasEntityRef[];
   folders: ReturnType<typeof useFolders>['folders'];
@@ -540,7 +543,7 @@ const AppInner = memo(function AppInner({
   whiteboards, createWhiteboard, updateWhiteboard, deleteWhiteboard,
   trashWhiteboard, restoreWhiteboard, toggleArchiveWhiteboard,
   emptyTrashWhiteboards, getFilteredWhiteboards, whiteboardCounts, reloadWhiteboards,
-  standaloneIOCsHook, evidenceItemsHook, chatsHook, canvasEntities,
+  standaloneIOCsHook, evidenceItemsHook, reportsHook, chatsHook, canvasEntities,
   folders, foldersLoading, createFolder, findOrCreateFolder, updateFolder, deleteFolder,
   deleteFolderWithContents, trashFolderContents, archiveFolder, unarchiveFolder, reloadFolders,
   tags, createTag, updateTag, deleteTag, reloadTags,
@@ -1870,6 +1873,29 @@ const AppInner = memo(function AppInner({
     navigateTo('chat');
   }, [addToast, loggedCreateChatThread, navigateTo, selectedFolder?.name, selectedFolderId, setSelectedChatThreadId, settings.llmDefaultModel, settings.llmDefaultProvider]);
 
+  // Copies an evidence item's extracted content into a new ReportCaddy draft.
+  // The evidence item itself is left untouched — this is a copy, not a move or link.
+  const handlePromoteEvidenceToReportDraft = useCallback(async (item: EvidenceItem) => {
+    const report = await reportsHook.createReport({
+      title: item.title,
+      templateId: 'rt-imported-document',
+      sections: [{ sectionId: 'content', content: item.content }],
+      folderId: item.folderId,
+    });
+    addToast('success', `Created ReportCaddy draft from "${item.title}"`);
+    navigateTo('reportcaddy');
+    return report;
+  }, [reportsHook, addToast, navigateTo]);
+
+  const handleShipReportToProducts = useCallback((title: string, content: string, folderId?: string) => {
+    void loggedCreateNote({
+      title,
+      content,
+      folderId,
+      tags: [PRODUCT_NOTE_TAG, PRODUCT_DRAFT_TAG, 'reportcaddy'],
+    });
+  }, [loggedCreateNote]);
+
   const handleOpenFortuneInt = useCallback(() => {
     setFortuneIntMode(true);
     setFortuneIntOpenRequest((value) => value + 1);
@@ -2255,9 +2281,8 @@ const AppInner = memo(function AppInner({
   const experimentalWorkspaceActive = activeView === 'experimental';
   const agentCaddyWorkspaceActive = activeView === 'agent';
   const chatWorkspaceActive = activeView === 'chat';
-  const reportsWorkspaceActive = activeView === 'reports';
   const workspaceRouteActive = activeView === 'workspace';
-  const appWorkspaceActive = workspaceRouteActive || assistantWorkspaceActive || dashboardWorkspaceActive || activityWorkspaceActive || productsWorkspaceActive || notesWorkspaceActive || tasksWorkspaceActive || evidenceWorkspaceActive || timelineWorkspaceActive || whiteboardsWorkspaceActive || graphWorkspaceActive || reportCaddyWorkspaceActive || iocsWorkspaceActive || experimentalWorkspaceActive || agentCaddyWorkspaceActive || chatWorkspaceActive || reportsWorkspaceActive;
+  const appWorkspaceActive = workspaceRouteActive || assistantWorkspaceActive || dashboardWorkspaceActive || activityWorkspaceActive || productsWorkspaceActive || notesWorkspaceActive || tasksWorkspaceActive || evidenceWorkspaceActive || timelineWorkspaceActive || whiteboardsWorkspaceActive || graphWorkspaceActive || reportCaddyWorkspaceActive || iocsWorkspaceActive || experimentalWorkspaceActive || agentCaddyWorkspaceActive || chatWorkspaceActive;
   const assistantWorkspaceVisible = assistantWorkspaceActive && !showSettings && !showTrash && !showArchive;
   const dashboardWorkspaceVisible = dashboardWorkspaceActive && !showSettings && !showTrash && !showArchive;
   const activityWorkspaceVisible = activityWorkspaceActive && !showSettings && !showTrash && !showArchive;
@@ -2273,7 +2298,6 @@ const AppInner = memo(function AppInner({
   const experimentalWorkspaceVisible = experimentalWorkspaceActive && !showSettings && !showTrash && !showArchive;
   const agentCaddyWorkspaceVisible = agentCaddyWorkspaceActive && !showSettings && !showTrash && !showArchive;
   const chatWorkspaceVisible = chatWorkspaceActive && !showSettings && !showTrash && !showArchive;
-  const reportsWorkspaceVisible = reportsWorkspaceActive && !showSettings && !showTrash && !showArchive;
   const workspaceRouteVisible = workspaceRouteActive && !showSettings && !showTrash && !showArchive;
   const appWorkspaceVisible = appWorkspaceActive && !showSettings && !showTrash && !showArchive;
   const assistantShellView = activeView === 'cademail'
@@ -2777,6 +2801,7 @@ const AppInner = memo(function AppInner({
       onCreateTableIOCs={handleCreateTableIOCsFromEvidence}
       onOpenChat={() => navigateTo('chat')}
       onAnalyzeImage={handleAnalyzeImageEvidence}
+      onPromoteToReportDraft={handlePromoteEvidenceToReportDraft}
     />
   );
 
@@ -2785,6 +2810,12 @@ const AppInner = memo(function AppInner({
       folderId={selectedFolderId}
       folderName={selectedFolder?.name}
       settings={settings}
+      reports={reportsHook.reports}
+      onCreateReport={reportsHook.createReport}
+      onUpdateReportSection={reportsHook.updateSection}
+      onUpdateReportTitle={reportsHook.updateTitle}
+      onDeleteReport={reportsHook.deleteReport}
+      onShipReportToProducts={handleShipReportToProducts}
     />
   );
 
@@ -3191,8 +3222,6 @@ const AppInner = memo(function AppInner({
               agentCaddy={agentCaddyWorkspace}
               chatActive={chatWorkspaceVisible}
               chat={chatWorkspace}
-              reportsActive={reportsWorkspaceVisible}
-              reports={<ReportsPanel />}
               workspacePanelLaunchRequest={workspacePanelLaunchRequest}
               onWorkspacePanelLaunchHandled={handleWorkspacePanelLaunchHandled}
               assistantWorkspacePanelLaunchRequest={assistantWorkspacePanelLaunchRequest}

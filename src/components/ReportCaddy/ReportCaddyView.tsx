@@ -1,16 +1,24 @@
-import { useState, useCallback, useMemo } from 'react';
-import { Search, Plus, Trash2, Copy, ChevronRight, FileText, Sparkles, X, Edit2 } from 'lucide-react';
+import { useState, useCallback, useMemo, useRef } from 'react';
+import { Search, Plus, Trash2, Copy, ChevronRight, FileText, Sparkles, X, Edit2, Upload, FolderOpen } from 'lucide-react';
 import { useReportTemplates } from '../../hooks/useReportTemplates';
 import { useLLM } from '../../hooks/useLLM';
 import { resolveAssistantLLMConfig } from '../../lib/assistant-llm-config';
 import { cn } from '../../lib/utils';
-import type { ReportSection, ReportTemplate } from '../../types';
+import { extractDocxEvidence } from '../../lib/evidence-import';
+import { buildReportContext, renderSectionTemplate, ReportEditor, ReportList, TemplatePicker, buildMarkdown } from './ReportInstanceEditor';
+import type { ReportSection, ReportTemplate, Report } from '../../types';
 import type { Settings } from '../../types';
 
 interface ReportCaddyViewProps {
   folderId?: string;
   folderName?: string;
   settings?: Settings;
+  reports: Report[];
+  onCreateReport: (partial: Pick<Report, 'title' | 'templateId' | 'sections'> & Partial<Pick<Report, 'folderId'>>) => Promise<Report>;
+  onUpdateReportSection: (id: string, sectionId: string, content: string) => void;
+  onUpdateReportTitle: (id: string, title: string) => void;
+  onDeleteReport: (id: string) => void;
+  onShipReportToProducts: (title: string, content: string, folderId?: string) => void;
 }
 
 const EXTRACTION_SYSTEM_PROMPT = `You are a document structure analyst. The user will paste an existing report. Extract ONLY the structural skeleton: section headings, sub-headings, field labels, and any recurring outline patterns. Do NOT include any actual report content, analysis, prose, or data.
@@ -159,8 +167,24 @@ function SectionEditor({
   );
 }
 
-export function ReportCaddyView({ settings }: ReportCaddyViewProps) {
+export function ReportCaddyView({
+  folderId,
+  folderName,
+  settings,
+  reports,
+  onCreateReport,
+  onUpdateReportSection,
+  onUpdateReportTitle,
+  onDeleteReport,
+  onShipReportToProducts,
+}: ReportCaddyViewProps) {
   const { allTemplates, loading, createTemplate, updateTemplate, deleteTemplate, categories } = useReportTemplates();
+
+  const [activeTab, setActiveTab] = useState<'templates' | 'reports'>('templates');
+  const [activeReportId, setActiveReportId] = useState<string | null>(null);
+  const [showReportPicker, setShowReportPicker] = useState(false);
+  const docxTemplateInputRef = useRef<HTMLInputElement>(null);
+  const [docxImportError, setDocxImportError] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -294,6 +318,67 @@ export function ReportCaddyView({ settings }: ReportCaddyViewProps) {
     setSelectedTemplate(prev => prev ? { ...prev, sections: editingSectionsDraft } : null);
   };
 
+  const visibleReports = useMemo(
+    () => folderId ? reports.filter(r => r.folderId === folderId) : reports,
+    [reports, folderId],
+  );
+  const activeReport = reports.find(r => r.id === activeReportId) ?? null;
+  const activeReportTemplate = activeReport ? allTemplates.find(t => t.id === activeReport.templateId) ?? null : null;
+
+  const handleSelectTemplateForNewReport = useCallback(async (template: ReportTemplate) => {
+    const ctx = await buildReportContext(folderId, folderName);
+    const report = await onCreateReport({
+      title: folderName ? `${folderName} — ${template.name}` : template.name,
+      templateId: template.id,
+      sections: template.sections.map(s => ({
+        sectionId: s.id,
+        content: s.bodyTemplate ? renderSectionTemplate(s.bodyTemplate, ctx) : '',
+      })),
+      folderId,
+    });
+    setActiveReportId(report.id);
+    setShowReportPicker(false);
+  }, [folderId, folderName, onCreateReport]);
+
+  const handleNewBlankReport = useCallback(async () => {
+    const blank = allTemplates.find(t => t.id === 'rt-blank-report');
+    if (!blank) return;
+    await handleSelectTemplateForNewReport(blank);
+  }, [allTemplates, handleSelectTemplateForNewReport]);
+
+  const handleDeleteActiveReport = useCallback(() => {
+    if (!activeReport) return;
+    onDeleteReport(activeReport.id);
+    setActiveReportId(null);
+  }, [activeReport, onDeleteReport]);
+
+  const handleShipActiveReport = useCallback(() => {
+    if (!activeReport || !activeReportTemplate) return;
+    const md = buildMarkdown(activeReport, activeReportTemplate);
+    onShipReportToProducts(activeReport.title, md, activeReport.folderId ?? folderId);
+  }, [activeReport, activeReportTemplate, folderId, onShipReportToProducts]);
+
+  const handleDocxTemplateFile = useCallback(async (file: File) => {
+    setDocxImportError(null);
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const { text, warning } = extractDocxEvidence(bytes);
+      if (!text.trim()) {
+        setDocxImportError(warning || 'No readable text could be extracted from this Word document.');
+        return;
+      }
+      setImportText(text);
+      setImportName(file.name.replace(/\.docx$/i, ''));
+      setImportStatus('idle');
+      setExtractedSections([]);
+      setShowImport(true);
+      setShowNewForm(false);
+    } catch (err) {
+      setDocxImportError(err instanceof Error ? err.message : 'Failed to read Word document.');
+    }
+  }, []);
+
+  const renderTemplatesTab = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full text-text-muted text-sm">
@@ -429,6 +514,22 @@ export function ReportCaddyView({ settings }: ReportCaddyViewProps) {
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <input
+              ref={docxTemplateInputRef}
+              type="file"
+              accept=".docx"
+              className="hidden"
+              onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleDocxTemplateFile(file); e.target.value = ''; }}
+            />
+            <button
+              type="button"
+              onClick={() => docxTemplateInputRef.current?.click()}
+              className="flex items-center gap-1.5 rounded-lg border border-border-subtle bg-bg-primary px-2.5 py-1.5 text-xs text-text-secondary hover:text-text-primary transition-colors"
+              title="Upload a Word (.docx) document and extract its structure as a template"
+            >
+              <Upload size={12} />
+              Upload Word template
+            </button>
             <button
               type="button"
               onClick={() => { setShowImport(v => !v); setShowNewForm(false); }}
@@ -457,6 +558,13 @@ export function ReportCaddyView({ settings }: ReportCaddyViewProps) {
             </button>
           </div>
         </div>
+
+        {docxImportError && (
+          <div className="flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+            <span>{docxImportError}</span>
+            <button type="button" onClick={() => setDocxImportError(null)} className="ms-auto text-red-300 hover:text-red-200"><X size={12} /></button>
+          </div>
+        )}
 
         <div className="relative">
           <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
@@ -637,6 +745,96 @@ export function ReportCaddyView({ settings }: ReportCaddyViewProps) {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+  };
+
+  const renderReportsTab = () => {
+    if (activeReport && activeReportTemplate) {
+      return (
+        <ReportEditor
+          report={activeReport}
+          template={activeReportTemplate}
+          onUpdateSection={(sid, val) => onUpdateReportSection(activeReport.id, sid, val)}
+          onUpdateTitle={(title) => onUpdateReportTitle(activeReport.id, title)}
+          onBack={() => setActiveReportId(null)}
+          onDelete={handleDeleteActiveReport}
+          onShipToProducts={handleShipActiveReport}
+        />
+      );
+    }
+
+    if (showReportPicker) {
+      return (
+        <div className="flex flex-col h-full overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 shrink-0 border-b border-border-subtle">
+            <button type="button" onClick={() => setShowReportPicker(false)} className="p-1 rounded text-text-muted hover:text-text-primary">
+              <X size={14} />
+            </button>
+            <span className="text-xs font-semibold text-text-primary">New Report</span>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <TemplatePicker onSelect={handleSelectTemplateForNewReport} onNewBlank={handleNewBlankReport} />
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col h-full overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 shrink-0 border-b border-border-subtle">
+          <FolderOpen size={14} className="text-accent" />
+          <span className="text-xs font-semibold flex-1 text-text-primary">My Reports</span>
+          {folderName && (
+            <span className="text-[11px] text-text-muted truncate max-w-[140px]">{folderName}</span>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowReportPicker(true)}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-accent text-white hover:bg-accent/90 transition-colors"
+          >
+            <Plus size={11} />
+            New
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          <ReportList reports={visibleReports} allTemplates={allTemplates} onOpen={setActiveReportId} onNew={() => setShowReportPicker(true)} />
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="shrink-0 flex items-center gap-1 border-b border-border-subtle px-4 pt-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab('templates')}
+          className={cn(
+            'px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors',
+            activeTab === 'templates'
+              ? 'border-accent text-text-primary'
+              : 'border-transparent text-text-muted hover:text-text-primary',
+          )}
+        >
+          Templates
+        </button>
+        <button
+          type="button"
+          onClick={() => { setActiveTab('reports'); setSelectedTemplate(null); }}
+          className={cn(
+            'px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors',
+            activeTab === 'reports'
+              ? 'border-accent text-text-primary'
+              : 'border-transparent text-text-muted hover:text-text-primary',
+          )}
+        >
+          My Reports
+        </button>
+      </div>
+      <div className="flex-1 overflow-hidden flex flex-col">
+        {activeTab === 'templates' ? renderTemplatesTab() : renderReportsTab()}
       </div>
     </div>
   );

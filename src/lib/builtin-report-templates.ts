@@ -634,4 +634,39 @@ export const BUILTIN_REPORT_TEMPLATES: readonly ReportTemplate[] = [
     createdAt: 0,
     updatedAt: 0,
   },
+
+  // ── Imported Document (single free-form section, used for Evidence → ReportCaddy drafts) ──
+  {
+    id: 'rt-imported-document',
+    name: 'Imported Document',
+    description: 'A single free-form section seeded from an imported document. Restructure or split into sections as needed.',
+    icon: '📋',
+    category: 'Imported',
+    sections: [
+      {
+        id: 'content', title: 'Content', order: 0,
+        placeholder: 'Imported document content.',
+      },
+    ],
+    source: 'builtin',
+    createdAt: 0,
+    updatedAt: 0,
+  },
+
+  // ── Blank Report (starting point for a report with no fixed structure) ──
+  {
+    id: 'rt-blank-report',
+    name: 'Blank Report',
+    description: 'Start from scratch with a minimal structure.',
+    icon: '📝',
+    category: 'Custom',
+    sections: [
+      { id: 's1', title: 'Summary', order: 0, placeholder: 'Write your summary here.' },
+      { id: 's2', title: 'Findings', order: 1, placeholder: 'Describe your findings.' },
+      { id: 's3', title: 'Recommendations', order: 2, placeholder: 'List your recommendations.' },
+    ],
+    source: 'builtin',
+    createdAt: 0,
+    updatedAt: 0,
+  },
 ];

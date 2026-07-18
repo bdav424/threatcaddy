@@ -1,8 +1,7 @@
 import { useState, useCallback, useRef, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileText, Plus, Trash2, Download, Copy, ChevronRight, ArrowLeft, LayoutTemplate, X, Camera } from 'lucide-react';
+import { FileText, Plus, Trash2, Download, Copy, ChevronRight, ArrowLeft, X, Camera, Rocket } from 'lucide-react';
 import { useReportTemplates } from '../../hooks/useReportTemplates';
-import { useReports } from '../../hooks/useReports';
 import { useInvestigation } from '../../contexts/InvestigationContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useWorkspacePanelChromeState } from '../WorkspacePanels/WorkspacePanel';
@@ -10,10 +9,10 @@ import { buildReportContext, renderSectionTemplate } from '../../lib/report-temp
 import { useGraphSnapshots } from '../../hooks/useGraphSnapshots';
 import type { ReportTemplate, ReportSection, Report } from '../../types';
 
-// Re-exported for the toast-regression test, which still imports the old name.
+// Re-exported for the toast-regression test, which still imports this name.
 export type ActiveReport = Report;
 
-function buildMarkdown(report: Report, template: ReportTemplate): string {
+export function buildMarkdown(report: Report, template: ReportTemplate): string {
   const lines: string[] = [`# ${report.title}`, ''];
   const ordered = [...template.sections].sort((a, b) => a.order - b.order);
   for (const sec of ordered) {
@@ -38,7 +37,7 @@ function downloadMarkdown(report: ActiveReport, template: ReportTemplate) {
 
 // ─── Template picker ──────────────────────────────────────────────────────────
 
-function TemplatePicker({
+export function TemplatePicker({
   onSelect,
   onNewBlank,
 }: {
@@ -65,7 +64,7 @@ function TemplatePicker({
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-2 px-4 pt-4 pb-3 shrink-0">
-        <LayoutTemplate size={15} style={{ color: 'var(--color-accent)' }} />
+        <FileText size={15} style={{ color: 'var(--color-accent)' }} />
         <span className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
           {t('reports.pickTemplate', { defaultValue: 'Choose a report template' })}
         </span>
@@ -151,7 +150,7 @@ function TemplatePicker({
 
 // ─── Section editor ───────────────────────────────────────────────────────────
 
-function SectionEditor({
+function SectionFieldEditor({
   section,
   content,
   onChange,
@@ -300,6 +299,7 @@ export function ReportEditor({
   onUpdateTitle,
   onBack,
   onDelete,
+  onShipToProducts,
 }: {
   report: ActiveReport;
   template: ReportTemplate;
@@ -307,6 +307,7 @@ export function ReportEditor({
   onUpdateTitle: (title: string) => void;
   onBack: () => void;
   onDelete: () => void;
+  onShipToProducts?: () => void;
 }) {
   const { t } = useTranslation();
   const { addToast } = useToast();
@@ -325,6 +326,12 @@ export function ReportEditor({
     await navigator.clipboard.writeText(md);
     addToast('success', 'Copied to clipboard');
   }, [report, template, addToast]);
+
+  const handleShip = useCallback(() => {
+    if (!onShipToProducts) return;
+    onShipToProducts();
+    addToast('success', 'Shipped to Products');
+  }, [onShipToProducts, addToast]);
 
   const getSectionContent = (sectionId: string) =>
     report.sections.find(s => s.sectionId === sectionId)?.content ?? '';
@@ -356,6 +363,18 @@ export function ReportEditor({
         <span className="text-[11px] shrink-0" style={{ color: 'var(--color-text-muted)' }}>
           {template.name}
         </span>
+
+        {onShipToProducts && (
+          <button
+            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors text-[11px] font-medium"
+            style={{ background: 'var(--color-accent)', color: '#fff' }}
+            title="Ship completed report to Products"
+            onClick={handleShip}
+          >
+            <Rocket size={12} />
+            Ship to Products
+          </button>
+        )}
 
         <button
           className="p-1.5 rounded transition-colors hover:bg-[color:var(--color-bg-raised)]"
@@ -422,7 +441,7 @@ export function ReportEditor({
               id={`report-section-${sec.id}`}
               onFocus={() => setActiveSectionIdx(idx)}
             >
-              <SectionEditor
+              <SectionFieldEditor
                 section={sec}
                 content={getSectionContent(sec.id)}
                 onChange={val => onUpdateSection(sec.id, val)}
@@ -436,179 +455,80 @@ export function ReportEditor({
   );
 }
 
-// ─── Main panel ───────────────────────────────────────────────────────────────
+// ─── Report list ──────────────────────────────────────────────────────────────
 
-export function ReportsPanel() {
+export function ReportList({
+  reports,
+  allTemplates,
+  onOpen,
+  onNew,
+}: {
+  reports: Report[];
+  allTemplates: ReportTemplate[];
+  onOpen: (id: string) => void;
+  onNew: () => void;
+}) {
   const { t } = useTranslation();
-  const { selectedFolder } = useInvestigation();
-  const { allTemplates, createTemplate } = useReportTemplates();
-  const { reports, createReport: persistReport, updateSection, updateTitle, deleteReport: removeReport } = useReports();
 
-  const [activeReportId, setActiveReportId] = useState<string | null>(null);
-  const [showPicker, setShowPicker] = useState(false);
-
-  const activeReport = reports.find(r => r.id === activeReportId) ?? null;
-  const activeTemplate = activeReport
-    ? (allTemplates.find(t => t.id === activeReport.templateId) ?? null)
-    : null;
-
-  const createReport = useCallback(async (template: ReportTemplate) => {
-    const ctx = await buildReportContext(selectedFolder?.id, selectedFolder?.name);
-    const report = await persistReport({
-      title: selectedFolder
-        ? `${selectedFolder.name} — ${template.name}`
-        : template.name,
-      templateId: template.id,
-      sections: template.sections.map(s => ({
-        sectionId: s.id,
-        content: s.bodyTemplate ? renderSectionTemplate(s.bodyTemplate, ctx) : '',
-      })),
-      folderId: selectedFolder?.id,
-    });
-    setActiveReportId(report.id);
-    setShowPicker(false);
-  }, [selectedFolder, persistReport]);
-
-  // Blank reports need a real persisted template, not an in-memory-only one —
-  // otherwise the report survives a reload but activeTemplate lookup (below)
-  // comes back null forever since nothing in reportTemplates matches its
-  // templateId, and the report can never be opened again.
-  const createBlankReport = useCallback(async () => {
-    const template = await createTemplate({
-      name: t('reports.blankReport', { defaultValue: 'Blank Report' }),
-      category: 'Custom',
-      sections: [
-        { id: 's1', title: 'Summary', order: 0, placeholder: 'Write your summary here.' },
-        { id: 's2', title: 'Findings', order: 1, placeholder: 'Describe your findings.' },
-        { id: 's3', title: 'Recommendations', order: 2, placeholder: 'List your recommendations.' },
-      ],
-    });
-    await createReport(template);
-  }, [t, createTemplate, createReport]);
-
-  const deleteReport = useCallback((reportId: string) => {
-    void removeReport(reportId);
-    setActiveReportId(null);
-  }, [removeReport]);
-
-  // ── Active report view ──
-  if (activeReport && activeTemplate) {
+  if (reports.length === 0) {
     return (
-      <ReportEditor
-        report={activeReport}
-        template={activeTemplate}
-        onUpdateSection={(sid, val) => updateSection(activeReport.id, sid, val)}
-        onUpdateTitle={title => updateTitle(activeReport.id, title)}
-        onBack={() => setActiveReportId(null)}
-        onDelete={() => deleteReport(activeReport.id)}
-      />
-    );
-  }
-
-  // ── Template picker overlay ──
-  if (showPicker) {
-    return (
-      <div className="flex flex-col h-full overflow-hidden">
-        <div className="flex items-center gap-2 px-3 py-2 shrink-0 border-b" style={{ borderColor: 'var(--color-border-subtle)' }}>
-          <button className="p-1 rounded" onClick={() => setShowPicker(false)} style={{ color: 'var(--color-text-muted)' }}>
-            <X size={14} />
-          </button>
-          <span className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-            {t('reports.newReport', { defaultValue: 'New Report' })}
-          </span>
-        </div>
-        <div className="flex-1 overflow-hidden">
-          <TemplatePicker onSelect={createReport} onNewBlank={createBlankReport} />
-        </div>
-      </div>
-    );
-  }
-
-  // ── Report list ──
-  return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <div
-        className="flex items-center gap-2 px-3 py-2.5 shrink-0 border-b"
-        style={{ borderColor: 'var(--color-border-subtle)' }}
-      >
-        <FileText size={14} style={{ color: 'var(--color-accent)' }} />
-        <span className="text-xs font-semibold flex-1" style={{ color: 'var(--color-text-primary)' }}>
-          {t('reports.panelTitle', { defaultValue: 'Reports' })}
-        </span>
-        {selectedFolder && (
-          <span className="text-[11px] truncate max-w-[120px]" style={{ color: 'var(--color-text-muted)' }}>
-            {selectedFolder.name}
-          </span>
-        )}
-        <button
-          className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors"
-          style={{ background: 'var(--color-accent)', color: '#fff' }}
-          onClick={() => setShowPicker(true)}
+      <div className="flex flex-col items-center justify-center gap-4 h-full px-6 text-center">
+        <div
+          className="w-12 h-12 rounded-xl flex items-center justify-center"
+          style={{ background: 'var(--color-bg-raised)' }}
         >
-          <Plus size={11} />
-          {t('reports.new', { defaultValue: 'New' })}
+          <FileText size={22} style={{ color: 'var(--color-accent)' }} />
+        </div>
+        <div>
+          <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            {t('reports.emptyTitle', { defaultValue: 'No reports yet' })}
+          </p>
+          <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+            {t('reports.emptyDesc', { defaultValue: 'Create a report from a template to get started.' })}
+          </p>
+        </div>
+        <button
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium"
+          style={{ background: 'var(--color-accent)', color: '#fff' }}
+          onClick={onNew}
+        >
+          <Plus size={12} />
+          {t('reports.createReport', { defaultValue: 'Create Report' })}
         </button>
       </div>
+    );
+  }
 
-      {/* Report list or empty state */}
-      <div className="flex-1 overflow-y-auto">
-        {reports.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-4 h-full px-6 text-center">
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center"
-              style={{ background: 'var(--color-bg-raised)' }}
-            >
-              <FileText size={22} style={{ color: 'var(--color-accent)' }} />
+  return (
+    <div className="py-2">
+      {reports.map(report => {
+        const tmpl = allTemplates.find(t => t.id === report.templateId);
+        const filledSections = report.sections.filter(s => s.content.trim()).length;
+        const totalSections = tmpl?.sections.length ?? report.sections.length;
+        return (
+          <button
+            key={report.id}
+            className="w-full flex items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-[color:var(--color-bg-hover)]"
+            onClick={() => onOpen(report.id)}
+          >
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 text-sm"
+              style={{ background: 'var(--color-bg-raised)' }}>
+              {tmpl?.icon ?? <FileText size={12} style={{ color: 'var(--color-accent)' }} />}
             </div>
-            <div>
-              <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                {t('reports.emptyTitle', { defaultValue: 'No reports yet' })}
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
+                {report.title}
               </p>
-              <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                {t('reports.emptyDesc', { defaultValue: 'Create a report from a template to get started.' })}
+              <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                {tmpl?.name ?? 'Custom'} · {filledSections}/{totalSections} sections filled
               </p>
             </div>
-            <button
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium"
-              style={{ background: 'var(--color-accent)', color: '#fff' }}
-              onClick={() => setShowPicker(true)}
-            >
-              <Plus size={12} />
-              {t('reports.createReport', { defaultValue: 'Create Report' })}
-            </button>
-          </div>
-        ) : (
-          <div className="py-2">
-            {reports.map(report => {
-              const tmpl = allTemplates.find(t => t.id === report.templateId);
-              const filledSections = report.sections.filter(s => s.content.trim()).length;
-              const totalSections = tmpl?.sections.length ?? report.sections.length;
-              return (
-                <button
-                  key={report.id}
-                  className="w-full flex items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-[color:var(--color-bg-hover)]"
-                  onClick={() => setActiveReportId(report.id)}
-                >
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 text-sm"
-                    style={{ background: 'var(--color-bg-raised)' }}>
-                    {tmpl?.icon ?? <FileText size={12} style={{ color: 'var(--color-accent)' }} />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
-                      {report.title}
-                    </p>
-                    <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                      {tmpl?.name ?? 'Custom'} · {filledSections}/{totalSections} sections filled
-                    </p>
-                  </div>
-                  <ChevronRight size={12} style={{ color: 'var(--color-text-muted)' }} className="shrink-0 mt-1" />
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
+            <ChevronRight size={12} style={{ color: 'var(--color-text-muted)' }} className="shrink-0 mt-1" />
+          </button>
+        );
+      })}
     </div>
   );
 }
+
+export { buildReportContext, renderSectionTemplate, downloadMarkdown, X as CloseIcon };
