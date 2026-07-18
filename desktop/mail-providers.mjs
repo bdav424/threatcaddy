@@ -1,12 +1,9 @@
 // desktop/mail-providers.mjs
 //
-// Plain-ESM copy of src/lib/mail-providers.ts for use in the Electron main process.
-// Kept in sync with the TypeScript source manually — both files define the same
-// MAIL_PROVIDERS table. The reason this copy exists: the TypeScript source
-// can't be reliably imported by Node/Electron at runtime in a packaged build
-// (no TypeScript compilation step in the main-process bundle), so we maintain
-// this as a stable plain-JS peer. When you add/change a provider in mail-providers.ts,
-// mirror the change here.
+// The MAIL_PROVIDERS table for the Electron main process. Used to be kept in
+// sync with a src/lib/mail-providers.ts peer; that TS copy was unreachable
+// dead code (nothing in the renderer imported it) and was deleted. This file
+// is now the sole source of truth for the provider table.
 
 /** @typedef {'generic'|'proton'|'google'|'microsoft'} MailProviderId */
 /** @typedef {'basic'|'oauth'} MailAuthMethod */
