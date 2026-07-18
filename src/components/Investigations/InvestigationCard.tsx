@@ -187,8 +187,11 @@ export function InvestigationCard({
   };
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onOpen(folderId)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(folderId); } }}
       data-tlp={effectiveClsLevel || undefined}
       className={cn(
         'relative w-full text-start rounded-lg border transition-all duration-200 cursor-pointer',
@@ -420,6 +423,6 @@ export function InvestigationCard({
         </div>
       </div>
 
-    </button>
+    </div>
   );
 }
