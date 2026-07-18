@@ -70,7 +70,7 @@ describe('Database schema', () => {
   });
 
   it('is at version 45', () => {
-    expect(db.verno).toBe(45);
+    expect(db.verno).toBe(46);
   });
 });
 

@@ -1045,6 +1045,17 @@ export function Sidebar({
                 accentColor={accentColorFor('graph')}
               />
             </div>
+            <div className="ms-4">
+              <NavItem
+                icon={<FileOutput size={14} />}
+                label={t('sidebar.reports')}
+                active={activeView === 'reports' && !showTrash && !showArchive}
+                onClick={() => nav(() => navToView('reports'))}
+                compact
+                accentStyle={sidebarAccentStyle}
+                accentColor={accentColorFor('reports')}
+              />
+            </div>
             <div data-tour="activity" className="ms-4">
               <NavItem
                 icon={<Activity size={14} />}

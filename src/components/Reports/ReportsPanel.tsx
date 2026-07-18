@@ -2,23 +2,18 @@ import { useState, useCallback, useRef, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileText, Plus, Trash2, Download, Copy, ChevronRight, ArrowLeft, LayoutTemplate, X, Camera } from 'lucide-react';
 import { useReportTemplates } from '../../hooks/useReportTemplates';
+import { useReports } from '../../hooks/useReports';
 import { useInvestigation } from '../../contexts/InvestigationContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useWorkspacePanelChromeState } from '../WorkspacePanels/WorkspacePanel';
 import { buildReportContext, renderSectionTemplate } from '../../lib/report-template-renderer';
 import { useGraphSnapshots } from '../../hooks/useGraphSnapshots';
-import { nanoid } from 'nanoid';
-import type { ReportTemplate, ReportSection } from '../../types';
+import type { ReportTemplate, ReportSection, Report } from '../../types';
 
-export interface ActiveReport {
-  id: string;
-  title: string;
-  templateId: string;
-  sections: Array<{ sectionId: string; content: string }>;
-  createdAt: number;
-}
+// Re-exported for the toast-regression test, which still imports the old name.
+export type ActiveReport = Report;
 
-function buildMarkdown(report: ActiveReport, template: ReportTemplate): string {
+function buildMarkdown(report: Report, template: ReportTemplate): string {
   const lines: string[] = [`# ${report.title}`, ''];
   const ordered = [...template.sections].sort((a, b) => a.order - b.order);
   for (const sec of ordered) {
@@ -446,9 +441,9 @@ export function ReportEditor({
 export function ReportsPanel() {
   const { t } = useTranslation();
   const { selectedFolder } = useInvestigation();
-  const { allTemplates } = useReportTemplates();
+  const { allTemplates, createTemplate } = useReportTemplates();
+  const { reports, createReport: persistReport, updateSection, updateTitle, deleteReport: removeReport } = useReports();
 
-  const [reports, setReports] = useState<ActiveReport[]>([]);
   const [activeReportId, setActiveReportId] = useState<string | null>(null);
   const [showPicker, setShowPicker] = useState(false);
 
@@ -458,10 +453,8 @@ export function ReportsPanel() {
     : null;
 
   const createReport = useCallback(async (template: ReportTemplate) => {
-    const now = Date.now();
     const ctx = await buildReportContext(selectedFolder?.id, selectedFolder?.name);
-    const report: ActiveReport = {
-      id: nanoid(),
+    const report = await persistReport({
       title: selectedFolder
         ? `${selectedFolder.name} — ${template.name}`
         : template.name,
@@ -470,16 +463,18 @@ export function ReportsPanel() {
         sectionId: s.id,
         content: s.bodyTemplate ? renderSectionTemplate(s.bodyTemplate, ctx) : '',
       })),
-      createdAt: now,
-    };
-    setReports(prev => [report, ...prev]);
+      folderId: selectedFolder?.id,
+    });
     setActiveReportId(report.id);
     setShowPicker(false);
-  }, [selectedFolder]);
+  }, [selectedFolder, persistReport]);
 
-  const createBlankReport = useCallback(() => {
-    const blankTemplate: ReportTemplate = {
-      id: `blank-${nanoid()}`,
+  // Blank reports need a real persisted template, not an in-memory-only one —
+  // otherwise the report survives a reload but activeTemplate lookup (below)
+  // comes back null forever since nothing in reportTemplates matches its
+  // templateId, and the report can never be opened again.
+  const createBlankReport = useCallback(async () => {
+    const template = await createTemplate({
       name: t('reports.blankReport', { defaultValue: 'Blank Report' }),
       category: 'Custom',
       sections: [
@@ -487,36 +482,14 @@ export function ReportsPanel() {
         { id: 's2', title: 'Findings', order: 1, placeholder: 'Describe your findings.' },
         { id: 's3', title: 'Recommendations', order: 2, placeholder: 'List your recommendations.' },
       ],
-      source: 'user',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    void createReport(blankTemplate);
-  }, [t, createReport]);
-
-  const updateSection = useCallback((reportId: string, sectionId: string, content: string) => {
-    setReports(prev =>
-      prev.map(r =>
-        r.id !== reportId
-          ? r
-          : {
-              ...r,
-              sections: r.sections.map(s =>
-                s.sectionId === sectionId ? { ...s, content } : s,
-              ),
-            },
-      ),
-    );
-  }, []);
-
-  const updateTitle = useCallback((reportId: string, title: string) => {
-    setReports(prev => prev.map(r => (r.id !== reportId ? r : { ...r, title })));
-  }, []);
+    });
+    await createReport(template);
+  }, [t, createTemplate, createReport]);
 
   const deleteReport = useCallback((reportId: string) => {
-    setReports(prev => prev.filter(r => r.id !== reportId));
+    void removeReport(reportId);
     setActiveReportId(null);
-  }, []);
+  }, [removeReport]);
 
   // ── Active report view ──
   if (activeReport && activeTemplate) {

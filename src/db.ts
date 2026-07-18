@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, ReportTemplate, GraphSnapshot, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus, EnrichmentCacheEntry, VirtualCaddyJob, NetworkDevice, NetworkScanJob, SyncAuthSettings, JournalPage, JournalBook, JournalCollection, IOCRecheckDiff } from './types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, EvidenceItem, ChatThread, NoteTemplate, PlaybookTemplate, ReportTemplate, Report, GraphSnapshot, Checkpoint, CustomSlashCommand, AgentAction, AgentProfile, AgentDeployment, AgentMeeting, EvidenceKind, EvidenceExtractionStatus, EnrichmentCacheEntry, VirtualCaddyJob, NetworkDevice, NetworkScanJob, SyncAuthSettings, JournalPage, JournalBook, JournalCollection, IOCRecheckDiff } from './types';
 import type { IntegrationTemplate, InstalledIntegration, IntegrationRun } from './types/integration-types';
 import { installEncryptionMiddleware } from './lib/encryptionMiddleware';
 
@@ -37,6 +37,7 @@ const db = new Dexie('ThreatCaddyDB') as Dexie & {
   iocRecheckDiffs: EntityTable<IOCRecheckDiff, 'id'>;
   journalBooks: EntityTable<JournalBook, 'id'>;
   journalCollections: EntityTable<JournalCollection, 'id'>;
+  reports: EntityTable<Report, 'id'>;
 };
 
 db.version(1).stores({
@@ -390,6 +391,16 @@ db.version(44).stores({
 // simply uncollected until merged.
 db.version(45).stores({
   journalCollections: 'id, name, investigationId, order, createdAt, updatedAt',
+});
+
+// Version 46: Written reports. ReportsPanel previously kept its ActiveReport[]
+// in component useState only — closing the panel, refreshing, or crashing
+// silently discarded every report a user had written. Report templates
+// (reportTemplates, v33) always persisted; the reports written from them did
+// not. folderId is unindexed-optional, matching journalPages' pattern for
+// personal-vs-investigation-scoped records.
+db.version(46).stores({
+  reports: 'id, templateId, folderId, createdAt, updatedAt',
 });
 
 

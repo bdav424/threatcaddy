@@ -1469,6 +1469,23 @@ export interface ReportTemplate {
   updatedAt: number;
 }
 
+/** Persisted content for a single section within a written Report. */
+export interface ReportSectionContent {
+  sectionId: string;
+  content: string;
+}
+
+/** A written report — the user-authored output of filling in a ReportTemplate. */
+export interface Report {
+  id: string;
+  title: string;
+  templateId: string;
+  sections: ReportSectionContent[];
+  folderId?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface EnrichmentCacheEntry {
   id: string;
   /** Composite cache key: '{templateId}:{iocType}:{normalizedValue}' */

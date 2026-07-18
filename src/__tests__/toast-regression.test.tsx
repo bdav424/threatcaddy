@@ -50,6 +50,7 @@ describe('toast regression — addToast(type, message) wiring', () => {
       templateId: 'tpl-1',
       sections: [{ sectionId: 's1', content: 'Body text.' }],
       createdAt: Date.now(),
+      updatedAt: Date.now(),
     };
 
     render(
