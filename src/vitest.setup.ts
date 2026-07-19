@@ -99,6 +99,24 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
 }
 
+// jsdom doesn't implement matchMedia either — useIsMobile() (Journal, Graph,
+// KanbanBoard) calls it on mount and throws "window.matchMedia is not a
+// function" without this. Always reports "not matching" (desktop layout),
+// which is the right default for tests that don't care about the mobile
+// breakpoint; tests that do can override window.matchMedia themselves.
+if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
+  window.matchMedia = (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  } as unknown as MediaQueryList);
+}
+
 const namespaces: Record<string, Record<string, unknown>> = {
   settings: settingsEn, analysis: analysisEn, timeline: timelineEn,
   notes: notesEn, tasks: tasksEn, chat: chatEn, graph: graphEn,

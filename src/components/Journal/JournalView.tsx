@@ -1,12 +1,13 @@
 import { useState, useCallback, useRef, useEffect, useMemo, type PointerEvent as ReactPointerEvent, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import DOMPurify from 'dompurify';
-import { BookOpen, Plus, Trash2, Send, Palette, Upload, ChevronLeft, ChevronRight, MoreVertical, SquarePen, Library, Pencil, Eraser, X } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Send, Palette, Upload, ChevronLeft, ChevronRight, MoreVertical, SquarePen, Library, Pencil, Eraser, X, ArrowLeft } from 'lucide-react';
 import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
 import { Placeholder } from '@tiptap/extensions';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { useJournalPages } from '../../hooks/useJournalPages';
 import { useJournalBooks } from '../../hooks/useJournalBooks';
 import { useJournalCollections } from '../../hooks/useJournalCollections';
@@ -1385,9 +1386,12 @@ interface PageEditorProps {
   onDelete: () => void;
   onTear: () => void;
   onImportMeeting: () => void;
+  /** Set on mobile only — the page list is hidden (not just narrowed) while a
+   * page is open there, so this is the only way back to it. */
+  onBack?: () => void;
 }
 
-function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageEditorProps) {
+function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting, onBack }: PageEditorProps) {
   const [title, setTitle] = useState(page.title);
   const [showBgPicker, setShowBgPicker] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -1519,6 +1523,16 @@ function PageEditor({ page, onUpdate, onDelete, onTear, onImportMeeting }: PageE
           editor height; the surface below adds matching top padding so
           content doesn't start out hidden underneath it. */}
       <div ref={toolbarRef} className="absolute top-0 left-0 right-0 z-20 flex items-center gap-2 border-b border-border-subtle px-4 py-2 bg-bg-raised/95 backdrop-blur flex-wrap">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="flex items-center justify-center h-7 w-7 -ms-1 rounded text-text-muted hover:bg-bg-hover hover:text-text-primary"
+            title="Back to pages"
+            aria-label="Back to pages"
+          >
+            <ArrowLeft size={15} />
+          </button>
+        )}
         <div className="relative">
           <button
             ref={bgButtonRef}
@@ -1702,9 +1716,13 @@ interface PageListProps {
    * book already belongs to one — the source book just joins it; otherwise
    * a merge prompt offers to create a new collection for both. */
   onMergeBooks: (sourceBook: JournalBook, targetBook: JournalBook, targetCollection: JournalCollection | undefined) => void;
+  /** Mobile only — the list is the sole visible pane there (the editor is
+   * hidden until a page is picked), so it should fill the screen instead of
+   * sitting at its fixed desktop rail width. */
+  fullWidth?: boolean;
 }
 
-function PageList({ pages, books, collections, folders, selectedId, onSelect, onNewPage, onNewJournal, onNewBook, onNewPageInBook, onEditDetails, onTear, onTearBook, onDelete, onRenameBook, onDeleteBook, onRenameCollection, onDeleteCollection, onBindPages, onMergeBooks }: PageListProps) {
+function PageList({ pages, books, collections, folders, selectedId, onSelect, onNewPage, onNewJournal, onNewBook, onNewPageInBook, onEditDetails, onTear, onTearBook, onDelete, onRenameBook, onDeleteBook, onRenameCollection, onDeleteCollection, onBindPages, onMergeBooks, fullWidth }: PageListProps) {
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem('journal-list-collapsed') === 'true'; } catch { return false; }
   });
@@ -1913,7 +1931,7 @@ function PageList({ pages, books, collections, folders, selectedId, onSelect, on
   }
 
   return (
-    <div className="flex h-full w-56 shrink-0 flex-col border-r border-border-subtle bg-bg-raised">
+    <div className={cn('flex h-full shrink-0 flex-col border-r border-border-subtle bg-bg-raised', fullWidth ? 'w-full' : 'w-56')}>
       <div className="flex items-center justify-between border-b border-border-subtle px-3 py-2">
         <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">Journals</span>
         <div className="flex items-center gap-1">
@@ -2246,6 +2264,7 @@ interface JournalViewProps {
 }
 
 export function JournalView({ folders, onTearToInvestigation, clsLevels }: JournalViewProps) {
+  const isMobile = useIsMobile();
   const { pages, loading, createPage, updatePage, deletePage, linkToInvestigation } = useJournalPages();
   const { books, createBook, deleteBook, updateBook } = useJournalBooks();
   const { collections, createCollection, deleteCollection, updateCollection } = useJournalCollections();
@@ -2260,9 +2279,17 @@ export function JournalView({ folders, onTearToInvestigation, clsLevels }: Journ
 
   const selectedPage = useMemo(() => pages.find((p) => p.id === selectedId) ?? null, [pages, selectedId]);
 
-  // Auto-select first page when pages load
+  // Auto-select first page on initial load only — guarded by a ref (not just
+  // `!selectedId` in the deps) so this fires once, not every time selectedId
+  // goes back to null. Without the guard, clearing selectedId to return to
+  // the list (mobile's Back button, or deleting the open page) fought this
+  // effect: it re-selected page one on the very next render, so Back looked
+  // like it did nothing.
+  const hasAutoSelected = useRef(false);
   useEffect(() => {
-    if (!loading && pages.length > 0 && !selectedId) setSelectedId(pages[0].id);
+    if (hasAutoSelected.current || loading || pages.length === 0) return;
+    hasAutoSelected.current = true;
+    if (!selectedId) setSelectedId(pages[0].id);
   }, [loading, pages, selectedId]);
 
   const handleNewPage = useCallback(async () => {
@@ -2383,34 +2410,48 @@ export function JournalView({ folders, onTearToInvestigation, clsLevels }: Journ
     return <div className="flex h-full items-center justify-center text-text-muted text-sm">Loading journal…</div>;
   }
 
+  // On mobile, a fixed-width list column left the editor squeezed down to a
+  // sliver (the actual root cause behind the editor's contentEditable area
+  // looking like a tiny boxed-in rectangle — it was correctly filling its
+  // container, the container itself was just starved of width). Below the
+  // md breakpoint, show one pane at a time instead: the list full-width when
+  // nothing's open, the editor full-width (with its own Back button) once a
+  // page is selected.
+  const showList = !isMobile || !selectedPage;
+  const showEditorPane = !isMobile || !!selectedPage;
+
   return (
     <div className="flex h-full overflow-hidden">
-      <PageList
-        pages={pages}
-        books={books}
-        collections={collections}
-        folders={folders}
-        selectedId={selectedId}
-        onSelect={setSelectedId}
-        onNewPage={handleNewPage}
-        onNewJournal={handleNewJournal}
-        onNewBook={() => setShowNewBookModal(true)}
-        onNewPageInBook={handleNewPageInBook}
-        onEditDetails={setEditingPage}
-        onTear={setTearingPage}
-        onTearBook={setTearingBook}
-        onDelete={async (pageId) => {
-          await deletePage(pageId);
-          if (selectedId === pageId) setSelectedId(null);
-        }}
-        onRenameBook={(book, name) => updateBook(book.id, { name })}
-        onDeleteBook={handleDeleteBook}
-        onRenameCollection={(collection, name) => updateCollection(collection.id, { name })}
-        onDeleteCollection={handleDeleteCollection}
-        onBindPages={handleBindPages}
-        onMergeBooks={handleMergeBooks}
-      />
+      {showList && (
+        <PageList
+          pages={pages}
+          books={books}
+          collections={collections}
+          folders={folders}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onNewPage={handleNewPage}
+          onNewJournal={handleNewJournal}
+          onNewBook={() => setShowNewBookModal(true)}
+          onNewPageInBook={handleNewPageInBook}
+          onEditDetails={setEditingPage}
+          onTear={setTearingPage}
+          onTearBook={setTearingBook}
+          onDelete={async (pageId) => {
+            await deletePage(pageId);
+            if (selectedId === pageId) setSelectedId(null);
+          }}
+          onRenameBook={(book, name) => updateBook(book.id, { name })}
+          onDeleteBook={handleDeleteBook}
+          onRenameCollection={(collection, name) => updateCollection(collection.id, { name })}
+          onDeleteCollection={handleDeleteCollection}
+          onBindPages={handleBindPages}
+          onMergeBooks={handleMergeBooks}
+          fullWidth={isMobile}
+        />
+      )}
 
+      {showEditorPane && (
       <div className="flex-1 min-w-0 overflow-hidden">
         {selectedPage ? (
           <PageEditor
@@ -2419,6 +2460,7 @@ export function JournalView({ folders, onTearToInvestigation, clsLevels }: Journ
             onDelete={handleDelete}
             onTear={() => setTearingPage(selectedPage)}
             onImportMeeting={() => setShowMeetingModal(true)}
+            onBack={isMobile ? () => setSelectedId(null) : undefined}
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-text-muted">
@@ -2434,6 +2476,7 @@ export function JournalView({ folders, onTearToInvestigation, clsLevels }: Journ
           </div>
         )}
       </div>
+      )}
 
       {tearingPage && (
         <TearModal
