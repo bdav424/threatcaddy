@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { Bot, Check, Clipboard, Download, FileOutput, FilePenLine, FileText, Layers, Printer, Search, Settings2, Sparkles, Upload, Wand2, X } from 'lucide-react';
+import { Bot, Check, Clipboard, Download, FileOutput, FilePenLine, FileText, Image as ImageIcon, Layers, Printer, Search, Settings2, Sparkles, Upload, Wand2, X } from 'lucide-react';
 import type { Note, NoteTemplate } from '../../types';
 import { formatDate } from '../../lib/utils';
 import { renderMarkdown } from '../../lib/markdown';
@@ -35,6 +35,10 @@ interface ProductViewProps {
   /** Section wand — assembles the analyst's per-section text into a product
    * note, identical in shape/tags to one the AI-driven render tool creates. */
   onGenerateProduct?: (baseline: NoteTemplate, sections: { heading: string; content: string }[], title: string) => Promise<Note>;
+  /** Figure upload-to-format (CaddyLab Stage 3) — persists an uploaded image
+   * against a product's structuralMap figure key, so DOCX export can pour it
+   * into that figure's template-owned frame. */
+  onUpdateProductFigures?: (productId: string, figures: Note['productFigures']) => Promise<void>;
 }
 
 interface WandSectionState {
@@ -58,6 +62,7 @@ export function ProductView({
   onUpdateBaseline,
   onLoadBaselineContext,
   onGenerateProduct,
+  onUpdateProductFigures,
 }: ProductViewProps) {
   const [query, setQuery] = useState('');
   const [baselineManagerOpen, setBaselineManagerOpen] = useState(false);
@@ -210,6 +215,21 @@ export function ProductView({
     } catch (error) {
       setBaselineError(error instanceof Error ? error.message : 'Failed to render DOCX from the attached baseline template.');
       downloadBlob(buildDocxBlob(selectedProduct.title, selectedProductHtml), `${safeFilename(selectedProduct.title)}.docx`);
+    }
+  };
+
+  const handleFigureUpload = async (figureKey: string, file: File) => {
+    if (!selectedProduct || !onUpdateProductFigures) return;
+    const buffer = await file.arrayBuffer();
+    const data = arrayBufferToBase64(buffer);
+    const next = [
+      ...(selectedProduct.productFigures || []).filter((figure) => figure.key !== figureKey),
+      { key: figureKey, name: file.name, mimeType: file.type || 'application/octet-stream', data },
+    ];
+    try {
+      await onUpdateProductFigures(selectedProduct.id, next);
+    } catch (error) {
+      setBaselineError(error instanceof Error ? error.message : 'Failed to attach the figure image.');
     }
   };
 
@@ -664,6 +684,49 @@ export function ProductView({
                 </button>
               </div>
             </div>
+            {selectedProductBaseline?.productBaseline?.structuralMap?.figures &&
+              selectedProductBaseline.productBaseline.structuralMap.figures.length > 0 && (
+              <div className="rounded-lg border border-border-subtle bg-bg-surface p-3">
+                <h3 className="mb-2 text-xs font-semibold uppercase text-text-muted">Figures</h3>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {selectedProductBaseline.productBaseline.structuralMap.figures.map((figure) => {
+                    const uploaded = selectedProduct.productFigures?.find((upload) => upload.key === figure.key);
+                    return (
+                      <div key={figure.key} className="flex items-center gap-3 rounded-md border border-border-subtle bg-bg-raised/40 p-2">
+                        {uploaded ? (
+                          <img
+                            src={`data:${uploaded.mimeType};base64,${uploaded.data}`}
+                            alt={figure.caption || `Figure ${figure.order + 1}`}
+                            className="h-12 w-12 shrink-0 rounded object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-bg-hover text-text-muted">
+                            <ImageIcon size={16} />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-medium text-text-primary">{figure.caption || `Figure ${figure.order + 1}`}</p>
+                          <p className="truncate text-[11px] text-text-muted">{uploaded ? uploaded.name : 'Pending — no image uploaded'}</p>
+                        </div>
+                        <label className="shrink-0 cursor-pointer rounded-md border border-border-subtle px-2 py-1 text-[11px] font-medium text-text-secondary hover:text-text-primary hover:bg-bg-hover">
+                          {uploaded ? 'Replace' : 'Upload'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
+                              event.target.value = '';
+                              if (file) void handleFigureUpload(figure.key, file);
+                            }}
+                          />
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div className="max-h-[68vh] overflow-auto rounded-lg border border-border-subtle bg-gray-200 p-4">
               <article
                 className="product-document markdown-preview mx-auto min-h-[11in] max-w-[8.5in] bg-white px-[0.7in] py-[0.65in] text-[12pt] text-gray-950 shadow-lg"

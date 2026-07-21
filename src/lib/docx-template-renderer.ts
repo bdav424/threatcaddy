@@ -3,9 +3,11 @@ import type {
   Note,
   NoteTemplate,
   ProductBaselineAsset,
+  ProductBaselineFigure,
   ProductBaselinePaletteColor,
   ProductBaselineSection,
   ProductBaselineStructuralMap,
+  ProductFigureUpload,
 } from '../types';
 
 const DOCX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -79,6 +81,7 @@ export function buildTemplateBackedDocxBlob(product: Note, baseline: NoteTemplat
     product.content,
     baseline?.productBaseline?.productType,
     baseline?.productBaseline?.structuralMap,
+    product.productFigures,
   );
   const buffer = new ArrayBuffer(docxBytes.byteLength);
   new Uint8Array(buffer).set(docxBytes);
@@ -90,13 +93,14 @@ export function buildTemplateBackedDocxBytes(
   markdown: string,
   productType?: string,
   structuralMap?: ProductBaselineStructuralMap,
+  figureUploads?: ProductFigureUpload[],
 ): Uint8Array {
   // A derived structural map (any uploaded docx, Stage 1) takes priority over
   // the older hardcoded intel-note anchor list — it's the generalized version
   // of the same "clone the original paragraph's formatting, swap its text"
   // technique, just driven by data instead of one fixed heading set.
   if (structuralMap && structuralMap.sections.length > 0) {
-    return buildStructuralDocxBytes(templateBytes, markdown, structuralMap);
+    return buildStructuralDocxBytes(templateBytes, markdown, structuralMap, figureUploads);
   }
 
   const entries = unzip(templateBytes);
@@ -192,15 +196,61 @@ export function deriveDocxTemplate(templateBytes: Uint8Array): ProductBaselineSt
   const themeEntry = entries.find((entry) => entry.path === 'word/theme/theme1.xml');
   const palette = extractPalette(documentXml, themeEntry ? decodeUtf8(themeEntry.data) : undefined);
   const tableCount = elements.filter((element) => element.type === 'tbl').length;
-  const figurePlaceholderCount = Array.from(documentXml.matchAll(/<w:drawing\b|<w:pict\b/g)).length;
+  const figures = extractFigures(elements, sections);
 
   return {
     schemaVersion: 1,
     sections,
     palette,
+    figures,
     tableCount,
-    figurePlaceholderCount,
+    figurePlaceholderCount: figures.length,
   };
+}
+
+/** Walks the same element list `deriveDocxTemplate` already produced (so
+ * heading-tracking stays a single source of truth) and pulls out each real
+ * embedded image (`<w:drawing>` with an `<a:blip r:embed>`) into a figure
+ * spec: which section it falls under, its captured size, and the caption
+ * paragraph immediately after it, if the template styled one. Non-image
+ * drawings (text boxes, shapes without a blip) are left alone — nothing for
+ * the upload workflow to attach a replacement image to. */
+function extractFigures(elements: BodyElement[], sections: ProductBaselineSection[]): ProductBaselineFigure[] {
+  const figures: ProductBaselineFigure[] = [];
+  const usedKeys = new Set<string>();
+  let sectionCursor = 0;
+  let currentSectionKey: string | undefined;
+
+  elements.forEach((element, index) => {
+    const level = element.type === 'p' ? headingLevelFromStyle(element.style) : undefined;
+    if (level !== undefined && element.text.trim()) {
+      currentSectionKey = sections[sectionCursor]?.key;
+      sectionCursor += 1;
+      return;
+    }
+    if (element.type !== 'p') return;
+
+    for (const drawingXml of element.xml.matchAll(/<w:drawing\b[\s\S]*?<\/w:drawing>/g)) {
+      const relationshipId = drawingXml[0].match(/<a:blip\b[^>]*\br:embed="([^"]+)"/)?.[1];
+      if (!relationshipId) continue;
+      const extentMatch = drawingXml[0].match(/<wp:extent\s+cx="(\d+)"\s+cy="(\d+)"/);
+      const nextElement = elements[index + 1];
+      const caption = nextElement?.type === 'p' && /caption/i.test(nextElement.style || '')
+        ? nextElement.text.trim() || undefined
+        : undefined;
+      figures.push({
+        key: uniqueSlug(caption || `figure-${figures.length + 1}`, usedKeys),
+        order: figures.length,
+        sectionKey: currentSectionKey,
+        caption,
+        widthEmu: extentMatch ? Number.parseInt(extentMatch[1], 10) : 0,
+        heightEmu: extentMatch ? Number.parseInt(extentMatch[2], 10) : 0,
+        relationshipId,
+      });
+    }
+  });
+
+  return figures;
 }
 
 function uniqueSlug(text: string, used: Set<string>): string {
@@ -311,12 +361,148 @@ function splitBodyIntoSpans(elements: BodyElement[]): { preamble: BodyElement[];
   return { preamble, spans };
 }
 
+// ── Figures — placeholder emission + upload-to-format (CaddyLab Stage 3) ───
+// A figure's <w:drawing> frame (size, position) is template-owned formatting,
+// same as a table's tblPr — so it's handled the same way the rest of this
+// file treats "faithful": never fabricated, always the source docx's own
+// frame with only the payload swapped. Two payload states:
+//   - no upload yet: the drawing is replaced with a `[Figure: pending]` text
+//     run so a fresh generation never carries a photo from someone else's
+//     source report.
+//   - uploaded: the drawing's frame is left byte-identical; only its
+//     `r:embed` is repointed at a new relationship/media part carrying the
+//     analyst's image, so it inherits the template's size/position for free
+//     ("auto-formats" per the build spec — nothing about the frame changes).
+
+const IMAGE_RELATIONSHIP_TYPE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
+const MIME_TO_EXTENSION: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpeg',
+  'image/jpg': 'jpeg',
+  'image/gif': 'gif',
+  'image/bmp': 'bmp',
+  'image/webp': 'webp',
+  'image/svg+xml': 'svg',
+};
+
+function extensionForMimeType(mimeType: string): string {
+  return MIME_TO_EXTENSION[mimeType.toLowerCase()] || mimeType.split('/')[1]?.replace(/[^a-z0-9]/gi, '') || 'png';
+}
+
+function figureRelationshipId(paragraphXml: string): string | undefined {
+  return paragraphXml.match(/<a:blip\b[^>]*\br:embed="([^"]+)"/)?.[1];
+}
+
+function isFigureParagraph(element: BodyElement, figuresByRelId: Map<string, ProductBaselineFigure>): boolean {
+  if (element.type !== 'p') return false;
+  const relationshipId = figureRelationshipId(element.xml);
+  return Boolean(relationshipId && figuresByRelId.has(relationshipId));
+}
+
+function placeholderFigureParagraph(paragraphXml: string, figure: ProductBaselineFigure): string {
+  const pPr = paragraphXml.match(/<w:pPr[\s\S]*?<\/w:pPr>/)?.[0] || '';
+  const label = figure.caption ? `[Figure: pending — ${figure.caption}]` : '[Figure: pending]';
+  return `<w:p>${pPr}<w:r>${runProperties({ size: BODY_FONT_SIZE })}<w:t xml:space="preserve">${escapeXml(label)}</w:t></w:r></w:p>`;
+}
+
+/** Adds a media part + relationship for each uploaded figure and returns the
+ * old→new relationship-id mapping the body pass uses to repoint each
+ * drawing's blip. Everything else about the zip (document.xml itself,
+ * unrelated media/rels) passes through unmodified. */
+function prepareFigureUploads(
+  entries: ZipEntry[],
+  figures: ProductBaselineFigure[],
+  uploadsByKey: Map<string, ProductFigureUpload>,
+): { entries: ZipEntry[]; relIdRemap: Map<string, string> } {
+  const relIdRemap = new Map<string, string>();
+  const targets = figures.filter((figure) => uploadsByKey.has(figure.key));
+  if (targets.length === 0) return { entries, relIdRemap };
+
+  const relsPath = 'word/_rels/document.xml.rels';
+  const relsEntry = entries.find((entry) => entry.path === relsPath);
+  const relsXml = relsEntry ? decodeUtf8(relsEntry.data) : (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>'
+  );
+  const existingIds = Array.from(relsXml.matchAll(/<Relationship\b[^>]*\bId="([^"]+)"/g)).map((match) => match[1]);
+  let nextIdNumber = 1 + Math.max(0, ...existingIds.map((id) => Number.parseInt(id.replace(/^rId/, ''), 10) || 0));
+
+  const contentTypesPath = '[Content_Types].xml';
+  const contentTypesEntry = entries.find((entry) => entry.path === contentTypesPath);
+  let contentTypesXml = contentTypesEntry ? decodeUtf8(contentTypesEntry.data) : (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>'
+  );
+  const declaredExtensions = new Set(
+    Array.from(contentTypesXml.matchAll(/<Default\s+Extension="([^"]+)"/g)).map((match) => match[1].toLowerCase()),
+  );
+
+  const newMediaEntries: ZipEntry[] = [];
+  const newRelationshipTags: string[] = [];
+
+  for (const figure of targets) {
+    const upload = uploadsByKey.get(figure.key)!;
+    const extension = extensionForMimeType(upload.mimeType);
+    const mediaTarget = `media/figure-${figure.key}.${extension}`;
+    newMediaEntries.push({ path: `word/${mediaTarget}`, data: base64ToBytes(upload.data) });
+
+    const relId = `rId${nextIdNumber}`;
+    nextIdNumber += 1;
+    newRelationshipTags.push(`<Relationship Id="${relId}" Type="${IMAGE_RELATIONSHIP_TYPE}" Target="${mediaTarget}"/>`);
+    relIdRemap.set(figure.key, relId);
+
+    if (!declaredExtensions.has(extension)) {
+      declaredExtensions.add(extension);
+      contentTypesXml = contentTypesXml.replace(
+        '</Types>',
+        `<Default Extension="${extension}" ContentType="${upload.mimeType || `image/${extension}`}"/></Types>`,
+      );
+    }
+  }
+
+  const nextRelsXml = relsXml.replace('</Relationships>', `${newRelationshipTags.join('')}</Relationships>`);
+  const nextEntries = entries
+    .filter((entry) => entry.path !== relsPath && entry.path !== contentTypesPath)
+    .concat(
+      { path: relsPath, data: encodeUtf8(nextRelsXml) },
+      { path: contentTypesPath, data: encodeUtf8(contentTypesXml) },
+      newMediaEntries,
+    );
+
+  return { entries: nextEntries, relIdRemap };
+}
+
+/** Applies the pending-placeholder / uploaded-image treatment to one body
+ * element. A no-op for anything that isn't a tracked figure paragraph. */
+function transformFigureParagraph(
+  element: BodyElement,
+  figuresByRelId: Map<string, ProductBaselineFigure>,
+  uploadsByKey: Map<string, ProductFigureUpload>,
+  relIdRemap: Map<string, string>,
+): BodyElement {
+  if (element.type !== 'p') return element;
+  const relationshipId = figureRelationshipId(element.xml);
+  const figure = relationshipId ? figuresByRelId.get(relationshipId) : undefined;
+  if (!figure || !relationshipId) return element;
+  if (uploadsByKey.has(figure.key)) {
+    const newRelId = relIdRemap.get(figure.key);
+    if (!newRelId) return element;
+    return { ...element, xml: element.xml.replace(`r:embed="${relationshipId}"`, `r:embed="${newRelId}"`) };
+  }
+  return { ...element, xml: placeholderFigureParagraph(element.xml, figure) };
+}
+
 export function buildStructuralDocxBytes(
   templateBytes: Uint8Array,
   markdown: string,
   structuralMap: ProductBaselineStructuralMap,
+  figureUploads?: ProductFigureUpload[],
 ): Uint8Array {
-  const entries = unzip(templateBytes);
+  const uploadsByKey = new Map((figureUploads ?? []).map((upload) => [upload.key, upload] as const));
+  const figuresByRelId = new Map(structuralMap.figures.map((figure) => [figure.relationshipId, figure] as const));
+  const { entries, relIdRemap } = prepareFigureUploads(unzip(templateBytes), structuralMap.figures, uploadsByKey);
+  const withFigureFill = (element: BodyElement) => transformFigureParagraph(element, figuresByRelId, uploadsByKey, relIdRemap);
+
   const documentEntry = entries.find((entry) => entry.path === 'word/document.xml');
   if (!documentEntry) throw new Error('Template DOCX is missing word/document.xml.');
   const documentXml = decodeUtf8(documentEntry.data);
@@ -343,20 +529,22 @@ export function buildStructuralDocxBytes(
     contentBySectionKey.set(match.key, mdSection);
   }
 
-  const next: string[] = preamble.map((element) => element.xml);
+  const next: string[] = preamble.map((element) => withFigureFill(element).xml);
   spans.forEach((span, index) => {
     const structuralSection = structuralMap.sections[index];
     const mdSection = structuralSection ? contentBySectionKey.get(structuralSection.key) : undefined;
     if (!mdSection) {
-      // Unmatched — carry the original span through verbatim (heading + body).
-      next.push(...span.map((element) => element.xml));
+      // Unmatched — carry the original span through verbatim (heading + body),
+      // except any figure it holds still gets pending/upload treatment: every
+      // generation is a fresh product, never a copy of the source report's photos.
+      next.push(...span.map((element) => withFigureFill(element).xml));
       return;
     }
 
     const [headingElement, ...bodyElements] = span;
     next.push(headingElement.xml); // Heading text/style stays exactly as authored in the template.
 
-    const paragraphTemplate = bodyElements.find((element) => element.type === 'p');
+    const paragraphTemplate = bodyElements.find((element) => element.type === 'p' && !isFigureParagraph(element, figuresByRelId));
     const tableTemplate = bodyElements.find((element) => element.type === 'tbl');
     const tablePr = tableTemplate ? (extractTableProperties(tableTemplate.xml) || defaultTablePr) : defaultTablePr;
     const tableWidths = tableTemplate ? extractTableGridWidths(tableTemplate.xml) : undefined;
@@ -369,6 +557,14 @@ export function buildStructuralDocxBytes(
       } else {
         next.push(renderParagraphFromTemplate(paragraphTemplate, block.text || ''));
       }
+    }
+
+    // The block-fill above replaces this section's body wholesale, so any
+    // figure that lived in it would otherwise silently vanish — carry it
+    // back through (pending placeholder, or the analyst's uploaded image).
+    for (const bodyElement of bodyElements) {
+      if (!isFigureParagraph(bodyElement, figuresByRelId)) continue;
+      next.push(withFigureFill(bodyElement).xml);
     }
   });
 

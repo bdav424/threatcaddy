@@ -1365,6 +1365,9 @@ const AppInner = memo(function AppInner({
     addToast('success', `Generated product "${product.title}".`);
     return product;
   }, [addToast, selectedFolder, notes.reload]);
+  const handleUpdateProductFigures = useCallback(async (productId: string, figures: Note['productFigures']) => {
+    await notes.updateNote(productId, { productFigures: figures });
+  }, [notes.updateNote]);
 
   // Screenshare context value
   const screenshareCtx = useMemo(
@@ -3279,6 +3282,7 @@ const AppInner = memo(function AppInner({
                   onUpdateBaseline={handleUpdateProductBaseline}
                   onLoadBaselineContext={handleLoadBaselineContext}
                   onGenerateProduct={handleGenerateProduct}
+                  onUpdateProductFigures={handleUpdateProductFigures}
                 />
               )}
               notesActive={notesWorkspaceVisible}

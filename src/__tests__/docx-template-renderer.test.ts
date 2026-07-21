@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildTemplateBackedDocxBytes, deriveDocxTemplate, extractDocxTemplateProfile } from '../lib/docx-template-renderer';
+import type { ProductFigureUpload } from '../types';
 
 describe('docx template renderer', () => {
   it('replaces the main document body while preserving section furniture', () => {
@@ -242,6 +243,103 @@ describe('docx template derivation (CaddyLab Stage 1 — generic docx round-trip
 
     // Preamble content before the first heading also survives untouched.
     expect(documentXml).toContain('Cover page preamble, no heading yet.');
+  });
+});
+
+describe('docx figure placeholders + upload-to-format (CaddyLab Stage 3)', () => {
+  function buildReportZipWithFigure() {
+    return buildStoredZip([
+      {
+        path: '[Content_Types].xml',
+        content: '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="png" ContentType="image/png"/></Types>',
+      },
+      {
+        path: 'word/_rels/document.xml.rels',
+        content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/></Relationships>',
+      },
+      {
+        path: 'word/media/image1.png',
+        content: 'ORIGINAL-SOURCE-REPORT-IMAGE-BYTES',
+      },
+      {
+        path: 'word/document.xml',
+        content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+  <w:body>
+    <w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr><w:r><w:t>Quarterly Threat Roundup</w:t></w:r></w:p>
+    <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Overview</w:t></w:r></w:p>
+    <w:p><w:r><w:t>OLD overview text that should be replaced.</w:t></w:r></w:p>
+    <w:p><w:r><w:drawing><wp:inline><wp:extent cx="914400" cy="609600"/><a:graphic><a:graphicData><pic:pic><pic:blipFill><a:blip r:embed="rId5"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>
+    <w:p><w:pPr><w:pStyle w:val="Caption"/></w:pPr><w:r><w:t>Figure 1: Sample Screenshot</w:t></w:r></w:p>
+    <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Notable Incidents</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Some incident narrative.</w:t></w:r></w:p>
+    <w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>
+  </w:body>
+</w:document>`,
+      },
+    ]);
+  }
+
+  it('derives a figure spec (section, caption, size, relationship id) from a real embedded image', () => {
+    const template = buildReportZipWithFigure();
+    const map = deriveDocxTemplate(template);
+
+    expect(map.figures).toHaveLength(1);
+    const figure = map.figures[0];
+    expect(figure.relationshipId).toBe('rId5');
+    expect(figure.sectionKey).toBe('overview');
+    expect(figure.caption).toBe('Figure 1: Sample Screenshot');
+    expect(figure.widthEmu).toBe(914400);
+    expect(figure.heightEmu).toBe(609600);
+    expect(map.figurePlaceholderCount).toBe(1);
+  });
+
+  it('emits a [Figure: pending] placeholder when generating with no uploaded image', () => {
+    const template = buildReportZipWithFigure();
+    const map = deriveDocxTemplate(template);
+
+    const rendered = buildTemplateBackedDocxBytes(template, [
+      '## Overview',
+      '',
+      'New overview content written by the analyst.',
+    ].join('\n'), undefined, map);
+    const documentXml = readZipText(rendered, 'word/document.xml');
+
+    expect(documentXml).toContain('[Figure: pending — Figure 1: Sample Screenshot]');
+    expect(documentXml).not.toContain('r:embed="rId5"');
+    expect(documentXml).toContain('New overview content written by the analyst.');
+  });
+
+  it('pours an uploaded image into the figure, preserving the template frame and adding a fresh media part', () => {
+    const template = buildReportZipWithFigure();
+    const map = deriveDocxTemplate(template);
+    const figureKey = map.figures[0].key;
+    const uploads: ProductFigureUpload[] = [
+      { key: figureKey, name: 'screenshot.png', mimeType: 'image/png', data: btoa('ANALYST-UPLOADED-IMAGE-BYTES') },
+    ];
+
+    const rendered = buildTemplateBackedDocxBytes(template, [
+      '## Overview',
+      '',
+      'New overview content written by the analyst.',
+    ].join('\n'), undefined, map, uploads);
+    const documentXml = readZipText(rendered, 'word/document.xml');
+    const relsXml = readZipText(rendered, 'word/_rels/document.xml.rels');
+
+    expect(documentXml).not.toContain('[Figure: pending');
+    expect(documentXml).not.toContain('r:embed="rId5"'); // repointed at the new relationship
+    expect(documentXml).toContain('<wp:extent cx="914400" cy="609600"/>'); // frame untouched — "auto-formats"
+    const newRelId = documentXml.match(/r:embed="([^"]+)"/)?.[1];
+    expect(newRelId).toBeTruthy();
+    expect(relsXml).toContain(`Id="${newRelId}"`);
+    expect(relsXml).toContain(`Target="media/figure-${figureKey}.png"`);
+
+    const uploadedMedia = readZipText(rendered, `word/media/figure-${figureKey}.png`);
+    expect(uploadedMedia).toBe('ANALYST-UPLOADED-IMAGE-BYTES');
+
+    // The original template's own source image is left in place, untouched, just unreferenced.
+    const originalMedia = readZipText(rendered, 'word/media/image1.png');
+    expect(originalMedia).toBe('ORIGINAL-SOURCE-REPORT-IMAGE-BYTES');
   });
 });
 

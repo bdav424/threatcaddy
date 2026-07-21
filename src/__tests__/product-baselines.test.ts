@@ -328,6 +328,7 @@ describe('CaddyLab Stage 2 — section wand', () => {
         { key: 'timeline', heading: 'Timeline', level: 1, order: 1, hasTable: true, paragraphCount: 0 },
       ],
       palette: [{ hex: '1F4E79', usage: 'accent' as const, count: 3 }],
+      figures: [],
       tableCount: 1,
       figurePlaceholderCount: 0,
     };

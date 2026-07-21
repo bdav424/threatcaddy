@@ -94,10 +94,21 @@ export interface Note {
   noteType?: NoteType;
   /** Links this note to the VirtualCaddy job that created it, if any. */
   virtualCaddyJobId?: string;
+  /** Analyst-uploaded images poured into a docx-template baseline's figure
+   * placeholders (CaddyLab Stage 3), keyed to `ProductBaselineFigure.key` on
+   * the generating baseline's structuralMap. Only meaningful on product notes. */
+  productFigures?: ProductFigureUpload[];
   createdBy?: string;
   updatedBy?: string;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface ProductFigureUpload {
+  key: string;
+  name: string;
+  mimeType: string;
+  data: string;
 }
 
 export interface IOCTarget {
@@ -1396,6 +1407,22 @@ export interface ProductBaselinePaletteColor {
   count: number;
 }
 
+/** One figure (image) placeholder derived from an uploaded docx's real body
+ * structure (CaddyLab Stage 3). `relationshipId` is the source docx's own
+ * `r:embed` id for the drawing this was derived from — generation uses it to
+ * find the same drawing again and either swap in an analyst-uploaded image
+ * (frame/size untouched, so it inherits the template's placement) or emit a
+ * `[Figure: pending]` placeholder when nothing's been uploaded yet. */
+export interface ProductBaselineFigure {
+  key: string;
+  order: number;
+  sectionKey?: string;
+  caption?: string;
+  widthEmu: number;
+  heightEmu: number;
+  relationshipId: string;
+}
+
 /** Captured once when a docx is uploaded and "derived" into a template
  * (CaddyLab docx round-trip). Lets the renderer fill an arbitrary uploaded
  * report's real structure instead of only the one hardcoded intel-note
@@ -1404,6 +1431,7 @@ export interface ProductBaselineStructuralMap {
   schemaVersion: 1;
   sections: ProductBaselineSection[];
   palette: ProductBaselinePaletteColor[];
+  figures: ProductBaselineFigure[];
   tableCount: number;
   figurePlaceholderCount: number;
 }
