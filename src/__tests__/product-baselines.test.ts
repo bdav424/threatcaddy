@@ -5,6 +5,8 @@ import { executeTool } from '../lib/llm-tools';
 import { exportJSON, importJSON } from '../lib/export';
 import {
   buildBaselineFromDocumentText,
+  buildDerivedBaselineFromDocx,
+  createProductFromSections,
   importProductBaselinePackage,
   normalizeProductRenderContextInput,
   PRODUCT_BASELINE_PACKAGE_SCHEMA,
@@ -12,6 +14,8 @@ import {
   PRODUCT_NOTE_TAG,
   renderJinjaTemplate,
   serializeProductBaselinePackage,
+  stageSectionContent,
+  suggestSectionMapping,
 } from '../lib/product-baselines';
 
 function makeToolUse(name: string, input: Record<string, unknown> = {}): ToolUseBlock {
@@ -240,5 +244,96 @@ describe('product baselines', () => {
 
   it('rejects building a baseline from empty extracted text', () => {
     expect(() => buildBaselineFromDocumentText('   ', 'empty.docx', 'docx')).toThrow(/no readable text/i);
+  });
+});
+
+describe('CaddyLab Stage 2 — section wand', () => {
+  beforeEach(async () => {
+    await db.notes.clear();
+    await db.folders.clear();
+  });
+
+  it('maps common report headings to known investigation-data fields', () => {
+    expect(suggestSectionMapping('Timeline of Significant Events')?.contextKey).toBe('timelineEvents');
+    expect(suggestSectionMapping('Digital Identifiers')?.contextKey).toBe('iocs');
+    expect(suggestSectionMapping('Sources')?.contextKey).toBe('sources');
+    expect(suggestSectionMapping('Recommendations')?.contextKey).toBe('recommendations');
+    expect(suggestSectionMapping('Executive Summary')?.contextKey).toBe('executiveSummary');
+    expect(suggestSectionMapping('Notable Incidents')).toBeUndefined();
+    expect(suggestSectionMapping('Appendix')).toBeUndefined();
+  });
+
+  it('stages real timeline/IOC/source data as rendered markdown, and treats placeholder text as empty', () => {
+    const timelineMapping = suggestSectionMapping('Timeline');
+    const staged = stageSectionContent(timelineMapping, {
+      timelineEvents: [
+        { date: '2026-02-01', title: 'Initial access', eventType: 'intrusion', description: 'Phishing email opened' },
+      ],
+    });
+    expect(staged).toContain('| Date | Event | Type |');
+    expect(staged).toContain('Initial access');
+    expect(staged).toContain('Phishing email opened');
+
+    const execMapping = suggestSectionMapping('Executive Summary');
+    expect(stageSectionContent(execMapping, { executiveSummary: 'Draft executive summary pending analyst review.' })).toBe('');
+    expect(stageSectionContent(execMapping, { executiveSummary: 'A real analyst-written summary.' })).toBe('A real analyst-written summary.');
+
+    expect(stageSectionContent(undefined, { executiveSummary: 'anything' })).toBe('');
+  });
+
+  it('stages IOC and source data as markdown tables/lists', () => {
+    const iocStaged = stageSectionContent(suggestSectionMapping('Indicators'), {
+      iocs: [{ type: 'domain', value: 'evil.example', context: 'C2', confidence: 'High' }],
+    });
+    expect(iocStaged).toContain('| Type | Value | Context | Confidence |');
+    expect(iocStaged).toContain('evil.example');
+
+    const sourcesStaged = stageSectionContent(suggestSectionMapping('Sources'), {
+      sources: [{ title: 'Vendor Report A' }, { title: 'Vendor Report B' }],
+    });
+    expect(sourcesStaged).toBe('- Vendor Report A\n- Vendor Report B');
+  });
+
+  it('assembles wand sections into a product note tagged the same way the AI render path tags one', async () => {
+    await db.folders.add({ id: 'f-wand', name: 'Wand Test Investigation', order: 0, createdAt: Date.now(), clsLevel: 'TLP:AMBER' });
+    const folder = (await db.folders.get('f-wand'))!;
+    const baseline = {
+      id: 'baseline-wand', name: 'Wand Baseline', content: '', category: 'Product Baseline',
+      source: 'user' as const, createdAt: Date.now(), updatedAt: Date.now(),
+    };
+
+    const product = await createProductFromSections(folder, baseline, [
+      { heading: 'Executive Summary', content: 'Real analyst-written summary.' },
+      { heading: 'Appendix', content: '' },
+    ], 'Wand Test Product');
+
+    expect(product.title).toBe('Wand Test Product');
+    expect(product.folderId).toBe('f-wand');
+    expect(product.tags).toContain(PRODUCT_NOTE_TAG);
+    expect(product.tags).toContain('baseline:baseline-wand');
+    expect(product.content).toContain('## Executive Summary');
+    expect(product.content).toContain('Real analyst-written summary.');
+    expect(product.content).toContain('## Appendix');
+    expect(product.content).toContain('_No content provided for this section._');
+
+    const stored = await db.notes.get(product.id);
+    expect(stored?.title).toBe('Wand Test Product');
+  });
+
+  it('preserves structuralMap through normalization so the Fill Sections wand can find it (regression)', () => {
+    const structuralMap = {
+      schemaVersion: 1 as const,
+      sections: [
+        { key: 'executive-summary', heading: 'Executive Summary', level: 1, order: 0, hasTable: false, paragraphCount: 1 },
+        { key: 'timeline', heading: 'Timeline', level: 1, order: 1, hasTable: true, paragraphCount: 0 },
+      ],
+      palette: [{ hex: '1F4E79', usage: 'accent' as const, count: 3 }],
+      tableCount: 1,
+      figurePlaceholderCount: 0,
+    };
+
+    const built = buildDerivedBaselineFromDocx('wand-test.docx', 'ZmFrZS1kb2N4LWJ5dGVz', structuralMap);
+
+    expect(built.productBaseline?.structuralMap).toEqual(structuralMap);
   });
 });

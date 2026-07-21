@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 import { nanoid } from 'nanoid';
 import { db } from '../db';
 import type {
@@ -234,6 +235,122 @@ export function buildDerivedBaselineFromDocx(
   };
 }
 
+// ── CaddyLab Stage 2 — section-level wand ──────────────────────────────────
+// Three-tier, per the build spec: (1) confident sections auto-fill from real
+// investigation data, (2) ambiguous sections stage that data as context but
+// leave content empty, (3) the analyst's own words always win. Which tier a
+// section lands in isn't decided here — suggestSectionMapping only proposes
+// WHICH context field a heading probably means; the wand UI checks whether
+// that field actually holds real data (buildProductRenderContext returns a
+// placeholder string for e.g. executiveSummary, not empty) before treating
+// it as "confident."
+
+export type SectionDataKind = 'text' | 'list' | 'timeline-table' | 'ioc-table';
+
+export interface SectionMapping {
+  contextKey: string;
+  kind: SectionDataKind;
+  label: string;
+}
+
+const SECTION_MAPPINGS: { pattern: RegExp; mapping: SectionMapping }[] = [
+  { pattern: /timeline|chronology|sequence of events/i, mapping: { contextKey: 'timelineEvents', kind: 'timeline-table', label: 'Timeline events' } },
+  { pattern: /digital identifiers|indicators|iocs?\b/i, mapping: { contextKey: 'iocs', kind: 'ioc-table', label: 'Indicators of compromise' } },
+  { pattern: /sources?|references?|bibliography/i, mapping: { contextKey: 'sources', kind: 'list', label: 'Sources' } },
+  { pattern: /recent activity/i, mapping: { contextKey: 'recentActivity', kind: 'text', label: 'Recent activity' } },
+  { pattern: /recommend/i, mapping: { contextKey: 'recommendations', kind: 'text', label: 'Recommendations' } },
+  { pattern: /key judg?ment/i, mapping: { contextKey: 'keyJudgments', kind: 'list', label: 'Key judgments' } },
+  { pattern: /threat actor|attribution/i, mapping: { contextKey: 'actorOverview', kind: 'text', label: 'Actor overview' } },
+  { pattern: /assessment/i, mapping: { contextKey: 'assessment', kind: 'text', label: 'Assessment' } },
+  { pattern: /impact/i, mapping: { contextKey: 'impactAssessment', kind: 'text', label: 'Impact assessment' } },
+  { pattern: /next steps?/i, mapping: { contextKey: 'nextSteps', kind: 'text', label: 'Next steps' } },
+  { pattern: /executive summary|overview|summary/i, mapping: { contextKey: 'executiveSummary', kind: 'text', label: 'Executive summary' } },
+];
+
+/** Pure heading → context-field guess; no investigation data involved. */
+export function suggestSectionMapping(heading: string): SectionMapping | undefined {
+  return SECTION_MAPPINGS.find(({ pattern }) => pattern.test(heading))?.mapping;
+}
+
+function stringifySectionValue(value: unknown, kind: SectionDataKind): string {
+  if (value == null) return '';
+  if (kind === 'timeline-table' && Array.isArray(value)) {
+    const rows = value as Array<{ date?: string; title?: string; eventType?: string; description?: string }>;
+    if (rows.length === 0) return '';
+    return [
+      '| Date | Event | Type |',
+      '| --- | --- | --- |',
+      ...rows.map((row) => `| ${row.date || ''} | ${row.title || ''}${row.description ? ` — ${row.description}` : ''} | ${row.eventType || ''} |`),
+    ].join('\n');
+  }
+  if (kind === 'ioc-table' && Array.isArray(value)) {
+    const rows = value as Array<{ type?: string; value?: string; context?: string; confidence?: string }>;
+    if (rows.length === 0) return '';
+    return [
+      '| Type | Value | Context | Confidence |',
+      '| --- | --- | --- | --- |',
+      ...rows.map((row) => `| ${row.type || ''} | ${row.value || ''} | ${row.context || ''} | ${row.confidence || ''} |`),
+    ].join('\n');
+  }
+  if (kind === 'list' && Array.isArray(value)) {
+    const items = value as Array<{ title?: string; name?: string } | string>;
+    if (items.length === 0) return '';
+    return items.map((item) => `- ${typeof item === 'string' ? item : item.title || item.name || ''}`).join('\n');
+  }
+  if (typeof value === 'string') return value;
+  return '';
+}
+
+/** Given a section's context-field guess, returns the real staged value (or
+ * '' if there's nothing deterministic there) — the wand uses an empty
+ * result to decide a section needs analyst/AI input rather than auto-fill. */
+export function stageSectionContent(mapping: SectionMapping | undefined, context: ProductRenderContext): string {
+  if (!mapping) return '';
+  const value = context[mapping.contextKey];
+  const stringified = stringifySectionValue(value, mapping.kind);
+  // executiveSummary/assessment/etc. default to a placeholder sentence, not
+  // real content — treat that the same as empty so it doesn't masquerade as
+  // a confident auto-fill.
+  if (mapping.kind === 'text' && /^draft .* pending analyst review\.?$/i.test(stringified.trim())) return '';
+  return stringified;
+}
+
+/**
+ * Assembles the wand's per-section text into one product note, the same
+ * shape/tags render_product_baseline's LLM tool creates — so a wand-built
+ * product looks identical to an AI-rendered one everywhere else in the app
+ * (Products list, docx export via buildTemplateBackedDocxBlob, etc). Doesn't
+ * go through Jinja: each section's text is already final, whether it came
+ * from a confident auto-fill, staged data the analyst edited, or something
+ * typed/pasted in from CaddyAI.
+ */
+export async function createProductFromSections(
+  folder: Folder,
+  baseline: NoteTemplate,
+  sections: { heading: string; content: string }[],
+  title: string,
+): Promise<Note> {
+  const body = sections
+    .map((section) => `## ${section.heading}\n\n${section.content.trim() || '_No content provided for this section._'}`)
+    .join('\n\n');
+  const content = DOMPurify.sanitize(body, { ALLOWED_TAGS: [] }).slice(0, 500_000);
+  const now = Date.now();
+  const note: Note = {
+    id: nanoid(),
+    title: DOMPurify.sanitize(cleanString(title) || `${folder.name} Product`, { ALLOWED_TAGS: [] }),
+    content,
+    folderId: folder.id,
+    tags: uniqueStrings([PRODUCT_NOTE_TAG, PRODUCT_DRAFT_TAG, `baseline:${baseline.id}`]),
+    pinned: false,
+    archived: false,
+    trashed: false,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.notes.add(note);
+  return note;
+}
+
 export function serializeProductBaselinePackage(template: NoteTemplate): string {
   const pkg: ProductBaselinePackage = {
     schemaVersion: PRODUCT_BASELINE_PACKAGE_SCHEMA,
@@ -394,6 +511,7 @@ export function normalizeProductBaselineMetadata(
     sourceDocuments: normalizeSourceDocuments(raw?.sourceDocuments),
     testFixtures: normalizeTestFixtures(raw?.testFixtures),
     assets: normalizeAssets(raw?.assets),
+    structuralMap: raw?.structuralMap,
     layoutNotes: uniqueStrings(raw?.layoutNotes),
     sourceNoteRules: uniqueStrings(raw?.sourceNoteRules),
     requiredFields: uniqueStrings(raw?.requiredFields),

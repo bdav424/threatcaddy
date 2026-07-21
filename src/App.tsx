@@ -71,7 +71,7 @@ const SearchOverlay = lazy(() => import('./components/Search/SearchOverlay').the
 import { extractIOCs, mergeIOCAnalysis } from './lib/ioc-extractor';
 import { buildEvidenceItemDrafts, evidenceFileKeyFromFile, evidenceFileKeyFromItem, findDuplicateEvidenceItemIds, MAX_EVIDENCE_IMPORT_FILES } from './lib/evidence-import';
 import { extractEvidenceTableIOCCandidates, type EvidenceTableIOCCandidate } from './lib/evidence-ioc-candidates';
-import { BUILTIN_PRODUCT_BASELINES, importProductBaselinePackage, isProductBaselineTemplate, isProductNote, PRODUCT_NOTE_TAG, PRODUCT_DRAFT_TAG } from './lib/product-baselines';
+import { BUILTIN_PRODUCT_BASELINES, buildProductRenderContext, createProductFromSections, importProductBaselinePackage, isProductBaselineTemplate, isProductNote, PRODUCT_NOTE_TAG, PRODUCT_DRAFT_TAG } from './lib/product-baselines';
 import { generateSampleInvestigation, isSampleEntity } from './lib/sample-investigation';
 import { db } from './db';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
@@ -1350,6 +1350,21 @@ const AppInner = memo(function AppInner({
     await noteTemplatesHook.updateTemplate(id, updates);
     addToast('success', 'Updated product baseline.');
   }, [addToast, noteTemplatesHook]);
+  const handleLoadBaselineContext = useCallback(async (baseline: NoteTemplate) => {
+    if (!selectedFolder) throw new Error('Select an investigation first.');
+    return buildProductRenderContext(selectedFolder, baseline);
+  }, [selectedFolder]);
+  const handleGenerateProduct = useCallback(async (
+    baseline: NoteTemplate,
+    sections: { heading: string; content: string }[],
+    title: string,
+  ) => {
+    if (!selectedFolder) throw new Error('Select an investigation first.');
+    const product = await createProductFromSections(selectedFolder, baseline, sections, title);
+    await notes.reload();
+    addToast('success', `Generated product "${product.title}".`);
+    return product;
+  }, [addToast, selectedFolder, notes.reload]);
 
   // Screenshare context value
   const screenshareCtx = useMemo(
@@ -3262,6 +3277,8 @@ const AppInner = memo(function AppInner({
                   onImportBaseline={handleImportProductBaseline}
                   onCreateBaseline={handleCreateProductBaseline}
                   onUpdateBaseline={handleUpdateProductBaseline}
+                  onLoadBaselineContext={handleLoadBaselineContext}
+                  onGenerateProduct={handleGenerateProduct}
                 />
               )}
               notesActive={notesWorkspaceVisible}

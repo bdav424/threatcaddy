@@ -1,10 +1,17 @@
 import { useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { Bot, Clipboard, Download, FileOutput, FilePenLine, FileText, Layers, Printer, Search, Settings2, Upload, X } from 'lucide-react';
+import { Bot, Check, Clipboard, Download, FileOutput, FilePenLine, FileText, Layers, Printer, Search, Settings2, Sparkles, Upload, Wand2, X } from 'lucide-react';
 import type { Note, NoteTemplate } from '../../types';
 import { formatDate } from '../../lib/utils';
 import { renderMarkdown } from '../../lib/markdown';
 import { downloadFile } from '../../lib/export';
-import { buildBaselineFromDocumentText, serializeProductBaselinePackage } from '../../lib/product-baselines';
+import {
+  buildBaselineFromDocumentText,
+  serializeProductBaselinePackage,
+  stageSectionContent,
+  suggestSectionMapping,
+  type ProductRenderContext,
+  type SectionMapping,
+} from '../../lib/product-baselines';
 import { arrayBufferToBase64, buildTemplateBackedDocxBlob, hasDocxTemplateAsset } from '../../lib/docx-template-renderer';
 import { extractDocxEvidence, extractPdfText } from '../../lib/evidence-import';
 import { Modal } from '../Common/Modal';
@@ -21,6 +28,23 @@ interface ProductViewProps {
    * raw file contents. */
   onCreateBaseline?: (partial: Partial<NoteTemplate> & { name: string; content: string }) => Promise<NoteTemplate>;
   onUpdateBaseline?: (id: string, updates: Partial<NoteTemplate>) => Promise<void>;
+  /** Section wand (CaddyLab Stage 2) — loads the same investigation-data
+   * context render_product_baseline uses, so the wand can tell a section
+   * with real data ("3 timeline events found") from one with none. */
+  onLoadBaselineContext?: (baseline: NoteTemplate) => Promise<ProductRenderContext>;
+  /** Section wand — assembles the analyst's per-section text into a product
+   * note, identical in shape/tags to one the AI-driven render tool creates. */
+  onGenerateProduct?: (baseline: NoteTemplate, sections: { heading: string; content: string }[], title: string) => Promise<Note>;
+}
+
+interface WandSectionState {
+  key: string;
+  heading: string;
+  content: string;
+  mapping?: SectionMapping;
+  /** True if `content` was seeded from real investigation data on open —
+   * used only for the badge; editing the textarea doesn't clear it. */
+  autoFilled: boolean;
 }
 
 export function ProductView({
@@ -32,6 +56,8 @@ export function ProductView({
   onImportBaseline,
   onCreateBaseline,
   onUpdateBaseline,
+  onLoadBaselineContext,
+  onGenerateProduct,
 }: ProductViewProps) {
   const [query, setQuery] = useState('');
   const [baselineManagerOpen, setBaselineManagerOpen] = useState(false);
@@ -41,6 +67,90 @@ export function ProductView({
   const [baselineError, setBaselineError] = useState('');
   const baselineInputRef = useRef<HTMLInputElement>(null);
   const docxTemplateInputRef = useRef<HTMLInputElement>(null);
+
+  // Section wand (CaddyLab Stage 2) state — separate from the baseline
+  // manager modal above since it operates on one specific baseline's
+  // structuralMap, not the picker.
+  const [wandBaseline, setWandBaseline] = useState<NoteTemplate | null>(null);
+  const [wandSections, setWandSections] = useState<WandSectionState[]>([]);
+  const [wandTitle, setWandTitle] = useState('');
+  const [wandLoading, setWandLoading] = useState(false);
+  const [wandSaving, setWandSaving] = useState(false);
+  const [wandError, setWandError] = useState('');
+
+  async function openWand(baseline: NoteTemplate) {
+    const structuralMap = baseline.productBaseline?.structuralMap;
+    if (!structuralMap || !onLoadBaselineContext) return;
+    setWandBaseline(baseline);
+    setWandError('');
+    setWandLoading(true);
+    setWandTitle(`${folderName ? `${folderName} — ` : ''}${baseline.name}`);
+    try {
+      const context = await onLoadBaselineContext(baseline);
+      setWandSections(structuralMap.sections.map((section) => {
+        const mapping = suggestSectionMapping(section.heading);
+        const staged = stageSectionContent(mapping, context);
+        return {
+          key: section.key,
+          heading: section.heading,
+          content: staged,
+          mapping,
+          autoFilled: staged.trim().length > 0,
+        };
+      }));
+    } catch (error) {
+      setWandError(error instanceof Error ? error.message : 'Failed to load investigation data for this baseline.');
+    } finally {
+      setWandLoading(false);
+    }
+  }
+
+  function closeWand() {
+    setWandBaseline(null);
+    setWandSections([]);
+    setWandError('');
+  }
+
+  function updateWandSection(key: string, content: string) {
+    setWandSections((current) => current.map((section) => (section.key === key ? { ...section, content } : section)));
+  }
+
+  async function copySectionPrompt(section: WandSectionState) {
+    const prompt = [
+      'CaddyLab section wand — draft one section of a product.',
+      `Investigation: ${folderName || '[select an investigation]'}`,
+      `Baseline: ${wandBaseline?.name || ''}`,
+      `Section: ${section.heading}`,
+      section.mapping ? `Likely maps to: ${section.mapping.label}` : 'No obvious data mapping for this heading — use investigation notes/evidence as you see fit.',
+      section.content.trim() ? `Staged reference data:\n${section.content}` : 'No staged data — draft from investigation context.',
+      'Return ONLY the section body (no heading, no preamble) so it can be pasted directly in.',
+    ].join('\n\n');
+    try {
+      await navigator.clipboard?.writeText(prompt);
+    } catch {
+      // Clipboard can be unavailable from file://; the analyst can still type directly.
+    }
+    onOpenChat();
+  }
+
+  async function handleGenerateProduct() {
+    if (!wandBaseline || !onGenerateProduct) return;
+    setWandSaving(true);
+    setWandError('');
+    try {
+      const product = await onGenerateProduct(
+        wandBaseline,
+        wandSections.map(({ heading, content }) => ({ heading, content })),
+        wandTitle,
+      );
+      setSelectedProductId(product.id);
+      closeWand();
+    } catch (error) {
+      setWandError(error instanceof Error ? error.message : 'Failed to generate this product.');
+    } finally {
+      setWandSaving(false);
+    }
+  }
 
   const filteredProducts = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -443,6 +553,15 @@ export function ProductView({
                         />
                       </label>
                     )}
+                    {selectedBaseline.productBaseline?.structuralMap && onGenerateProduct && (
+                      <button
+                        onClick={() => openWand(selectedBaseline)}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-accent-blue/40 bg-accent-blue/15 px-2.5 py-1.5 text-xs font-medium text-accent-blue hover:bg-accent-blue/20"
+                      >
+                        <Wand2 size={13} />
+                        Fill Sections
+                      </button>
+                    )}
                     <button
                       onClick={() => handleCopyBaselinePrompt(selectedBaseline)}
                       className="inline-flex items-center gap-1.5 rounded-md border border-border-subtle px-2.5 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-bg-hover"
@@ -550,6 +669,81 @@ export function ProductView({
                 className="product-document markdown-preview mx-auto min-h-[11in] max-w-[8.5in] bg-white px-[0.7in] py-[0.65in] text-[12pt] text-gray-950 shadow-lg"
                 dangerouslySetInnerHTML={{ __html: selectedProductHtml }}
               />
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={wandBaseline !== null}
+        onClose={closeWand}
+        title={wandBaseline ? `Fill Sections — ${wandBaseline.name}` : 'Fill Sections'}
+        extraWide
+      >
+        {wandLoading ? (
+          <div className="p-8 text-center text-sm text-text-muted">Loading investigation data…</div>
+        ) : (
+          <div className="space-y-3">
+            {wandError && <p className="text-xs text-red-400">{wandError}</p>}
+            <label className="grid gap-1 text-xs font-medium text-text-secondary">
+              Product title
+              <input
+                value={wandTitle}
+                onChange={(event) => setWandTitle(event.target.value)}
+                className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent-blue"
+              />
+            </label>
+            <div className="max-h-[55vh] space-y-3 overflow-auto pr-1">
+              {wandSections.map((section) => (
+                <div key={section.key} className="rounded-lg border border-border-subtle bg-bg-surface p-3">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-text-primary">{section.heading}</h3>
+                    {section.autoFilled ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-accent-green/30 bg-accent-green/10 px-2 py-0.5 text-[10px] font-medium text-accent-green">
+                        <Check size={10} />
+                        Auto-filled{section.mapping ? ` · ${section.mapping.label}` : ''}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[10px] font-medium text-amber-300">
+                        <Sparkles size={10} />
+                        Needs input{section.mapping ? ` · ${section.mapping.label} not found` : ''}
+                      </span>
+                    )}
+                  </div>
+                  <textarea
+                    value={section.content}
+                    onChange={(event) => updateWandSection(section.key, event.target.value)}
+                    rows={section.mapping?.kind === 'timeline-table' || section.mapping?.kind === 'ioc-table' ? 6 : 4}
+                    placeholder="Type this section's content, or ask CaddyAI to draft it…"
+                    className="w-full rounded-lg border border-border-subtle bg-bg-primary px-3 py-2 font-mono text-xs text-text-primary outline-none focus:border-accent-blue"
+                  />
+                  {!section.autoFilled && (
+                    <button
+                      onClick={() => copySectionPrompt(section)}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-border-subtle px-2 py-1 text-[11px] font-medium text-text-secondary hover:text-text-primary hover:bg-bg-hover"
+                    >
+                      <Bot size={12} />
+                      Ask CaddyAI to draft this
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2 border-t border-border-subtle pt-3">
+              <button
+                onClick={closeWand}
+                className="rounded-lg border border-border-subtle px-3 py-2 text-sm text-text-secondary hover:bg-bg-hover"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleGenerateProduct}
+                disabled={wandSaving}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-accent-blue px-4 py-2 text-sm font-semibold text-white hover:bg-accent-blue/90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Wand2 size={14} />
+                {wandSaving ? 'Generating…' : 'Generate Product'}
+              </button>
             </div>
           </div>
         )}
