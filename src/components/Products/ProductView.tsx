@@ -4,8 +4,9 @@ import type { Note, NoteTemplate } from '../../types';
 import { formatDate } from '../../lib/utils';
 import { renderMarkdown } from '../../lib/markdown';
 import { downloadFile } from '../../lib/export';
-import { serializeProductBaselinePackage } from '../../lib/product-baselines';
+import { buildBaselineFromDocumentText, serializeProductBaselinePackage } from '../../lib/product-baselines';
 import { arrayBufferToBase64, buildTemplateBackedDocxBlob, hasDocxTemplateAsset } from '../../lib/docx-template-renderer';
+import { extractDocxEvidence, extractPdfText } from '../../lib/evidence-import';
 import { Modal } from '../Common/Modal';
 
 interface ProductViewProps {
@@ -15,6 +16,10 @@ interface ProductViewProps {
   onOpenSourceNote: (id: string) => void;
   onOpenChat: () => void;
   onImportBaseline?: (json: string, fileName: string) => Promise<NoteTemplate>;
+  /** PDF/DOCX path — no structured package to parse, so this takes an
+   * already-built baseline (see buildBaselineFromDocumentText) instead of
+   * raw file contents. */
+  onCreateBaseline?: (partial: Partial<NoteTemplate> & { name: string; content: string }) => Promise<NoteTemplate>;
   onUpdateBaseline?: (id: string, updates: Partial<NoteTemplate>) => Promise<void>;
 }
 
@@ -25,6 +30,7 @@ export function ProductView({
   onOpenSourceNote,
   onOpenChat,
   onImportBaseline,
+  onCreateBaseline,
   onUpdateBaseline,
 }: ProductViewProps) {
   const [query, setQuery] = useState('');
@@ -120,9 +126,39 @@ export function ProductView({
   const handleBaselineFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (baselineInputRef.current) baselineInputRef.current.value = '';
-    if (!file || !onImportBaseline) return;
+    if (!file) return;
     setBaselineError('');
     setBaselineMessage('');
+
+    // PDF/DOCX have no structured package to parse — extract their text and
+    // seed a new markdown baseline from it, the same way ReportCaddy's
+    // "Upload Word template" seeds a new report template. Only .json goes
+    // through the existing importProductBaselinePackage path below.
+    const lowerName = file.name.toLowerCase();
+    if (lowerName.endsWith('.pdf') || lowerName.endsWith('.docx')) {
+      if (!onCreateBaseline) return;
+      try {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const docType = lowerName.endsWith('.pdf') ? 'pdf' as const : 'docx' as const;
+        const { text, warning } = docType === 'pdf'
+          ? (() => { const r = extractPdfText(bytes); return { text: r.text, warning: r.rejected ? 'This looks like a scanned or image-only PDF with no embedded text layer.' : undefined }; })()
+          : extractDocxEvidence(bytes);
+        if (!text.trim()) {
+          setBaselineError(warning || `No readable text could be extracted from this ${docType.toUpperCase()} file.`);
+          return;
+        }
+        const partial = buildBaselineFromDocumentText(text, file.name, docType);
+        const created = await onCreateBaseline(partial);
+        setSelectedBaselineId(created.id);
+        setBaselineManagerOpen(true);
+        setBaselineMessage(warning ? `Imported ${created.name} (${warning})` : `Imported ${created.name}`);
+      } catch (error) {
+        setBaselineError(error instanceof Error ? error.message : `Failed to import ${file.name}.`);
+      }
+      return;
+    }
+
+    if (!onImportBaseline) return;
     try {
       const imported = await onImportBaseline(await file.text(), file.name);
       setSelectedBaselineId(imported.id);
@@ -180,14 +216,17 @@ export function ProductView({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {onImportBaseline && (
-            <label className="inline-flex cursor-pointer items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border-subtle text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors">
+          {(onImportBaseline || onCreateBaseline) && (
+            <label
+              className="inline-flex cursor-pointer items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border-subtle text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+              title="Import a .tc-product-baseline.json package, or a .pdf/.docx to seed a new baseline from its extracted text"
+            >
               <Upload size={14} />
               Import Baseline
               <input
                 ref={baselineInputRef}
                 type="file"
-                accept=".json,.tc-product-baseline.json,application/json"
+                accept=".json,.tc-product-baseline.json,application/json,.pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 onChange={handleBaselineFileSelect}
                 className="hidden"
               />

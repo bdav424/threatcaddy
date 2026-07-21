@@ -742,7 +742,7 @@ function parseCellValue(attrs: string, cellXml: string, sharedStrings: string[])
   return value;
 }
 
-function extractPdfText(bytes: Uint8Array): { text: string; rejected: boolean } {
+export function extractPdfText(bytes: Uint8Array): { text: string; rejected: boolean } {
   const raw = bytesToLatin1(bytes);
   const texts: string[] = [];
   let sawPdfTextObject = false;

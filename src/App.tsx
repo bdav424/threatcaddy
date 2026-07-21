@@ -1339,6 +1339,13 @@ const AppInner = memo(function AppInner({
     addToast('success', `Imported product baseline "${template.name}".`);
     return template;
   }, [addToast, noteTemplatesHook]);
+  const handleCreateProductBaseline = useCallback(async (
+    partial: Partial<NoteTemplate> & { name: string; content: string },
+  ): Promise<NoteTemplate> => {
+    const template = await noteTemplatesHook.createTemplate(partial);
+    addToast('success', `Imported product baseline "${template.name}".`);
+    return template;
+  }, [addToast, noteTemplatesHook]);
   const handleUpdateProductBaseline = useCallback(async (id: string, updates: Partial<NoteTemplate>) => {
     await noteTemplatesHook.updateTemplate(id, updates);
     addToast('success', 'Updated product baseline.');
@@ -3252,6 +3259,7 @@ const AppInner = memo(function AppInner({
                   onOpenSourceNote={(id) => handleSearchNavigateToNote(id)}
                   onOpenChat={() => navigateTo('chat')}
                   onImportBaseline={handleImportProductBaseline}
+                  onCreateBaseline={handleCreateProductBaseline}
                   onUpdateBaseline={handleUpdateProductBaseline}
                 />
               )}

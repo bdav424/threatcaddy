@@ -4,6 +4,7 @@ import type { ToolUseBlock } from '../types';
 import { executeTool } from '../lib/llm-tools';
 import { exportJSON, importJSON } from '../lib/export';
 import {
+  buildBaselineFromDocumentText,
   importProductBaselinePackage,
   normalizeProductRenderContextInput,
   PRODUCT_BASELINE_PACKAGE_SCHEMA,
@@ -216,5 +217,28 @@ describe('product baselines', () => {
     expect(product?.tags).toContain(PRODUCT_NOTE_TAG);
     expect(product?.content).toContain('Executive summary text.');
     expect(product?.content).toContain('Source Finding');
+  });
+
+  it('builds a markdown baseline from PDF/DOCX-extracted text, with the source file recorded as provenance', () => {
+    const built = buildBaselineFromDocumentText(
+      'Executive Summary\n\nThe actor established persistence via a scheduled task.',
+      'Q3 Incident Report.pdf',
+      'pdf',
+    );
+
+    expect(built.name).toBe('Q3 Incident Report');
+    expect(built.content).toContain('scheduled task');
+    expect(built.category).toBe('Product Baseline');
+    expect(built.tags).toContain(PRODUCT_BASELINE_TAG);
+    expect(built.productBaseline?.kind).toBe('markdown');
+    expect(built.productBaseline?.renderer).toBe('markdown');
+    expect(built.productBaseline?.sourceDocuments?.[0]).toMatchObject({
+      name: 'Q3 Incident Report.pdf',
+      type: 'pdf',
+    });
+  });
+
+  it('rejects building a baseline from empty extracted text', () => {
+    expect(() => buildBaselineFromDocumentText('   ', 'empty.docx', 'docx')).toThrow(/no readable text/i);
   });
 });

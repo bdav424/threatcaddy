@@ -129,6 +129,53 @@ export function productBaselinePackageToTemplate(input: unknown, importedFrom?: 
   };
 }
 
+/**
+ * Builds a new markdown-kind baseline from text already extracted out of a
+ * PDF or Word document (see extractPdfText / extractDocxEvidence in
+ * evidence-import.ts). Unlike importProductBaselinePackage, there's no
+ * structured .tc-product-baseline.json to parse — the document's extracted
+ * text becomes the baseline's own Jinja-renderable content directly, the
+ * same way ReportCaddy's "Upload Word template" seeds a new report template
+ * from an uploaded .docx. PDF/DOCX bytes aren't retained (there's no
+ * fill-in-the-blanks renderer for either format the way there is for a real
+ * .docx template — see the docx-template kind/renderer above); only the
+ * source file's name is kept, as sourceDocuments provenance.
+ */
+export function buildBaselineFromDocumentText(
+  text: string,
+  fileName: string,
+  docType: 'pdf' | 'docx',
+): Partial<NoteTemplate> & { name: string; content: string } {
+  const content = cleanString(text, 500_000);
+  if (!content) {
+    throw new Error(`No readable text could be extracted from this ${docType.toUpperCase()} file.`);
+  }
+  const now = Date.now();
+  const name = cleanString(fileName.replace(/\.(pdf|docx)$/i, '')) || 'Imported baseline';
+  const productBaseline = normalizeProductBaselineMetadata(
+    {
+      productType: 'custom',
+      kind: 'markdown',
+      renderer: 'markdown',
+      visualFidelity: 'structural',
+      sourceDocuments: [{ name: fileName, type: docType, notes: 'Text extracted on import; original file was not stored.' }],
+    },
+    fileName,
+    now,
+  );
+  const tags = uniqueStrings([PRODUCT_BASELINE_TAG, productBaseline.productType]);
+
+  return {
+    name,
+    description: `Imported from ${fileName}`,
+    icon: defaultProductBaselineIcon(productBaseline.productType),
+    content,
+    category: PRODUCT_BASELINE_CATEGORY,
+    tags,
+    productBaseline,
+  };
+}
+
 export function serializeProductBaselinePackage(template: NoteTemplate): string {
   const pkg: ProductBaselinePackage = {
     schemaVersion: PRODUCT_BASELINE_PACKAGE_SCHEMA,
@@ -264,7 +311,7 @@ export function normalizeProductRenderContextInput(input: ProductRenderContext =
   return normalized;
 }
 
-function normalizeProductBaselineMetadata(
+export function normalizeProductBaselineMetadata(
   raw: Partial<ProductBaselineMetadata> | undefined,
   importedFrom: string | undefined,
   importedAt: number,
