@@ -99,7 +99,11 @@ function DocxTemplateDeriver({
       const buffer = await file.arrayBuffer();
       const map = deriveDocxTemplate(new Uint8Array(buffer));
       if (map.sections.length === 0) {
-        setError('No headings were found in this document. Add Heading/Title styles in Word and re-upload.');
+        setError(
+          'No headings were found. The Templatizer checks Word\'s Heading/Title styles first, then falls back ' +
+          'to spotting text that\'s consistently larger and/or bolder than the body text — this document has ' +
+          'neither. Try applying Heading styles in Word, or make sure headers are visibly bigger/bolder than body text.',
+        );
         return;
       }
       setFileName(file.name);
@@ -136,11 +140,13 @@ function DocxTemplateDeriver({
             <FileStack size={14} />
             Report engine
           </div>
-          <h2 className="mt-3 text-lg font-semibold text-text-primary">Derive a template from a report</h2>
+          <h2 className="mt-3 text-lg font-semibold text-text-primary">The Templatizer</h2>
           <p className="mt-1 text-sm leading-6 text-text-secondary">
-            Upload a .docx and CaddyLab maps its real structure — headings, tables, and color palette — into a
-            reusable baseline. Save it, then fill it section-by-section from Products; sections you don't fill
-            keep the original document's content untouched.
+            Upload a .docx and it maps the real structure — headings, tables, figures, and color palette — into a
+            reusable baseline. Headings are detected from Word's Heading/Title styles when the document uses them;
+            otherwise it falls back to spotting text that's consistently larger and/or bolder than body text, so a
+            report styled by hand (not through Word's style picker) still templatizes. Save it, then fill it
+            section-by-section from Products; sections you don't fill keep the original document's content untouched.
           </p>
         </div>
       </div>

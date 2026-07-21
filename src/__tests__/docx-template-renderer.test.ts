@@ -360,6 +360,115 @@ describe('docx figure placeholders + upload-to-format (CaddyLab Stage 3)', () =>
   });
 });
 
+describe('smart formatting fallback — headings without named Word styles', () => {
+  // Mirrors a real house style reported by a user: 12pt bold colored headers,
+  // 10pt bold subheaders, 10pt bold CENTERED graphic headers on tables/figures
+  // (same size as subheaders — only distinguishable by centering + sitting
+  // next to the table/image), 9.5pt body text. None of it uses Word's named
+  // Heading/Title paragraph styles — direct run formatting only.
+  function run(sizeHalfPoints: number, text: string, opts: { bold?: boolean; color?: string; centered?: boolean } = {}) {
+    const pPr = opts.centered ? '<w:pPr><w:jc w:val="center"/></w:pPr>' : '';
+    const rPr = `<w:rPr>${opts.bold ? '<w:b/>' : ''}${opts.color ? `<w:color w:val="${opts.color}"/>` : ''}<w:sz w:val="${sizeHalfPoints}"/></w:rPr>`;
+    return `<w:p>${pPr}<w:r>${rPr}<w:t>${text}</w:t></w:r></w:p>`;
+  }
+
+  function buildFormattingOnlyReportZip() {
+    const body = [
+      run(24, 'Quarterly Threat Roundup', { bold: true, color: '1F4E79' }), // 12pt header
+      run(20, 'Overview', { bold: true }), // 10pt subheader
+      run(19, 'First overview sentence.'),
+      run(19, 'Second overview sentence.'),
+      run(20, 'Notable Incidents', { bold: true }), // 10pt subheader
+      run(20, 'Table 1: Incidents', { bold: true, centered: true }), // 10pt graphic header/caption
+      '<w:tbl><w:tblPr><w:tblStyle w:val="ArbitraryTable"/><w:tblW w:w="0" w:type="auto"/></w:tblPr><w:tr><w:tc><w:p><w:r><w:t>OLD incident row</w:t></w:r></w:p></w:tc></w:tr></w:tbl>',
+      run(19, 'Incident narrative follow-up.'),
+      run(20, 'Untouched Appendix', { bold: true }), // 10pt subheader
+      run(19, 'This appendix has no matching markdown section and must survive verbatim.'),
+      run(19, 'Second appendix sentence.'),
+      '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>',
+    ].join('');
+    return buildStoredZip([
+      {
+        path: '[Content_Types].xml',
+        content: '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>',
+      },
+      {
+        path: 'word/document.xml',
+        content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}</w:body></w:document>`,
+      },
+    ]);
+  }
+
+  it('derives a section hierarchy from font size/weight when no named heading styles exist', () => {
+    const template = buildFormattingOnlyReportZip();
+    const map = deriveDocxTemplate(template);
+
+    expect(map.sections.map((s) => s.heading)).toEqual([
+      'Quarterly Threat Roundup',
+      'Overview',
+      'Notable Incidents',
+      'Untouched Appendix',
+    ]);
+    expect(map.sections[0].level).toBe(1); // 12pt — the larger, rarer size ranks first
+    expect(map.sections[1].level).toBe(2); // 10pt subheaders
+    expect(map.sections[2].level).toBe(2);
+    expect(map.sections[3].level).toBe(2);
+    // The same-size (10pt bold) centered table caption must NOT become a 5th section.
+    expect(map.sections.some((s) => s.heading.includes('Table 1'))).toBe(false);
+    expect(map.sections[2].hasTable).toBe(true);
+  });
+
+  it('fills a formatting-derived template the same way a style-derived one fills, matched sections replaced and unmatched carried through verbatim', () => {
+    const template = buildFormattingOnlyReportZip();
+    const map = deriveDocxTemplate(template);
+
+    const rendered = buildTemplateBackedDocxBytes(template, [
+      '## Overview',
+      '',
+      'New overview content written by the analyst.',
+    ].join('\n'), undefined, map);
+    const documentXml = readZipText(rendered, 'word/document.xml');
+
+    expect(documentXml).toContain('New overview content written by the analyst.');
+    expect(documentXml).not.toContain('First overview sentence.');
+    // Unmatched sections (including the one holding the table + its caption) survive untouched.
+    expect(documentXml).toContain('Notable Incidents');
+    expect(documentXml).toContain('Table 1: Incidents');
+    expect(documentXml).toContain('OLD incident row');
+    expect(documentXml).toContain('Untouched Appendix');
+    expect(documentXml).toContain('This appendix has no matching markdown section and must survive verbatim.');
+  });
+
+  it('attributes a caption to a figure by formatting (centered + bold) when there is no named Caption style', () => {
+    const body = [
+      run(24, 'Incident Report', { bold: true, color: '1F4E79' }),
+      run(20, 'Findings', { bold: true }),
+      run(19, 'Some findings text describing the intrusion in more detail for context.'),
+      run(19, 'A second sentence of body prose adds even more length to this section.'),
+      '<w:p><w:r><w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="1000000" cy="500000"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId9"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>',
+      run(20, 'Figure 1: Network Diagram', { bold: true, centered: true }),
+      '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>',
+    ].join('');
+    const template = buildStoredZip([
+      {
+        path: '[Content_Types].xml',
+        content: '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>',
+      },
+      {
+        path: 'word/document.xml',
+        content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}</w:body></w:document>`,
+      },
+    ]);
+
+    const map = deriveDocxTemplate(template);
+
+    expect(map.sections.map((s) => s.heading)).toEqual(['Incident Report', 'Findings']);
+    expect(map.figures).toHaveLength(1);
+    expect(map.figures[0].caption).toBe('Figure 1: Network Diagram');
+    expect(map.figures[0].sectionKey).toBe('findings');
+  });
+});
+
 function buildStoredZip(files: Array<{ path: string; content: string }>): Uint8Array {
   const encoder = new TextEncoder();
   const localParts: Uint8Array[] = [];

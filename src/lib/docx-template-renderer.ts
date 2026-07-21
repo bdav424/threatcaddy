@@ -145,6 +145,143 @@ function headingLevelFromStyle(style: string | undefined): number | undefined {
   return match[1].toLowerCase() === 'title' ? 1 : Number.parseInt(match[2], 10);
 }
 
+// ── Smart formatting fallback ───────────────────────────────────────────────
+// Plenty of real-world reports never use Word's named Heading/Title styles —
+// headers are just "bigger and/or bolder than body text," applied by hand or
+// by whatever authoring tool exported the doc. When no named-style headings
+// exist anywhere in the document, fall back to inferring the heading
+// hierarchy from each paragraph's own run formatting (point size, bold,
+// color) instead of refusing to derive a template at all. Named styles still
+// win whenever they're present — they're the more reliable signal.
+
+interface RunFormatting {
+  /** Font size in half-points (OOXML's w:sz unit) — e.g. 24 = 12pt. */
+  size?: number;
+  bold: boolean;
+  /** Non-black explicit run color, if set — a secondary "this is styled
+   * differently from body text" signal alongside size/bold. */
+  color?: string;
+  centered: boolean;
+}
+
+/** Reads the formatting of a paragraph's first run that actually carries
+ * text (skipping empty bookmark/field runs), plus the paragraph's own
+ * alignment — the same signal a human eye uses to spot "this looks like a
+ * heading" without relying on the paragraph's style name at all. */
+function extractDominantRunFormatting(paragraphXml: string): RunFormatting {
+  const centered = /<w:jc\s+w:val="(?:center|centre)"/i.test(paragraphXml);
+  for (const run of paragraphXml.matchAll(/<w:r\b[^>]*>([\s\S]*?)<\/w:r>/g)) {
+    const runXml = run[0];
+    const textMatch = runXml.match(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/);
+    if (!textMatch || !unescapeXml(textMatch[1]).trim()) continue;
+    const rPr = runXml.match(/<w:rPr>[\s\S]*?<\/w:rPr>/)?.[0] || '';
+    const sizeMatch = rPr.match(/<w:sz\s+w:val="(\d+)"/);
+    const bold = /<w:b\s*\/>|<w:b\s+w:val="(?:1|true|on)"/i.test(rPr) && !/<w:b\s+w:val="(?:0|false|off)"/i.test(rPr);
+    const colorMatch = rPr.match(/<w:color\s+w:val="([0-9A-Fa-f]{6})"/i);
+    return {
+      size: sizeMatch ? Number.parseInt(sizeMatch[1], 10) : undefined,
+      bold,
+      color: colorMatch && colorMatch[1].toUpperCase() !== '000000' ? colorMatch[1].toUpperCase() : undefined,
+      centered,
+    };
+  }
+  return { bold: false, centered };
+}
+
+/** A table/image immediately before or after a paragraph is what makes a
+ * centered-bold line a caption ("Table 1: ...", "Figure 2: ...") rather than
+ * a genuine section heading, even when it shares a heading candidate's
+ * size/weight — captions on graphics are exactly that shape in most house
+ * styles (see extractFigures' equivalent style-based check). */
+function isAdjacentToGraphic(elements: BodyElement[], index: number): boolean {
+  const isGraphic = (element: BodyElement | undefined) =>
+    Boolean(element) && (element!.type === 'tbl' || (element!.type === 'p' && /<w:drawing\b/.test(element!.xml)));
+  return isGraphic(elements[index - 1]) || isGraphic(elements[index + 1]);
+}
+
+interface HeadingContext {
+  useFormattingFallback: boolean;
+  bodySize?: number;
+  levelBySignature: Map<number, number>;
+  formattingByIndex: Map<number, RunFormatting>;
+}
+
+/** Decides, once per document, whether section detection can rely on named
+ * Heading/Title styles or needs to fall back to formatting. In fallback mode,
+ * ranks the distinct point sizes used by heading-candidate paragraphs
+ * (larger than body text, or same size but bold+colored) largest-first into
+ * levels 1..N — mirroring how a reader would read a house style's own
+ * hierarchy (e.g. 12pt bold headers > 10pt bold subheaders > 9.5pt body). */
+function buildHeadingContext(elements: BodyElement[]): HeadingContext {
+  const hasStyleHeadings = elements.some((element) =>
+    element.type === 'p' && element.text.trim() && headingLevelFromStyle(element.style) !== undefined);
+  if (hasStyleHeadings) {
+    return { useFormattingFallback: false, levelBySignature: new Map(), formattingByIndex: new Map() };
+  }
+
+  // Body size is picked by total character count per size, not paragraph
+  // count — a report's headings/subheadings/captions are usually short
+  // phrases, so a document with a handful of long body paragraphs and many
+  // short headings would otherwise have its heading size win a per-paragraph
+  // vote despite reading, to a human, as obviously the smaller/rarer text.
+  const formattingByIndex = new Map<number, RunFormatting>();
+  const charCountBySize = new Map<number, number>();
+  elements.forEach((element, index) => {
+    if (element.type !== 'p' || !element.text.trim()) return;
+    const formatting = extractDominantRunFormatting(element.xml);
+    formattingByIndex.set(index, formatting);
+    if (formatting.size !== undefined) {
+      charCountBySize.set(formatting.size, (charCountBySize.get(formatting.size) || 0) + element.text.trim().length);
+    }
+  });
+  let bodySize = 0;
+  let bodySizeCharCount = -1;
+  for (const [size, charCount] of charCountBySize) {
+    if (charCount > bodySizeCharCount) { bodySize = size; bodySizeCharCount = charCount; }
+  }
+
+  const candidateSizes: number[] = [];
+  elements.forEach((_element, index) => {
+    const formatting = formattingByIndex.get(index);
+    if (!formatting || formatting.size === undefined) return;
+    const passesFormatting = formatting.size > bodySize || (formatting.size === bodySize && formatting.bold && Boolean(formatting.color));
+    if (!passesFormatting) return;
+    if (formatting.centered && isAdjacentToGraphic(elements, index)) return; // graphic caption, not a section heading
+    candidateSizes.push(formatting.size);
+  });
+  const distinctSizesDesc = Array.from(new Set(candidateSizes)).sort((a, b) => b - a);
+  const levelBySignature = new Map(distinctSizesDesc.map((size, index) => [size, Math.min(index + 1, 6)]));
+
+  return { useFormattingFallback: distinctSizesDesc.length > 0, bodySize, levelBySignature, formattingByIndex };
+}
+
+/** The single heading-level lookup every section-tracking pass (derivation,
+ * figure/section attribution, fill-time span splitting) goes through, so
+ * named-style detection and the formatting fallback never disagree about
+ * which paragraph is a heading. */
+function headingLevelForElement(element: BodyElement, index: number, elements: BodyElement[], ctx: HeadingContext): number | undefined {
+  if (!ctx.useFormattingFallback) return element.type === 'p' ? headingLevelFromStyle(element.style) : undefined;
+  if (element.type !== 'p' || !element.text.trim()) return undefined;
+  const formatting = ctx.formattingByIndex.get(index) ?? extractDominantRunFormatting(element.xml);
+  if (formatting.size === undefined) return undefined;
+  const bodySize = ctx.bodySize ?? 0;
+  const passesFormatting = formatting.size > bodySize || (formatting.size === bodySize && formatting.bold && Boolean(formatting.color));
+  if (!passesFormatting) return undefined;
+  if (formatting.centered && isAdjacentToGraphic(elements, index)) return undefined;
+  return ctx.levelBySignature.get(formatting.size);
+}
+
+/** Same "centered + bold, sitting right next to a table/image" shape
+ * `buildHeadingContext` uses to exclude graphic captions from the heading
+ * hierarchy — reused directly by extractFigures so a caption gets picked up
+ * even in documents that DO have named heading styles (so the two detectors
+ * don't have to agree on which mode they're in). */
+function isLikelyGraphicCaption(element: BodyElement | undefined): boolean {
+  if (!element || element.type !== 'p' || !element.text.trim()) return false;
+  const formatting = extractDominantRunFormatting(element.xml);
+  return formatting.centered && formatting.bold;
+}
+
 export function deriveDocxTemplate(templateBytes: Uint8Array): ProductBaselineStructuralMap {
   const entries = unzip(templateBytes);
   const documentEntry = entries.find((entry) => entry.path === 'word/document.xml');
@@ -156,6 +293,7 @@ export function deriveDocxTemplate(templateBytes: Uint8Array): ProductBaselineSt
     throw new Error('Template DOCX has an unsupported document body structure.');
   }
   const elements = parseBodyElements(documentXml.slice(bodyStart + '<w:body>'.length, bodyEnd));
+  const headingCtx = buildHeadingContext(elements);
 
   const sections: ProductBaselineSection[] = [];
   const usedKeys = new Set<string>();
@@ -170,8 +308,8 @@ export function deriveDocxTemplate(templateBytes: Uint8Array): ProductBaselineSt
     sections.push(pendingSection);
   };
 
-  for (const element of elements) {
-    const level = element.type === 'p' ? headingLevelFromStyle(element.style) : undefined;
+  elements.forEach((element, index) => {
+    const level = headingLevelForElement(element, index, elements, headingCtx);
     if (level !== undefined && element.text.trim()) {
       closeSection();
       currentTableCount = 0;
@@ -185,18 +323,18 @@ export function deriveDocxTemplate(templateBytes: Uint8Array): ProductBaselineSt
         hasTable: false,
         paragraphCount: 0,
       };
-      continue;
+      return;
     }
-    if (!pendingSection) continue;
+    if (!pendingSection) return;
     if (element.type === 'tbl') currentTableCount += 1;
     else if (element.type === 'p') currentParagraphCount += 1;
-  }
+  });
   closeSection();
 
   const themeEntry = entries.find((entry) => entry.path === 'word/theme/theme1.xml');
   const palette = extractPalette(documentXml, themeEntry ? decodeUtf8(themeEntry.data) : undefined);
   const tableCount = elements.filter((element) => element.type === 'tbl').length;
-  const figures = extractFigures(elements, sections);
+  const figures = extractFigures(elements, sections, headingCtx);
 
   return {
     schemaVersion: 1,
@@ -212,17 +350,19 @@ export function deriveDocxTemplate(templateBytes: Uint8Array): ProductBaselineSt
  * heading-tracking stays a single source of truth) and pulls out each real
  * embedded image (`<w:drawing>` with an `<a:blip r:embed>`) into a figure
  * spec: which section it falls under, its captured size, and the caption
- * paragraph immediately after it, if the template styled one. Non-image
- * drawings (text boxes, shapes without a blip) are left alone — nothing for
- * the upload workflow to attach a replacement image to. */
-function extractFigures(elements: BodyElement[], sections: ProductBaselineSection[]): ProductBaselineFigure[] {
+ * paragraph immediately after it, if the template has one (named "Caption"
+ * style, or the same centered+bold shape the formatting fallback treats as a
+ * graphic header). Non-image drawings (text boxes, shapes without a blip)
+ * are left alone — nothing for the upload workflow to attach a replacement
+ * image to. */
+function extractFigures(elements: BodyElement[], sections: ProductBaselineSection[], headingCtx: HeadingContext): ProductBaselineFigure[] {
   const figures: ProductBaselineFigure[] = [];
   const usedKeys = new Set<string>();
   let sectionCursor = 0;
   let currentSectionKey: string | undefined;
 
   elements.forEach((element, index) => {
-    const level = element.type === 'p' ? headingLevelFromStyle(element.style) : undefined;
+    const level = headingLevelForElement(element, index, elements, headingCtx);
     if (level !== undefined && element.text.trim()) {
       currentSectionKey = sections[sectionCursor]?.key;
       sectionCursor += 1;
@@ -235,8 +375,9 @@ function extractFigures(elements: BodyElement[], sections: ProductBaselineSectio
       if (!relationshipId) continue;
       const extentMatch = drawingXml[0].match(/<wp:extent\s+cx="(\d+)"\s+cy="(\d+)"/);
       const nextElement = elements[index + 1];
-      const caption = nextElement?.type === 'p' && /caption/i.test(nextElement.style || '')
-        ? nextElement.text.trim() || undefined
+      const namedCaption = nextElement?.type === 'p' && /caption/i.test(nextElement.style || '');
+      const caption = (namedCaption || isLikelyGraphicCaption(nextElement))
+        ? nextElement!.text.trim() || undefined
         : undefined;
       figures.push({
         key: uniqueSlug(caption || `figure-${figures.length + 1}`, usedKeys),
@@ -347,17 +488,18 @@ function matchStructuralSection(
 function splitBodyIntoSpans(elements: BodyElement[]): { preamble: BodyElement[]; spans: BodyElement[][] } {
   const preamble: BodyElement[] = [];
   const spans: BodyElement[][] = [];
+  const headingCtx = buildHeadingContext(elements);
   let current: BodyElement[] | null = null;
-  for (const element of elements) {
-    const level = element.type === 'p' ? headingLevelFromStyle(element.style) : undefined;
+  elements.forEach((element, index) => {
+    const level = headingLevelForElement(element, index, elements, headingCtx);
     if (level !== undefined && element.text.trim()) {
       current = [element];
       spans.push(current);
-      continue;
+      return;
     }
-    if (element.type === 'sectPr') continue;
+    if (element.type === 'sectPr') return;
     (current || preamble).push(element);
-  }
+  });
   return { preamble, spans };
 }
 

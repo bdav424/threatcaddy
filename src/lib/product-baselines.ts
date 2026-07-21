@@ -196,7 +196,11 @@ export function buildDerivedBaselineFromDocx(
   structuralMap: ProductBaselineStructuralMap,
 ): Partial<NoteTemplate> & { name: string; content: string } {
   if (structuralMap.sections.length === 0) {
-    throw new Error('No headings were found in this document — nothing to derive a template from.');
+    throw new Error(
+      'No headings were found in this document. The Templatizer looks for Word\'s Heading/Title styles first, ' +
+      'and if none are set, falls back to spotting text that\'s consistently larger and/or bolder than the ' +
+      'body text — but this document has neither a body-text baseline nor any text standing out from it.',
+    );
   }
   const name = cleanString(fileName.replace(/\.docx$/i, '')) || 'Derived baseline';
   const now = Date.now();
