@@ -1,20 +1,26 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Brain,
   CheckCircle2,
+  FileStack,
   FileText,
   Loader2,
   Lock,
   Network,
+  Palette,
   Search,
   Server,
   ShieldCheck,
   Clipboard,
   PlayCircle,
+  Table2,
+  Upload,
   XCircle,
 } from 'lucide-react';
-import type { Folder, Settings } from '../../types';
+import type { Folder, NoteTemplate, ProductBaselineStructuralMap, Settings } from '../../types';
 import { uniqueEndpoints, probeEndpoint, type EndpointProbe, type EndpointProbeStatus } from '../../lib/local-endpoint-discovery';
+import { arrayBufferToBase64, deriveDocxTemplate } from '../../lib/docx-template-renderer';
+import { buildDerivedBaselineFromDocx } from '../../lib/product-baselines';
 
 
 interface ExperimentalViewProps {
@@ -22,6 +28,10 @@ interface ExperimentalViewProps {
   settings: Settings;
   onUpdateSettings: (updates: Partial<Settings>) => void;
   onOpenChat: () => void;
+  /** CaddyLab docx round-trip (Stage 1) — same handler ProductView uses to
+   * create a baseline from an uploaded document, reused here so a derived
+   * template lands in the same picker either way. */
+  onCreateBaseline?: (partial: Partial<NoteTemplate> & { name: string; content: string }) => Promise<NoteTemplate>;
 }
 
 
@@ -56,7 +66,160 @@ const prototypes = [
 
 type PrototypeLane = typeof prototypes[number]['id'];
 
+// ── CaddyLab docx round-trip (BUILDSPEC Stage 1) ───────────────────────────
+// Upload a report → derive a reusable structural template (headings, table
+// map, color palette) → save it as a product baseline. The existing
+// docx-template-renderer.ts fills it back out section-by-section against
+// the SAME stored bytes; unmatched sections keep the original template's
+// content untouched instead of being wiped, which is what makes the
+// round-trip "faithful" rather than a wholesale content replace.
 
+function DocxTemplateDeriver({
+  onCreateBaseline,
+}: {
+  onCreateBaseline?: (partial: Partial<NoteTemplate> & { name: string; content: string }) => Promise<NoteTemplate>;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [docxBase64, setDocxBase64] = useState<string | null>(null);
+  const [structuralMap, setStructuralMap] = useState<ProductBaselineStructuralMap | null>(null);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function handleFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (!file) return;
+    setError('');
+    setMessage('');
+    setStructuralMap(null);
+    setDocxBase64(null);
+    try {
+      const buffer = await file.arrayBuffer();
+      const map = deriveDocxTemplate(new Uint8Array(buffer));
+      if (map.sections.length === 0) {
+        setError('No headings were found in this document. Add Heading/Title styles in Word and re-upload.');
+        return;
+      }
+      setFileName(file.name);
+      setDocxBase64(arrayBufferToBase64(buffer));
+      setStructuralMap(map);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to read this document.');
+    }
+  }
+
+  async function handleSaveAsBaseline() {
+    if (!fileName || !docxBase64 || !structuralMap || !onCreateBaseline) return;
+    setSaving(true);
+    setError('');
+    try {
+      const partial = buildDerivedBaselineFromDocx(fileName, docxBase64, structuralMap);
+      const created = await onCreateBaseline(partial);
+      setMessage(`Saved "${created.name}" as a product baseline — open it from Products → Baselines.`);
+      setFileName(null);
+      setDocxBase64(null);
+      setStructuralMap(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save this baseline.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-emerald-400/25 bg-bg-raised/80 p-5 shadow-xl shadow-black/10">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300">
+            <FileStack size={14} />
+            Report engine
+          </div>
+          <h2 className="mt-3 text-lg font-semibold text-text-primary">Derive a template from a report</h2>
+          <p className="mt-1 text-sm leading-6 text-text-secondary">
+            Upload a .docx and CaddyLab maps its real structure — headings, tables, and color palette — into a
+            reusable baseline. Save it, then fill it section-by-section from Products; sections you don't fill
+            keep the original document's content untouched.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-emerald-400/40 bg-emerald-400/15 px-4 py-2 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-400/20">
+          <Upload size={14} />
+          Upload .docx
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+        </label>
+        {fileName && <span className="text-xs text-text-muted">{fileName}</span>}
+      </div>
+
+      {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
+      {message && <p className="mt-3 text-xs text-accent-green">{message}</p>}
+
+      {structuralMap && (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-border-subtle bg-bg-base/60 p-3">
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+              <FileText size={12} />
+              {structuralMap.sections.length} section{structuralMap.sections.length === 1 ? '' : 's'} detected
+            </div>
+            <ul className="space-y-1 text-xs text-text-secondary">
+              {structuralMap.sections.map((section) => (
+                <li key={section.key} className="flex items-center gap-1.5" style={{ paddingLeft: (section.level - 1) * 12 }}>
+                  <span className="truncate">{section.heading}</span>
+                  {section.hasTable && (
+                    <span title="Contains a table" className="shrink-0 text-accent-blue">
+                      <Table2 size={11} />
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-xl border border-border-subtle bg-bg-base/60 p-3">
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+              <Palette size={12} />
+              Palette · {structuralMap.tableCount} table{structuralMap.tableCount === 1 ? '' : 's'}
+              {structuralMap.figurePlaceholderCount > 0 ? ` · ${structuralMap.figurePlaceholderCount} figure${structuralMap.figurePlaceholderCount === 1 ? '' : 's'}` : ''}
+            </div>
+            {structuralMap.palette.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {structuralMap.palette.map((color) => (
+                  <span
+                    key={`${color.hex}-${color.usage}`}
+                    title={`${color.hex} · ${color.usage} · seen ${color.count}x`}
+                    className="h-6 w-6 rounded-full border border-white/10"
+                    style={{ backgroundColor: color.hex }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-text-muted">No distinct colors sampled.</p>
+            )}
+          </div>
+          <div className="sm:col-span-2">
+            <button
+              type="button"
+              onClick={handleSaveAsBaseline}
+              disabled={saving || !onCreateBaseline}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-accent-blue/40 bg-accent-blue/15 px-4 py-2 text-sm font-semibold text-accent-blue transition hover:bg-accent-blue/20 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <FileStack size={14} />}
+              {saving ? 'Saving…' : 'Save as baseline'}
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
 
 function ProbeStatusIcon({ status }: { status: EndpointProbeStatus }) {
   if (status === 'probing') return <Loader2 className="animate-spin text-accent-blue" size={16} />;
@@ -180,7 +343,7 @@ function ActionRequestPanel({
   );
 }
 
-export function ExperimentalView({ folder, settings, onUpdateSettings, onOpenChat }: ExperimentalViewProps) {
+export function ExperimentalView({ folder, settings, onUpdateSettings, onOpenChat, onCreateBaseline }: ExperimentalViewProps) {
   const [activeLane, setActiveLane] = useState<PrototypeLane | null>(null);
   const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>({});
   const [customEndpoint, setCustomEndpoint] = useState('');
@@ -248,6 +411,8 @@ export function ExperimentalView({ folder, settings, onUpdateSettings, onOpenCha
             </div>
           </div>
         </section>
+
+        <DocxTemplateDeriver onCreateBaseline={onCreateBaseline} />
 
         <section className="grid gap-4 md:max-w-xl">
           {prototypes.map((prototype) => {

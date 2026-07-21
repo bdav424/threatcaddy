@@ -1375,6 +1375,39 @@ export interface ProductBaselineAsset {
   notes?: string;
 }
 
+/** One heading-delimited section derived from an uploaded docx's real body
+ * structure. `key` is a stable slug (from the heading text) the section wand
+ * (Stage 2) matches investigation data against; `order`/`level` place it
+ * back among its siblings so the renderer can re-locate the original
+ * paragraph/table run in the source docx at fill time. */
+export interface ProductBaselineSection {
+  key: string;
+  heading: string;
+  level: number;
+  style?: string;
+  order: number;
+  hasTable: boolean;
+  paragraphCount: number;
+}
+
+export interface ProductBaselinePaletteColor {
+  hex: string;
+  usage: 'accent' | 'table-header' | 'text' | 'theme';
+  count: number;
+}
+
+/** Captured once when a docx is uploaded and "derived" into a template
+ * (CaddyLab docx round-trip). Lets the renderer fill an arbitrary uploaded
+ * report's real structure instead of only the one hardcoded intel-note
+ * shape it originally supported. */
+export interface ProductBaselineStructuralMap {
+  schemaVersion: 1;
+  sections: ProductBaselineSection[];
+  palette: ProductBaselinePaletteColor[];
+  tableCount: number;
+  figurePlaceholderCount: number;
+}
+
 export interface ProductBaselineMetadata {
   schemaVersion: 1;
   kind: ProductBaselineKind;
@@ -1386,6 +1419,7 @@ export interface ProductBaselineMetadata {
   sourceDocuments?: ProductBaselineSourceDocument[];
   testFixtures?: ProductBaselineTestFixture[];
   assets?: ProductBaselineAsset[];
+  structuralMap?: ProductBaselineStructuralMap;
   layoutNotes?: string[];
   sourceNoteRules?: string[];
   requiredFields?: string[];

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTemplateBackedDocxBytes, extractDocxTemplateProfile } from '../lib/docx-template-renderer';
+import { buildTemplateBackedDocxBytes, deriveDocxTemplate, extractDocxTemplateProfile } from '../lib/docx-template-renderer';
 
 describe('docx template renderer', () => {
   it('replaces the main document body while preserving section furniture', () => {
@@ -157,6 +157,91 @@ describe('docx template renderer', () => {
     expect(footnotesXml).toContain('<w:vertAlign w:val="subscript"/>');
     expect(footnotesXml).toContain('<w:sz w:val="13"/>');
     expect(footnotesXml).not.toContain('OLD SOURCE FOOTNOTE');
+  });
+});
+
+describe('docx template derivation (CaddyLab Stage 1 — generic docx round-trip)', () => {
+  function buildArbitraryReportZip() {
+    return buildStoredZip([
+      {
+        path: '[Content_Types].xml',
+        content: '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>',
+      },
+      {
+        path: 'word/document.xml',
+        content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>Cover page preamble, no heading yet.</w:t></w:r></w:p>
+    <w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr><w:r><w:t>Quarterly Threat Roundup</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Some intro paragraph under the title.</w:t></w:r></w:p>
+    <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Overview</w:t></w:r></w:p>
+    <w:p><w:r><w:rPr><w:color w:val="1F4E79"/></w:rPr><w:t>OLD overview text that should be replaced.</w:t></w:r></w:p>
+    <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Notable Incidents</w:t></w:r></w:p>
+    <w:tbl><w:tblPr><w:tblStyle w:val="ArbitraryTable"/><w:tblW w:w="0" w:type="auto"/></w:tblPr><w:tr><w:tc><w:tcPr><w:shd w:val="clear" w:fill="4472C4"/></w:tcPr><w:p><w:r><w:t>OLD incident row</w:t></w:r></w:p></w:tc></w:tr></w:tbl>
+    <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Untouched Appendix</w:t></w:r></w:p>
+    <w:p><w:r><w:t>This appendix has no matching markdown section and must survive verbatim.</w:t></w:r></w:p>
+    <w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>
+  </w:body>
+</w:document>`,
+      },
+    ]);
+  }
+
+  it('derives an ordered section map, table detection, and a color palette from an arbitrary report shape', () => {
+    const template = buildArbitraryReportZip();
+    const map = deriveDocxTemplate(template);
+
+    expect(map.sections.map((s) => s.heading)).toEqual([
+      'Quarterly Threat Roundup',
+      'Overview',
+      'Notable Incidents',
+      'Untouched Appendix',
+    ]);
+    expect(map.sections[0].level).toBe(1); // Title
+    expect(map.sections[1].level).toBe(1); // Heading1
+    expect(map.sections[1].key).toBe('overview');
+    expect(map.sections[2].hasTable).toBe(true);
+    expect(map.sections[3].hasTable).toBe(false);
+    expect(map.sections[3].paragraphCount).toBe(1);
+    expect(map.tableCount).toBe(1);
+    expect(map.palette.some((c) => c.hex === '#4472C4' && c.usage === 'table-header')).toBe(true);
+    expect(map.palette.some((c) => c.hex === '#1F4E79' && c.usage === 'text')).toBe(true);
+  });
+
+  it('fills matched sections and leaves unmatched sections exactly as the original template had them', () => {
+    const template = buildArbitraryReportZip();
+    const map = deriveDocxTemplate(template);
+
+    const rendered = buildTemplateBackedDocxBytes(template, [
+      '## Overview',
+      '',
+      'New overview content written by the analyst.',
+      '',
+      '## Notable Incidents',
+      '',
+      '| Incident | Severity |',
+      '| --- | --- |',
+      '| APT phishing wave | High |',
+    ].join('\n'), undefined, map);
+
+    const documentXml = readZipText(rendered, 'word/document.xml');
+
+    // Matched sections got new content, and the ORIGINAL heading text/style survives untouched.
+    expect(documentXml).toContain('Overview');
+    expect(documentXml).toContain('New overview content written by the analyst.');
+    expect(documentXml).not.toContain('OLD overview text');
+    expect(documentXml).toContain('Notable Incidents');
+    expect(documentXml).toContain('APT phishing wave');
+    expect(documentXml).not.toContain('OLD incident row');
+    expect(documentXml).toContain('ArbitraryTable'); // table style cloned from the original template table
+
+    // Unmatched section (no markdown heading for it) survives byte-for-byte.
+    expect(documentXml).toContain('This appendix has no matching markdown section and must survive verbatim.');
+    expect(documentXml).toContain('Untouched Appendix');
+
+    // Preamble content before the first heading also survives untouched.
+    expect(documentXml).toContain('Cover page preamble, no heading yet.');
   });
 });
 

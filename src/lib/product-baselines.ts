@@ -8,6 +8,7 @@ import type {
   ProductBaselineAsset,
   ProductBaselineMetadata,
   ProductBaselineSourceDocument,
+  ProductBaselineStructuralMap,
   ProductBaselineTestFixture,
   StandaloneIOC,
   Task,
@@ -168,6 +169,63 @@ export function buildBaselineFromDocumentText(
   return {
     name,
     description: `Imported from ${fileName}`,
+    icon: defaultProductBaselineIcon(productBaseline.productType),
+    content,
+    category: PRODUCT_BASELINE_CATEGORY,
+    tags,
+    productBaseline,
+  };
+}
+
+/**
+ * CaddyLab Stage 1 — "docx round-trip." Unlike buildBaselineFromDocumentText
+ * (extracts text only, discards the file), this keeps the original .docx
+ * bytes as a docx-template asset AND the structural map derived from it
+ * (see deriveDocxTemplate in docx-template-renderer.ts), so
+ * buildTemplateBackedDocxBlob can later fill this exact document's real
+ * structure back out — matched sections get new content, everything else
+ * survives untouched. The seeded content is a markdown skeleton (one heading
+ * per derived section, with a fill placeholder) so the baseline is
+ * immediately legible in the picker and gives the analyst/CaddyAI something
+ * concrete to write into, matching each section's real heading text.
+ */
+export function buildDerivedBaselineFromDocx(
+  fileName: string,
+  docxBase64: string,
+  structuralMap: ProductBaselineStructuralMap,
+): Partial<NoteTemplate> & { name: string; content: string } {
+  if (structuralMap.sections.length === 0) {
+    throw new Error('No headings were found in this document — nothing to derive a template from.');
+  }
+  const name = cleanString(fileName.replace(/\.docx$/i, '')) || 'Derived baseline';
+  const now = Date.now();
+  const content = structuralMap.sections
+    .map((section) => `${'#'.repeat(Math.min(Math.max(section.level, 1), 3))} ${section.heading}\n\n_[Fill: ${section.heading}]_`)
+    .join('\n\n');
+
+  const productBaseline = normalizeProductBaselineMetadata(
+    {
+      productType: 'custom',
+      kind: 'docx-template',
+      renderer: 'docx-template',
+      visualFidelity: 'word-template',
+      sourceDocuments: [{ name: fileName, type: 'docx', notes: 'Original file retained as the docx-template asset below.' }],
+      assets: [{
+        name: fileName,
+        role: 'docx-template',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        data: docxBase64,
+      }],
+      structuralMap,
+    },
+    fileName,
+    now,
+  );
+  const tags = uniqueStrings([PRODUCT_BASELINE_TAG, productBaseline.productType, 'derived']);
+
+  return {
+    name,
+    description: `Derived from ${fileName} (${structuralMap.sections.length} sections, ${structuralMap.tableCount} tables)`,
     icon: defaultProductBaselineIcon(productBaseline.productType),
     content,
     category: PRODUCT_BASELINE_CATEGORY,

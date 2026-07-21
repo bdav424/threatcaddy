@@ -2883,6 +2883,7 @@ const AppInner = memo(function AppInner({
       settings={settings}
       onUpdateSettings={updateSettings}
       onOpenChat={() => navigateTo('chat')}
+      onCreateBaseline={handleCreateProductBaseline}
     />
   );
 

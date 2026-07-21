@@ -1,5 +1,12 @@
 import { inflateRaw } from 'pako';
-import type { Note, NoteTemplate, ProductBaselineAsset } from '../types';
+import type {
+  Note,
+  NoteTemplate,
+  ProductBaselineAsset,
+  ProductBaselinePaletteColor,
+  ProductBaselineSection,
+  ProductBaselineStructuralMap,
+} from '../types';
 
 const DOCX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const EOCD_SIGNATURE = 0x06054b50;
@@ -67,7 +74,12 @@ export function buildTemplateBackedDocxBlob(product: Note, baseline: NoteTemplat
   const asset = getDocxTemplateAsset(baseline);
   if (!asset?.data) return null;
   const templateBytes = base64ToBytes(asset.data);
-  const docxBytes = buildTemplateBackedDocxBytes(templateBytes, product.content, baseline?.productBaseline?.productType);
+  const docxBytes = buildTemplateBackedDocxBytes(
+    templateBytes,
+    product.content,
+    baseline?.productBaseline?.productType,
+    baseline?.productBaseline?.structuralMap,
+  );
   const buffer = new ArrayBuffer(docxBytes.byteLength);
   new Uint8Array(buffer).set(docxBytes);
   return new Blob([buffer], { type: DOCX_MIME_TYPE });
@@ -77,7 +89,16 @@ export function buildTemplateBackedDocxBytes(
   templateBytes: Uint8Array,
   markdown: string,
   productType?: string,
+  structuralMap?: ProductBaselineStructuralMap,
 ): Uint8Array {
+  // A derived structural map (any uploaded docx, Stage 1) takes priority over
+  // the older hardcoded intel-note anchor list — it's the generalized version
+  // of the same "clone the original paragraph's formatting, swap its text"
+  // technique, just driven by data instead of one fixed heading set.
+  if (structuralMap && structuralMap.sections.length > 0) {
+    return buildStructuralDocxBytes(templateBytes, markdown, structuralMap);
+  }
+
   const entries = unzip(templateBytes);
   const documentEntry = entries.find((entry) => entry.path === 'word/document.xml');
   if (!documentEntry) throw new Error('Template DOCX is missing word/document.xml.');
@@ -101,6 +122,262 @@ export function extractDocxTemplateProfile(templateBytes: Uint8Array): DocxTempl
   const documentEntry = entries.find((entry) => entry.path === 'word/document.xml');
   if (!documentEntry) throw new Error('Template DOCX is missing word/document.xml.');
   return extractDocxTemplateProfileFromXml(decodeUtf8(documentEntry.data));
+}
+
+// ── Template derivation (CaddyLab docx round-trip, Stage 1) ───────────────────
+// Walks an uploaded docx's real body structure into a generic, reusable map —
+// heading-delimited sections in document order, plus a sampled color palette —
+// instead of the fixed intel-note anchor list below. buildStructuralDocxBytes
+// then fills that map back out against the SAME stored template bytes, so any
+// uploaded report shape gets a faithful round-trip, not just the one hardcoded
+// productType this renderer originally supported.
+
+const HEADING_STYLE_PATTERN = /^(Heading([1-9])|Title)$/i;
+
+function headingLevelFromStyle(style: string | undefined): number | undefined {
+  if (!style) return undefined;
+  const match = style.match(HEADING_STYLE_PATTERN);
+  if (!match) return undefined;
+  return match[1].toLowerCase() === 'title' ? 1 : Number.parseInt(match[2], 10);
+}
+
+export function deriveDocxTemplate(templateBytes: Uint8Array): ProductBaselineStructuralMap {
+  const entries = unzip(templateBytes);
+  const documentEntry = entries.find((entry) => entry.path === 'word/document.xml');
+  if (!documentEntry) throw new Error('Template DOCX is missing word/document.xml.');
+  const documentXml = decodeUtf8(documentEntry.data);
+  const bodyStart = documentXml.indexOf('<w:body>');
+  const bodyEnd = documentXml.indexOf('</w:body>');
+  if (bodyStart === -1 || bodyEnd === -1 || bodyEnd <= bodyStart) {
+    throw new Error('Template DOCX has an unsupported document body structure.');
+  }
+  const elements = parseBodyElements(documentXml.slice(bodyStart + '<w:body>'.length, bodyEnd));
+
+  const sections: ProductBaselineSection[] = [];
+  const usedKeys = new Set<string>();
+  let currentTableCount = 0;
+  let currentParagraphCount = 0;
+  let pendingSection: ProductBaselineSection | null = null;
+
+  const closeSection = () => {
+    if (!pendingSection) return;
+    pendingSection.hasTable = currentTableCount > 0;
+    pendingSection.paragraphCount = currentParagraphCount;
+    sections.push(pendingSection);
+  };
+
+  for (const element of elements) {
+    const level = element.type === 'p' ? headingLevelFromStyle(element.style) : undefined;
+    if (level !== undefined && element.text.trim()) {
+      closeSection();
+      currentTableCount = 0;
+      currentParagraphCount = 0;
+      pendingSection = {
+        key: uniqueSlug(element.text, usedKeys),
+        heading: element.text.trim(),
+        level,
+        style: element.style,
+        order: sections.length,
+        hasTable: false,
+        paragraphCount: 0,
+      };
+      continue;
+    }
+    if (!pendingSection) continue;
+    if (element.type === 'tbl') currentTableCount += 1;
+    else if (element.type === 'p') currentParagraphCount += 1;
+  }
+  closeSection();
+
+  const themeEntry = entries.find((entry) => entry.path === 'word/theme/theme1.xml');
+  const palette = extractPalette(documentXml, themeEntry ? decodeUtf8(themeEntry.data) : undefined);
+  const tableCount = elements.filter((element) => element.type === 'tbl').length;
+  const figurePlaceholderCount = Array.from(documentXml.matchAll(/<w:drawing\b|<w:pict\b/g)).length;
+
+  return {
+    schemaVersion: 1,
+    sections,
+    palette,
+    tableCount,
+    figurePlaceholderCount,
+  };
+}
+
+function uniqueSlug(text: string, used: Set<string>): string {
+  const base = text.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'section';
+  let key = base;
+  let suffix = 2;
+  while (used.has(key)) {
+    key = `${base}-${suffix}`;
+    suffix += 1;
+  }
+  used.add(key);
+  return key;
+}
+
+function extractPalette(documentXml: string, themeXml: string | undefined): ProductBaselinePaletteColor[] {
+  const counts = new Map<string, { usage: ProductBaselinePaletteColor['usage']; count: number }>();
+  const tally = (hex: string, usage: ProductBaselinePaletteColor['usage']) => {
+    const normalized = hex.toUpperCase();
+    const existing = counts.get(normalized);
+    if (existing) existing.count += 1;
+    else counts.set(normalized, { usage, count: 1 });
+  };
+
+  for (const match of documentXml.matchAll(/<w:shd\b[^>]*w:fill="([0-9A-Fa-f]{6})"/g)) tally(match[1], 'table-header');
+  for (const match of documentXml.matchAll(/<w:color\b[^>]*w:val="([0-9A-Fa-f]{6})"/g)) tally(match[1], 'text');
+  if (themeXml) {
+    const schemeMatch = themeXml.match(/<a:clrScheme[\s\S]*?<\/a:clrScheme>/);
+    if (schemeMatch) {
+      for (const match of schemeMatch[0].matchAll(/<a:srgbClr\s+val="([0-9A-Fa-f]{6})"/g)) tally(match[1], 'theme');
+    }
+  }
+
+  return Array.from(counts.entries())
+    .map(([hex, { usage, count }]) => ({ hex: `#${hex}`, usage, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 12);
+}
+
+// ── Generic structural fill — Stage 1's other half ─────────────────────────
+// Fills a template docx section-by-section against its OWN derived map: the
+// analyst's markdown is split at its own headings, each markdown section is
+// matched to the closest-named structural-map section, and only matched
+// sections' body content is replaced — every unmatched section keeps its
+// original template content untouched. That's the actual "faithful" promise:
+// a 10-section report where only 6 sections got new content doesn't lose the
+// other 4, unlike the whole-body-replace fallback below.
+
+interface MarkdownSection {
+  heading: string;
+  level: number;
+  blocks: MarkdownBlock[];
+}
+
+function groupMarkdownIntoSections(markdown: string): MarkdownSection[] {
+  const blocks = parseMarkdown(markdown);
+  const sections: MarkdownSection[] = [];
+  let current: MarkdownSection | null = null;
+  for (const block of blocks) {
+    if (block.type === 'heading') {
+      current = { heading: (block.text || '').trim(), level: block.level || 1, blocks: [] };
+      sections.push(current);
+      continue;
+    }
+    if (!current) continue;
+    current.blocks.push(block);
+  }
+  return sections;
+}
+
+function normalizeHeadingText(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function matchStructuralSection(
+  markdownHeading: string,
+  candidates: ProductBaselineSection[],
+  claimed: Set<string>,
+): ProductBaselineSection | undefined {
+  const normalized = normalizeHeadingText(markdownHeading);
+  const unclaimed = candidates.filter((section) => !claimed.has(section.key));
+  const exact = unclaimed.find((section) => normalizeHeadingText(section.heading) === normalized);
+  if (exact) return exact;
+  return unclaimed.find((section) => {
+    const sectionNormalized = normalizeHeadingText(section.heading);
+    return sectionNormalized.includes(normalized) || normalized.includes(sectionNormalized);
+  });
+}
+
+/** Splits the parsed body into (content before the first heading, then one
+ * span per heading running up to the next heading paragraph). Matches
+ * deriveDocxTemplate's own heading detection so structuralMap.sections[i]
+ * lines up with the i-th span here, by order — both walk the same original
+ * document.xml in the same pass order. */
+function splitBodyIntoSpans(elements: BodyElement[]): { preamble: BodyElement[]; spans: BodyElement[][] } {
+  const preamble: BodyElement[] = [];
+  const spans: BodyElement[][] = [];
+  let current: BodyElement[] | null = null;
+  for (const element of elements) {
+    const level = element.type === 'p' ? headingLevelFromStyle(element.style) : undefined;
+    if (level !== undefined && element.text.trim()) {
+      current = [element];
+      spans.push(current);
+      continue;
+    }
+    if (element.type === 'sectPr') continue;
+    (current || preamble).push(element);
+  }
+  return { preamble, spans };
+}
+
+export function buildStructuralDocxBytes(
+  templateBytes: Uint8Array,
+  markdown: string,
+  structuralMap: ProductBaselineStructuralMap,
+): Uint8Array {
+  const entries = unzip(templateBytes);
+  const documentEntry = entries.find((entry) => entry.path === 'word/document.xml');
+  if (!documentEntry) throw new Error('Template DOCX is missing word/document.xml.');
+  const documentXml = decodeUtf8(documentEntry.data);
+  const bodyStart = documentXml.indexOf('<w:body>');
+  const bodyEnd = documentXml.indexOf('</w:body>');
+  if (bodyStart === -1 || bodyEnd === -1 || bodyEnd <= bodyStart) {
+    throw new Error('Template DOCX has an unsupported document body structure.');
+  }
+  const bodyInnerStart = bodyStart + '<w:body>'.length;
+  const existingBody = documentXml.slice(bodyInnerStart, bodyEnd);
+  const elements = parseBodyElements(existingBody);
+  const sectPr = elements.find((element) => element.type === 'sectPr')?.xml ||
+    '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr>';
+  const defaultTablePr = extractTableProperties(existingBody);
+  const { preamble, spans } = splitBodyIntoSpans(elements);
+
+  const markdownSections = groupMarkdownIntoSections(markdown);
+  const claimed = new Set<string>();
+  const contentBySectionKey = new Map<string, MarkdownSection>();
+  for (const mdSection of markdownSections) {
+    const match = matchStructuralSection(mdSection.heading, structuralMap.sections, claimed);
+    if (!match) continue;
+    claimed.add(match.key);
+    contentBySectionKey.set(match.key, mdSection);
+  }
+
+  const next: string[] = preamble.map((element) => element.xml);
+  spans.forEach((span, index) => {
+    const structuralSection = structuralMap.sections[index];
+    const mdSection = structuralSection ? contentBySectionKey.get(structuralSection.key) : undefined;
+    if (!mdSection) {
+      // Unmatched — carry the original span through verbatim (heading + body).
+      next.push(...span.map((element) => element.xml));
+      return;
+    }
+
+    const [headingElement, ...bodyElements] = span;
+    next.push(headingElement.xml); // Heading text/style stays exactly as authored in the template.
+
+    const paragraphTemplate = bodyElements.find((element) => element.type === 'p');
+    const tableTemplate = bodyElements.find((element) => element.type === 'tbl');
+    const tablePr = tableTemplate ? (extractTableProperties(tableTemplate.xml) || defaultTablePr) : defaultTablePr;
+    const tableWidths = tableTemplate ? extractTableGridWidths(tableTemplate.xml) : undefined;
+
+    for (const block of mdSection.blocks) {
+      if (block.type === 'table') {
+        next.push(renderTable(block.rows || [], tablePr, tableWidths));
+      } else if (block.type === 'bullet') {
+        next.push(renderParagraphFromTemplate(paragraphTemplate, block.text || '', true));
+      } else {
+        next.push(renderParagraphFromTemplate(paragraphTemplate, block.text || ''));
+      }
+    }
+  });
+
+  const replacementBody = `${next.join('')}${sectPr}`;
+  const nextDocumentXml = `${documentXml.slice(0, bodyInnerStart)}${replacementBody}${documentXml.slice(bodyEnd)}`;
+  const nextEntries = entries.map((entry) => entry.path === 'word/document.xml'
+    ? { ...entry, data: encodeUtf8(nextDocumentXml) }
+    : entry);
+  return zipStored(nextEntries);
 }
 
 export function arrayBufferToBase64(buffer: ArrayBuffer): string {
