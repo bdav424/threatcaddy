@@ -518,6 +518,11 @@ export function buildStructuralDocxBytes(
     '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr>';
   const defaultTablePr = extractTableProperties(existingBody);
   const { preamble, spans } = splitBodyIntoSpans(elements);
+  // Stage 4: any freshly-rendered table (analyst text, timeline/IOC autofill,
+  // or an attached xlsx sheet) shades its header row from the template's own
+  // sampled palette — "tables and charts draw from this palette" per spec —
+  // rather than staying unstyled just because the content is new.
+  const headerFillHex = structuralMap.palette.find((color) => color.usage === 'table-header')?.hex.replace(/^#/, '');
 
   const markdownSections = groupMarkdownIntoSections(markdown);
   const claimed = new Set<string>();
@@ -551,7 +556,7 @@ export function buildStructuralDocxBytes(
 
     for (const block of mdSection.blocks) {
       if (block.type === 'table') {
-        next.push(renderTable(block.rows || [], tablePr, tableWidths));
+        next.push(renderTable(block.rows || [], tablePr, tableWidths, headerFillHex));
       } else if (block.type === 'bullet') {
         next.push(renderParagraphFromTemplate(paragraphTemplate, block.text || '', true));
       } else {
@@ -1020,14 +1025,14 @@ function renderParagraph(text: string, style?: string, bullet = false): string {
   ].join('');
 }
 
-function renderTable(rows: string[][], tablePr: string, preferredWidths?: number[]): string {
+function renderTable(rows: string[][], tablePr: string, preferredWidths?: number[], headerFillHex?: string): string {
   if (rows.length === 0) return '';
   const columnCount = Math.max(...rows.map((row) => row.length));
   const widths = normalizeTableWidths(rows, columnCount, preferredWidths);
   const grid = widths.map((width) => `<w:gridCol w:w="${width}"/>`).join('');
   const renderedRows = rows.map((row, rowIndex) => {
     const cells = Array.from({ length: columnCount }, (_, index) => row[index] || '')
-      .map((cell, index) => renderCell(cell, rowIndex === 0, widths[index]))
+      .map((cell, index) => renderCell(cell, rowIndex === 0, widths[index], headerFillHex))
       .join('');
     return `<w:tr>${cells}</w:tr>`;
   }).join('');
@@ -1050,15 +1055,16 @@ function normalizeTableWidths(rows: string[][], columnCount: number, preferredWi
   return Array.from({ length: columnCount }, () => gridWidth);
 }
 
-function renderCell(text: string, header: boolean, width: number): string {
+function renderCell(text: string, header: boolean, width: number, headerFillHex?: string): string {
   const runPr = runProperties({
     size: header ? HEADER_FONT_SIZE : BODY_FONT_SIZE,
     bold: header,
   });
   const verticalAlign = header ? '' : '<w:vAlign w:val="top"/>';
+  const shading = header && headerFillHex ? `<w:shd w:val="clear" w:fill="${headerFillHex}"/>` : '';
   return [
     '<w:tc>',
-    `<w:tcPr><w:tcW w:w="${width}" w:type="dxa"/><w:tcMar><w:top w:w="${header ? 80 : 70}" w:type="dxa"/><w:start w:w="120" w:type="dxa"/><w:bottom w:w="${header ? 80 : 70}" w:type="dxa"/><w:end w:w="120" w:type="dxa"/></w:tcMar>${verticalAlign}</w:tcPr>`,
+    `<w:tcPr><w:tcW w:w="${width}" w:type="dxa"/><w:tcMar><w:top w:w="${header ? 80 : 70}" w:type="dxa"/><w:start w:w="120" w:type="dxa"/><w:bottom w:w="${header ? 80 : 70}" w:type="dxa"/><w:end w:w="120" w:type="dxa"/></w:tcMar>${verticalAlign}${shading}</w:tcPr>`,
     '<w:p><w:pPr><w:spacing w:after="0"/></w:pPr><w:r>',
     runPr,
     `<w:t xml:space="preserve">${escapeXml(stripMarkdownInline(text))}</w:t>`,

@@ -244,6 +244,23 @@ describe('docx template derivation (CaddyLab Stage 1 — generic docx round-trip
     // Preamble content before the first heading also survives untouched.
     expect(documentXml).toContain('Cover page preamble, no heading yet.');
   });
+
+  it('shades new table header rows from the template\'s own sampled palette (Stage 4: tables draw from the palette)', () => {
+    const template = buildArbitraryReportZip();
+    const map = deriveDocxTemplate(template);
+    expect(map.palette.some((color) => color.hex === '#4472C4' && color.usage === 'table-header')).toBe(true);
+
+    const rendered = buildTemplateBackedDocxBytes(template, [
+      '## Notable Incidents',
+      '',
+      '| Incident | Severity |',
+      '| --- | --- |',
+      '| APT phishing wave | High |',
+    ].join('\n'), undefined, map);
+    const documentXml = readZipText(rendered, 'word/document.xml');
+
+    expect(documentXml).toContain('<w:shd w:val="clear" w:fill="4472C4"/>');
+  });
 });
 
 describe('docx figure placeholders + upload-to-format (CaddyLab Stage 3)', () => {

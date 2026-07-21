@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { Bot, Check, Clipboard, Download, FileOutput, FilePenLine, FileText, Image as ImageIcon, Layers, Printer, Search, Settings2, Sparkles, Upload, Wand2, X } from 'lucide-react';
+import { Bot, Check, Clipboard, Download, FileOutput, FilePenLine, FileText, Image as ImageIcon, Layers, Printer, Search, Settings2, Sparkles, Table2, Upload, Wand2, X } from 'lucide-react';
 import type { Note, NoteTemplate } from '../../types';
 import { formatDate } from '../../lib/utils';
 import { renderMarkdown } from '../../lib/markdown';
@@ -14,6 +14,7 @@ import {
 } from '../../lib/product-baselines';
 import { arrayBufferToBase64, buildTemplateBackedDocxBlob, hasDocxTemplateAsset } from '../../lib/docx-template-renderer';
 import { extractDocxEvidence, extractPdfText } from '../../lib/evidence-import';
+import { parseXlsxWorkbook, rowsToMarkdownTable, type XlsxSheet } from '../../lib/xlsx-import';
 import { Modal } from '../Common/Modal';
 
 interface ProductViewProps {
@@ -82,6 +83,11 @@ export function ProductView({
   const [wandLoading, setWandLoading] = useState(false);
   const [wandSaving, setWandSaving] = useState(false);
   const [wandError, setWandError] = useState('');
+  // CaddyLab Stage 4 — xlsx read as a data source for tables. Transient per
+  // wand-session state (not persisted): which sheets a section's uploaded
+  // spreadsheet has, so a multi-sheet workbook can be re-picked without
+  // re-uploading.
+  const [wandXlsxSheets, setWandXlsxSheets] = useState<Record<string, XlsxSheet[]>>({});
 
   async function openWand(baseline: NoteTemplate) {
     const structuralMap = baseline.productBaseline?.structuralMap;
@@ -114,10 +120,32 @@ export function ProductView({
     setWandBaseline(null);
     setWandSections([]);
     setWandError('');
+    setWandXlsxSheets({});
   }
 
   function updateWandSection(key: string, content: string) {
     setWandSections((current) => current.map((section) => (section.key === key ? { ...section, content } : section)));
+  }
+
+  async function handleSectionXlsxUpload(sectionKey: string, file: File) {
+    try {
+      const buffer = await file.arrayBuffer();
+      const sheets = parseXlsxWorkbook(new Uint8Array(buffer));
+      if (sheets.length === 0) {
+        setWandError(`"${file.name}" has no readable rows.`);
+        return;
+      }
+      setWandXlsxSheets((current) => ({ ...current, [sectionKey]: sheets }));
+      updateWandSection(sectionKey, rowsToMarkdownTable(sheets[0].rows));
+    } catch {
+      setWandError(`Failed to read "${file.name}" as a spreadsheet.`);
+    }
+  }
+
+  function handleSectionSheetChange(sectionKey: string, sheetIndex: number) {
+    const sheet = wandXlsxSheets[sectionKey]?.[sheetIndex];
+    if (!sheet) return;
+    updateWandSection(sectionKey, rowsToMarkdownTable(sheet.rows));
   }
 
   async function copySectionPrompt(section: WandSectionState) {
@@ -780,15 +808,43 @@ export function ProductView({
                     placeholder="Type this section's content, or ask CaddyAI to draft it…"
                     className="w-full rounded-lg border border-border-subtle bg-bg-primary px-3 py-2 font-mono text-xs text-text-primary outline-none focus:border-accent-blue"
                   />
-                  {!section.autoFilled && (
-                    <button
-                      onClick={() => copySectionPrompt(section)}
-                      className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-border-subtle px-2 py-1 text-[11px] font-medium text-text-secondary hover:text-text-primary hover:bg-bg-hover"
-                    >
-                      <Bot size={12} />
-                      Ask CaddyAI to draft this
-                    </button>
-                  )}
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {!section.autoFilled && (
+                      <button
+                        onClick={() => copySectionPrompt(section)}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-border-subtle px-2 py-1 text-[11px] font-medium text-text-secondary hover:text-text-primary hover:bg-bg-hover"
+                      >
+                        <Bot size={12} />
+                        Ask CaddyAI to draft this
+                      </button>
+                    )}
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border-subtle px-2 py-1 text-[11px] font-medium text-text-secondary hover:text-text-primary hover:bg-bg-hover">
+                      <Table2 size={12} />
+                      Insert spreadsheet
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls,.csv"
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          event.target.value = '';
+                          if (file) void handleSectionXlsxUpload(section.key, file);
+                        }}
+                      />
+                    </label>
+                    {wandXlsxSheets[section.key] && wandXlsxSheets[section.key].length > 1 && (
+                      <select
+                        aria-label={`${section.heading} spreadsheet sheet`}
+                        defaultValue={0}
+                        onChange={(event) => handleSectionSheetChange(section.key, Number(event.target.value))}
+                        className="rounded-md border border-border-subtle bg-bg-primary px-2 py-1 text-[11px] text-text-primary outline-none focus:border-accent-blue"
+                      >
+                        {wandXlsxSheets[section.key].map((sheet, index) => (
+                          <option key={sheet.name} value={index}>{sheet.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
