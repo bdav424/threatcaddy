@@ -7,8 +7,10 @@ import type {
   ProductBaselinePaletteColor,
   ProductBaselineSection,
   ProductBaselineStructuralMap,
+  ProductChart,
   ProductFigureUpload,
 } from '../types';
+import { buildChartParts } from './docx-chart';
 
 const DOCX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const EOCD_SIGNATURE = 0x06054b50;
@@ -82,6 +84,7 @@ export function buildTemplateBackedDocxBlob(product: Note, baseline: NoteTemplat
     baseline?.productBaseline?.productType,
     baseline?.productBaseline?.structuralMap,
     product.productFigures,
+    product.productCharts,
   );
   const buffer = new ArrayBuffer(docxBytes.byteLength);
   new Uint8Array(buffer).set(docxBytes);
@@ -94,13 +97,14 @@ export function buildTemplateBackedDocxBytes(
   productType?: string,
   structuralMap?: ProductBaselineStructuralMap,
   figureUploads?: ProductFigureUpload[],
+  charts?: ProductChart[],
 ): Uint8Array {
   // A derived structural map (any uploaded docx, Stage 1) takes priority over
   // the older hardcoded intel-note anchor list — it's the generalized version
   // of the same "clone the original paragraph's formatting, swap its text"
   // technique, just driven by data instead of one fixed heading set.
   if (structuralMap && structuralMap.sections.length > 0) {
-    return buildStructuralDocxBytes(templateBytes, markdown, structuralMap, figureUploads);
+    return buildStructuralDocxBytes(templateBytes, markdown, structuralMap, figureUploads, charts);
   }
 
   const entries = unzip(templateBytes);
@@ -634,15 +638,87 @@ function transformFigureParagraph(
   return { ...element, xml: placeholderFigureParagraph(element.xml, figure) };
 }
 
+// ── Native Word charts — token injection (CaddyLab Stage 5b) ────────────────
+// A `[[chart:key]]` paragraph in a section's content marks where a native
+// editable Word chart goes. This adds the chart's coupled parts (chartSpace,
+// its rels, the embedded .xlsx data cache — all built + validated in
+// docx-chart.ts, proven in isolation first) to the zip, allocates a document
+// relationship above whatever the template already uses (so figures + charts
+// never collide on an rId), and returns the body drawing run each token is
+// replaced with. Same "add media + rels + content types, then swap the body
+// reference" shape as the figure upload path above.
+
+const CHART_TOKEN_PATTERN = /^\[\[chart:(.+)\]\]$/;
+
+function prepareChartParts(entries: ZipEntry[], charts: ProductChart[]): { entries: ZipEntry[]; runByKey: Map<string, string> } {
+  const runByKey = new Map<string, string>();
+  if (charts.length === 0) return { entries, runByKey };
+
+  const relsPath = 'word/_rels/document.xml.rels';
+  const relsXml = entries.find((entry) => entry.path === relsPath)
+    ? decodeUtf8(entries.find((entry) => entry.path === relsPath)!.data)
+    : '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+  const existingIds = Array.from(relsXml.matchAll(/\bId="([^"]+)"/g)).map((match) => match[1]);
+  let nextIdNumber = 1 + Math.max(0, ...existingIds.map((id) => Number.parseInt(id.replace(/^rId/, ''), 10) || 0));
+
+  const contentTypesPath = '[Content_Types].xml';
+  const contentTypesXml = entries.find((entry) => entry.path === contentTypesPath)
+    ? decodeUtf8(entries.find((entry) => entry.path === contentTypesPath)!.data)
+    : '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>';
+  const declaredExtensions = new Set(Array.from(contentTypesXml.matchAll(/<Default\s+Extension="([^"]+)"/g)).map((match) => match[1].toLowerCase()));
+  const declaredOverrides = new Set(Array.from(contentTypesXml.matchAll(/<Override\s+PartName="([^"]+)"/g)).map((match) => match[1]));
+
+  let nextChartIndex = 1 + Math.max(0, ...entries.map((entry) => Number.parseInt(entry.path.match(/^word\/charts\/chart(\d+)\.xml$/)?.[1] || '0', 10)));
+
+  const newParts: ZipEntry[] = [];
+  const newRelTags: string[] = [];
+  let overridesToAdd = '';
+  let defaultsToAdd = '';
+
+  for (const chart of charts) {
+    const chartIndex = nextChartIndex;
+    nextChartIndex += 1;
+    const docRelId = `rId${nextIdNumber}`;
+    nextIdNumber += 1;
+    const set = buildChartParts(chart.model, chartIndex, docRelId);
+    newParts.push(...set.parts);
+    newRelTags.push(`<Relationship Id="${set.documentRelationship.id}" Type="${set.documentRelationship.type}" Target="${set.documentRelationship.target}"/>`);
+    for (const override of set.contentTypeOverrides) {
+      const partName = override.match(/PartName="([^"]+)"/)?.[1];
+      if (partName && !declaredOverrides.has(partName)) { declaredOverrides.add(partName); overridesToAdd += override; }
+    }
+    for (const def of set.contentTypeDefaults) {
+      if (!declaredExtensions.has(def.extension.toLowerCase())) { declaredExtensions.add(def.extension.toLowerCase()); defaultsToAdd += `<Default Extension="${def.extension}" ContentType="${def.contentType}"/>`; }
+    }
+    runByKey.set(chart.key, set.drawingRun);
+  }
+
+  const nextRelsXml = relsXml.replace('</Relationships>', `${newRelTags.join('')}</Relationships>`);
+  const nextContentTypesXml = contentTypesXml.replace('</Types>', `${defaultsToAdd}${overridesToAdd}</Types>`);
+  const nextEntries = entries
+    .filter((entry) => entry.path !== relsPath && entry.path !== contentTypesPath)
+    .concat(
+      { path: relsPath, data: encodeUtf8(nextRelsXml) },
+      { path: contentTypesPath, data: encodeUtf8(nextContentTypesXml) },
+      newParts,
+    );
+  return { entries: nextEntries, runByKey };
+}
+
 export function buildStructuralDocxBytes(
   templateBytes: Uint8Array,
   markdown: string,
   structuralMap: ProductBaselineStructuralMap,
   figureUploads?: ProductFigureUpload[],
+  charts?: ProductChart[],
 ): Uint8Array {
   const uploadsByKey = new Map((figureUploads ?? []).map((upload) => [upload.key, upload] as const));
   const figuresByRelId = new Map(structuralMap.figures.map((figure) => [figure.relationshipId, figure] as const));
-  const { entries, relIdRemap } = prepareFigureUploads(unzip(templateBytes), structuralMap.figures, uploadsByKey);
+  const figurePrep = prepareFigureUploads(unzip(templateBytes), structuralMap.figures, uploadsByKey);
+  const chartPrep = prepareChartParts(figurePrep.entries, charts ?? []);
+  const entries = chartPrep.entries;
+  const relIdRemap = figurePrep.relIdRemap;
+  const chartRunByKey = chartPrep.runByKey;
   const withFigureFill = (element: BodyElement) => transformFigureParagraph(element, figuresByRelId, uploadsByKey, relIdRemap);
 
   const documentEntry = entries.find((entry) => entry.path === 'word/document.xml');
@@ -697,7 +773,10 @@ export function buildStructuralDocxBytes(
     const tableWidths = tableTemplate ? extractTableGridWidths(tableTemplate.xml) : undefined;
 
     for (const block of mdSection.blocks) {
-      if (block.type === 'table') {
+      const chartKey = (block.type === 'paragraph' && (block.text || '').trim().match(CHART_TOKEN_PATTERN)?.[1]) || undefined;
+      if (chartKey && chartRunByKey.has(chartKey)) {
+        next.push(`<w:p>${chartRunByKey.get(chartKey)}</w:p>`);
+      } else if (block.type === 'table') {
         next.push(renderTable(block.rows || [], tablePr, tableWidths, headerFillHex));
       } else if (block.type === 'bullet') {
         next.push(renderParagraphFromTemplate(paragraphTemplate, block.text || '', true));

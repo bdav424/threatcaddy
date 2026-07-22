@@ -8,7 +8,8 @@ import {
   validateChartDocx,
 } from '../lib/docx-chart';
 import { resolveChartModel } from '../lib/chart-model';
-import { unzip, zipStored } from '../lib/docx-template-renderer';
+import { buildStructuralDocxBytes, unzip, zipStored } from '../lib/docx-template-renderer';
+import type { ProductBaselineStructuralMap } from '../types';
 
 function barModel() {
   return resolveChartModel([
@@ -147,5 +148,47 @@ describe('chart validation harness (CaddyLab Stage 5b)', () => {
     const result = validateChartDocx(zipStored(entries));
     expect(result.ok).toBe(false);
     expect(result.errors.join('\n')).toMatch(/!= cache cell/i);
+  });
+});
+
+describe('chart injection into a template (CaddyLab Stage 5b wiring)', () => {
+  function templateWithSection() {
+    const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>` +
+      `<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Findings</w:t></w:r></w:p>` +
+      `<w:p><w:r><w:t>Old findings text.</w:t></w:r></w:p>` +
+      `<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:body></w:document>`;
+    return zipStored([
+      { path: '[Content_Types].xml', data: new TextEncoder().encode('<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>') },
+      { path: '_rels/.rels', data: new TextEncoder().encode('<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>') },
+      { path: 'word/_rels/document.xml.rels', data: new TextEncoder().encode('<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>') },
+      { path: 'word/document.xml', data: new TextEncoder().encode(documentXml) },
+    ]);
+  }
+
+  const structuralMap: ProductBaselineStructuralMap = {
+    schemaVersion: 1,
+    sections: [{ key: 'findings', heading: 'Findings', level: 1, order: 0, hasTable: false, paragraphCount: 1 }],
+    palette: [],
+    figures: [],
+    tableCount: 0,
+    figurePlaceholderCount: 0,
+  };
+
+  it('replaces a [[chart:key]] token in section content with a native chart, and the output validates', () => {
+    const model = barModel();
+    const markdown = '## Findings\n\nHere is the breakdown.\n\n[[chart:findings]]';
+    const output = buildStructuralDocxBytes(templateWithSection(), markdown, structuralMap, [], [{ key: 'findings', model }]);
+
+    const result = validateChartDocx(output);
+    expect(result.errors).toEqual([]);
+    expect(result.ok).toBe(true);
+
+    const entries = unzip(output);
+    const documentXml = new TextDecoder().decode(entries.find((e) => e.path === 'word/document.xml')!.data);
+    expect(documentXml).toContain('<c:chart');
+    expect(documentXml).not.toContain('[[chart:findings]]'); // token consumed
+    expect(documentXml).toContain('Here is the breakdown.'); // surrounding text kept
+    expect(entries.some((e) => e.path === 'word/charts/chart1.xml')).toBe(true);
+    expect(entries.some((e) => /^word\/embeddings\/.*\.xlsx$/.test(e.path))).toBe(true);
   });
 });

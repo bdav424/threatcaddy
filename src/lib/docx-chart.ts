@@ -1,6 +1,17 @@
 import * as XLSX from 'xlsx';
-import type { ChartModel, ChartType } from './chart-model';
+import type { ChartType } from './chart-model';
 import { unzip, zipStored, type ZipEntry } from './docx-template-renderer';
+
+/** The subset of a resolved ChartModel the emitter actually plots. Both the
+ * full ChartModel (lib/chart-model) and a persisted ProductChartModel
+ * (types.ts) satisfy this, so the exporter can feed either. */
+export interface ChartRenderModel {
+  type: ChartType;
+  categories: string[];
+  series: { name: string; values: number[] }[];
+  colors: string[];
+  title?: string;
+}
 
 // CaddyLab Stage 5b — native editable Word chart emission.
 //
@@ -82,7 +93,7 @@ function numRef(formula: string, values: number[]): string {
   return `<c:numRef><c:f>${esc(formula)}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${values.length}"/>${pts}</c:numCache></c:numRef>`;
 }
 
-function seriesColor(model: ChartModel, index: number): string {
+function seriesColor(model: ChartRenderModel, index: number): string {
   return (model.colors[index % model.colors.length] || '#4472C4').replace(/^#/, '');
 }
 
@@ -90,7 +101,7 @@ function seriesColor(model: ChartModel, index: number): string {
  * Row 1 is the series-name header (A1 blank, then one column per series);
  * each subsequent row is a category label followed by its values. Scatter
  * lays x-values in column A and y-values in column B (no category label). */
-function chartCacheAoa(model: ChartModel): (string | number)[][] {
+function chartCacheAoa(model: ChartRenderModel): (string | number)[][] {
   if (model.type === 'scatter') {
     const xValues = model.series[0]?.values ?? [];
     const yValues = model.series[1]?.values ?? [];
@@ -101,14 +112,14 @@ function chartCacheAoa(model: ChartModel): (string | number)[][] {
   return [header, ...model.categories.map((category, rowIndex) => [category, ...model.series.map((series) => series.values[rowIndex] ?? 0)])];
 }
 
-export function buildChartCacheXlsx(model: ChartModel): Uint8Array {
+export function buildChartCacheXlsx(model: ChartRenderModel): Uint8Array {
   const worksheet = XLSX.utils.aoa_to_sheet(chartCacheAoa(model));
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
   return new Uint8Array(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer);
 }
 
-function buildSeriesXml(model: ChartModel): string {
+function buildSeriesXml(model: ChartRenderModel): string {
   const rowCount = model.type === 'scatter'
     ? (model.series[0]?.values.length ?? 0)
     : model.categories.length;
@@ -147,7 +158,7 @@ function buildSeriesXml(model: ChartModel): string {
   }).join('');
 }
 
-function plotBodyXml(model: ChartModel): string {
+function plotBodyXml(model: ChartRenderModel): string {
   const element = plotElementName(model.type);
   const series = buildSeriesXml(model);
   const axisRefs = usesAxes(model.type) ? `<c:axId val="${CAT_AXIS_ID}"/><c:axId val="${VAL_AXIS_ID}"/>` : '';
@@ -170,7 +181,7 @@ function plotBodyXml(model: ChartModel): string {
   return `<c:${element}><c:barDir val="col"/><c:grouping val="${grouping}"/><c:varyColors val="0"/>${series}${overlap}<c:gapWidth val="150"/>${axisRefs}</c:${element}>`;
 }
 
-function axesXml(model: ChartModel): string {
+function axesXml(model: ChartRenderModel): string {
   if (!usesAxes(model.type)) return '';
   const valAxisPos = 'l';
   const catAxis = model.type === 'scatter'
@@ -180,7 +191,7 @@ function axesXml(model: ChartModel): string {
   return catAxis + valAxis;
 }
 
-export function buildChartXml(model: ChartModel, externalDataRelId = 'rId1'): string {
+export function buildChartXml(model: ChartRenderModel, externalDataRelId = 'rId1'): string {
   const title = model.title
     ? `<c:title><c:tx><c:rich><a:bodyPr/><a:p><a:r><a:t>${esc(model.title)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:autoTitleDeleted val="0"/>`
     : '<c:autoTitleDeleted val="1"/>';
@@ -217,7 +228,7 @@ export interface ChartPartSet {
 /** Builds the full coupled part set for one chart, numbered so multiple charts
  * in one document never collide. `documentRelId` is the r:id the body drawing
  * uses; the caller allocates it against the document's existing relationships. */
-export function buildChartParts(model: ChartModel, chartIndex: number, documentRelId: string, opts?: { widthEmu?: number; heightEmu?: number; name?: string }): ChartPartSet {
+export function buildChartParts(model: ChartRenderModel, chartIndex: number, documentRelId: string, opts?: { widthEmu?: number; heightEmu?: number; name?: string }): ChartPartSet {
   const chartPath = `word/charts/chart${chartIndex}.xml`;
   const chartRelsPath = `word/charts/_rels/chart${chartIndex}.xml.rels`;
   const embeddingTarget = `Microsoft_Excel_Worksheet${chartIndex}.xlsx`;
@@ -260,7 +271,7 @@ export function buildChartParts(model: ChartModel, chartIndex: number, documentR
 /** A minimal one-chart, one-paragraph docx — the smallest artifact the
  * validation harness can round-trip. Used by tests and as the reference the
  * OOXML variable is proven against in isolation before wiring into export. */
-export function assembleStandaloneChartDocx(model: ChartModel): Uint8Array {
+export function assembleStandaloneChartDocx(model: ChartRenderModel): Uint8Array {
   const relId = 'rId100';
   const set = buildChartParts(model, 1, relId);
   const encoder = new TextEncoder();

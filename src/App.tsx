@@ -1358,9 +1358,10 @@ const AppInner = memo(function AppInner({
     baseline: NoteTemplate,
     sections: { heading: string; content: string }[],
     title: string,
+    charts?: Note['productCharts'],
   ) => {
     if (!selectedFolder) throw new Error('Select an investigation first.');
-    const product = await createProductFromSections(selectedFolder, baseline, sections, title);
+    const product = await createProductFromSections(selectedFolder, baseline, sections, title, charts);
     await notes.reload();
     addToast('success', `Generated product "${product.title}".`);
     return product;

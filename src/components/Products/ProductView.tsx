@@ -37,7 +37,7 @@ interface ProductViewProps {
   onLoadBaselineContext?: (baseline: NoteTemplate) => Promise<ProductRenderContext>;
   /** Section wand — assembles the analyst's per-section text into a product
    * note, identical in shape/tags to one the AI-driven render tool creates. */
-  onGenerateProduct?: (baseline: NoteTemplate, sections: { heading: string; content: string }[], title: string) => Promise<Note>;
+  onGenerateProduct?: (baseline: NoteTemplate, sections: { heading: string; content: string }[], title: string, charts?: Note['productCharts']) => Promise<Note>;
   /** Figure upload-to-format (CaddyLab Stage 3) — persists an uploaded image
    * against a product's structuralMap figure key, so DOCX export can pour it
    * into that figure's template-owned frame. */
@@ -95,6 +95,10 @@ export function ProductView({
   // string value means the resolve failed and holds the reason to show.
   const [wandCharts, setWandCharts] = useState<Record<string, ChartModel | string>>({});
   const [wandChartOpen, setWandChartOpen] = useState<Record<string, boolean>>({});
+  // CaddyLab Stage 5b — charts the analyst committed to a section (each drops a
+  // [[chart:key]] token in that section's content). Survives content edits so
+  // the resolved model still exists at generate time; keyed by section key.
+  const [wandInsertedCharts, setWandInsertedCharts] = useState<Record<string, ChartModel>>({});
 
   async function openWand(baseline: NoteTemplate) {
     const structuralMap = baseline.productBaseline?.structuralMap;
@@ -130,6 +134,18 @@ export function ProductView({
     setWandXlsxSheets({});
     setWandCharts({});
     setWandChartOpen({});
+    setWandInsertedCharts({});
+  }
+
+  function insertSectionChart(sectionKey: string, model: ChartModel) {
+    setWandInsertedCharts((current) => ({ ...current, [sectionKey]: model }));
+    const token = `[[chart:${sectionKey}]]`;
+    // Append the token directly (not via updateWandSection, which would clear
+    // the live preview) so the chart persists into the generated content.
+    setWandSections((current) => current.map((section) =>
+      section.key === sectionKey && !section.content.includes(token)
+        ? { ...section, content: `${section.content.trimEnd()}\n\n${token}` }
+        : section));
   }
 
   function updateWandSection(key: string, content: string) {
@@ -209,10 +225,15 @@ export function ProductView({
     setWandSaving(true);
     setWandError('');
     try {
+      const charts = Object.entries(wandInsertedCharts).map(([key, model]) => ({
+        key,
+        model: { type: model.type, categories: model.categories, series: model.series, colors: model.colors, title: model.title },
+      }));
       const product = await onGenerateProduct(
         wandBaseline,
         wandSections.map(({ heading, content }) => ({ heading, content })),
         wandTitle,
+        charts.length > 0 ? charts : undefined,
       );
       setSelectedProductId(product.id);
       closeWand();
@@ -247,7 +268,10 @@ export function ProductView({
   );
 
   const selectedProductHtml = useMemo(
-    () => selectedProduct ? renderMarkdown(selectedProduct.content) : '',
+    // [[chart:key]] tokens are docx-export markers, not display text — strip
+    // them from the on-screen HTML; the charts render in the Charts panel and
+    // as native charts in the exported docx.
+    () => selectedProduct ? renderMarkdown(selectedProduct.content.replace(/\[\[chart:[^\]]+\]\]/g, '')) : '',
     [selectedProduct],
   );
 
@@ -793,6 +817,20 @@ export function ProductView({
                 </div>
               </div>
             )}
+            {selectedProduct.productCharts && selectedProduct.productCharts.length > 0 && (
+              <div className="rounded-lg border border-border-subtle bg-bg-surface p-3">
+                <h3 className="mb-2 text-xs font-semibold uppercase text-text-muted">
+                  Charts · native editable Word charts
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {selectedProduct.productCharts.map((chart) => (
+                    <div key={chart.key}>
+                      <ChartPreview model={{ ...chart.model, categoryColumnIndex: null, numericColumnIndexes: [], suggestionReason: '' }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="max-h-[68vh] overflow-auto rounded-lg border border-border-subtle bg-gray-200 p-4">
               <article
                 className="product-document markdown-preview mx-auto min-h-[11in] max-w-[8.5in] bg-white px-[0.7in] py-[0.65in] text-[12pt] text-gray-950 shadow-lg"
@@ -914,9 +952,18 @@ export function ProductView({
                             </label>
                           </div>
                           <ChartPreview model={wandCharts[section.key] as ChartModel} />
-                          <p className="mt-2 text-[10px] text-text-muted">
-                            Preview only — confirms the chart model (series, type, colors). Native editable Word chart export lands in the next step.
-                          </p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <button
+                              onClick={() => insertSectionChart(section.key, wandCharts[section.key] as ChartModel)}
+                              className="inline-flex items-center gap-1.5 rounded-md border border-accent-blue/40 bg-accent-blue/15 px-2 py-1 text-[11px] font-medium text-accent-blue hover:bg-accent-blue/20"
+                            >
+                              <Check size={12} />
+                              {wandInsertedCharts[section.key] ? 'Chart inserted — update' : 'Insert chart into section'}
+                            </button>
+                            <span className="text-[10px] text-text-muted">
+                              Exports as a native editable Word chart (Edit Data works in Word). Flattens to an image on PDF export.
+                            </span>
+                          </div>
                         </>
                       ) : (
                         <p className="text-[11px] text-text-muted">Resolving chart…</p>

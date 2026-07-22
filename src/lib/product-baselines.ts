@@ -11,6 +11,7 @@ import type {
   ProductBaselineSourceDocument,
   ProductBaselineStructuralMap,
   ProductBaselineTestFixture,
+  ProductChart,
   StandaloneIOC,
   Task,
   TimelineEvent,
@@ -333,11 +334,17 @@ export async function createProductFromSections(
   baseline: NoteTemplate,
   sections: { heading: string; content: string }[],
   title: string,
+  charts?: ProductChart[],
 ): Promise<Note> {
   const body = sections
     .map((section) => `## ${section.heading}\n\n${section.content.trim() || '_No content provided for this section._'}`)
     .join('\n\n');
+  // Preserve [[chart:key]] tokens through sanitization (they carry no HTML) so
+  // docx export can swap each for its native Word chart; only charts actually
+  // referenced by a surviving token are kept.
   const content = DOMPurify.sanitize(body, { ALLOWED_TAGS: [] }).slice(0, 500_000);
+  const referencedChartKeys = new Set(Array.from(content.matchAll(/\[\[chart:([^\]]+)\]\]/g)).map((match) => match[1]));
+  const keptCharts = (charts ?? []).filter((chart) => referencedChartKeys.has(chart.key));
   const now = Date.now();
   const note: Note = {
     id: nanoid(),
@@ -348,6 +355,7 @@ export async function createProductFromSections(
     pinned: false,
     archived: false,
     trashed: false,
+    ...(keptCharts.length > 0 ? { productCharts: keptCharts } : {}),
     createdAt: now,
     updatedAt: now,
   };

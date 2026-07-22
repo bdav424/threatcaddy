@@ -98,10 +98,31 @@ export interface Note {
    * placeholders (CaddyLab Stage 3), keyed to `ProductBaselineFigure.key` on
    * the generating baseline's structuralMap. Only meaningful on product notes. */
   productFigures?: ProductFigureUpload[];
+  /** Native editable Word charts the analyst inserted into sections
+   * (CaddyLab Stage 5). Each `key` matches a `[[chart:key]]` token in the
+   * note content that docx export replaces with the emitted chart. */
+  productCharts?: ProductChart[];
   createdBy?: string;
   updatedBy?: string;
   createdAt: number;
   updatedAt: number;
+}
+
+/** A native Word chart placed in a product. `model` is the resolved
+ * ChartModel (see lib/chart-model) the docx exporter turns into a chartSpace
+ * part + embedded data cache. Kept as `unknown`-friendly structural data so
+ * types.ts stays free of a lib import; the exporter narrows it. */
+export interface ProductChart {
+  key: string;
+  model: ProductChartModel;
+}
+
+export interface ProductChartModel {
+  type: 'bar' | 'stackedBar' | 'line' | 'area' | 'pie' | 'scatter';
+  categories: string[];
+  series: { name: string; values: number[] }[];
+  colors: string[];
+  title?: string;
 }
 
 export interface ProductFigureUpload {
