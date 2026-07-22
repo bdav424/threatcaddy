@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { Bot, Check, Clipboard, Download, FileOutput, FilePenLine, FileText, Image as ImageIcon, Layers, Printer, Search, Settings2, Sparkles, Table2, Upload, Wand2, X } from 'lucide-react';
+import { BarChart3, Bot, Check, Clipboard, Download, FileOutput, FilePenLine, FileText, Image as ImageIcon, Layers, Printer, Search, Settings2, Sparkles, Table2, Upload, Wand2, X } from 'lucide-react';
 import type { Note, NoteTemplate } from '../../types';
 import { formatDate } from '../../lib/utils';
 import { renderMarkdown } from '../../lib/markdown';
@@ -15,6 +15,8 @@ import {
 import { arrayBufferToBase64, buildTemplateBackedDocxBlob, hasDocxTemplateAsset } from '../../lib/docx-template-renderer';
 import { extractDocxEvidence, extractPdfText } from '../../lib/evidence-import';
 import { parseXlsxWorkbook, rowsToMarkdownTable, type XlsxSheet } from '../../lib/xlsx-import';
+import { CHART_TYPES, parseMarkdownTableRows, resolveChartModel, type ChartModel, type ChartType } from '../../lib/chart-model';
+import { ChartPreview } from './ChartPreview';
 import { Modal } from '../Common/Modal';
 
 interface ProductViewProps {
@@ -88,6 +90,11 @@ export function ProductView({
   // spreadsheet has, so a multi-sheet workbook can be re-picked without
   // re-uploading.
   const [wandXlsxSheets, setWandXlsxSheets] = useState<Record<string, XlsxSheet[]>>({});
+  // CaddyLab Stage 5a — resolved chart model per section (analyst confirms the
+  // model + type before any OOXML is generated). Keyed by section key; a
+  // string value means the resolve failed and holds the reason to show.
+  const [wandCharts, setWandCharts] = useState<Record<string, ChartModel | string>>({});
+  const [wandChartOpen, setWandChartOpen] = useState<Record<string, boolean>>({});
 
   async function openWand(baseline: NoteTemplate) {
     const structuralMap = baseline.productBaseline?.structuralMap;
@@ -121,10 +128,20 @@ export function ProductView({
     setWandSections([]);
     setWandError('');
     setWandXlsxSheets({});
+    setWandCharts({});
+    setWandChartOpen({});
   }
 
   function updateWandSection(key: string, content: string) {
     setWandSections((current) => current.map((section) => (section.key === key ? { ...section, content } : section)));
+    // The table drives the chart; if the content changed, any previewed model
+    // is stale — drop it so the analyst re-resolves against the new data.
+    setWandCharts((current) => {
+      if (!(key in current)) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
   }
 
   async function handleSectionXlsxUpload(sectionKey: string, file: File) {
@@ -146,6 +163,27 @@ export function ProductView({
     const sheet = wandXlsxSheets[sectionKey]?.[sheetIndex];
     if (!sheet) return;
     updateWandSection(sectionKey, rowsToMarkdownTable(sheet.rows));
+  }
+
+  function resolveSectionChart(sectionKey: string, content: string, forcedType?: ChartType) {
+    const rows = parseMarkdownTableRows(content);
+    if (!rows) {
+      setWandCharts((current) => ({ ...current, [sectionKey]: 'Add a table (type one or insert a spreadsheet) to chart it.' }));
+      return;
+    }
+    try {
+      const palette = wandBaseline?.productBaseline?.structuralMap?.palette;
+      const model = resolveChartModel(rows, { palette, forcedType });
+      setWandCharts((current) => ({ ...current, [sectionKey]: model }));
+    } catch (error) {
+      setWandCharts((current) => ({ ...current, [sectionKey]: error instanceof Error ? error.message : 'Could not build a chart from this table.' }));
+    }
+  }
+
+  function toggleSectionChart(sectionKey: string, content: string) {
+    const open = !wandChartOpen[sectionKey];
+    setWandChartOpen((current) => ({ ...current, [sectionKey]: open }));
+    if (open && !wandCharts[sectionKey]) resolveSectionChart(sectionKey, content);
   }
 
   async function copySectionPrompt(section: WandSectionState) {
@@ -844,7 +882,47 @@ export function ProductView({
                         ))}
                       </select>
                     )}
+                    {parseMarkdownTableRows(section.content) && (
+                      <button
+                        onClick={() => toggleSectionChart(section.key, section.content)}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-border-subtle px-2 py-1 text-[11px] font-medium text-text-secondary hover:text-text-primary hover:bg-bg-hover"
+                      >
+                        <BarChart3 size={12} />
+                        {wandChartOpen[section.key] ? 'Hide chart' : 'Preview as chart'}
+                      </button>
+                    )}
                   </div>
+                  {wandChartOpen[section.key] && (
+                    <div className="mt-2 rounded-lg border border-border-subtle bg-bg-base/40 p-3">
+                      {typeof wandCharts[section.key] === 'string' ? (
+                        <p className="text-[11px] text-amber-300">{wandCharts[section.key] as string}</p>
+                      ) : wandCharts[section.key] ? (
+                        <>
+                          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-[11px] text-text-muted">{(wandCharts[section.key] as ChartModel).suggestionReason}</p>
+                            <label className="inline-flex items-center gap-1.5 text-[11px] text-text-secondary">
+                              Type
+                              <select
+                                value={(wandCharts[section.key] as ChartModel).type}
+                                onChange={(event) => resolveSectionChart(section.key, section.content, event.target.value as ChartType)}
+                                className="rounded-md border border-border-subtle bg-bg-primary px-2 py-1 text-[11px] text-text-primary outline-none focus:border-accent-blue"
+                              >
+                                {CHART_TYPES.map((option) => (
+                                  <option key={option.type} value={option.type}>{option.label}</option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
+                          <ChartPreview model={wandCharts[section.key] as ChartModel} />
+                          <p className="mt-2 text-[10px] text-text-muted">
+                            Preview only — confirms the chart model (series, type, colors). Native editable Word chart export lands in the next step.
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-[11px] text-text-muted">Resolving chart…</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
