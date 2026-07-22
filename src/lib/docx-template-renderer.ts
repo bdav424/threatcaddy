@@ -1215,28 +1215,36 @@ function renderCell(text: string, header: boolean, width: number, headerFillHex?
   ].join('');
 }
 
-function runProperties(options: { size: string; bold?: boolean; subscript?: boolean }): string {
+function runProperties(options: { size: string; bold?: boolean; vertAlign?: 'subscript' | 'superscript' }): string {
   return [
     '<w:rPr>',
     `<w:rFonts w:ascii="${VENDOR_SANS_FONT}" w:hAnsi="${VENDOR_SANS_FONT}" w:eastAsia="${VENDOR_SANS_FONT}" w:cs="${VENDOR_SANS_FONT}"/>`,
     options.bold ? '<w:b/>' : '',
     `<w:sz w:val="${options.size}"/>`,
     `<w:szCs w:val="${options.size}"/>`,
-    options.subscript ? '<w:vertAlign w:val="subscript"/>' : '',
+    options.vertAlign ? `<w:vertAlign w:val="${options.vertAlign}"/>` : '',
     '</w:rPr>',
   ].join('');
 }
+
+// Footnote reference marks are superscript (standard Word footnote behavior),
+// not subscript. Two distinct sizes per the house style: the in-paragraph
+// citation marker rides at regular body size (9.5pt), and the note entry's
+// own number stays at that body size too — deliberately LARGER than the
+// 6.5pt footnote note text after it, so the number reads clearly above the
+// smaller citation text.
+const FOOTNOTE_MARK_SIZE = BODY_FONT_SIZE; // 9.5pt — the superscript number, in-paragraph and in the note entry.
 
 function renderFootnoteReferenceRuns(ids: number[]): string {
   return ids.map((id, index) => [
     index > 0 ? [
       '<w:r>',
-      runProperties({ size: BODY_FONT_SIZE, subscript: true }),
+      runProperties({ size: FOOTNOTE_MARK_SIZE, vertAlign: 'superscript' }),
       '<w:t xml:space="preserve">,</w:t>',
       '</w:r>',
     ].join('') : '',
     '<w:r>',
-    runProperties({ size: BODY_FONT_SIZE, subscript: true }),
+    runProperties({ size: FOOTNOTE_MARK_SIZE, vertAlign: 'superscript' }),
     `<w:footnoteReference w:id="${id}"/>`,
     '</w:r>',
   ].join('')).join('');
@@ -1248,7 +1256,7 @@ function renderSourceFootnotesXml(sources: string[]): string {
     '<w:p>',
     '<w:pPr><w:pStyle w:val="FootnoteText"/></w:pPr>',
     '<w:r>',
-    runProperties({ size: BODY_FONT_SIZE, subscript: true }),
+    runProperties({ size: FOOTNOTE_MARK_SIZE, vertAlign: 'superscript' }),
     '<w:footnoteRef/>',
     '</w:r>',
     '<w:r>',

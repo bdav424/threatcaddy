@@ -147,6 +147,9 @@ describe('docx template renderer', () => {
     expect(documentXml).not.toContain('<w:sz w:val="14"/>');
     expect(documentXml).not.toContain('w:fill="F2F2F2"');
     expect(documentXml).toContain('<w:footnoteReference w:id="1"/>');
+    // In-paragraph citation marker is a 9.5pt superscript, never subscript.
+    expect(documentXml).toContain('<w:vertAlign w:val="superscript"/>');
+    expect(documentXml).not.toContain('<w:vertAlign w:val="subscript"/>');
     expect(documentXml).toContain('IntelTimeline');
     expect(documentXml).toContain('IntelIocs');
     expect(documentXml).toContain('rIdHeader');
@@ -155,8 +158,12 @@ describe('docx template renderer', () => {
     expect(documentXml).not.toContain('Old IOC');
     expect(footnotesXml).toContain('Symantec Threat Hunter Team / Security.com');
     expect(footnotesXml).toContain('See: https://www.security.com/threat-intelligence/iran-seedworm-electronics');
-    expect(footnotesXml).toContain('<w:vertAlign w:val="subscript"/>');
-    expect(footnotesXml).toContain('<w:sz w:val="13"/>');
+    // Footnote marks are superscript (standard Word behavior), and the note
+    // entry's number (9.5pt) is larger than the 6.5pt note text after it.
+    expect(footnotesXml).toContain('<w:vertAlign w:val="superscript"/>');
+    expect(footnotesXml).not.toContain('<w:vertAlign w:val="subscript"/>');
+    expect(footnotesXml).toContain('<w:sz w:val="19"/>'); // 9.5pt superscript footnote number
+    expect(footnotesXml).toContain('<w:sz w:val="13"/>'); // 6.5pt footnote note text
     expect(footnotesXml).not.toContain('OLD SOURCE FOOTNOTE');
   });
 });
