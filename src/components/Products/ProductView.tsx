@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { BarChart3, Bot, Check, Clipboard, Download, FileOutput, FilePenLine, FileText, Image as ImageIcon, Layers, Printer, Search, Settings2, Sparkles, Table2, Upload, Wand2, X } from 'lucide-react';
+import { createElement, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { BarChart3, Bot, Check, Clipboard, Download, FileDown, FileOutput, FilePenLine, FileText, Image as ImageIcon, Layers, Printer, Search, Settings2, Sparkles, Table2, Upload, Wand2, X } from 'lucide-react';
 import type { Note, NoteTemplate } from '../../types';
 import { formatDate } from '../../lib/utils';
 import { renderMarkdown } from '../../lib/markdown';
@@ -73,6 +73,7 @@ export function ProductView({
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [baselineMessage, setBaselineMessage] = useState('');
   const [baselineError, setBaselineError] = useState('');
+  const [pdfExporting, setPdfExporting] = useState(false);
   const baselineInputRef = useRef<HTMLInputElement>(null);
   const docxTemplateInputRef = useRef<HTMLInputElement>(null);
 
@@ -332,6 +333,48 @@ export function ProductView({
     printWindow.document.close();
     printWindow.focus();
     printWindow.print();
+  };
+
+  const handleExportPdf = async () => {
+    if (!selectedProduct) return;
+    setPdfExporting(true);
+    setBaselineError('');
+    try {
+      // Render the product with chart tokens replaced by the chart flattened
+      // to a PNG image, inline where it belongs — the spec's "charts flatten to
+      // images on PDF export." (html2canvas stalls on inline <svg>, so the
+      // chart is rasterized up front; the legend rides alongside as plain HTML.)
+      let bodyHtml = renderMarkdown(selectedProduct.content);
+      const charts = selectedProduct.productCharts ?? [];
+      if (charts.length > 0) {
+        const [{ renderToStaticMarkup }, { svgToPngDataUrl }] = await Promise.all([
+          import('react-dom/server'),
+          import('../../lib/pdf-export'),
+        ]);
+        for (const chart of charts) {
+          const model = { ...chart.model, categoryColumnIndex: null, numericColumnIndexes: [], suggestionReason: '' };
+          const markup = renderToStaticMarkup(createElement(ChartPreview, { model }));
+          const svg = markup.match(/<svg[\s\S]*?<\/svg>/)?.[0];
+          let chartHtml = '';
+          if (svg) {
+            const png = await svgToPngDataUrl(svg);
+            const labels = model.type === 'pie' ? model.categories : model.series.map((series) => series.name);
+            const legend = `<div style="margin-top:4px;font-size:9px;color:#374151">${labels
+              .map((label, index) => `<span style="display:inline-block;margin-right:10px"><span style="display:inline-block;width:8px;height:8px;background:${model.colors[index % model.colors.length]};vertical-align:middle;margin-right:3px"></span>${escapeHtml(label)}</span>`)
+              .join('')}</div>`;
+            chartHtml = `<div class="product-chart"><img src="${png}" style="max-width:5.5in;height:auto"/>${legend}</div>`;
+          }
+          bodyHtml = bodyHtml.split(`[[chart:${chart.key}]]`).join(chartHtml);
+        }
+      }
+      bodyHtml = bodyHtml.replace(/\[\[chart:[^\]]+\]\]/g, ''); // drop any token whose chart wasn't stored
+      const { exportBodyToPdf } = await import('../../lib/pdf-export');
+      await exportBodyToPdf(bodyHtml, PRODUCT_DOCUMENT_CSS, `${safeFilename(selectedProduct.title)}.pdf`);
+    } catch (error) {
+      setBaselineError(error instanceof Error ? error.message : 'Failed to export this product as a PDF.');
+    } finally {
+      setPdfExporting(false);
+    }
   };
 
   const handleCopyBaselinePrompt = async (baseline: NoteTemplate) => {
@@ -752,6 +795,14 @@ export function ProductView({
                   DOCX
                 </button>
                 <button
+                  onClick={handleExportPdf}
+                  disabled={pdfExporting}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border-subtle px-2.5 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-bg-hover disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <FileDown size={13} />
+                  {pdfExporting ? 'Exporting…' : 'PDF'}
+                </button>
+                <button
                   onClick={handleDownloadMarkdown}
                   className="inline-flex items-center gap-1.5 rounded-md border border-border-subtle px-2.5 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-bg-hover"
                 >
@@ -1091,14 +1142,7 @@ function buildPrintableDocument(title: string, bodyHtml: string): string {
   return buildProductHtmlDocument(title, bodyHtml, '@page { size: letter; margin: 0.65in 0.7in; } body { margin: 0; }');
 }
 
-function buildProductHtmlDocument(title: string, bodyHtml: string, extraCss = ''): string {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>${escapeHtml(title)}</title>
-  <style>
-    ${extraCss}
+const PRODUCT_DOCUMENT_CSS = `
     body { font-family: Aptos, Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.45; color: #111827; }
     h1 { font-size: 20pt; border-bottom: 1px solid #9ca3af; padding-bottom: 4pt; }
     h2 { font-size: 15pt; margin-top: 18pt; }
@@ -1107,6 +1151,18 @@ function buildProductHtmlDocument(title: string, bodyHtml: string, extraCss = ''
     th, td { border: 1px solid #9ca3af; padding: 5pt; text-align: left; vertical-align: top; }
     th { background: #e5e7eb; font-weight: 700; }
     code { background: #f3f4f6; padding: 1pt 3pt; font-family: Consolas, monospace; }
+    .product-chart { margin: 12pt 0; max-width: 5.5in; }
+`;
+
+function buildProductHtmlDocument(title: string, bodyHtml: string, extraCss = ''): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(title)}</title>
+  <style>
+    ${extraCss}
+    ${PRODUCT_DOCUMENT_CSS}
   </style>
 </head>
 <body>${bodyHtml}</body>
