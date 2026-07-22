@@ -19,7 +19,7 @@ const HEADER_FONT_SIZE = '21'; // 10.5 pt in OOXML half-points.
 const BODY_FONT_SIZE = '19'; // 9.5 pt in OOXML half-points.
 const FOOTNOTE_TEXT_SIZE = '13'; // 6.5 pt in OOXML half-points.
 
-interface ZipEntry {
+export interface ZipEntry {
   path: string;
   data: Uint8Array;
 }
@@ -1311,7 +1311,7 @@ function stripMarkdownInline(value: string): string {
     .trim();
 }
 
-function unzip(bytes: Uint8Array): ZipEntry[] {
+export function unzip(bytes: Uint8Array): ZipEntry[] {
   const view = dataView(bytes);
   const eocdOffset = findEndOfCentralDirectory(view);
   const totalEntries = view.getUint16(eocdOffset + 10, true);
@@ -1351,7 +1351,7 @@ function readLocalEntry(bytes: Uint8Array, offset: number, compressedSize: numbe
   throw new Error(`Unsupported DOCX compression method: ${method}`);
 }
 
-function zipStored(files: ZipEntry[]): Uint8Array {
+export function zipStored(files: ZipEntry[]): Uint8Array {
   const localParts: Uint8Array[] = [];
   const centralParts: Uint8Array[] = [];
   let offset = 0;
