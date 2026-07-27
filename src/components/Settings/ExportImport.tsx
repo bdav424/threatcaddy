@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { exportJSON, importJSON, mergeImportJSON, exportNotesMarkdown, downloadFile } from '../../lib/export';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { MarkdownImportModal } from './MarkdownImportModal';
+import { EncryptedBackup } from './EncryptedBackup';
 import { useLogActivity } from '../../hooks/ActivityLogContext';
 import { useToast } from '../../contexts/ToastContext';
 import { db } from '../../db';
@@ -162,6 +163,14 @@ export function ExportImport({ notes, onImportComplete }: ExportImportProps) {
           {importing ? t('data.importing') : t('data.importJSON')}
           <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileSelect} className="hidden" disabled={importing} />
         </label>
+      </div>
+
+      <div className="border-t border-gray-700/60 pt-4">
+        <h3 className="mb-1 text-sm font-semibold text-gray-300">Encrypted backup (move to another machine)</h3>
+        <p className="mb-3 text-xs text-gray-500">
+          Includes settings, theme, AI config — and, uniquely, your API keys — all password-encrypted. Restore lets you keep, merge, or replace your local configuration.
+        </p>
+        <EncryptedBackup onImportComplete={onImportComplete} />
       </div>
 
       {message && (

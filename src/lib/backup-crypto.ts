@@ -51,6 +51,10 @@ export interface BackupPayload {
     journalPages?: unknown[];
     iocRecheckDiffs?: unknown[];
   };
+  /** App configuration from localStorage (settings/theme/AI). `apiKeys` is
+   * populated only on the local encrypted-file export — see
+   * backup-settings.ts and buildFullBackupPayload's includeApiKeys option. */
+  settings?: import('./backup-settings').BackupSettingsBlock;
   deletedIds?: Record<string, string[]>;
 }
 

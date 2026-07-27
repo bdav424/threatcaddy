@@ -4,6 +4,16 @@
 
 import { db } from '../db';
 import type { BackupPayload } from './backup-crypto';
+import { snapshotSettingsForBackup } from './backup-settings';
+
+/** Options for what a full backup includes beyond the table dump. */
+export interface FullBackupOptions {
+  /** Include API keys in the settings block. MUST stay false for any backup
+   * that leaves the machine to a shared destination (cloud / team server) —
+   * only the local encrypted-file export sets this true. Defaults to false so
+   * a new backup surface is safe by omission. */
+  includeApiKeys?: boolean;
+}
 
 // Helper: get a Dexie table by name, returning an untyped handle for dynamic access
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -15,6 +25,7 @@ function getTable(name: string): any {
 export async function buildFullBackupPayload(
   scope: 'all' | 'investigation' | 'entity',
   scopeId?: string,
+  options: FullBackupOptions = {},
 ): Promise<BackupPayload> {
   const data: BackupPayload['data'] = {};
 
@@ -103,6 +114,14 @@ export async function buildFullBackupPayload(
     data[tableName as keyof BackupPayload['data']] = [entity];
   }
 
+  // Settings ride along on every full backup, but keys are gated: a
+  // table-restore failure can't half-apply settings because this is a
+  // separate serialization path applied only at restore time. includeApiKeys
+  // defaults false, so cloud/team backups never carry credentials.
+  const settings = scope === 'all'
+    ? snapshotSettingsForBackup(options.includeApiKeys === true)
+    : undefined;
+
   return {
     version: 1,
     type: 'full',
@@ -110,6 +129,7 @@ export async function buildFullBackupPayload(
     scopeId,
     createdAt: Date.now(),
     data,
+    ...(settings ? { settings } : {}),
   };
 }
 
