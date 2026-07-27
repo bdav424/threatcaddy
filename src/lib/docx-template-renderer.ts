@@ -599,9 +599,12 @@ function prepareFigureUploads(
 
     if (!declaredExtensions.has(extension)) {
       declaredExtensions.add(extension);
+      // escapeXml the browser-supplied MIME string: a stray quote in it would
+      // otherwise break the [Content_Types].xml attribute and corrupt the docx.
+      const contentType = escapeXml(upload.mimeType || `image/${extension}`);
       contentTypesXml = contentTypesXml.replace(
         '</Types>',
-        `<Default Extension="${extension}" ContentType="${upload.mimeType || `image/${extension}`}"/></Types>`,
+        `<Default Extension="${extension}" ContentType="${contentType}"/></Types>`,
       );
     }
   }
