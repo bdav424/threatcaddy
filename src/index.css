@@ -2476,3 +2476,177 @@ body.tc-desktop-shell-body {
     animation: none;
   }
 }
+
+/* ============================================================================
+ * Ambient AI assistant — experimental Clippy-style desk companion.
+ * Off by default; the widget only mounts when Settings → AI enables it. Motion
+ * here is deliberately gentle (idle) with a louder "signature" flourish while
+ * .is-waving. All of it collapses under prefers-reduced-motion.
+ * ==========================================================================*/
+.ambient-assistant {
+  position: fixed;
+  right: 18px;
+  bottom: 78px; /* clears the mobile bottom nav / status strip */
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+@media (min-width: 768px) {
+  .ambient-assistant { bottom: 22px; }
+}
+.ambient-assistant-mascot {
+  pointer-events: auto;
+  background: transparent;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  line-height: 0;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
+  animation: aa-idle-bob 4.5s ease-in-out infinite;
+  transition: transform 0.18s ease;
+}
+.ambient-assistant-mascot:hover { transform: translateY(-2px) scale(1.04); }
+.ambient-assistant-mascot:focus-visible { outline: 2px solid var(--color-accent, #6ea8fe); outline-offset: 4px; border-radius: 999px; }
+
+/* Speech bubble */
+.ambient-assistant-bubble {
+  pointer-events: auto;
+  position: relative;
+  max-width: 232px;
+  padding: 10px 12px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--aa-accent, #3f6f9f);
+  background: rgba(20, 24, 33, 0.94);
+  color: #e6ebf2;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(6px);
+  animation: aa-bubble-in 0.22s ease-out both;
+}
+.ambient-assistant-bubble::after {
+  content: '';
+  position: absolute;
+  right: 26px;
+  bottom: -7px;
+  width: 12px;
+  height: 12px;
+  background: rgba(20, 24, 33, 0.94);
+  border-right: 1px solid var(--aa-accent, #3f6f9f);
+  border-bottom: 1px solid var(--aa-accent, #3f6f9f);
+  transform: rotate(45deg);
+}
+.ambient-assistant-bubble-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  padding: 3px;
+  color: #93a0b3;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.ambient-assistant-bubble-close:hover { color: #e6ebf2; background: rgba(255, 255, 255, 0.06); }
+.ambient-assistant-bubble-name {
+  margin: 0 0 2px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--aa-accent, #6ea8fe);
+}
+.ambient-assistant-bubble-text { margin: 0; font-size: 12px; line-height: 1.45; }
+.ambient-assistant-bubble-actions { display: flex; gap: 8px; margin-top: 8px; }
+.ambient-assistant-bubble-btn {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--aa-accent, #6ea8fe);
+  background: transparent;
+  border: none;
+  padding: 2px 2px;
+  cursor: pointer;
+}
+.ambient-assistant-bubble-btn:hover { text-decoration: underline; }
+.ambient-assistant-bubble-btn-muted { color: #93a0b3; margin-left: auto; }
+
+@keyframes aa-idle-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+@keyframes aa-bubble-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Signature flourishes — each mascot animates one part while .is-waving.
+ * transform-box: fill-box keeps rotation/translate origins local to the SVG
+ * part rather than the SVG viewport. */
+.aa-mascot [class^="aa-part-"] { transform-box: fill-box; transform-origin: center; }
+
+/* Edgar — glasses glint sweeps across the lenses. */
+.aa-mascot.aa-edgar .aa-part-glint { opacity: 0; }
+.aa-mascot.aa-edgar.is-waving .aa-part-glint { animation: aa-edgar-glint 1.1s ease-in-out infinite; }
+.aa-mascot.aa-edgar.is-waving .aa-part-cowlick { animation: aa-edgar-cowlick 0.9s ease-in-out infinite; transform-origin: bottom left; }
+@keyframes aa-edgar-glint {
+  0% { opacity: 0; transform: translateX(0); }
+  30% { opacity: 0.9; }
+  70% { opacity: 0.9; transform: translateX(28px); }
+  100% { opacity: 0; transform: translateX(30px); }
+}
+@keyframes aa-edgar-cowlick {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-10deg); }
+}
+
+/* Gopher — pops up out of the burrow. */
+.aa-mascot.aa-gopher .aa-part-pop { transform: translateY(6px); }
+.aa-mascot.aa-gopher.is-waving .aa-part-pop { animation: aa-gopher-pop 1.5s ease-in-out infinite; }
+.aa-mascot.aa-gopher.is-waving .aa-part-flag { animation: aa-gopher-flag 0.8s ease-in-out infinite; transform-origin: bottom center; }
+@keyframes aa-gopher-pop {
+  0%, 100% { transform: translateY(9px); }
+  45% { transform: translateY(-4px); }
+}
+@keyframes aa-gopher-flag {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(8deg); }
+}
+
+/* Clip — springy wire arms wave. */
+.aa-mascot.aa-clip .aa-part-arms { transform-origin: bottom center; }
+.aa-mascot.aa-clip.is-waving .aa-part-arms { animation: aa-clip-wave 0.7s ease-in-out infinite; }
+.aa-mascot.aa-clip.is-waving .aa-part-eye { animation: aa-clip-eye 1.4s ease-in-out infinite; }
+@keyframes aa-clip-wave {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(6deg); }
+}
+@keyframes aa-clip-eye {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(1.4px, 0.6px); }
+}
+
+/* Wilson — a gentle spin-wobble on the tee. */
+.aa-mascot.aa-wilson .aa-part-ball { transform-origin: 50px 82px; }
+.aa-mascot.aa-wilson.is-waving .aa-part-ball { animation: aa-wilson-wobble 1.4s ease-in-out infinite; }
+@keyframes aa-wilson-wobble {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-assistant-mascot,
+  .aa-mascot.is-waving .aa-part-glint,
+  .aa-mascot.is-waving .aa-part-cowlick,
+  .aa-mascot.is-waving .aa-part-pop,
+  .aa-mascot.is-waving .aa-part-flag,
+  .aa-mascot.is-waving .aa-part-arms,
+  .aa-mascot.is-waving .aa-part-eye,
+  .aa-mascot.is-waving .aa-part-ball,
+  .ambient-assistant-bubble {
+    animation: none !important;
+  }
+  .aa-mascot.aa-edgar .aa-part-glint { opacity: 0; }
+  .aa-mascot.aa-gopher .aa-part-pop { transform: translateY(0); }
+}

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useEffect, useRef, useState, lazy, Suspense, memo, type ReactNode } from 'react';
 import type { CanvasEntityRef } from './components/Common/CanvasEntityBridge';
 import { AppLayout } from './components/Layout/AppLayout';
+import { AmbientAssistant } from './components/AmbientAssistant/AmbientAssistant';
 import { BottomTabBar } from './components/Layout/BottomTabBar';
 import { Header } from './components/Layout/Header';
 import { Sidebar } from './components/Layout/Sidebar';
@@ -3318,6 +3319,14 @@ const AppInner = memo(function AppInner({
         </Suspense>
         </ErrorBoundary>
       </AppLayout>
+
+      {/* Ambient AI assistant — experimental desk companion, off by default */}
+      <AmbientAssistant
+        enabled={settings.ambientAssistantEnabled}
+        character={settings.ambientAssistantCharacter}
+        tipsEnabled={settings.ambientAssistantTips}
+        onDisable={() => updateSettings({ ambientAssistantEnabled: false })}
+      />
 
       {/* Mobile sidebar overlay */}
       {mobileSidebarOpen && (

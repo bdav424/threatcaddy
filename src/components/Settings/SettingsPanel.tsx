@@ -40,6 +40,7 @@ import { LanSyncSettings } from './LanSyncSettings';
 import { MobileSyncSettings } from './MobileSyncSettings';
 import { getLocalLlmHealthUrl, normalizeLocalLlmEndpoint } from '../../lib/local-llm-endpoint';
 import { getInvestigationColorMode, setInvestigationColorMode, type InvestigationColorMode } from '../../lib/investigation-color-mode';
+import { MascotPicker } from '../AmbientAssistant/MascotPicker';
 
 function SystemPromptEditor({ value, onChange }: { value?: string; onChange: (v: string | undefined) => void }) {
   const { t } = useTranslation('settings');
@@ -1394,6 +1395,8 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
               <Bot size={16} />
               {t('ai.title')}
             </h3>
+
+            <MascotPicker settings={settings} onUpdateSettings={onUpdateSettings} />
 
             <AssistantCaddyAISetup
               settings={settings}

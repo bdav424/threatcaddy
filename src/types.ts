@@ -337,6 +337,13 @@ export type AppearanceTypographyTarget = 'interface' | 'headings' | 'body' | 'co
 export type SidebarAccentStyle = 'default' | 'color-chips';
 export type BackgroundEffectPattern = 'none' | 'dots' | 'synapse' | 'rain' | 'constellations' | 'perlin-flow' | 'petals' | 'sparkles' | 'embers' | 'swirls' | 'warp';
 
+/**
+ * Ambient AI assistant mascot (experimental, Clippy-style companion).
+ * 'off' is represented by the ambientAssistantEnabled flag being false, not a
+ * character value — so switching the mascot off never loses which one you picked.
+ */
+export type AmbientAssistantCharacter = 'edgar' | 'gopher' | 'clip' | 'wilson';
+
 /** Top-level view/page the user can navigate to. */
 export type ViewMode = 'dashboard' | 'workspace' | 'notes' | 'tasks' | 'evidence' | 'products' | 'experimental' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat' | 'caddyassistant' | 'cademail' | 'calendarcaddy' | 'reportcaddy' | 'agent' | 'investigations' | 'virtualcaddy' | 'netmap' | 'journal' | 'caddyshack';
 
@@ -551,6 +558,9 @@ export interface Settings {
   rgbSpeed?: number;      // traveling spectrum ring speed in seconds (1–6); overrides rgbBorderSpeed
   rgbRepeats?: number;    // how many full spectrums repeat around the ring (1–8; default 1)
   bgEffectTrail?: number;        // 0–100; canvas particle motion trail/fade length; default 0 (no trail)
+  ambientAssistantEnabled?: boolean;              // experimental Clippy-style desk companion; off by default
+  ambientAssistantCharacter?: AmbientAssistantCharacter; // which mascot is shown when enabled; default 'edgar'
+  ambientAssistantTips?: boolean;                 // whether the mascot surfaces rotating idle tips; default true
   frostedPanels?: boolean;
   /** Visual treatment for the frosted-panel highlight. Default 'streaks'. */
   glassStyle?: 'streaks' | 'blurry' | 'bumpy' | 'lined';
@@ -744,6 +754,9 @@ export const DEFAULT_SETTINGS: Settings = {
   bgParticleGlow: 45,
   panelTransparency: 75,
   bgEffectTrail: 0,
+  ambientAssistantEnabled: false,
+  ambientAssistantCharacter: 'edgar',
+  ambientAssistantTips: true,
   frostedPanels: false,
   glassStyle: 'streaks',
   llmRoutingMode: 'auto',
