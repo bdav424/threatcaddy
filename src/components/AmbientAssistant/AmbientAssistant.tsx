@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import type { AmbientAssistantCharacter } from '../../types';
-import { getMascot } from './mascots';
+import { getMascot, Mascot, type MascotConfig } from './mascots';
 
 /**
  * The floating ambient assistant — a Clippy-style desk companion.
@@ -17,14 +17,15 @@ import { getMascot } from './mascots';
 interface AmbientAssistantProps {
   enabled?: boolean;
   character?: AmbientAssistantCharacter;
+  config?: MascotConfig;
   tipsEnabled?: boolean;
   /** Called when the operator hides the companion from the bubble. */
   onDisable?: () => void;
 }
 
-export function AmbientAssistant({ enabled, character, tipsEnabled = true, onDisable }: AmbientAssistantProps) {
+export function AmbientAssistant({ enabled, character, config, tipsEnabled = true, onDisable }: AmbientAssistantProps) {
   const mascot = getMascot(character);
-  const { Component, name, tips, accent } = mascot;
+  const { name, tips, accent } = mascot;
 
   const [bubbleOpen, setBubbleOpen] = useState(false);
   const [tipIndex, setTipIndex] = useState(0);
@@ -94,7 +95,7 @@ export function AmbientAssistant({ enabled, character, tipsEnabled = true, onDis
         aria-label={`${name}, your ambient assistant. Click for a tip.`}
         title={name}
       >
-        <Component size={64} waving={waving} title={name} />
+        <Mascot character={character ?? 'edgar'} config={config} size={64} waving={waving} title={name} />
       </button>
     </div>
   );

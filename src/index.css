@@ -2592,9 +2592,9 @@ body.tc-desktop-shell-body {
 .aa-mascot.aa-edgar.is-waving .aa-part-cowlick { animation: aa-edgar-cowlick 0.9s ease-in-out infinite; transform-origin: bottom left; }
 @keyframes aa-edgar-glint {
   0% { opacity: 0; transform: translateX(0); }
-  30% { opacity: 0.9; }
-  70% { opacity: 0.9; transform: translateX(28px); }
-  100% { opacity: 0; transform: translateX(30px); }
+  30% { opacity: 0.85; }
+  70% { opacity: 0.85; transform: translateX(74px); }
+  100% { opacity: 0; transform: translateX(80px); }
 }
 @keyframes aa-edgar-cowlick {
   0%, 100% { transform: rotate(0deg); }
@@ -2628,7 +2628,7 @@ body.tc-desktop-shell-body {
 }
 
 /* Wilson — a gentle spin-wobble on the tee. */
-.aa-mascot.aa-wilson .aa-part-ball { transform-origin: 50px 82px; }
+.aa-mascot.aa-wilson .aa-part-ball { transform-origin: bottom center; }
 .aa-mascot.aa-wilson.is-waving .aa-part-ball { animation: aa-wilson-wobble 1.4s ease-in-out infinite; }
 @keyframes aa-wilson-wobble {
   0%, 100% { transform: rotate(-4deg); }

@@ -3324,6 +3324,7 @@ const AppInner = memo(function AppInner({
       <AmbientAssistant
         enabled={settings.ambientAssistantEnabled}
         character={settings.ambientAssistantCharacter}
+        config={settings.ambientAssistantCharacter ? settings.ambientAssistantCustomizations?.[settings.ambientAssistantCharacter] : undefined}
         tipsEnabled={settings.ambientAssistantTips}
         onDisable={() => updateSettings({ ambientAssistantEnabled: false })}
       />

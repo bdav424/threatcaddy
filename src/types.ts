@@ -561,6 +561,7 @@ export interface Settings {
   ambientAssistantEnabled?: boolean;              // experimental Clippy-style desk companion; off by default
   ambientAssistantCharacter?: AmbientAssistantCharacter; // which mascot is shown when enabled; default 'edgar'
   ambientAssistantTips?: boolean;                 // whether the mascot surfaces rotating idle tips; default true
+  ambientAssistantCustomizations?: Record<string, Record<string, string>>; // per-character slot->option choices (paper-doll customizer)
   frostedPanels?: boolean;
   /** Visual treatment for the frosted-panel highlight. Default 'streaks'. */
   glassStyle?: 'streaks' | 'blurry' | 'bumpy' | 'lined';
